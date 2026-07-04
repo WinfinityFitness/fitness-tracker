@@ -176,10 +176,11 @@ function renderRing(container, pct, opts) {
   const offset = c - (clamped / 100) * c;
   const center = opts.centerHtml || `<span style="font-size:${Math.round(size * 0.22)}px;font-weight:800;font-family:var(--font-mono);color:var(--text-primary);">${opts.centerText || ''}</span>`;
   container.innerHTML = `
+    ${opts.modTag ? `<p class="mod-tag">${opts.modTag}</p>` : ''}
     <div style="position:relative;width:${size}px;height:${size}px;">
       <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
         <circle class="ring-track" cx="${size / 2}" cy="${size / 2}" r="${r}" stroke-width="${stroke}"></circle>
-        <circle class="ring-fill${opts.violet ? ' violet' : ''}" cx="${size / 2}" cy="${size / 2}" r="${r}" stroke-width="${stroke}"
+        <circle class="ring-fill${opts.violet ? ' violet' : ''}${opts.magenta ? ' magenta' : ''}" cx="${size / 2}" cy="${size / 2}" r="${r}" stroke-width="${stroke}"
           stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}"
           transform="rotate(-90 ${size / 2} ${size / 2})"></circle>
       </svg>
@@ -216,6 +217,10 @@ function initTabs() {
         const p = getProfile();
         if (p) renderComputedTargets(p);
         renderSleepBarChart();
+      }
+      if (target === 'leaderboard' && sbConfigured()) {
+        pullLeaderboard().then(renderNexusRankings).catch(() => {});
+        fetchChatMessages().then(renderChatMessages).catch(() => {});
       }
     });
   });
@@ -289,6 +294,7 @@ function initSetupForm() {
     document.getElementById('bioMenstruatingField').hidden = profile.gender !== 'female';
     renderNutritionTargets();
     renderDashboard();
+    updateCodeNameHint();
   });
 }
 
@@ -516,14 +522,14 @@ function renderDashboard() {
 
   const habit = computeHabitCompletion(profile, todayEntry);
   renderRing(document.getElementById('ringHabitCard'), habit.pct, {
-    size: 128, centerText: habit.pct + '%', label: 'Habit completion', sub: `${habit.done}/${habit.total} today`,
+    size: 128, modTag: 'MOD_HABIT_01', centerText: habit.pct + '%', label: 'Habit completion', sub: `${habit.done}/${habit.total} today`,
   });
 
   const waterGoal = (profile && profile.waterGoal) || 8;
   const waterToday = (todayEntry && todayEntry.water != null) ? todayEntry.water : 0;
   const waterPct = waterGoal > 0 ? (waterToday / waterGoal) * 100 : 0;
   renderRing(document.getElementById('ringHydrationCard'), waterPct, {
-    size: 128, violet: true, centerText: Math.round(Math.min(100, waterPct)) + '%', label: 'Hydration', sub: `${waterToday} / ${waterGoal} cups`,
+    size: 128, magenta: true, modTag: 'MOD_FUEL_02', centerText: Math.round(Math.min(100, waterPct)) + '%', label: 'Hydration', sub: `${waterToday} / ${waterGoal} cups`,
   });
 
   document.getElementById('avgSteps').textContent = fmtOrDash(avgOfLastNDays(logsArr, 'steps', 7), v => round0(v));
@@ -1325,6 +1331,16 @@ async function exportCSV(logsArr, filenamePrefix) {
   alert('CSV downloaded: ' + filename + '\nOpen your email app, start a new message, and attach the file from Downloads.');
 }
 
+function downloadBackupJSON() {
+  const data = { profile: getProfile(), logs: getLogs(), reviews: getReviews() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `fitness-backup-${todayISO()}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
 function initExport() {
   document.getElementById('btnExportWeek').addEventListener('click', () => {
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 6); cutoff.setHours(0,0,0,0);
@@ -1335,15 +1351,7 @@ function initExport() {
     exportCSV(sortedLogsArray(), 'fitness-log-all');
   });
 
-  document.getElementById('btnBackup').addEventListener('click', () => {
-    const data = { profile: getProfile(), logs: getLogs(), reviews: getReviews() };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `fitness-backup-${todayISO()}.json`;
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
-  });
+  document.getElementById('btnBackup').addEventListener('click', downloadBackupJSON);
 
   document.getElementById('fileRestore').addEventListener('change', async e => {
     const file = e.target.files[0];
@@ -1471,6 +1479,262 @@ async function saveToDrive(manual) {
 }
 
 /* ---------------------------------------------------------------- */
+/* Leaderboard (anonymous opt-in, Supabase-backed)                      */
+/* ---------------------------------------------------------------- */
+let sb = null;
+function sbConfigured() {
+  const hasCreds = typeof SUPABASE_URL === 'string' && SUPABASE_URL && !SUPABASE_URL.startsWith('YOUR_') &&
+    typeof SUPABASE_ANON_KEY === 'string' && SUPABASE_ANON_KEY && !SUPABASE_ANON_KEY.startsWith('YOUR_');
+  if (!hasCreds) return false;
+  if (!sb && window.supabase) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  return !!sb;
+}
+
+const LB_ADJECTIVES = ['Swift', 'Neon', 'Silent', 'Blazing', 'Iron', 'Crimson', 'Frost', 'Turbo', 'Cosmic', 'Rapid'];
+const LB_NOUNS = ['Falcon', 'Tiger', 'Comet', 'Wolf', 'Phoenix', 'Panther', 'Rocket', 'Viper', 'Eagle', 'Storm'];
+
+function generateCodeName() {
+  const a = LB_ADJECTIVES[Math.floor(Math.random() * LB_ADJECTIVES.length)];
+  const n = LB_NOUNS[Math.floor(Math.random() * LB_NOUNS.length)];
+  const num = Math.floor(Math.random() * 90 + 10);
+  return `${a} ${n} ${num}`;
+}
+function generateShareKey() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+function computeLeaderboardStats() {
+  const profile = getProfile();
+  const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
+  const logsArr = sortedLogsArray();
+  const kgNow = currentWeightKg(profile);
+  const startKg = profile ? profile.startWeightKg : null;
+  const progressKg = (kgNow != null && startKg != null) ? (kgNow - startKg) : null;
+  const progressPct = (progressKg != null && startKg) ? round2((progressKg / startKg) * 100) : null;
+  const steps = avgOfLastNDays(logsArr, 'steps', 7);
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 6); cutoff.setHours(0,0,0,0);
+  const volumeKg = logsArr.filter(l => parseISO(l.date) >= cutoff).reduce((sum, l) =>
+    sum + (l.exercises || []).reduce((s, ex) =>
+      s + ex.sets.filter(st => st.completed && st.weightKg != null && st.reps != null).reduce((ss, st) => ss + st.weightKg * st.reps, 0), 0), 0);
+  return {
+    weight: kgNow != null ? round2(fromKg(kgNow, wu)) : null,
+    weightUnit: wu,
+    progress: progressKg != null ? round2(fromKg(progressKg, wu)) : null,
+    progressPct,
+    steps: steps != null ? round0(steps) : null,
+    volume: round0(fromKg(volumeKg, wu)),
+    volumeUnit: wu,
+  };
+}
+
+function effectiveLeaderboardName() {
+  const profile = getProfile();
+  const bioName = profile && profile.name && profile.name.trim();
+  if (bioName) return bioName;
+  if (!localStorage.getItem('wft_lb_fallback_name')) localStorage.setItem('wft_lb_fallback_name', generateCodeName());
+  return localStorage.getItem('wft_lb_fallback_name');
+}
+
+function updateCodeNameHint() {
+  const hint = document.getElementById('lbCodeNameHint');
+  const optedIn = localStorage.getItem('wft_lb_optin') === '1';
+  hint.textContent = optedIn ? `Sharing as "${effectiveLeaderboardName()}"` : 'Not sharing. Turn on to join the Nexus.';
+}
+
+async function pushLeaderboardEntry() {
+  const shareKey = localStorage.getItem('wft_lb_share_key');
+  const stats = computeLeaderboardStats();
+  const { error } = await sb.rpc('upsert_leaderboard_entry', {
+    p_share_key: shareKey,
+    p_code_name: effectiveLeaderboardName(),
+    p_weight: stats.weight,
+    p_weight_unit: stats.weightUnit,
+    p_weight_progress: stats.progress,
+    p_weight_progress_pct: stats.progressPct,
+    p_steps: stats.steps,
+    p_volume_lifted: stats.volume,
+    p_volume_unit: stats.volumeUnit,
+  });
+  if (error) throw error;
+}
+
+async function pullLeaderboard() {
+  const { data, error } = await sb.from('leaderboard')
+    .select('code_name, weight, weight_unit, weight_progress, weight_progress_pct, steps, volume_lifted, volume_unit, updated_at')
+    .order('updated_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+async function removeFromLeaderboard() {
+  const shareKey = localStorage.getItem('wft_lb_share_key');
+  if (!shareKey || !sbConfigured()) return;
+  try { await sb.rpc('delete_leaderboard_entry', { p_share_key: shareKey }); }
+  catch (e) { /* best effort */ }
+}
+
+function timeAgo(iso) {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.round(diffMs / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return mins + 'm ago';
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return hrs + 'h ago';
+  return Math.round(hrs / 24) + 'd ago';
+}
+
+function renderRankList(containerId, rows, opts) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  if (!rows.length) {
+    container.innerHTML = '<p class="empty-note">No data yet.</p>';
+    return;
+  }
+  rows.slice(0, 5).forEach((r, i) => {
+    const row = document.createElement('div');
+    row.className = 'rank-row' + (i === 0 ? ' is-top' : '');
+    row.innerHTML = `<span class="rank-num">${String(i + 1).padStart(2, '0')}</span>
+      <span class="rank-name">${escapeHtml(r.code_name)}</span>
+      <span class="rank-value">${opts.formatValue(r)}</span>`;
+    container.appendChild(row);
+  });
+}
+
+function renderNexusRankings(rows) {
+  document.getElementById('lbEmptyNote').hidden = rows.length > 0;
+
+  const bySteps = rows.filter(r => r.steps != null).sort((a, b) => b.steps - a.steps);
+  renderRankList('lbStepsRanking', bySteps, { formatValue: r => r.steps >= 1000 ? (r.steps / 1000).toFixed(1) + 'k' : String(r.steps) });
+
+  const byVolume = rows.filter(r => r.volume_lifted != null).sort((a, b) => b.volume_lifted - a.volume_lifted);
+  renderRankList('lbVolumeRanking', byVolume, { formatValue: r => round0(r.volume_lifted) + ' ' + (r.volume_unit || 'kg') });
+
+  const byProgress = rows.filter(r => r.weight_progress_pct != null).sort((a, b) => a.weight_progress_pct - b.weight_progress_pct);
+  renderRankList('lbBioRanking', byProgress, { formatValue: r => (r.weight_progress_pct > 0 ? '+' : '') + r.weight_progress_pct + '%' });
+
+  const avgPct = byProgress.length ? byProgress.reduce((s, r) => s + r.weight_progress_pct, 0) / byProgress.length : null;
+  renderRing(document.getElementById('lbBioRing'), avgPct != null ? Math.min(100, Math.abs(avgPct) * 5) : 0, {
+    size: 96, stroke: 8, centerText: avgPct != null ? round2(avgPct) + '%' : '–', sub: '',
+  });
+}
+
+async function fetchChatMessages() {
+  const { data, error } = await sb.from('chat_messages')
+    .select('code_name, message, created_at')
+    .order('created_at', { ascending: false })
+    .limit(50);
+  if (error) throw error;
+  return (data || []).slice().reverse();
+}
+
+async function postChatMessage(text) {
+  const trimmed = text.trim().slice(0, 280);
+  if (!trimmed) return;
+  const { error } = await sb.from('chat_messages').insert({
+    code_name: effectiveLeaderboardName(),
+    message: trimmed,
+  });
+  if (error) throw error;
+}
+
+function renderChatMessages(messages) {
+  const list = document.getElementById('lbChatList');
+  list.innerHTML = '';
+  if (!messages.length) {
+    list.innerHTML = '<p class="empty-note">No messages yet. Say hi!</p>';
+    return;
+  }
+  messages.forEach(m => {
+    const row = document.createElement('div');
+    row.className = 'chat-row';
+    const time = new Date(m.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    row.innerHTML = `<span class="chat-time">[${time}]</span> <span class="chat-name">${escapeHtml(m.code_name)}:</span> <span class="chat-msg">${escapeHtml(m.message)}</span>`;
+    list.appendChild(row);
+  });
+  list.scrollTop = list.scrollHeight;
+}
+
+async function updateLeaderboard() {
+  const note = document.getElementById('lbSaveNote');
+  note.textContent = 'Syncing…';
+  try {
+    if (localStorage.getItem('wft_lb_optin') === '1') await pushLeaderboardEntry();
+    const rows = await pullLeaderboard();
+    renderNexusRankings(rows);
+    const messages = await fetchChatMessages();
+    renderChatMessages(messages);
+    note.textContent = 'Synced ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    note.textContent = 'Sync failed: ' + (e.message || 'check your connection');
+  }
+}
+
+function initLeaderboard() {
+  const optInEl = document.getElementById('lbOptIn');
+  optInEl.checked = localStorage.getItem('wft_lb_optin') === '1';
+  updateCodeNameHint();
+
+  optInEl.addEventListener('change', () => {
+    if (optInEl.checked) {
+      if (!localStorage.getItem('wft_lb_share_key')) localStorage.setItem('wft_lb_share_key', generateShareKey());
+      localStorage.setItem('wft_lb_optin', '1');
+    } else {
+      localStorage.setItem('wft_lb_optin', '0');
+      removeFromLeaderboard();
+    }
+    updateCodeNameHint();
+  });
+
+  document.getElementById('btnLbUpdate').addEventListener('click', updateLeaderboard);
+
+  document.getElementById('btnLbChatSend').addEventListener('click', async () => {
+    const input = document.getElementById('lbChatInput');
+    if (!input.value.trim() || !sbConfigured()) return;
+    try {
+      await postChatMessage(input.value);
+      input.value = '';
+      const messages = await fetchChatMessages();
+      renderChatMessages(messages);
+    } catch (e) { /* best effort */ }
+  });
+  document.getElementById('lbChatInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('btnLbChatSend').click();
+  });
+
+  if (!sbConfigured()) {
+    document.getElementById('lbSaveNote').textContent = 'Nexus not set up yet.';
+    optInEl.disabled = true;
+    document.getElementById('btnLbUpdate').disabled = true;
+    document.getElementById('btnLbChatSend').disabled = true;
+  }
+}
+
+/* ---------------------------------------------------------------- */
+/* Beta lock                                                            */
+/* ---------------------------------------------------------------- */
+const BETA_DURATION_DAYS = 30;
+
+function initBetaLock() {
+  const KEY_FIRST_USED = 'wft_first_used';
+  let firstUsed = localStorage.getItem(KEY_FIRST_USED);
+  if (!firstUsed) {
+    firstUsed = new Date().toISOString();
+    localStorage.setItem(KEY_FIRST_USED, firstUsed);
+  }
+  const daysUsed = (Date.now() - new Date(firstUsed).getTime()) / 86400000;
+  if (daysUsed < BETA_DURATION_DAYS) return;
+
+  document.getElementById('lockOverlay').hidden = false;
+  document.getElementById('btnLockExportCSV').addEventListener('click', () => exportCSV(sortedLogsArray(), 'fitness-log-all'));
+  document.getElementById('btnLockExportBackup').addEventListener('click', downloadBackupJSON);
+}
+
+/* ---------------------------------------------------------------- */
 /* Init                                                                 */
 /* ---------------------------------------------------------------- */
 document.getElementById('headerToday').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
@@ -1485,13 +1749,16 @@ initBioLog();
 initReviewForm();
 initExport();
 initDrive();
+initLeaderboard();
 loadSetupForm();
 loadCheckinForm();
 renderDashboard();
+initBetaLock();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   });
 }
+
 

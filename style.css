@@ -43,7 +43,7 @@ html, body {
 }
 
 body {
-  padding-bottom: 80px;
+  padding-bottom: 100px;
   min-height: 100vh;
   background-image:
     radial-gradient(ellipse 600px 300px at 20% 0%, rgba(45,226,230,0.07), transparent 60%),
@@ -168,6 +168,7 @@ body {
 .ring-track { stroke: var(--gridline); fill: none; }
 .ring-fill { stroke: var(--cyan); fill: none; stroke-linecap: round; filter: drop-shadow(0 0 5px var(--cyan-glow)); transition: stroke-dashoffset 0.6s ease; }
 .ring-fill.violet { stroke: var(--violet); filter: drop-shadow(0 0 5px rgba(139,107,242,0.55)); }
+.ring-fill.magenta { stroke: var(--magenta); filter: drop-shadow(0 0 5px rgba(225,88,196,0.55)); }
 .ring-value {
   font-size: 1.5rem;
   font-weight: 800;
@@ -394,6 +395,16 @@ body {
   font-family: var(--font-mono);
   color: var(--cyan);
 }
+.slider-endpoints {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: -4px;
+}
 .field--checkbox {
   flex-direction: row;
   align-items: center;
@@ -594,25 +605,36 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 /* ---------------- Nav bar ---------------- */
 .tab-bar {
   position: fixed;
-  bottom: 0; left: 0; right: 0;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  left: 12px; right: 12px;
+  max-width: 616px;
+  margin: 0 auto;
   display: flex;
-  background: rgba(6,10,13,0.92);
-  backdrop-filter: blur(10px);
-  border-top: 1px solid var(--border);
-  padding-bottom: env(safe-area-inset-bottom);
+  background: rgba(10,15,18,0.88);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--border);
+  border-radius: 26px;
+  padding: 6px 4px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.02);
   z-index: 20;
 }
 .tab-btn {
   flex: 1;
   background: none;
   border: none;
-  padding: 9px 2px 10px;
+  border-radius: 20px;
+  padding: 9px 2px 7px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  font-size: 1.05rem;
   color: var(--text-muted);
+}
+.tab-btn svg {
+  width: 22px;
+  height: 22px;
+  stroke: currentColor;
+  fill: none;
 }
 .tab-btn span {
   font-family: var(--font-mono);
@@ -621,7 +643,106 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.tab-btn.is-active { color: var(--cyan); text-shadow: 0 0 10px var(--cyan-glow); }
+.tab-btn.is-active { color: var(--cyan); }
+.tab-btn.is-active svg { filter: drop-shadow(0 0 5px var(--cyan-glow)); }
+.tab-btn.is-active span { text-shadow: 0 0 10px var(--cyan-glow); }
+
+/* ---------------- Beta lock ---------------- */
+.lock-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(2,4,5,0.9);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.lock-overlay[hidden] { display: none; }
+.lock-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  padding: 32px 24px;
+  max-width: 340px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 0 50px rgba(45,226,230,0.18);
+}
+.lock-icon {
+  font-size: 2.6rem;
+  margin-bottom: 12px;
+  filter: drop-shadow(0 0 12px var(--cyan-glow));
+}
+.lock-card h2 {
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cyan);
+  margin: 0 0 10px;
+}
+.lock-card p {
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  margin: 0 0 20px;
+}
+.lock-card .btn-row .btn { min-width: 0; }
+
+/* ---------------- Terminal module tags ---------------- */
+.mod-tag {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin: 0 0 4px;
+}
+
+/* ---------------- Rank list (Nexus) ---------------- */
+.rank-list { display: flex; flex-direction: column; gap: 6px; }
+.rank-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border-left: 2px solid transparent;
+}
+.rank-row.is-top { border-left-color: var(--cyan); background: rgba(45,226,230,0.08); }
+.rank-num { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); width: 20px; }
+.rank-name { flex: 1; font-weight: 700; font-size: 0.85rem; letter-spacing: 0.02em; }
+.rank-value { font-family: var(--font-mono); font-weight: 700; color: var(--cyan); font-size: 0.85rem; }
+
+/* ---------------- Public chat (Nexus) ---------------- */
+.chat-list {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 2px;
+  margin-bottom: 10px;
+}
+.chat-row { font-size: 0.8rem; line-height: 1.4; color: var(--text-secondary); }
+.chat-time { font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-muted); }
+.chat-name { color: var(--cyan); font-weight: 700; }
+.chat-msg { color: var(--text-primary); }
+.chat-input-row { display: flex; gap: 8px; }
+.chat-input-row input {
+  flex: 1;
+  font-size: 0.9rem;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-soft);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-family: inherit;
+}
+.chat-input-row .btn { width: 48px; padding: 10px; }
 
 /* ---------------- Modal (More panel) ---------------- */
 .sheet-overlay {

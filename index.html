@@ -231,24 +231,28 @@
         <span>Menstruating today</span>
       </label>
       <label class="field">
-        <span>Sleep quality (1 = couldn't sleep, 5 = well rested)</span>
+        <span>Sleep quality</span>
         <input type="range" id="bioSleep" min="1" max="5" step="1" value="3">
         <output id="bioSleepOut">3</output>
+        <div class="slider-endpoints"><span>Restless</span><span>Optimal</span></div>
       </label>
       <label class="field">
-        <span>Stress (1 = least, 5 = most)</span>
+        <span>Stress</span>
         <input type="range" id="bioStress" min="1" max="5" step="1" value="3">
         <output id="bioStressOut">3</output>
+        <div class="slider-endpoints"><span>Zen</span><span>Critical</span></div>
       </label>
       <label class="field">
-        <span>Fatigue (1 = least, 5 = most)</span>
+        <span>Fatigue</span>
         <input type="range" id="bioFatigue" min="1" max="5" step="1" value="3">
         <output id="bioFatigueOut">3</output>
+        <div class="slider-endpoints"><span>Energized</span><span>Exhausted</span></div>
       </label>
       <label class="field">
-        <span>Hunger (1 = not hungry, 5 = intense)</span>
+        <span>Hunger</span>
         <input type="range" id="bioHunger" min="1" max="5" step="1" value="3">
         <output id="bioHungerOut">3</output>
+        <div class="slider-endpoints"><span>Satiated</span><span>Famine</span></div>
       </label>
     </fieldset>
 
@@ -401,14 +405,79 @@
     </form>
   </section>
 
+  <!-- ============ GLOBAL NEXUS ============ -->
+  <section class="tab-panel" id="tab-leaderboard" data-tab="leaderboard" hidden>
+    <div class="hero-card">
+      <p class="hero-eyebrow">System status: active</p>
+      <h2 class="hero-title">Global Nexus</h2>
+      <label class="field field--checkbox" style="margin-top:12px;">
+        <input type="checkbox" id="lbOptIn">
+        <span>Share my progress</span>
+      </label>
+      <p class="hint" id="lbCodeNameHint">Not sharing.</p>
+      <p class="hint">Uses the name from your Bio tab, visible to everyone on the Nexus. Set a name in Bio before sharing.</p>
+    </div>
+
+    <button type="button" class="btn btn--primary" id="btnLbUpdate">Sync to Nexus</button>
+    <p class="save-note" id="lbSaveNote"></p>
+    <p class="empty-note" id="lbEmptyNote" hidden>No Nexus data yet. Tap Sync to share and see others.</p>
+
+    <div class="chart-card">
+      <p class="mod-tag">MOD_CHRONOS_01</p>
+      <div class="chart-card-head"><span class="chart-card-title">Steps Ranking</span></div>
+      <div class="rank-list" id="lbStepsRanking"></div>
+    </div>
+
+    <div class="chart-card">
+      <p class="mod-tag">MOD_FORCE_02</p>
+      <div class="chart-card-head"><span class="chart-card-title">Training Volume</span></div>
+      <div class="rank-list" id="lbVolumeRanking"></div>
+    </div>
+
+    <div class="chart-card">
+      <p class="mod-tag">MOD_BIO_03</p>
+      <div class="chart-card-head"><span class="chart-card-title">Bio-Adaptation</span></div>
+      <div class="ring-card" id="lbBioRing" style="border:none;padding:8px 0;"></div>
+      <div class="rank-list" id="lbBioRanking"></div>
+    </div>
+
+    <div class="chart-card">
+      <p class="mod-tag">Public channel // uplink stable</p>
+      <div id="lbChatList" class="chat-list"></div>
+      <div class="chat-input-row">
+        <input type="text" id="lbChatInput" maxlength="280" placeholder="Transmit message…">
+        <button type="button" class="btn btn--primary btn--sm" id="btnLbChatSend">➤</button>
+      </div>
+    </div>
+  </section>
+
 </main>
 
 <nav class="tab-bar">
-  <button class="tab-btn is-active" data-target="status">📡<span>Status</span></button>
-  <button class="tab-btn" data-target="training">🏋️<span>Training</span></button>
-  <button class="tab-btn" data-target="nutrition">🍽️<span>Nutrition</span></button>
-  <button class="tab-btn" data-target="bio">🧬<span>Bio</span></button>
-  <button class="tab-btn" id="btnOpenMore">⚙️<span>More</span></button>
+  <button class="tab-btn is-active" data-target="status">
+    <svg viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="10" rx="1.5"/><rect x="14" y="3" width="7" height="6" rx="1.5"/><rect x="14" y="13" width="7" height="8" rx="1.5"/><rect x="3" y="17" width="7" height="4" rx="1.5"/></svg>
+    <span>Status</span>
+  </button>
+  <button class="tab-btn" data-target="training">
+    <svg viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><g transform="rotate(45 12 12)"><line x1="6.5" y1="12" x2="17.5" y2="12"/><rect x="3.5" y="9" width="3" height="6" rx="1"/><rect x="17.5" y="9" width="3" height="6" rx="1"/><rect x="1.5" y="10.3" width="2" height="3.4" rx="0.6"/><rect x="20.5" y="10.3" width="2" height="3.4" rx="0.6"/></g></svg>
+    <span>Training</span>
+  </button>
+  <button class="tab-btn" data-target="nutrition">
+    <svg viewBox="0 0 24 24" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2v6a1.5 1.5 0 0 0 3 0V2M8.5 8v13"/><path d="M16 2c-1.7 0-3 1.8-3 4.5S14.3 11 16 11v11"/></svg>
+    <span>Fuel</span>
+  </button>
+  <button class="tab-btn" data-target="bio">
+    <svg viewBox="0 0 24 24" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3c0 5 10 5 10 10s-10 5-10 10"/><path d="M17 3c0 5-10 5-10 10s10 5 10 10"/><path d="M8 7h8M7.5 12h9M8 17h8"/></svg>
+    <span>DNA</span>
+  </button>
+  <button class="tab-btn" data-target="leaderboard">
+    <svg viewBox="0 0 24 24" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.3"/><circle cx="12" cy="4" r="1.8"/><circle cx="12" cy="20" r="1.8"/><circle cx="4" cy="12" r="1.8"/><circle cx="20" cy="12" r="1.8"/><path d="M12 6.3v3.4M12 14.3v3.4M9.7 12H6.3M14.3 12h3.4"/></svg>
+    <span>Nexus</span>
+  </button>
+  <button class="tab-btn" id="btnOpenMore">
+    <svg viewBox="0 0 24 24" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.8"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6c.5-.13.9-.6 1-1.11V3a2 2 0 0 1 4 0v.09c.1.51.5.98 1 1.11.5.13 1.32.17 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06c-.4.79-.46 1.32-.33 1.82.13.5.6.9 1.11 1H21a2 2 0 0 1 0 4h-.09c-.51.1-.98.5-1.11 1z"/></svg>
+    <span>More</span>
+  </button>
 </nav>
 
 <!-- ============ MORE SHEET ============ -->
@@ -518,8 +587,22 @@
   </div>
 </div>
 
+<!-- ============ BETA LOCK ============ -->
+<div class="lock-overlay" id="lockOverlay" hidden>
+  <div class="lock-card">
+    <div class="lock-icon">🔒</div>
+    <h2>Beta Testing Has Ended</h2>
+    <p>Thanks for helping test Winfinity Tracker! This beta period has ended — please wait for the full version.</p>
+    <div class="btn-row">
+      <button class="btn btn--primary" id="btnLockExportCSV">Export data (CSV)</button>
+      <button class="btn" id="btnLockExportBackup">Save backup (JSON)</button>
+    </div>
+  </div>
+</div>
+
 <script src="config.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="app.js"></script>
 </body>
 </html>
