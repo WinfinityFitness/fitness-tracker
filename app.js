@@ -232,9 +232,23 @@ function initTabs() {
       if (target === 'leaderboard' && sbConfigured()) {
         pullLeaderboard().then(renderNexusRankings).catch(() => {});
         fetchChatMessages().then(renderChatMessages).catch(() => {});
+        startNexusPolling();
+      } else {
+        stopNexusPolling();
       }
     });
   });
+}
+
+let nexusPollId = null;
+function startNexusPolling() {
+  stopNexusPolling();
+  nexusPollId = setInterval(() => {
+    fetchChatMessages().then(renderChatMessages).catch(() => {});
+  }, 5000);
+}
+function stopNexusPolling() {
+  if (nexusPollId) { clearInterval(nexusPollId); nexusPollId = null; }
 }
 
 function initSheet() {
@@ -1002,6 +1016,7 @@ function initTraining() {
   loadTrainingForDate(todayISO());
   renderTrainingStats();
   initTimer();
+  initSessionTemplates();
 }
 
 function renderTrainingStats() {
@@ -1012,6 +1027,134 @@ function renderTrainingStats() {
   const sets = recent.reduce((sum, l) => sum + (l.exercises || []).reduce((s, ex) => s + ex.sets.filter(st => st.completed).length, 0), 0);
   document.getElementById('statWorkoutsWeek').textContent = workouts;
   document.getElementById('statSetsWeek').textContent = sets;
+  renderPRBoard();
+}
+
+/* ---- Session templates ---- */
+function getSessionTemplates() {
+  try { return JSON.parse(localStorage.getItem('wft_session_templates')) || []; }
+  catch { return []; }
+}
+function saveSessionTemplates(list) { localStorage.setItem('wft_session_templates', JSON.stringify(list)); }
+
+function renderSessionTemplateOptions() {
+  const sel = document.getElementById('sessionTemplateSelect');
+  const templates = getSessionTemplates();
+  const current = sel.value;
+  sel.innerHTML = '<option value="">— Select —</option>' +
+    templates.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+  if (templates.some(t => t.id === current)) sel.value = current;
+}
+
+function initSessionTemplates() {
+  renderSessionTemplateOptions();
+
+  document.getElementById('btnSaveTemplate').addEventListener('click', () => {
+    const nameInput = document.getElementById('sessionTemplateName');
+    const name = nameInput.value.trim();
+    const note = document.getElementById('sessionTemplateNote');
+    if (!name) { alert('Enter a name for this session.'); return; }
+    if (!currentExercises.length) { alert('Add at least one exercise before saving a session.'); return; }
+    const templates = getSessionTemplates();
+    const templateExercises = currentExercises.map(ex => ({
+      name: ex.name,
+      restSeconds: ex.restSeconds,
+      sets: ex.sets.map(s => ({ reps: s.reps, weightKg: s.weightKg })),
+    }));
+    templates.push({ id: generateShareKey(), name, exercises: templateExercises });
+    saveSessionTemplates(templates);
+    renderSessionTemplateOptions();
+    nameInput.value = '';
+    note.textContent = `Saved "${name}".`;
+    setTimeout(() => { note.textContent = ''; }, 2500);
+  });
+
+  document.getElementById('btnLoadTemplate').addEventListener('click', () => {
+    const id = document.getElementById('sessionTemplateSelect').value;
+    if (!id) { alert('Select a session to load.'); return; }
+    const template = getSessionTemplates().find(t => t.id === id);
+    if (!template) return;
+    if (currentExercises.length && !confirm('This replaces the exercises currently logged for this date. Continue?')) return;
+    currentExercises = template.exercises.map(ex => ({
+      name: ex.name,
+      restSeconds: ex.restSeconds || 180,
+      notes: '',
+      sets: ex.sets.map(s => ({ reps: s.reps, weightKg: s.weightKg, completed: false })),
+    }));
+    persistExercises();
+    renderExerciseCards();
+    renderTrainingStats();
+    const note = document.getElementById('sessionTemplateNote');
+    note.textContent = `Loaded "${template.name}".`;
+    setTimeout(() => { note.textContent = ''; }, 2500);
+  });
+
+  document.getElementById('btnDeleteTemplate').addEventListener('click', () => {
+    const id = document.getElementById('sessionTemplateSelect').value;
+    if (!id) { alert('Select a session to delete.'); return; }
+    const templates = getSessionTemplates();
+    const template = templates.find(t => t.id === id);
+    if (!template || !confirm(`Delete session "${template.name}"?`)) return;
+    saveSessionTemplates(templates.filter(t => t.id !== id));
+    renderSessionTemplateOptions();
+  });
+}
+
+/* ---- Personal records board ---- */
+function computePRBoard() {
+  const logs = getLogs();
+  const profile = getProfile();
+  const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
+  const byExercise = {};
+  Object.keys(logs).sort().forEach(date => {
+    (logs[date].exercises || []).forEach(ex => {
+      const key = ex.name.trim().toLowerCase();
+      if (!byExercise[key]) byExercise[key] = { name: ex.name.trim(), entries: [] };
+      (ex.sets || []).forEach(s => {
+        if (!s.completed || s.weightKg == null || s.reps == null) return;
+        byExercise[key].entries.push({ date, weightKg: s.weightKg, reps: s.reps, oneRM: estOneRM(s.weightKg, s.reps) });
+      });
+    });
+  });
+  const rows = Object.values(byExercise).map(ex => {
+    if (!ex.entries.length) return null;
+    let best = null, prevBest = null;
+    ex.entries.forEach(e => {
+      if (!best || e.oneRM > best.oneRM + 0.01) { prevBest = best; best = e; }
+    });
+    return { name: ex.name, current: best, previous: prevBest, wu };
+  }).filter(Boolean);
+  rows.sort((a, b) => a.name.localeCompare(b.name));
+  return rows;
+}
+
+function renderPRBoard() {
+  const rows = computePRBoard();
+  const board = document.getElementById('prBoard');
+  const empty = document.getElementById('prBoardEmpty');
+  board.innerHTML = '';
+  if (!rows.length) { empty.hidden = false; return; }
+  empty.hidden = true;
+  rows.forEach(r => {
+    const wu = r.wu;
+    const curText = `${round2(fromKg(r.current.weightKg, wu))}${wu} × ${r.current.reps}`;
+    const prevText = r.previous ? `${round2(fromKg(r.previous.weightKg, wu))}${wu} × ${r.previous.reps}` : '–';
+    const deltaPct = r.previous ? round2(((r.current.oneRM - r.previous.oneRM) / r.previous.oneRM) * 100) : null;
+    const row = document.createElement('div');
+    row.className = 'pr-board-row';
+    row.innerHTML = `
+      <div class="pr-board-name">${escapeHtml(r.name)}</div>
+      <div class="pr-board-compare">
+        <div class="pr-board-col"><span class="pr-board-label">Previous</span><span class="pr-board-value">${prevText}</span></div>
+        <div class="pr-board-arrow">→</div>
+        <div class="pr-board-col"><span class="pr-board-label">Current</span><span class="pr-board-value pr-board-value--current">${curText}</span></div>
+      </div>
+      ${deltaPct != null
+        ? `<div class="pr-board-delta ${deltaPct >= 0 ? 'is-up' : 'is-down'}">${deltaPct >= 0 ? '+' : ''}${deltaPct}% est. 1RM</div>`
+        : `<div class="pr-board-delta is-up">New PR!</div>`}
+    `;
+    board.appendChild(row);
+  });
 }
 
 /* ---- Finish workout summary + PR detection ---- */
@@ -1060,12 +1203,59 @@ function renderWorkoutSummary(summary) {
 }
 
 /* ---- Rest timer ---- */
-const timerState = { remaining: 180, duration: 180, running: false, intervalId: null };
+const timerState = { remaining: 180, duration: 180, running: false, endAt: null };
+let timerTickId = null;
 
 function formatTime(sec) {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
   return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function saveTimerState() {
+  localStorage.setItem('wft_timer_state', JSON.stringify({
+    duration: timerState.duration, running: timerState.running, endAt: timerState.endAt, remaining: timerState.remaining,
+  }));
+}
+
+function loadTimerState() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem('wft_timer_state')); } catch (e) { /* ignore */ }
+  if (!saved) return;
+  timerState.duration = saved.duration || 180;
+  if (saved.running && saved.endAt) {
+    const remaining = Math.round((saved.endAt - Date.now()) / 1000);
+    if (remaining > 0) {
+      timerState.running = true;
+      timerState.endAt = saved.endAt;
+      timerState.remaining = remaining;
+    } else {
+      timerState.running = false;
+      timerState.endAt = null;
+      timerState.remaining = 0;
+    }
+  } else {
+    timerState.running = false;
+    timerState.endAt = null;
+    timerState.remaining = saved.remaining != null ? saved.remaining : timerState.duration;
+  }
+}
+
+function ensureTicking() {
+  if (timerTickId) return;
+  timerTickId = setInterval(() => {
+    if (timerState.running) {
+      timerState.remaining = Math.max(0, Math.round((timerState.endAt - Date.now()) / 1000));
+      if (timerState.remaining <= 0) {
+        timerState.running = false;
+        timerState.endAt = null;
+        document.getElementById('btnTimerStart').textContent = 'Start';
+        saveTimerState();
+        onTimerComplete();
+      }
+    }
+    renderTimerRing();
+  }, 1000);
 }
 
 function renderTimerRing() {
@@ -1079,12 +1269,21 @@ function initTimer() {
   const durationInput = document.getElementById('timerDuration');
   const label = document.getElementById('timerDurationLabel');
 
+  loadTimerState();
+  const restoredMins = Math.max(1, Math.min(15, Math.round(timerState.duration / 60)));
+  durationInput.value = restoredMins;
+  label.textContent = `${restoredMins}:00 min`;
+  document.getElementById('btnTimerStart').textContent = timerState.running
+    ? 'Pause'
+    : (timerState.remaining > 0 && timerState.remaining < timerState.duration ? 'Resume' : 'Start');
+
   durationInput.addEventListener('input', () => {
     const mins = parseInt(durationInput.value, 10);
     label.textContent = `${mins}:00 min`;
     if (!timerState.running) {
       timerState.duration = mins * 60;
       timerState.remaining = mins * 60;
+      saveTimerState();
       renderTimerRing();
     }
   });
@@ -1092,44 +1291,34 @@ function initTimer() {
   document.getElementById('btnTimerStart').addEventListener('click', toggleTimer);
   document.getElementById('btnTimerReset').addEventListener('click', resetTimer);
 
-  const initMins = parseInt(durationInput.value, 10);
-  timerState.duration = initMins * 60;
-  timerState.remaining = initMins * 60;
+  if (timerState.running) ensureTicking();
   renderTimerRing();
 }
 
 function toggleTimer() {
   const btn = document.getElementById('btnTimerStart');
   if (timerState.running) {
-    clearInterval(timerState.intervalId);
+    timerState.remaining = Math.max(0, Math.round((timerState.endAt - Date.now()) / 1000));
     timerState.running = false;
+    timerState.endAt = null;
     btn.textContent = 'Resume';
   } else {
-    if (timerState.remaining <= 0) {
-      timerState.remaining = timerState.duration;
-    }
+    if (timerState.remaining <= 0) timerState.remaining = timerState.duration;
     timerState.running = true;
+    timerState.endAt = Date.now() + timerState.remaining * 1000;
     btn.textContent = 'Pause';
-    timerState.intervalId = setInterval(() => {
-      timerState.remaining -= 1;
-      if (timerState.remaining <= 0) {
-        timerState.remaining = 0;
-        clearInterval(timerState.intervalId);
-        timerState.running = false;
-        btn.textContent = 'Start';
-        onTimerComplete();
-      }
-      renderTimerRing();
-    }, 1000);
+    ensureTicking();
   }
+  saveTimerState();
   renderTimerRing();
 }
 
 function resetTimer() {
-  clearInterval(timerState.intervalId);
   timerState.running = false;
+  timerState.endAt = null;
   timerState.remaining = timerState.duration;
   document.getElementById('btnTimerStart').textContent = 'Start';
+  saveTimerState();
   renderTimerRing();
 }
 
@@ -1139,25 +1328,16 @@ function onTimerComplete() {
 }
 
 function autoStartRestTimer(seconds) {
-  clearInterval(timerState.intervalId);
   timerState.duration = seconds;
   timerState.remaining = seconds;
+  timerState.running = true;
+  timerState.endAt = Date.now() + seconds * 1000;
   const mins = Math.max(1, Math.min(15, Math.round(seconds / 60)));
   document.getElementById('timerDuration').value = mins;
   document.getElementById('timerDurationLabel').textContent = `${mins}:00 min`;
-  timerState.running = true;
   document.getElementById('btnTimerStart').textContent = 'Pause';
-  timerState.intervalId = setInterval(() => {
-    timerState.remaining -= 1;
-    if (timerState.remaining <= 0) {
-      timerState.remaining = 0;
-      clearInterval(timerState.intervalId);
-      timerState.running = false;
-      document.getElementById('btnTimerStart').textContent = 'Start';
-      onTimerComplete();
-    }
-    renderTimerRing();
-  }, 1000);
+  ensureTicking();
+  saveTimerState();
   renderTimerRing();
 }
 
@@ -1810,6 +1990,24 @@ function initBetaLock() {
 }
 
 /* ---------------------------------------------------------------- */
+/* Theme toggle                                                         */
+/* ---------------------------------------------------------------- */
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  document.getElementById('themeIcon').textContent = theme === 'light' ? '☀️' : '🌙';
+  document.getElementById('themeToggle').checked = theme === 'light';
+  localStorage.setItem('wft_theme', theme);
+}
+
+function initThemeToggle() {
+  applyTheme(localStorage.getItem('wft_theme') || 'dark');
+  document.getElementById('themeToggle').addEventListener('change', e => {
+    applyTheme(e.target.checked ? 'light' : 'dark');
+  });
+}
+initThemeToggle();
+
+/* ---------------------------------------------------------------- */
 /* Init                                                                 */
 /* ---------------------------------------------------------------- */
 document.getElementById('headerToday').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
@@ -1837,6 +2035,14 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   });
+}
+
+
+
+if (location.hash.startsWith('#tab=')) {
+  const t = location.hash.slice(5);
+  const btn = document.querySelector(`.tab-btn[data-target="${t}"]`);
+  if (btn) btn.click();
 }
 
 

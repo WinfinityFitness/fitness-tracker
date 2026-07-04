@@ -27,9 +27,49 @@
   --serious: #ff8a4c;
   --critical: #ff4d6a;
 
+  --surface-translucent: rgba(6,10,13,0.88);
+  --nav-translucent: rgba(10,15,18,0.88);
+
   --card-radius: 18px;
   --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Roboto Mono", monospace;
   --font-display: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* "Bright Core" light theme — same variable names, so every component
+   already built against these tokens repaints automatically. Font stack
+   is kept as system sans/mono (not Sora/JetBrains Mono webfonts) so the
+   app has zero external font requests and keeps working fully offline. */
+:root[data-theme="light"] {
+  --bg: #f7f9fb;
+  --bg-elevated: #ffffff;
+  --surface-1: #ffffff;
+  --surface-2: #f2f4f6;
+  --border: rgba(6, 182, 212, 0.22);
+  --border-soft: #e2e8f0;
+  --text-primary: #191c1e;
+  --text-secondary: #3d494c;
+  --text-muted: #6d797d;
+  --gridline: rgba(25, 28, 30, 0.08);
+  --baseline: #bcc9cd;
+
+  --cyan: #06b6d4;
+  --cyan-dim: #00687a;
+  --cyan-glow: rgba(6, 182, 212, 0.30);
+  --violet: #6b38d4;
+  --magenta: #bc0b3b;
+
+  --series-1: #06b6d4;
+  --series-2: #6b38d4;
+  --gradient-bar: linear-gradient(90deg, var(--violet) 0%, #3f8ff0 55%, var(--cyan) 100%);
+  --gradient-glow: rgba(63, 143, 240, 0.28);
+
+  --good: #0a8754;
+  --warning: #b45309;
+  --serious: #c2410c;
+  --critical: #ba1a1a;
+
+  --surface-translucent: rgba(247,249,251,0.88);
+  --nav-translucent: rgba(255,255,255,0.88);
 }
 
 * { box-sizing: border-box; }
@@ -58,7 +98,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: rgba(6,10,13,0.88);
+  background: var(--surface-translucent);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
   padding: 14px 16px 12px;
@@ -67,6 +107,8 @@ body {
   justify-content: space-between;
   gap: 8px;
 }
+.brand { display: flex; align-items: center; gap: 8px; }
+.brand-logo { display: block; filter: drop-shadow(0 0 6px var(--cyan-glow)); }
 .app-header h1 {
   font-family: var(--font-mono);
   font-size: 1.1rem;
@@ -109,7 +151,7 @@ body {
 .hero-sub { color: var(--text-secondary); font-size: 0.85rem; margin: 6px 0 0; line-height: 1.4; }
 .accent-text { color: var(--cyan); }
 .chip-row { display: flex; gap: 8px; flex-wrap: wrap; }
-.chip-row .chip { margin-top: 12px; flex: 1; min-width: 130px; }
+.chip-row .chip { margin-top: 12px; flex: 1 1 130px; min-width: 0; }
 .hero-eyebrow {
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -131,9 +173,11 @@ body {
   color: transparent;
 }
 .chip {
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 2px 8px;
+  max-width: 100%;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -495,7 +539,7 @@ body {
 .btn-row .btn { flex: 1; min-width: 140px; }
 
 .save-note { font-family: var(--font-mono); font-size: 0.78rem; color: var(--good); min-height: 1.1em; text-align: center; }
-.hint { font-size: 0.8rem; color: var(--text-muted); margin: -6px 0 4px; }
+.hint { font-size: 0.8rem; color: var(--text-muted); margin: 8px 0 4px; line-height: 1.4; }
 
 .computed-card {
   background: var(--surface-1);
@@ -636,6 +680,29 @@ tbody tr:nth-child(even) { background: rgba(255,255,255,0.02); }
 tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .ex-add-set { width: 100%; margin-top: 8px; }
 
+.pr-board { display: flex; flex-direction: column; gap: 8px; }
+.pr-board-row {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  padding: 12px;
+}
+.pr-board-name { font-weight: 700; font-size: 0.9rem; margin-bottom: 8px; }
+.pr-board-compare { display: flex; align-items: center; gap: 10px; }
+.pr-board-col { flex: 1; text-align: center; }
+.pr-board-label {
+  display: block; font-family: var(--font-mono); font-size: 0.6rem; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px;
+}
+.pr-board-value { font-family: var(--font-mono); font-size: 0.9rem; font-weight: 700; color: var(--text-secondary); }
+.pr-board-value--current { color: var(--cyan); text-shadow: 0 0 8px var(--cyan-glow); }
+.pr-board-arrow { color: var(--text-muted); font-size: 1rem; }
+.pr-board-delta {
+  margin-top: 8px; text-align: center; font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700;
+}
+.pr-board-delta.is-up { color: var(--good); }
+.pr-board-delta.is-down { color: var(--critical); }
+
 .new-protocol-box {
   border: 1px dashed var(--border-soft);
   border-radius: var(--card-radius);
@@ -701,7 +768,7 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   max-width: 616px;
   margin: 0 auto;
   display: flex;
-  background: rgba(10,15,18,0.88);
+  background: var(--nav-translucent);
   backdrop-filter: blur(14px);
   border: 1px solid var(--border);
   border-radius: 26px;
@@ -834,6 +901,36 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   font-family: inherit;
 }
 .chat-input-row .btn { width: 48px; padding: 10px; }
+
+/* ---------------- Theme toggle ---------------- */
+.theme-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 2px 0 18px;
+}
+.theme-icon { font-size: 1.25rem; line-height: 1; }
+.switch { position: relative; display: inline-block; width: 46px; height: 26px; cursor: pointer; flex: none; }
+.switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.switch-track {
+  position: absolute; inset: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  pointer-events: none;
+}
+.switch-thumb {
+  position: absolute; top: 2px; left: 2px;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+.switch input:checked + .switch-track { background: var(--cyan); border-color: transparent; box-shadow: 0 0 10px var(--cyan-glow); }
+.switch input:checked + .switch-track .switch-thumb { transform: translateX(20px); background: #04181a; }
+.switch input:focus-visible + .switch-track { outline: 2px solid var(--cyan); outline-offset: 2px; }
 
 /* ---------------- Modal (More panel) ---------------- */
 .sheet-overlay {

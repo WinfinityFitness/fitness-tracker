@@ -16,7 +16,10 @@
 <body>
 
 <header class="app-header">
-  <h1>WINFINITY</h1>
+  <div class="brand">
+    <img class="brand-logo" src="icons/icon-192.png" alt="" width="28" height="28">
+    <h1>WINFINITY</h1>
+  </div>
   <span class="app-header-sub" id="headerToday"></span>
 </header>
 
@@ -136,6 +139,24 @@
       <button type="button" class="btn btn--finish" id="btnFinishWorkout">Finish</button>
     </div>
 
+    <fieldset class="field-group">
+      <legend>Session templates</legend>
+      <label class="field">
+        <span>Load a saved session</span>
+        <select id="sessionTemplateSelect"><option value="">— Select —</option></select>
+      </label>
+      <div class="btn-row">
+        <button type="button" class="btn btn--primary" id="btnLoadTemplate">Load into this date</button>
+        <button type="button" class="btn btn--danger" id="btnDeleteTemplate">Delete</button>
+      </div>
+      <label class="field" style="margin-top:12px;">
+        <span>Save current exercises as</span>
+        <input type="text" id="sessionTemplateName" placeholder="e.g. Push Day A">
+      </label>
+      <button type="button" class="btn" id="btnSaveTemplate">Save as new session</button>
+      <p class="save-note" id="sessionTemplateNote"></p>
+    </fieldset>
+
     <div class="stat-grid">
       <div class="stat-tile">
         <div class="stat-tile-value" id="statWorkoutsWeek">–</div>
@@ -174,6 +195,10 @@
       </label>
       <button type="button" class="btn" id="btnAddExercise">Synchronize new exercise</button>
     </div>
+
+    <h2 class="section-title">Personal records</h2>
+    <div class="pr-board" id="prBoard"></div>
+    <p class="empty-note" id="prBoardEmpty">Log completed sets to start tracking personal records.</p>
   </section>
 
   <!-- ============ NUTRITION / FUEL ============ -->
@@ -541,6 +566,14 @@
     <div class="sheet-head">
       <h2>More</h2>
       <button class="sheet-close" id="btnCloseSheet">✕</button>
+    </div>
+
+    <div class="theme-toggle-row">
+      <span class="theme-icon" id="themeIcon">🌙</span>
+      <label class="switch">
+        <input type="checkbox" id="themeToggle">
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+      </label>
     </div>
 
     <div class="sheet-section">
