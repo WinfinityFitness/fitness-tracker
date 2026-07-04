@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#2a78d6">
-<title>Fitness Tracker</title>
+<meta name="theme-color" content="#060a0d">
+<title>Winfinity Tracker</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -16,31 +16,32 @@
 <body>
 
 <header class="app-header">
-  <h1>Fitness Tracker</h1>
+  <h1>WINFINITY</h1>
   <span class="app-header-sub" id="headerToday"></span>
 </header>
 
 <main id="app">
 
-  <!-- ============ DASHBOARD ============ -->
-  <section class="tab-panel" id="tab-dashboard" data-tab="dashboard">
-    <div class="stat-tile stat-tile--hero" id="tile-daysLeft">
-      <div class="stat-tile-value" id="daysLeftValue">–</div>
-      <div class="stat-tile-label">Days left in challenge</div>
+  <!-- ============ STATUS ============ -->
+  <section class="tab-panel" id="tab-status" data-tab="status">
+    <div class="hero-card">
+      <p class="hero-eyebrow">System check-in</p>
+      <h2 class="hero-title">Welcome back, <span class="accent" id="heroName">Operator</span>.</h2>
+      <div class="chip">
+        <span class="chip-label">Days left in challenge</span>
+        <span class="chip-value" id="daysLeftValue">–</span>
+      </div>
+    </div>
+
+    <div class="ring-row">
+      <div class="ring-card" id="ringHabitCard"></div>
+      <div class="ring-card" id="ringHydrationCard"></div>
     </div>
 
     <div class="stat-grid">
       <div class="stat-tile">
-        <div class="stat-tile-value" id="avgCalories">–</div>
-        <div class="stat-tile-label">Avg calories (7d)</div>
-      </div>
-      <div class="stat-tile">
         <div class="stat-tile-value" id="avgSteps">–</div>
         <div class="stat-tile-label">Avg steps (7d)</div>
-      </div>
-      <div class="stat-tile">
-        <div class="stat-tile-value" id="avgProtein">–</div>
-        <div class="stat-tile-label">Avg protein (7d)</div>
       </div>
       <div class="stat-tile">
         <div class="stat-tile-value" id="currentBMI">–</div>
@@ -67,223 +68,251 @@
     <h2 class="section-title">Recent performance (7-day avg)</h2>
     <div class="perf-grid" id="perfGrid"></div>
 
-    <h2 class="section-title">Weight journey</h2>
     <div class="chart-card">
+      <div class="chart-card-head">
+        <span class="chart-card-title">Weight journey</span>
+        <span class="chart-card-sub" id="chartRange"></span>
+      </div>
       <div id="weightChart" class="weight-chart"></div>
       <div class="chart-legend" id="chartLegend"></div>
       <p class="empty-note" id="chartEmptyNote">Log at least one weight entry to see your trend.</p>
     </div>
 
-    <h2 class="section-title">Goal progress</h2>
     <div class="chart-card" id="goalProgressCard">
-      <p class="empty-note" id="goalEmptyNote">Set your weights in Setup and log a weight entry to see progress.</p>
+      <div class="chart-card-head"><span class="chart-card-title">Goal progress</span></div>
+      <p class="empty-note" id="goalEmptyNote">Set your weights in Bio and log a weight entry to see progress.</p>
     </div>
-  </section>
 
-  <!-- ============ DAILY LOG ============ -->
-  <section class="tab-panel" id="tab-log" data-tab="log" hidden>
-    <form id="logForm">
-      <label class="field">
-        <span>Date</span>
-        <input type="date" id="logDate" required>
-      </label>
-
-      <fieldset class="field-group">
-        <legend>☀️ Morning</legend>
-        <label class="field">
-          <span>Sleep quality (1 = couldn't sleep, 5 = well rested)</span>
-          <input type="range" id="logSleep" min="1" max="5" step="1" value="3">
-          <output id="logSleepOut">3</output>
-        </label>
-        <label class="field">
-          <span>Morning weight</span>
-          <input type="number" step="0.01" id="logWeight" placeholder="e.g. 79.5">
-        </label>
-        <label class="field field--checkbox" id="menstruatingField">
-          <input type="checkbox" id="logMenstruating">
-          <span>Menstruating today</span>
-        </label>
-      </fieldset>
-
-      <fieldset class="field-group">
-        <legend>💪 Fitness &amp; nutrition</legend>
-        <label class="field field--checkbox">
-          <input type="checkbox" id="logWorkout">
-          <span>Did you work out today?</span>
-        </label>
-        <label class="field">
-          <span>Steps</span>
-          <input type="number" id="logSteps" placeholder="e.g. 8000">
-        </label>
-        <label class="field">
-          <span>Calories consumed</span>
-          <input type="number" id="logCalories" placeholder="e.g. 2200">
-        </label>
-        <label class="field">
-          <span>Protein (g)</span>
-          <input type="number" id="logProtein" placeholder="e.g. 140">
-        </label>
-        <label class="field">
-          <span>Water (16oz cups)</span>
-          <input type="number" id="logWater" min="0" placeholder="e.g. 6">
-        </label>
-      </fieldset>
-
+    <form id="checkinForm">
       <fieldset class="field-group" id="extraHabitsGroup">
-        <legend>💡 Extra habits</legend>
+        <legend>Extra habits</legend>
       </fieldset>
-
       <fieldset class="field-group">
-        <legend>📊 How you're feeling (1–5)</legend>
-        <label class="field">
-          <span>Stress (1 = least, 5 = most)</span>
-          <input type="range" id="logStress" min="1" max="5" step="1" value="3">
-          <output id="logStressOut">3</output>
-        </label>
-        <label class="field">
-          <span>Fatigue (1 = least, 5 = most)</span>
-          <input type="range" id="logFatigue" min="1" max="5" step="1" value="3">
-          <output id="logFatigueOut">3</output>
-        </label>
-        <label class="field">
-          <span>Hunger (1 = not hungry, 5 = intense)</span>
-          <input type="range" id="logHunger" min="1" max="5" step="1" value="3">
-          <output id="logHungerOut">3</output>
-        </label>
-      </fieldset>
-
-      <fieldset class="field-group">
-        <legend>🌙 Before sleeping</legend>
+        <legend>Before sleeping</legend>
         <label class="field field--checkbox">
-          <input type="checkbox" id="logReviewedGoals">
+          <input type="checkbox" id="statusReviewedGoals">
           <span>Reviewed your goals and vision today</span>
         </label>
         <label class="field field--checkbox">
-          <input type="checkbox" id="logPlannedTomorrow">
+          <input type="checkbox" id="statusPlannedTomorrow">
           <span>Planned tomorrow (workouts, meals, etc.)</span>
         </label>
         <label class="field">
           <span>Struggles today</span>
-          <textarea id="logStruggles" rows="2"></textarea>
+          <textarea id="statusStruggles" rows="2"></textarea>
         </label>
         <label class="field">
           <span>How to do better tomorrow</span>
-          <textarea id="logImprove" rows="2"></textarea>
+          <textarea id="statusImprove" rows="2"></textarea>
         </label>
       </fieldset>
-
-      <button type="submit" class="btn btn--primary">Save today's log</button>
-      <p class="save-note" id="logSaveNote"></p>
+      <button type="submit" class="btn btn--primary">Save check-in</button>
+      <p class="save-note" id="checkinSaveNote"></p>
     </form>
   </section>
 
-  <!-- ============ WEEKLY REVIEW ============ -->
-  <section class="tab-panel" id="tab-review" data-tab="review" hidden>
-    <form id="reviewForm">
-      <label class="field">
-        <span>Week ending</span>
-        <input type="date" id="reviewDate" required>
-      </label>
-      <label class="field">
-        <span>Adjustments made to keep progress on track</span>
-        <textarea id="reviewAdjustments" rows="2"></textarea>
-      </label>
-      <label class="field">
-        <span>Wins this week</span>
-        <textarea id="reviewWins" rows="2"></textarea>
-      </label>
-      <label class="field">
-        <span>Improvements this week</span>
-        <textarea id="reviewImprovements" rows="2"></textarea>
-      </label>
+  <!-- ============ TRAINING ============ -->
+  <section class="tab-panel" id="tab-training" data-tab="training" hidden>
+    <div class="stat-grid">
+      <div class="stat-tile">
+        <div class="stat-tile-value" id="statWorkoutsWeek">–</div>
+        <div class="stat-tile-label">Workouts (7d)</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-tile-value" id="statSetsWeek">–</div>
+        <div class="stat-tile-label">Total sets (7d)</div>
+      </div>
+    </div>
 
-      <fieldset class="field-group">
-        <legend>Focus for next week (pick 1–2)</legend>
-        <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="consistency"><span>Be more consistent with logging</span></label>
-        <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="accuracy"><span>Be more accurate measuring food</span></label>
-        <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="calorieTarget"><span>Do better hitting calorie target</span></label>
-        <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="stepTarget"><span>Hit step target</span></label>
-        <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="workoutTarget"><span>Hit workout target</span></label>
-        <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="other"><span>Other (detail below)</span></label>
-      </fieldset>
+    <div class="timer-card">
+      <div class="timer-ring-wrap" id="timerRingWrap"></div>
+      <div class="timer-duration">
+        <div class="timer-duration-row">
+          <span>Rest duration</span>
+          <span id="timerDurationLabel">3:00 min</span>
+        </div>
+        <input type="range" id="timerDuration" min="1" max="15" step="1" value="3">
+      </div>
+      <div class="timer-controls">
+        <button class="btn btn--primary" id="btnTimerStart">Start</button>
+        <button class="btn" id="btnTimerReset">Reset</button>
+      </div>
+    </div>
 
+    <h2 class="section-title">Log today's session</h2>
+    <label class="field">
+      <span>Date</span>
+      <input type="date" id="trainDate">
+    </label>
+
+    <fieldset class="field-group">
+      <legend>Add exercise</legend>
       <label class="field">
-        <span>Other changes for next week</span>
-        <textarea id="reviewOther" rows="2"></textarea>
+        <span>Exercise name</span>
+        <input type="text" id="exerciseName" placeholder="e.g. Barbell Squat">
       </label>
+      <div class="field-row">
+        <label class="field">
+          <span>Sets</span>
+          <input type="number" id="exerciseSets" min="1" max="20" value="3">
+        </label>
+        <label class="field">
+          <span>Reps</span>
+          <input type="number" id="exerciseReps" min="1" max="100" value="10">
+        </label>
+      </div>
+      <button type="button" class="btn" id="btnAddExercise">+ Add exercise</button>
+    </fieldset>
 
-      <button type="submit" class="btn btn--primary">Save weekly review</button>
-      <p class="save-note" id="reviewSaveNote"></p>
-    </form>
+    <div class="exercise-list" id="exerciseList"></div>
+    <p class="empty-note" id="exerciseEmptyNote">No exercises logged for this date yet.</p>
+
+    <button type="button" class="btn btn--primary" id="btnSaveSession">Save session</button>
+    <p class="save-note" id="trainSaveNote"></p>
   </section>
 
-  <!-- ============ HISTORY / EXPORT ============ -->
-  <section class="tab-panel" id="tab-history" data-tab="history" hidden>
-    <h2 class="section-title">Export &amp; email</h2>
-    <div class="btn-row">
-      <button class="btn btn--primary" id="btnExportWeek">Export last 7 days (CSV)</button>
-      <button class="btn" id="btnExportAll">Export all logs (CSV)</button>
-    </div>
-    <p class="hint">Tap Export, then choose your email app from the share sheet to send the CSV as an attachment. If sharing isn't supported, the file downloads and you can attach it manually.</p>
+  <!-- ============ NUTRITION ============ -->
+  <section class="tab-panel" id="tab-nutrition" data-tab="nutrition" hidden>
+    <label class="field">
+      <span>Date</span>
+      <input type="date" id="nutDate">
+    </label>
 
-    <h2 class="section-title">Backup</h2>
-    <div class="btn-row">
-      <button class="btn" id="btnBackup">Save backup (JSON)</button>
-      <label class="btn btn--file">
-        Restore backup
-        <input type="file" id="fileRestore" accept="application/json" hidden>
+    <div class="computed-card">
+      <h3>Today's targets</h3>
+      <dl class="computed-list" id="nutTargetsList"></dl>
+    </div>
+
+    <fieldset class="field-group">
+      <legend>Today's intake</legend>
+      <label class="field">
+        <span>Calories consumed</span>
+        <input type="number" id="nutCalories" placeholder="e.g. 2200">
       </label>
-    </div>
-    <p class="hint">Your data lives only on this device. Save a backup occasionally in case you clear browser data or switch phones.</p>
+      <label class="field">
+        <span>Protein (g)</span>
+        <input type="number" id="nutProtein" placeholder="e.g. 140">
+      </label>
+      <label class="field">
+        <span>Water (16oz cups)</span>
+        <input type="number" id="nutWater" min="0" placeholder="e.g. 6">
+      </label>
+      <label class="field">
+        <span>Steps</span>
+        <input type="number" id="nutSteps" placeholder="e.g. 8000">
+      </label>
+    </fieldset>
 
-    <h2 class="section-title">Log history</h2>
-    <div class="table-wrap">
-      <table id="historyTable">
-        <thead>
-          <tr><th>Date</th><th>Weight</th><th>Steps</th><th>Cal</th><th>Protein</th><th>Sleep</th><th>Workout</th></tr>
-        </thead>
-        <tbody id="historyBody"></tbody>
-      </table>
+    <button type="button" class="btn btn--primary" id="btnSaveNutrition">Save intake</button>
+    <p class="save-note" id="nutSaveNote"></p>
+
+    <h2 class="section-title">Averages (7-day)</h2>
+    <div class="stat-grid stat-grid--3">
+      <div class="stat-tile">
+        <div class="stat-tile-value" id="avgCalories">–</div>
+        <div class="stat-tile-label">Calories</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-tile-value" id="avgProtein">–</div>
+        <div class="stat-tile-label">Protein</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-tile-value" id="avgWater">–</div>
+        <div class="stat-tile-label">Water</div>
+      </div>
     </div>
-    <p class="empty-note" id="historyEmptyNote">No logs yet.</p>
   </section>
 
-  <!-- ============ SETUP ============ -->
-  <section class="tab-panel" id="tab-setup" data-tab="setup" hidden>
+  <!-- ============ BIO ============ -->
+  <section class="tab-panel" id="tab-bio" data-tab="bio" hidden>
+    <label class="field">
+      <span>Date</span>
+      <input type="date" id="bioDate">
+    </label>
+
+    <fieldset class="field-group">
+      <legend>Today's biometrics</legend>
+      <label class="field">
+        <span>Morning weight</span>
+        <input type="number" step="0.01" id="bioWeight" placeholder="e.g. 79.5">
+      </label>
+      <label class="field field--checkbox" id="bioMenstruatingField">
+        <input type="checkbox" id="bioMenstruating">
+        <span>Menstruating today</span>
+      </label>
+      <label class="field">
+        <span>Sleep quality (1 = couldn't sleep, 5 = well rested)</span>
+        <input type="range" id="bioSleep" min="1" max="5" step="1" value="3">
+        <output id="bioSleepOut">3</output>
+      </label>
+      <label class="field">
+        <span>Stress (1 = least, 5 = most)</span>
+        <input type="range" id="bioStress" min="1" max="5" step="1" value="3">
+        <output id="bioStressOut">3</output>
+      </label>
+      <label class="field">
+        <span>Fatigue (1 = least, 5 = most)</span>
+        <input type="range" id="bioFatigue" min="1" max="5" step="1" value="3">
+        <output id="bioFatigueOut">3</output>
+      </label>
+      <label class="field">
+        <span>Hunger (1 = not hungry, 5 = intense)</span>
+        <input type="range" id="bioHunger" min="1" max="5" step="1" value="3">
+        <output id="bioHungerOut">3</output>
+      </label>
+    </fieldset>
+
+    <button type="button" class="btn btn--primary" id="btnSaveBio">Save biometrics</button>
+    <p class="save-note" id="bioSaveNote"></p>
+
+    <div class="chart-card">
+      <div class="chart-card-head"><span class="chart-card-title">Sleep quality (7 days)</span></div>
+      <div class="bar-chart" id="sleepBarChart"></div>
+      <div class="bar-chart-labels" id="sleepBarLabels"></div>
+    </div>
+
+    <div class="computed-card">
+      <h3>Computed targets</h3>
+      <dl class="computed-list" id="computedList"></dl>
+    </div>
+
+    <h2 class="section-title">Profile &amp; goals</h2>
     <form id="setupForm">
       <label class="field">
         <span>Name</span>
         <input type="text" id="setupName" placeholder="Optional">
       </label>
 
-      <label class="field">
-        <span>Weight unit</span>
-        <select id="setupWeightUnit">
-          <option value="kg">Kilograms (kg)</option>
-          <option value="lb">Pounds (lb)</option>
-        </select>
-      </label>
+      <div class="field-row">
+        <label class="field">
+          <span>Weight unit</span>
+          <select id="setupWeightUnit">
+            <option value="kg">Kilograms (kg)</option>
+            <option value="lb">Pounds (lb)</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Height unit</span>
+          <select id="setupHeightUnit">
+            <option value="cm">Centimeters (cm)</option>
+            <option value="ftin">Feet &amp; inches</option>
+          </select>
+        </label>
+      </div>
 
-      <label class="field">
-        <span>Height unit</span>
-        <select id="setupHeightUnit">
-          <option value="cm">Centimeters (cm)</option>
-          <option value="ftin">Feet &amp; inches</option>
-        </select>
-      </label>
-
-      <label class="field">
-        <span>Biological gender</span>
-        <select id="setupGender">
-          <option value="male">Male</option>
-          <option value="female">Female</option>
-        </select>
-      </label>
-
-      <label class="field">
-        <span>Age</span>
-        <input type="number" id="setupAge" min="10" max="100">
-      </label>
+      <div class="field-row">
+        <label class="field">
+          <span>Biological gender</span>
+          <select id="setupGender">
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Age</span>
+          <input type="number" id="setupAge" min="10" max="100">
+        </label>
+      </div>
 
       <div id="heightCmField">
         <label class="field">
@@ -309,15 +338,24 @@
         <input type="number" step="0.01" id="setupStartWeight">
       </label>
 
-      <label class="field">
-        <span>Activity level</span>
-        <select id="setupActivity">
-          <option value="1.2">Sedentary (under 8k steps/day)</option>
-          <option value="1.375">Lightly active (8k–10k steps/day)</option>
-          <option value="1.55">Moderately active (10k–12k steps/day)</option>
-          <option value="1.725">Very active (12k+ steps/day)</option>
-        </select>
-      </label>
+      <div class="field-row">
+        <label class="field">
+          <span>Activity level</span>
+          <select id="setupActivity">
+            <option value="1.2">Sedentary (under 8k steps/day)</option>
+            <option value="1.375">Lightly active (8k–10k steps/day)</option>
+            <option value="1.55">Moderately active (10k–12k steps/day)</option>
+            <option value="1.725">Very active (12k+ steps/day)</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Goal</span>
+          <select id="setupGoalMode">
+            <option value="cut">Cutting</option>
+            <option value="bulk">Bulking</option>
+          </select>
+        </label>
+      </div>
 
       <label class="field">
         <span>Lifting sessions per week</span>
@@ -354,6 +392,11 @@
         </label>
       </div>
 
+      <label class="field">
+        <span>Daily water goal (16oz cups)</span>
+        <input type="number" id="setupWaterGoal" value="8" min="1">
+      </label>
+
       <fieldset class="field-group">
         <legend>Custom extra habits (optional, up to 5)</legend>
         <input type="text" class="extraHabitInput" data-idx="0" placeholder="e.g. Meditation">
@@ -365,23 +408,100 @@
 
       <button type="submit" class="btn btn--primary">Save profile</button>
       <p class="save-note" id="setupSaveNote"></p>
-
-      <div class="computed-card">
-        <h3>Computed targets</h3>
-        <dl class="computed-list" id="computedList"></dl>
-      </div>
     </form>
   </section>
 
 </main>
 
 <nav class="tab-bar">
-  <button class="tab-btn is-active" data-target="dashboard">📊<span>Dashboard</span></button>
-  <button class="tab-btn" data-target="log">📝<span>Daily Log</span></button>
-  <button class="tab-btn" data-target="review">📆<span>Review</span></button>
-  <button class="tab-btn" data-target="history">📤<span>Export</span></button>
-  <button class="tab-btn" data-target="setup">⚙️<span>Setup</span></button>
+  <button class="tab-btn is-active" data-target="status">📡<span>Status</span></button>
+  <button class="tab-btn" data-target="training">🏋️<span>Training</span></button>
+  <button class="tab-btn" data-target="nutrition">🍽️<span>Nutrition</span></button>
+  <button class="tab-btn" data-target="bio">🧬<span>Bio</span></button>
+  <button class="tab-btn" id="btnOpenMore">⚙️<span>More</span></button>
 </nav>
+
+<!-- ============ MORE SHEET ============ -->
+<div class="sheet-overlay" id="sheetOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>More</h2>
+      <button class="sheet-close" id="btnCloseSheet">✕</button>
+    </div>
+
+    <div class="sheet-section">
+      <h2 class="section-title">Weekly review</h2>
+      <form id="reviewForm">
+        <label class="field">
+          <span>Week ending</span>
+          <input type="date" id="reviewDate" required>
+        </label>
+        <label class="field">
+          <span>Adjustments made to keep progress on track</span>
+          <textarea id="reviewAdjustments" rows="2"></textarea>
+        </label>
+        <label class="field">
+          <span>Wins this week</span>
+          <textarea id="reviewWins" rows="2"></textarea>
+        </label>
+        <label class="field">
+          <span>Improvements this week</span>
+          <textarea id="reviewImprovements" rows="2"></textarea>
+        </label>
+        <fieldset class="field-group">
+          <legend>Focus for next week (pick 1–2)</legend>
+          <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="consistency"><span>Be more consistent with logging</span></label>
+          <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="accuracy"><span>Be more accurate measuring food</span></label>
+          <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="calorieTarget"><span>Do better hitting calorie target</span></label>
+          <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="stepTarget"><span>Hit step target</span></label>
+          <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="workoutTarget"><span>Hit workout target</span></label>
+          <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="other"><span>Other (detail below)</span></label>
+        </fieldset>
+        <label class="field">
+          <span>Other changes for next week</span>
+          <textarea id="reviewOther" rows="2"></textarea>
+        </label>
+        <button type="submit" class="btn btn--primary">Save weekly review</button>
+        <p class="save-note" id="reviewSaveNote"></p>
+      </form>
+    </div>
+
+    <div class="sheet-section">
+      <h2 class="section-title">Export &amp; email</h2>
+      <div class="btn-row">
+        <button class="btn btn--primary" id="btnExportWeek">Export last 7 days (CSV)</button>
+        <button class="btn" id="btnExportAll">Export all logs (CSV)</button>
+      </div>
+      <p class="hint">Tap Export, then choose your email app from the share sheet to send the CSV as an attachment. If sharing isn't supported, the file downloads and you can attach it manually.</p>
+    </div>
+
+    <div class="sheet-section">
+      <h2 class="section-title">Backup</h2>
+      <div class="btn-row">
+        <button class="btn" id="btnBackup">Save backup (JSON)</button>
+        <label class="btn btn--file">
+          Restore backup
+          <input type="file" id="fileRestore" accept="application/json" hidden>
+        </label>
+      </div>
+      <p class="hint">Your data lives only on this device. Save a backup occasionally in case you clear browser data or switch phones.</p>
+    </div>
+
+    <div class="sheet-section">
+      <h2 class="section-title">Log history</h2>
+      <div class="table-wrap">
+        <table id="historyTable">
+          <thead>
+            <tr><th>Date</th><th>Weight</th><th>Steps</th><th>Cal</th><th>Protein</th><th>Sleep</th><th>Exercises</th></tr>
+          </thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div>
+      <p class="empty-note" id="historyEmptyNote">No logs yet.</p>
+    </div>
+  </div>
+</div>
 
 <script src="app.js"></script>
 </body>
