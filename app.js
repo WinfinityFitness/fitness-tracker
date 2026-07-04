@@ -756,54 +756,101 @@ function renderGoalProgress(profile, kgNow, wu) {
 }
 
 /* ---------------------------------------------------------------- */
-/* Training: exercise log + rest timer                                 */
+/* Training: Strong-style exercise log + rest timer                    */
 /* ---------------------------------------------------------------- */
 let currentExercises = [];
 
 function loadTrainingForDate(date) {
   const logs = getLogs();
-  currentExercises = (logs[date] && logs[date].exercises) ? logs[date].exercises.slice() : [];
-  renderExerciseList();
-}
-
-function renderExerciseList() {
-  const list = document.getElementById('exerciseList');
-  const emptyNote = document.getElementById('exerciseEmptyNote');
-  list.innerHTML = '';
-  if (!currentExercises.length) { emptyNote.hidden = false; return; }
-  emptyNote.hidden = true;
-  currentExercises.forEach((ex, i) => {
-    const row = document.createElement('div');
-    row.className = 'exercise-row';
-    row.innerHTML = `<div class="exercise-row-main">
-        <div class="exercise-row-name">${escapeHtml(ex.name)}</div>
-        <div class="exercise-row-meta">${ex.sets} sets × ${ex.reps} reps</div>
-      </div>
-      <button type="button" class="exercise-row-remove" data-i="${i}">✕</button>`;
-    list.appendChild(row);
-  });
-  list.querySelectorAll('.exercise-row-remove').forEach(btn => {
-    btn.addEventListener('click', () => {
-      currentExercises.splice(parseInt(btn.dataset.i, 10), 1);
-      persistExercises();
-      renderExerciseList();
-    });
-  });
+  currentExercises = (logs[date] && logs[date].exercises) ? JSON.parse(JSON.stringify(logs[date].exercises)) : [];
+  renderExerciseCards();
 }
 
 function persistExercises() {
   const date = document.getElementById('trainDate').value;
-  updateLogFields(date, { exercises: currentExercises.slice(), workout: currentExercises.length > 0 });
+  const completedCount = currentExercises.reduce((n, ex) => n + ex.sets.filter(s => s.completed).length, 0);
+  updateLogFields(date, { exercises: JSON.parse(JSON.stringify(currentExercises)), workout: completedCount > 0 });
 }
 
-function renderTrainingStats() {
-  const logsArr = sortedLogsArray();
-  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 6); cutoff.setHours(0,0,0,0);
-  const recent = logsArr.filter(l => parseISO(l.date) >= cutoff);
-  const workouts = recent.filter(l => l.exercises && l.exercises.length > 0).length;
-  const sets = recent.reduce((sum, l) => sum + (l.exercises || []).reduce((s, e) => s + (e.sets || 0), 0), 0);
-  document.getElementById('statWorkoutsWeek').textContent = workouts;
-  document.getElementById('statSetsWeek').textContent = sets;
+function findPreviousSets(name, beforeDate) {
+  const logs = getLogs();
+  const dates = Object.keys(logs).filter(d => d < beforeDate).sort();
+  for (let i = dates.length - 1; i >= 0; i--) {
+    const ex = (logs[dates[i]].exercises || []).find(e => e.name.trim().toLowerCase() === name.trim().toLowerCase());
+    if (ex) return ex.sets;
+  }
+  return null;
+}
+
+function estOneRM(weightKg, reps) {
+  if (weightKg == null || reps == null || reps <= 0) return 0;
+  return weightKg * (1 + reps / 30);
+}
+
+function bestHistoricalOneRM(name, beforeDate) {
+  const logs = getLogs();
+  let best = 0;
+  Object.keys(logs).forEach(d => {
+    if (d >= beforeDate) return;
+    (logs[d].exercises || []).forEach(ex => {
+      if (ex.name.trim().toLowerCase() !== name.trim().toLowerCase()) return;
+      (ex.sets || []).forEach(s => {
+        if (!s.completed) return;
+        const rm = estOneRM(s.weightKg, s.reps);
+        if (rm > best) best = rm;
+      });
+    });
+  });
+  return best;
+}
+
+function renderExerciseCards() {
+  const container = document.getElementById('exerciseCards');
+  const emptyNote = document.getElementById('exerciseEmptyNote');
+  const profile = getProfile();
+  const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
+  const date = document.getElementById('trainDate').value;
+  container.innerHTML = '';
+
+  if (!currentExercises.length) { emptyNote.hidden = false; return; }
+  emptyNote.hidden = true;
+
+  currentExercises.forEach((ex, exIdx) => {
+    const prevSets = findPreviousSets(ex.name, date);
+    const card = document.createElement('div');
+    card.className = 'ex-card';
+    const restMins = Math.round((ex.restSeconds || 180) / 60);
+    const restOptions = Array.from({ length: 15 }, (_, i) => i + 1)
+      .map(m => `<option value="${m}"${m === restMins ? ' selected' : ''}>${m}m</option>`).join('');
+
+    const rows = ex.sets.map((s, setIdx) => {
+      const prev = prevSets && prevSets[setIdx] ? `${prevSets[setIdx].reps} × ${round2(fromKg(prevSets[setIdx].weightKg, wu))}${wu}` : '–';
+      const weightDisplay = s.weightKg != null ? round2(fromKg(s.weightKg, wu)) : '';
+      return `<tr class="${s.completed ? 'is-complete' : ''}">
+        <td>${setIdx + 1}</td>
+        <td class="ex-set-prev">${prev}</td>
+        <td><input type="number" class="ex-set-reps" data-ex="${exIdx}" data-set="${setIdx}" value="${s.reps ?? ''}" min="0"></td>
+        <td><input type="number" class="ex-set-weight" data-ex="${exIdx}" data-set="${setIdx}" value="${weightDisplay}" step="0.5" min="0"></td>
+        <td><button type="button" class="ex-set-check${s.completed ? ' is-done' : ''}" data-ex="${exIdx}" data-set="${setIdx}">✓</button></td>
+        <td><button type="button" class="ex-set-remove" data-ex="${exIdx}" data-set="${setIdx}">✕</button></td>
+      </tr>`;
+    }).join('');
+
+    card.innerHTML = `
+      <div class="ex-card-head">
+        <div class="ex-card-title">${escapeHtml(ex.name)}</div>
+        <div class="ex-card-rest">⏱ <select class="ex-rest-select" data-ex="${exIdx}">${restOptions}</select></div>
+        <button type="button" class="ex-card-remove" data-ex="${exIdx}">✕</button>
+      </div>
+      <input type="text" class="ex-card-notes" data-ex="${exIdx}" placeholder="Add notes here…" value="${escapeHtml(ex.notes || '')}">
+      <table class="ex-sets-table">
+        <thead><tr><th>Set</th><th>Previous</th><th>Reps</th><th>${wu}</th><th></th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <button type="button" class="btn btn--sm ex-add-set" data-ex="${exIdx}">+ Add Set</button>
+    `;
+    container.appendChild(card);
+  });
 }
 
 function initTraining() {
@@ -813,26 +860,157 @@ function initTraining() {
   document.getElementById('btnAddExercise').addEventListener('click', () => {
     const nameInput = document.getElementById('exerciseName');
     const name = nameInput.value.trim();
-    const sets = parseInt(document.getElementById('exerciseSets').value, 10) || 1;
-    const reps = parseInt(document.getElementById('exerciseReps').value, 10) || 1;
     if (!name) return;
-    currentExercises.push({ name, sets, reps });
+    const date = document.getElementById('trainDate').value;
+    const prevSets = findPreviousSets(name, date);
+    const firstSet = prevSets && prevSets[0] ? { reps: prevSets[0].reps, weightKg: prevSets[0].weightKg, completed: false } : { reps: null, weightKg: null, completed: false };
+    currentExercises.push({ name, restSeconds: 180, notes: '', sets: [firstSet] });
     persistExercises();
-    renderExerciseList();
+    renderExerciseCards();
     nameInput.value = '';
     nameInput.focus();
   });
 
-  document.getElementById('btnSaveSession').addEventListener('click', () => {
-    persistExercises();
-    document.getElementById('trainSaveNote').textContent = 'Session saved.';
-    setTimeout(() => { document.getElementById('trainSaveNote').textContent = ''; }, 2000);
-    renderTrainingStats();
+  const cards = document.getElementById('exerciseCards');
+
+  cards.addEventListener('click', e => {
+    const wu = (getProfile() || {}).weightUnit || 'kg';
+
+    const removeExBtn = e.target.closest('.ex-card-remove');
+    if (removeExBtn) {
+      currentExercises.splice(parseInt(removeExBtn.dataset.ex, 10), 1);
+      persistExercises(); renderExerciseCards(); return;
+    }
+
+    const addSetBtn = e.target.closest('.ex-add-set');
+    if (addSetBtn) {
+      const exIdx = parseInt(addSetBtn.dataset.ex, 10);
+      const ex = currentExercises[exIdx];
+      const last = ex.sets[ex.sets.length - 1];
+      const date = document.getElementById('trainDate').value;
+      const prevSets = findPreviousSets(ex.name, date);
+      const nextIdx = ex.sets.length;
+      const fallback = prevSets && prevSets[nextIdx] ? { reps: prevSets[nextIdx].reps, weightKg: prevSets[nextIdx].weightKg } : (last ? { reps: last.reps, weightKg: last.weightKg } : { reps: null, weightKg: null });
+      ex.sets.push({ reps: fallback.reps, weightKg: fallback.weightKg, completed: false });
+      persistExercises(); renderExerciseCards(); return;
+    }
+
+    const removeSetBtn = e.target.closest('.ex-set-remove');
+    if (removeSetBtn) {
+      const exIdx = parseInt(removeSetBtn.dataset.ex, 10);
+      const setIdx = parseInt(removeSetBtn.dataset.set, 10);
+      currentExercises[exIdx].sets.splice(setIdx, 1);
+      if (!currentExercises[exIdx].sets.length) currentExercises.splice(exIdx, 1);
+      persistExercises(); renderExerciseCards(); return;
+    }
+
+    const checkBtn = e.target.closest('.ex-set-check');
+    if (checkBtn) {
+      const exIdx = parseInt(checkBtn.dataset.ex, 10);
+      const setIdx = parseInt(checkBtn.dataset.set, 10);
+      const set = currentExercises[exIdx].sets[setIdx];
+      set.completed = !set.completed;
+      persistExercises();
+      renderExerciseCards();
+      renderTrainingStats();
+      if (set.completed) autoStartRestTimer(currentExercises[exIdx].restSeconds || 180);
+      return;
+    }
   });
+
+  cards.addEventListener('change', e => {
+    const wu = (getProfile() || {}).weightUnit || 'kg';
+    if (e.target.classList.contains('ex-set-reps')) {
+      const exIdx = parseInt(e.target.dataset.ex, 10), setIdx = parseInt(e.target.dataset.set, 10);
+      currentExercises[exIdx].sets[setIdx].reps = parseIntOrNull(e.target.value);
+      persistExercises();
+    } else if (e.target.classList.contains('ex-set-weight')) {
+      const exIdx = parseInt(e.target.dataset.ex, 10), setIdx = parseInt(e.target.dataset.set, 10);
+      const val = parseFloat(e.target.value);
+      currentExercises[exIdx].sets[setIdx].weightKg = isNaN(val) ? null : toKg(val, wu);
+      persistExercises();
+    } else if (e.target.classList.contains('ex-card-notes')) {
+      const exIdx = parseInt(e.target.dataset.ex, 10);
+      currentExercises[exIdx].notes = e.target.value;
+      persistExercises();
+    } else if (e.target.classList.contains('ex-rest-select')) {
+      const exIdx = parseInt(e.target.dataset.ex, 10);
+      currentExercises[exIdx].restSeconds = parseInt(e.target.value, 10) * 60;
+      persistExercises();
+    }
+  });
+
+  document.getElementById('btnFinishWorkout').addEventListener('click', () => {
+    persistExercises();
+    const date = document.getElementById('trainDate').value;
+    const summary = computeWorkoutSummary(date);
+    renderWorkoutSummary(summary);
+    document.getElementById('summaryOverlay').hidden = false;
+    renderTrainingStats();
+    if (driveAccessToken) saveToDrive();
+  });
+
+  document.getElementById('btnCloseSummary').addEventListener('click', () => { document.getElementById('summaryOverlay').hidden = true; });
+  document.getElementById('btnDoneSummary').addEventListener('click', () => { document.getElementById('summaryOverlay').hidden = true; });
 
   loadTrainingForDate(todayISO());
   renderTrainingStats();
   initTimer();
+}
+
+function renderTrainingStats() {
+  const logsArr = sortedLogsArray();
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 6); cutoff.setHours(0,0,0,0);
+  const recent = logsArr.filter(l => parseISO(l.date) >= cutoff);
+  const workouts = recent.filter(l => l.exercises && l.exercises.some(ex => ex.sets.some(s => s.completed))).length;
+  const sets = recent.reduce((sum, l) => sum + (l.exercises || []).reduce((s, ex) => s + ex.sets.filter(st => st.completed).length, 0), 0);
+  document.getElementById('statWorkoutsWeek').textContent = workouts;
+  document.getElementById('statSetsWeek').textContent = sets;
+}
+
+/* ---- Finish workout summary + PR detection ---- */
+function computeWorkoutSummary(date) {
+  const profile = getProfile();
+  const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
+  let totalVolumeKg = 0, totalSets = 0;
+  const exercises = currentExercises.map(ex => {
+    const completed = ex.sets.filter(s => s.completed && s.weightKg != null && s.reps != null);
+    const volumeKg = completed.reduce((sum, s) => sum + s.weightKg * s.reps, 0);
+    totalVolumeKg += volumeKg;
+    totalSets += completed.length;
+    const bestOneRM = completed.reduce((max, s) => Math.max(max, estOneRM(s.weightKg, s.reps)), 0);
+    const historicalBest = bestHistoricalOneRM(ex.name, date);
+    const isPR = completed.length > 0 && historicalBest > 0 && bestOneRM > historicalBest + 0.01;
+    return { name: ex.name, completedSets: completed.length, volumeKg, isPR };
+  });
+  return { exercises, totalVolumeKg, totalSets, wu };
+}
+
+function renderWorkoutSummary(summary) {
+  const content = document.getElementById('summaryContent');
+  const wu = summary.wu;
+  const prCount = summary.exercises.filter(e => e.isPR).length;
+  let html = `<div class="summary-stats">
+    <div class="stat-tile"><div class="stat-tile-value">${summary.exercises.length}</div><div class="stat-tile-label">Exercises</div></div>
+    <div class="stat-tile"><div class="stat-tile-value">${summary.totalSets}</div><div class="stat-tile-label">Sets</div></div>
+    <div class="stat-tile"><div class="stat-tile-value">${round0(fromKg(summary.totalVolumeKg, wu))}</div><div class="stat-tile-label">Volume (${wu})</div></div>
+  </div>`;
+  if (prCount > 0) {
+    html += `<p style="text-align:center;color:var(--warning);font-family:var(--font-mono);font-size:0.8rem;margin-bottom:10px;">🏆 ${prCount} new personal record${prCount > 1 ? 's' : ''}!</p>`;
+  }
+  if (!summary.exercises.length) {
+    html += `<p class="empty-note">No exercises logged for this date.</p>`;
+  }
+  summary.exercises.forEach(ex => {
+    html += `<div class="summary-ex-row">
+      <div>
+        <div class="summary-ex-name">${escapeHtml(ex.name)}</div>
+        <div class="summary-ex-meta">${ex.completedSets} sets · ${round0(fromKg(ex.volumeKg, wu))} ${wu} volume</div>
+      </div>
+      ${ex.isPR ? '<span class="pr-pill">🏆 PR</span>' : ''}
+    </div>`;
+  });
+  content.innerHTML = html;
 }
 
 /* ---- Rest timer ---- */
@@ -912,6 +1090,29 @@ function resetTimer() {
 function onTimerComplete() {
   if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
   playBeep();
+}
+
+function autoStartRestTimer(seconds) {
+  clearInterval(timerState.intervalId);
+  timerState.duration = seconds;
+  timerState.remaining = seconds;
+  const mins = Math.max(1, Math.min(15, Math.round(seconds / 60)));
+  document.getElementById('timerDuration').value = mins;
+  document.getElementById('timerDurationLabel').textContent = `${mins}:00 min`;
+  timerState.running = true;
+  document.getElementById('btnTimerStart').textContent = 'Pause';
+  timerState.intervalId = setInterval(() => {
+    timerState.remaining -= 1;
+    if (timerState.remaining <= 0) {
+      timerState.remaining = 0;
+      clearInterval(timerState.intervalId);
+      timerState.running = false;
+      document.getElementById('btnTimerStart').textContent = 'Start';
+      onTimerComplete();
+    }
+    renderTimerRing();
+  }, 1000);
+  renderTimerRing();
 }
 
 function playBeep() {
@@ -1061,9 +1262,15 @@ function csvEscape(v) {
   return s;
 }
 
-function formatExercises(exercises) {
+function formatExercises(exercises, wu) {
   if (!exercises || !exercises.length) return '';
-  return exercises.map(e => `${e.name} (${e.sets}x${e.reps})`).join('; ');
+  return exercises.map(ex => {
+    const setsText = (ex.sets || [])
+      .filter(s => s.completed)
+      .map(s => `${s.reps ?? '?'}x${s.weightKg != null ? round2(fromKg(s.weightKg, wu)) : '?'}${wu}`)
+      .join('/');
+    return `${ex.name} (${setsText || 'no completed sets'})`;
+  }).join('; ');
 }
 
 function buildCSV(logsArr, profile) {
@@ -1080,7 +1287,7 @@ function buildCSV(logsArr, profile) {
       l.sleep ?? '', l.stress ?? '', l.fatigue ?? '', l.hunger ?? '',
       l.steps ?? '', l.calories ?? '', l.protein ?? '', l.water ?? '',
       l.workout ? 'Yes' : 'No',
-      formatExercises(l.exercises),
+      formatExercises(l.exercises, wu),
       l.menstruating ? 'Yes' : 'No',
       l.reviewedGoals ? 'Yes' : 'No', l.plannedTomorrow ? 'Yes' : 'No',
       ...habitLabels.map(h => (l.extra && l.extra[h.idx]) ? 'Yes' : 'No'),
@@ -1160,6 +1367,110 @@ function initExport() {
 }
 
 /* ---------------------------------------------------------------- */
+/* Google Drive backup                                                  */
+/* ---------------------------------------------------------------- */
+let driveTokenClient = null;
+let driveAccessToken = null;
+
+function setDriveStatus(text) {
+  const el = document.getElementById('driveStatus');
+  if (el) el.textContent = text;
+}
+
+function driveConfigured() {
+  return typeof GOOGLE_CLIENT_ID === 'string' && GOOGLE_CLIENT_ID && !GOOGLE_CLIENT_ID.startsWith('YOUR_CLIENT_ID');
+}
+
+function initDrive() {
+  const connectBtn = document.getElementById('btnDriveConnect');
+  const syncBtn = document.getElementById('btnDriveSyncNow');
+
+  if (!driveConfigured()) {
+    setDriveStatus('Not set up yet — add your Google Client ID in config.js to enable Drive backup.');
+    connectBtn.disabled = true;
+    return;
+  }
+
+  connectBtn.addEventListener('click', () => connectDrive());
+  syncBtn.addEventListener('click', () => saveToDrive(true));
+
+  const tryInit = () => {
+    if (!window.google || !google.accounts || !google.accounts.oauth2) {
+      setDriveStatus('Waiting for Google sign-in to load (requires internet)…');
+      return false;
+    }
+    driveTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: 'https://www.googleapis.com/auth/drive.file',
+      callback: (resp) => {
+        if (resp.error) { setDriveStatus('Sign-in failed: ' + resp.error); return; }
+        driveAccessToken = resp.access_token;
+        localStorage.setItem('wft_drive_connected', '1');
+        connectBtn.hidden = true;
+        syncBtn.hidden = false;
+        setDriveStatus('Connected. Syncing…');
+        saveToDrive();
+      },
+    });
+    setDriveStatus(localStorage.getItem('wft_drive_connected') ? 'Reconnecting…' : 'Not connected.');
+    if (localStorage.getItem('wft_drive_connected')) {
+      driveTokenClient.requestAccessToken({ prompt: '' });
+    }
+    return true;
+  };
+
+  if (!tryInit()) {
+    window.addEventListener('load', () => setTimeout(tryInit, 800));
+  }
+}
+
+function connectDrive() {
+  if (!driveTokenClient) {
+    alert('Google sign-in isn\'t available right now. Check your internet connection and try again.');
+    return;
+  }
+  driveTokenClient.requestAccessToken({ prompt: 'consent' });
+}
+
+async function saveToDrive(manual) {
+  if (!driveAccessToken) {
+    if (manual) alert('Not connected to Google Drive yet.');
+    return;
+  }
+  setDriveStatus('Syncing…');
+  const data = { profile: getProfile(), logs: getLogs(), reviews: getReviews(), savedAt: new Date().toISOString() };
+  const body = JSON.stringify(data, null, 2);
+  const fileId = localStorage.getItem('wft_drive_file_id');
+  try {
+    if (fileId) {
+      const res = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${driveAccessToken}`, 'Content-Type': 'application/json' },
+        body,
+      });
+      if (!res.ok) throw new Error('upload failed: ' + res.status);
+    } else {
+      const boundary = 'wft_boundary_' + Date.now();
+      const metadata = { name: 'winfinity-fitness-backup.json', mimeType: 'application/json' };
+      const multipartBody =
+        `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
+        `--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
+      const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${driveAccessToken}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+        body: multipartBody,
+      });
+      if (!res.ok) throw new Error('create failed: ' + res.status);
+      const json = await res.json();
+      if (json.id) localStorage.setItem('wft_drive_file_id', json.id);
+    }
+    setDriveStatus('Last synced ' + new Date().toLocaleTimeString());
+  } catch (e) {
+    setDriveStatus('Sync failed — will retry on next save.');
+  }
+}
+
+/* ---------------------------------------------------------------- */
 /* Init                                                                 */
 /* ---------------------------------------------------------------- */
 document.getElementById('headerToday').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
@@ -1173,6 +1484,7 @@ initNutrition();
 initBioLog();
 initReviewForm();
 initExport();
+initDrive();
 loadSetupForm();
 loadCheckinForm();
 renderDashboard();
@@ -1182,3 +1494,4 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   });
 }
+

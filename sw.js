@@ -1,9 +1,10 @@
-const CACHE_NAME = 'fittracker-v2';
+const CACHE_NAME = 'fittracker-v5';
 const CORE_ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js',
+  './config.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',

@@ -113,6 +113,14 @@
 
   <!-- ============ TRAINING ============ -->
   <section class="tab-panel" id="tab-training" data-tab="training" hidden>
+    <div class="training-topbar">
+      <label class="field">
+        <span>Date</span>
+        <input type="date" id="trainDate">
+      </label>
+      <button type="button" class="btn btn--finish" id="btnFinishWorkout">Finish</button>
+    </div>
+
     <div class="stat-grid">
       <div class="stat-tile">
         <div class="stat-tile-value" id="statWorkoutsWeek">–</div>
@@ -139,36 +147,18 @@
       </div>
     </div>
 
-    <h2 class="section-title">Log today's session</h2>
-    <label class="field">
-      <span>Date</span>
-      <input type="date" id="trainDate">
-    </label>
+    <h2 class="section-title">Today's exercises</h2>
+    <div class="exercise-cards" id="exerciseCards"></div>
+    <p class="empty-note" id="exerciseEmptyNote">No exercises logged for this date yet.</p>
 
     <fieldset class="field-group">
       <legend>Add exercise</legend>
       <label class="field">
         <span>Exercise name</span>
-        <input type="text" id="exerciseName" placeholder="e.g. Barbell Squat">
+        <input type="text" id="exerciseName" placeholder="e.g. Barbell Bench Press">
       </label>
-      <div class="field-row">
-        <label class="field">
-          <span>Sets</span>
-          <input type="number" id="exerciseSets" min="1" max="20" value="3">
-        </label>
-        <label class="field">
-          <span>Reps</span>
-          <input type="number" id="exerciseReps" min="1" max="100" value="10">
-        </label>
-      </div>
       <button type="button" class="btn" id="btnAddExercise">+ Add exercise</button>
     </fieldset>
-
-    <div class="exercise-list" id="exerciseList"></div>
-    <p class="empty-note" id="exerciseEmptyNote">No exercises logged for this date yet.</p>
-
-    <button type="button" class="btn btn--primary" id="btnSaveSession">Save session</button>
-    <p class="save-note" id="trainSaveNote"></p>
   </section>
 
   <!-- ============ NUTRITION ============ -->
@@ -489,6 +479,16 @@
     </div>
 
     <div class="sheet-section">
+      <h2 class="section-title">Google Drive backup</h2>
+      <p class="hint" id="driveStatus">Not connected.</p>
+      <div class="btn-row">
+        <button class="btn btn--primary" id="btnDriveConnect">Sign in with Google</button>
+        <button class="btn" id="btnDriveSyncNow" hidden>Backup now</button>
+      </div>
+      <p class="hint">Once connected, finishing a workout automatically backs up your data to a file named "winfinity-fitness-backup.json" in your Drive. Requires an internet connection.</p>
+    </div>
+
+    <div class="sheet-section">
       <h2 class="section-title">Log history</h2>
       <div class="table-wrap">
         <table id="historyTable">
@@ -503,6 +503,23 @@
   </div>
 </div>
 
+<!-- ============ WORKOUT SUMMARY SHEET ============ -->
+<div class="sheet-overlay" id="summaryOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Workout Summary</h2>
+      <button class="sheet-close" id="btnCloseSummary">✕</button>
+    </div>
+    <div id="summaryContent"></div>
+    <div class="btn-row" style="margin-top:16px;">
+      <button class="btn btn--primary" id="btnDoneSummary">Done</button>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="app.js"></script>
 </body>
 </html>
