@@ -1972,17 +1972,10 @@ function initLeaderboard() {
 /* ---------------------------------------------------------------- */
 /* Beta lock                                                            */
 /* ---------------------------------------------------------------- */
-const BETA_DURATION_DAYS = 30;
+const BETA_END_DATE = new Date(2026, 6, 31, 23, 59, 59); // end of day, July 31, 2026
 
 function initBetaLock() {
-  const KEY_FIRST_USED = 'wft_first_used';
-  let firstUsed = localStorage.getItem(KEY_FIRST_USED);
-  if (!firstUsed) {
-    firstUsed = new Date().toISOString();
-    localStorage.setItem(KEY_FIRST_USED, firstUsed);
-  }
-  const daysUsed = (Date.now() - new Date(firstUsed).getTime()) / 86400000;
-  if (daysUsed < BETA_DURATION_DAYS) return;
+  if (Date.now() < BETA_END_DATE.getTime()) return;
 
   document.getElementById('lockOverlay').hidden = false;
   document.getElementById('btnLockExportCSV').addEventListener('click', () => exportCSV(sortedLogsArray(), 'fitness-log-all'));
