@@ -19,6 +19,8 @@
 
   --series-1: #2de2e6;
   --series-2: #8b6bf2;
+  --gradient-bar: linear-gradient(90deg, var(--violet) 0%, #3f8ff0 55%, var(--cyan) 100%);
+  --gradient-glow: rgba(63,143,240,0.45);
 
   --good: #35d488;
   --warning: #f0b429;
@@ -89,11 +91,25 @@ body {
 
 /* ---------------- Hero ---------------- */
 .hero-card {
+  position: relative;
   background: linear-gradient(160deg, var(--surface-2), var(--surface-1));
   border: 1px solid var(--border);
   border-radius: var(--card-radius);
   padding: 18px;
 }
+.sys-version {
+  position: absolute;
+  top: 14px; right: 16px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+.hero-sub { color: var(--text-secondary); font-size: 0.85rem; margin: 6px 0 0; line-height: 1.4; }
+.accent-text { color: var(--cyan); }
+.chip-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip-row .chip { margin-top: 12px; flex: 1; min-width: 130px; }
 .hero-eyebrow {
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -292,10 +308,14 @@ body {
 
 /* Bar chart (sleep architecture style) */
 .bar-chart { display: flex; align-items: flex-end; gap: 4px; height: 90px; }
+.bar-chart--sparkline { height: 50px; }
+.empty-note .btn { margin-top: 10px; display: inline-flex; width: auto; }
 .bar-chart-col { flex: 1; background: var(--gridline); border-radius: 3px 3px 1px 1px; min-height: 3px; position: relative; }
 .bar-chart-col.has-value { background: var(--cyan-dim); }
 .bar-chart-labels { display: flex; gap: 4px; margin-top: 6px; }
 .bar-chart-labels span { flex: 1; text-align: center; font-family: var(--font-mono); font-size: 0.58rem; color: var(--text-muted); }
+.sleep-stats-row { display: flex; justify-content: space-between; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-soft); }
+.sleep-stats-row .stat-tile-value { font-size: 1.1rem; margin-top: 2px; }
 
 /* ---------------- Goal progress bar ---------------- */
 .goal-track {
@@ -308,9 +328,9 @@ body {
 .goal-fill {
   position: absolute;
   top: 0; left: 0; height: 100%;
-  background: var(--cyan);
+  background: var(--gradient-bar);
   border-radius: 4px;
-  box-shadow: 0 0 8px var(--cyan-glow);
+  box-shadow: 0 0 8px var(--gradient-glow);
 }
 .goal-marker {
   position: absolute;
@@ -488,6 +508,67 @@ body {
 .computed-list { margin: 0; display: grid; grid-template-columns: 1fr; gap: 10px; }
 .computed-list dt { font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .computed-list dd { margin: 0; font-size: 1rem; font-weight: 700; color: var(--cyan); font-family: var(--font-mono); }
+.target-icon { color: var(--text-muted); font-size: 1rem; }
+
+/* ---------------- Gradient bars (Fuel status, Goal progress) ---------------- */
+.gradient-bar {
+  height: 8px;
+  border-radius: 5px;
+  background: var(--surface-2);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--border-soft);
+}
+.gradient-bar--sm { height: 6px; }
+.gradient-bar-fill {
+  height: 100%;
+  border-radius: 5px;
+  background: var(--gradient-bar);
+  box-shadow: 0 0 10px var(--gradient-glow);
+  transition: width 0.5s ease;
+}
+.fuel-status-card { display: flex; flex-direction: column; gap: 8px; }
+.fuel-status-title { margin: 2px 0 4px; font-size: 1.05rem; font-weight: 800; }
+.fuel-hero-stat { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.fuel-hero-value {
+  font-family: var(--font-mono);
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1;
+}
+.fuel-hero-of { font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); }
+.gradient-stat-row { margin-top: 10px; }
+.gradient-stat-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.85rem;
+  color: var(--cyan);
+  margin-bottom: 6px;
+}
+.gradient-stat-row-head strong { color: var(--text-primary); font-family: var(--font-mono); font-size: 0.95rem; }
+.gradient-stat-row-head span span { color: var(--text-muted); font-family: var(--font-mono); font-size: 0.8rem; }
+.dashed-empty {
+  border: 1px dashed var(--border-soft);
+  border-radius: 12px;
+  padding: 20px 16px;
+  text-align: center;
+}
+.dashed-empty-icon { font-size: 1.4rem; color: var(--text-muted); margin-bottom: 8px; }
+.dashed-empty p { color: var(--text-secondary); font-size: 0.85rem; line-height: 1.5; margin: 0 0 8px; }
+.dashed-empty strong { color: var(--text-primary); }
+.link-btn {
+  background: none; border: none; color: var(--cyan);
+  font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase;
+  letter-spacing: 0.05em; text-decoration: underline; cursor: pointer; padding: 4px;
+}
+.input-unit-wrap { position: relative; }
+.input-unit-wrap input { padding-right: 52px !important; }
+.input-unit {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.04em; pointer-events: none;
+}
 
 /* ---------------- History table ---------------- */
 .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--card-radius); }
@@ -512,6 +593,7 @@ tbody tr:nth-child(even) { background: rgba(255,255,255,0.02); }
 .ex-card {
   background: var(--surface-1);
   border: 1px solid var(--border);
+  border-left: 2px solid var(--cyan);
   border-radius: var(--card-radius);
   padding: 12px;
 }
@@ -525,7 +607,7 @@ tbody tr:nth-child(even) { background: rgba(255,255,255,0.02); }
   background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--border-soft);
   border-radius: 8px; font-family: var(--font-mono); font-size: 0.72rem; padding: 3px 4px;
 }
-.ex-card-remove { background: none; border: none; color: var(--text-muted); font-size: 1.05rem; cursor: pointer; padding: 2px 6px; }
+.ex-card-remove { background: none; border: none; color: var(--text-muted); font-size: 1.1rem; line-height: 1; cursor: pointer; padding: 2px 8px; }
 .ex-card-remove:hover { color: var(--critical); }
 .ex-card-notes {
   width: 100%; font-size: 0.85rem; padding: 8px 10px; margin-bottom: 8px;
@@ -549,10 +631,19 @@ tbody tr:nth-child(even) { background: rgba(255,255,255,0.02); }
   width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border-soft);
   background: var(--surface-2); color: var(--text-muted); font-size: 0.95rem; cursor: pointer;
 }
-.ex-set-check.is-done { background: var(--good); border-color: transparent; color: #04180a; box-shadow: 0 0 8px rgba(53,212,136,0.5); }
+.ex-set-check.is-done { background: var(--cyan); border-color: transparent; color: #04181a; box-shadow: 0 0 8px var(--cyan-glow); }
 .ex-set-remove { background: none; border: none; color: var(--text-muted); font-size: 0.9rem; cursor: pointer; padding: 2px 6px; }
 tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .ex-add-set { width: 100%; margin-top: 8px; }
+
+.new-protocol-box {
+  border: 1px dashed var(--border-soft);
+  border-radius: var(--card-radius);
+  padding: 14px;
+}
+.new-protocol-box .field { margin-bottom: 10px; }
+.new-protocol-box input[type="text"] { text-align: center; }
+.new-protocol-box .btn { width: 100%; }
 
 /* ---------------- Workout summary ---------------- */
 .summary-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }

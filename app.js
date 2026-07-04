@@ -166,6 +166,8 @@ function computeHabitCompletion(profile, entry) {
 /* ---------------------------------------------------------------- */
 /* Radial ring renderer (reused by Status rings + Training timer)     */
 /* ---------------------------------------------------------------- */
+let ringGradCounter = 0;
+
 function renderRing(container, pct, opts) {
   opts = opts || {};
   const size = opts.size || 120;
@@ -175,13 +177,22 @@ function renderRing(container, pct, opts) {
   const clamped = Math.min(100, Math.max(0, pct));
   const offset = c - (clamped / 100) * c;
   const center = opts.centerHtml || `<span style="font-size:${Math.round(size * 0.22)}px;font-weight:800;font-family:var(--font-mono);color:var(--text-primary);">${opts.centerText || ''}</span>`;
+  const gradId = `ringGrad${ringGradCounter++}`;
+  const strokeAttr = opts.gradient ? `url(#${gradId})` : '';
+  const glow = opts.gradient ? `filter: drop-shadow(0 0 6px var(--gradient-glow));` : '';
   container.innerHTML = `
     ${opts.modTag ? `<p class="mod-tag">${opts.modTag}</p>` : ''}
     <div style="position:relative;width:${size}px;height:${size}px;">
       <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+        ${opts.gradient ? `<defs><linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#8b6bf2"/>
+          <stop offset="55%" stop-color="#3f8ff0"/>
+          <stop offset="100%" stop-color="#2de2e6"/>
+        </linearGradient></defs>` : ''}
         <circle class="ring-track" cx="${size / 2}" cy="${size / 2}" r="${r}" stroke-width="${stroke}"></circle>
         <circle class="ring-fill${opts.violet ? ' violet' : ''}${opts.magenta ? ' magenta' : ''}" cx="${size / 2}" cy="${size / 2}" r="${r}" stroke-width="${stroke}"
           stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}"
+          style="${strokeAttr ? `stroke:${strokeAttr};${glow}` : ''}"
           transform="rotate(-90 ${size / 2} ${size / 2})"></circle>
       </svg>
       <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;">${center}</div>
@@ -394,6 +405,7 @@ function loadBioForDate(date) {
   document.getElementById('bioHunger').value = e.hunger ?? 3;
   document.getElementById('bioHungerOut').textContent = e.hunger ?? 3;
   document.getElementById('bioMenstruatingField').hidden = !profile || profile.gender !== 'female';
+  document.getElementById('bioWeightUnitLabel').textContent = wu;
 }
 
 function initBioLog() {
@@ -451,6 +463,11 @@ function renderSleepBarChart() {
     lbl.textContent = d.dateObj.toLocaleDateString(undefined, { weekday: 'narrow' });
     labels.appendChild(lbl);
   });
+
+  const logged = days.filter(d => d.sleep != null);
+  const avgQuality = logged.length ? logged.reduce((s, d) => s + d.sleep, 0) / logged.length : null;
+  document.getElementById('sleepAvgQuality').textContent = avgQuality != null ? `${avgQuality.toFixed(1)}/5.0` : '–';
+  document.getElementById('sleepConsistency').textContent = `${round0((logged.length / 7) * 100)}%`;
 }
 
 /* ---------------------------------------------------------------- */
@@ -501,6 +518,27 @@ function loadCheckinForm() {
 /* ---------------------------------------------------------------- */
 /* Status: dashboard rendering                                         */
 /* ---------------------------------------------------------------- */
+function renderPulseSparkline() {
+  const logsArr = sortedLogsArray();
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const entry = logsArr.find(l => l.date === iso);
+    days.push(entry && entry.steps != null ? entry.steps : 0);
+  }
+  const max = Math.max(...days, 1);
+  const container = document.getElementById('pulseSparkline');
+  container.innerHTML = '';
+  days.forEach(v => {
+    const col = document.createElement('div');
+    col.className = 'bar-chart-col' + (v > 0 ? ' has-value' : '');
+    col.style.height = v > 0 ? `${Math.max(6, (v / max) * 100)}%` : '4%';
+    container.appendChild(col);
+  });
+}
+
+
 function renderDashboard() {
   const profile = getProfile();
   const logsArr = sortedLogsArray();
@@ -510,9 +548,9 @@ function renderDashboard() {
 
   if (profile && profile.startDate) {
     const start = parseISO(profile.startDate);
-    const elapsed = daysBetween(new Date(start), new Date());
-    const left = Math.max(0, (profile.programDays || 100) - elapsed);
-    document.getElementById('daysLeftValue').textContent = left;
+    const total = profile.programDays || 100;
+    const elapsed = Math.max(0, Math.min(total, daysBetween(new Date(start), new Date())));
+    document.getElementById('daysLeftValue').textContent = `${elapsed} / ${total}`;
   } else {
     document.getElementById('daysLeftValue').textContent = '–';
   }
@@ -522,14 +560,14 @@ function renderDashboard() {
 
   const habit = computeHabitCompletion(profile, todayEntry);
   renderRing(document.getElementById('ringHabitCard'), habit.pct, {
-    size: 128, modTag: 'MOD_HABIT_01', centerText: habit.pct + '%', label: 'Habit completion', sub: `${habit.done}/${habit.total} today`,
+    size: 140, stroke: 9, modTag: 'MOD_HABIT_01', centerText: habit.pct + '%', label: 'Habit completion', sub: `${habit.done}/${habit.total} today`,
   });
 
   const waterGoal = (profile && profile.waterGoal) || 8;
   const waterToday = (todayEntry && todayEntry.water != null) ? todayEntry.water : 0;
   const waterPct = waterGoal > 0 ? (waterToday / waterGoal) * 100 : 0;
   renderRing(document.getElementById('ringHydrationCard'), waterPct, {
-    size: 128, magenta: true, modTag: 'MOD_FUEL_02', centerText: Math.round(Math.min(100, waterPct)) + '%', label: 'Hydration', sub: `${waterToday} / ${waterGoal} cups`,
+    size: 140, stroke: 9, magenta: true, modTag: 'MOD_FUEL_02', centerText: Math.round(Math.min(100, waterPct)) + '%', label: 'Hydration', sub: `${waterToday} / ${waterGoal} cups`,
   });
 
   document.getElementById('avgSteps').textContent = fmtOrDash(avgOfLastNDays(logsArr, 'steps', 7), v => round0(v));
@@ -566,6 +604,7 @@ function renderDashboard() {
 
   renderWeightChart(trendSeries, wu);
   renderGoalProgress(profile, kgNow, wu);
+  renderPulseSparkline();
 }
 
 /* ---- Weight chart (SVG, hover tooltip) ---- */
@@ -843,17 +882,18 @@ function renderExerciseCards() {
     }).join('');
 
     card.innerHTML = `
+      <p class="mod-tag">MOD_P_${String(exIdx + 1).padStart(2, '0')}</p>
       <div class="ex-card-head">
         <div class="ex-card-title">${escapeHtml(ex.name)}</div>
         <div class="ex-card-rest">⏱ <select class="ex-rest-select" data-ex="${exIdx}">${restOptions}</select></div>
-        <button type="button" class="ex-card-remove" data-ex="${exIdx}">✕</button>
+        <button type="button" class="ex-card-remove" data-ex="${exIdx}">⋮</button>
       </div>
       <input type="text" class="ex-card-notes" data-ex="${exIdx}" placeholder="Add notes here…" value="${escapeHtml(ex.notes || '')}">
       <table class="ex-sets-table">
-        <thead><tr><th>Set</th><th>Previous</th><th>Reps</th><th>${wu}</th><th></th><th></th></tr></thead>
+        <thead><tr><th>Set</th><th>Previous</th><th>Reps</th><th>Load (${wu})</th><th></th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <button type="button" class="btn btn--sm ex-add-set" data-ex="${exIdx}">+ Add Set</button>
+      <button type="button" class="btn btn--sm ex-add-set" data-ex="${exIdx}">+ Append set block</button>
     `;
     container.appendChild(card);
   });
@@ -953,7 +993,7 @@ function initTraining() {
     renderWorkoutSummary(summary);
     document.getElementById('summaryOverlay').hidden = false;
     renderTrainingStats();
-    if (driveAccessToken) saveToDrive();
+    saveToDrive();
   });
 
   document.getElementById('btnCloseSummary').addEventListener('click', () => { document.getElementById('summaryOverlay').hidden = true; });
@@ -1032,7 +1072,7 @@ function renderTimerRing() {
   const pct = timerState.duration > 0 ? ((timerState.duration - timerState.remaining) / timerState.duration) * 100 : 0;
   const statusText = timerState.remaining === 0 ? 'Done' : (timerState.running ? 'Resting' : 'Ready');
   const centerHtml = `<div><div class="timer-time${timerState.remaining === 0 ? ' is-done' : ''}">${formatTime(timerState.remaining)}</div><div class="timer-status">${statusText}</div></div>`;
-  renderRing(document.getElementById('timerRingWrap'), pct, { size: 180, stroke: 12, centerHtml });
+  renderRing(document.getElementById('timerRingWrap'), pct, { size: 192, stroke: 9, gradient: true, centerHtml });
 }
 
 function initTimer() {
@@ -1149,11 +1189,15 @@ function loadNutritionForDate(date) {
   document.getElementById('nutProtein').value = e.protein ?? '';
   document.getElementById('nutWater').value = e.water ?? '';
   document.getElementById('nutSteps').value = e.steps ?? '';
+  document.getElementById('fuelDateLabel').textContent = fmtDate(parseISO(date));
 }
 
 function initNutrition() {
   document.getElementById('nutDate').value = todayISO();
-  document.getElementById('nutDate').addEventListener('change', e => loadNutritionForDate(e.target.value));
+  document.getElementById('nutDate').addEventListener('change', e => { loadNutritionForDate(e.target.value); renderNutritionTargets(); });
+  document.getElementById('btnGoToBioFromFuel').addEventListener('click', () => {
+    document.querySelector('.tab-btn[data-target="bio"]').click();
+  });
 
   document.getElementById('btnSaveNutrition').addEventListener('click', () => {
     const date = document.getElementById('nutDate').value;
@@ -1166,6 +1210,7 @@ function initNutrition() {
     document.getElementById('nutSaveNote').textContent = 'Saved intake for ' + date;
     setTimeout(() => { document.getElementById('nutSaveNote').textContent = ''; }, 2000);
     renderNutritionAverages();
+    renderNutritionTargets();
   });
 
   loadNutritionForDate(todayISO());
@@ -1175,26 +1220,41 @@ function initNutrition() {
 
 function renderNutritionTargets() {
   const profile = getProfile();
-  const list = document.getElementById('nutTargetsList');
-  list.innerHTML = '';
-  if (!profile) {
-    list.innerHTML = '<p class="empty-note">Fill in your profile in Bio to see targets.</p>';
+  const emptyBox = document.getElementById('nutTargetsEmpty');
+  const statRows = document.querySelectorAll('#fuelStatusCard .fuel-hero-stat, #fuelStatusCard .gradient-bar, #fuelStatusCard .gradient-stat-row');
+  const kg = profile ? currentWeightKg(profile) : null;
+  const targets = (profile && kg) ? computeTargets(profile, kg) : null;
+
+  if (!targets) {
+    emptyBox.hidden = false;
+    statRows.forEach(el => el.style.display = 'none');
     return;
   }
-  const kg = currentWeightKg(profile);
-  const targets = kg ? computeTargets(profile, kg) : null;
-  const rows = [];
-  if (targets) {
-    const range = profile.goalMode === 'bulk' ? targets.bulking : targets.cutting;
-    rows.push(['Calorie target', `${round0(range[0])}–${round0(range[1])} kcal`]);
-    rows.push(['Protein target', `${round0(targets.protein[0])}–${round0(targets.protein[1])} g`]);
-  }
-  rows.push(['Water goal', `${profile.waterGoal || 8} cups`]);
-  rows.forEach(([k, v]) => {
-    const dt = document.createElement('dt'); dt.textContent = k;
-    const dd = document.createElement('dd'); dd.textContent = v;
-    list.appendChild(dt); list.appendChild(dd);
-  });
+  emptyBox.hidden = true;
+  statRows.forEach(el => el.style.display = '');
+
+  const range = profile.goalMode === 'bulk' ? targets.bulking : targets.cutting;
+  const calorieTarget = round0((range[0] + range[1]) / 2);
+  const proteinTarget = round0((targets.protein[0] + targets.protein[1]) / 2);
+  const waterTarget = profile.waterGoal || 8;
+
+  const date = document.getElementById('nutDate').value;
+  const entry = getLogs()[date] || {};
+  const caloriesNow = entry.calories ?? 0;
+  const proteinNow = entry.protein ?? 0;
+  const waterNow = entry.water ?? 0;
+
+  document.getElementById('fuelCaloriesNow').textContent = caloriesNow;
+  document.getElementById('fuelCaloriesTarget').textContent = calorieTarget;
+  document.getElementById('fuelCaloriesBar').style.width = Math.min(100, (caloriesNow / calorieTarget) * 100) + '%';
+
+  document.getElementById('fuelProteinNow').textContent = proteinNow + 'g';
+  document.getElementById('fuelProteinTarget').textContent = proteinTarget + 'g';
+  document.getElementById('fuelProteinBar').style.width = Math.min(100, (proteinNow / proteinTarget) * 100) + '%';
+
+  document.getElementById('fuelWaterNow').textContent = waterNow;
+  document.getElementById('fuelWaterTarget').textContent = waterTarget;
+  document.getElementById('fuelWaterBar').style.width = Math.min(100, (waterNow / waterTarget) * 100) + '%';
 }
 
 function renderNutritionAverages() {
@@ -1420,9 +1480,12 @@ function initDrive() {
         saveToDrive();
       },
     });
-    setDriveStatus(localStorage.getItem('wft_drive_connected') ? 'Reconnecting…' : 'Not connected.');
     if (localStorage.getItem('wft_drive_connected')) {
-      driveTokenClient.requestAccessToken({ prompt: '' });
+      connectBtn.hidden = true;
+      syncBtn.hidden = false;
+      setDriveStatus('Connected. Tap Backup now to sync.');
+    } else {
+      setDriveStatus('Not connected.');
     }
     return true;
   };
@@ -1442,7 +1505,19 @@ function connectDrive() {
 
 async function saveToDrive(manual) {
   if (!driveAccessToken) {
-    if (manual) alert('Not connected to Google Drive yet.');
+    const wasConnected = localStorage.getItem('wft_drive_connected');
+    if (!wasConnected) {
+      if (manual) alert('Not connected to Google Drive yet.');
+      return;
+    }
+    if (!driveTokenClient) {
+      if (manual) alert('Google sign-in isn\'t available right now. Check your internet connection.');
+      return;
+    }
+    // Only reached from an explicit backup action (button tap or finishing a workout),
+    // never automatically on page load — so a sign-in prompt here is expected.
+    setDriveStatus('Reconnecting…');
+    driveTokenClient.requestAccessToken({ prompt: '' });
     return;
   }
   setDriveStatus('Syncing…');
@@ -1740,6 +1815,9 @@ function initBetaLock() {
 document.getElementById('headerToday').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
 
 initTabs();
+document.getElementById('btnGoToBioFromChart').addEventListener('click', () => {
+  document.querySelector('.tab-btn[data-target="bio"]').click();
+});
 initSheet();
 initSetupForm();
 initCheckin();
@@ -1760,5 +1838,7 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   });
 }
+
+
 
 

@@ -25,11 +25,18 @@
   <!-- ============ STATUS ============ -->
   <section class="tab-panel" id="tab-status" data-tab="status">
     <div class="hero-card">
+      <p class="sys-version">SYS_V.4.2</p>
       <p class="hero-eyebrow">System check-in</p>
       <h2 class="hero-title">Welcome back, <span class="accent" id="heroName">Operator</span>.</h2>
-      <div class="chip">
-        <span class="chip-label">Days left in challenge</span>
-        <span class="chip-value" id="daysLeftValue">–</span>
+      <div class="chip-row">
+        <div class="chip">
+          <span class="chip-label">Sync_status</span>
+          <span class="chip-value" id="syncStatusValue">Synchronized</span>
+        </div>
+        <div class="chip">
+          <span class="chip-label">Challenge_day</span>
+          <span class="chip-value" id="daysLeftValue">–</span>
+        </div>
       </div>
     </div>
 
@@ -69,13 +76,21 @@
     <div class="perf-grid" id="perfGrid"></div>
 
     <div class="chart-card">
+      <p class="mod-tag">Synchronization pulse</p>
+      <div class="bar-chart bar-chart--sparkline" id="pulseSparkline"></div>
+    </div>
+
+    <div class="chart-card">
       <div class="chart-card-head">
-        <span class="chart-card-title">Weight journey</span>
+        <span class="chart-card-title">Entity weight journey</span>
         <span class="chart-card-sub" id="chartRange"></span>
       </div>
       <div id="weightChart" class="weight-chart"></div>
       <div class="chart-legend" id="chartLegend"></div>
-      <p class="empty-note" id="chartEmptyNote">Log at least one weight entry to see your trend.</p>
+      <div class="empty-note" id="chartEmptyNote">
+        <p>Insufficient data points for visual projection. Log at least one weight entry to initialize trend.</p>
+        <button type="button" class="btn btn--primary btn--sm" id="btnGoToBioFromChart">Initialize sync</button>
+      </div>
     </div>
 
     <div class="chart-card" id="goalProgressCard">
@@ -88,14 +103,14 @@
         <legend>Extra habits</legend>
       </fieldset>
       <fieldset class="field-group">
-        <legend>Before sleeping</legend>
+        <legend>Operational protocol</legend>
         <label class="field field--checkbox">
           <input type="checkbox" id="statusReviewedGoals">
-          <span>Reviewed your goals and vision today</span>
+          <span>Reviewed mission objectives and future-vision calibration</span>
         </label>
         <label class="field field--checkbox">
           <input type="checkbox" id="statusPlannedTomorrow">
-          <span>Planned tomorrow (workouts, meals, etc.)</span>
+          <span>Projected T+1 strategy (training, fuel, recovery)</span>
         </label>
         <label class="field">
           <span>Struggles today</span>
@@ -133,6 +148,7 @@
     </div>
 
     <div class="timer-card">
+      <p class="mod-tag" style="align-self:flex-start;">MOD_TIMER_08</p>
       <div class="timer-ring-wrap" id="timerRingWrap"></div>
       <div class="timer-duration">
         <div class="timer-duration-row">
@@ -147,53 +163,79 @@
       </div>
     </div>
 
-    <h2 class="section-title">Today's exercises</h2>
+    <h2 class="section-title">Protocol execution queue</h2>
     <div class="exercise-cards" id="exerciseCards"></div>
     <p class="empty-note" id="exerciseEmptyNote">No exercises logged for this date yet.</p>
 
-    <fieldset class="field-group">
-      <legend>Add exercise</legend>
+    <div class="new-protocol-box">
+      <p class="mod-tag">+ New_protocol_sequence</p>
       <label class="field">
-        <span>Exercise name</span>
-        <input type="text" id="exerciseName" placeholder="e.g. Barbell Bench Press">
+        <input type="text" id="exerciseName" placeholder="Protocol Name (e.g., Deadlift)">
       </label>
-      <button type="button" class="btn" id="btnAddExercise">+ Add exercise</button>
-    </fieldset>
+      <button type="button" class="btn" id="btnAddExercise">Synchronize new exercise</button>
+    </div>
   </section>
 
-  <!-- ============ NUTRITION ============ -->
+  <!-- ============ NUTRITION / FUEL ============ -->
   <section class="tab-panel" id="tab-nutrition" data-tab="nutrition" hidden>
+    <div class="hero-card">
+      <p class="hero-eyebrow">Sys_fuel_mgmt_v2.0</p>
+      <h2 class="hero-title">Fuel Intake Terminal</h2>
+      <p class="hero-sub">Execute precise metabolic protocol for <span class="accent-text" id="fuelDateLabel"></span></p>
+    </div>
+
     <label class="field">
       <span>Date</span>
       <input type="date" id="nutDate">
     </label>
 
-    <div class="computed-card">
-      <h3>Today's targets</h3>
-      <dl class="computed-list" id="nutTargetsList"></dl>
+    <div class="hero-card fuel-status-card" id="fuelStatusCard">
+      <div class="chart-card-head"><p class="mod-tag" style="margin:0;">Current performance</p><span class="target-icon">◎</span></div>
+      <h3 class="fuel-status-title">Daily Fuel Status</h3>
+
+      <div class="fuel-hero-stat">
+        <span class="fuel-hero-value" id="fuelCaloriesNow">0</span>
+        <span class="fuel-hero-of">of <span id="fuelCaloriesTarget">–</span> kcal</span>
+      </div>
+      <div class="gradient-bar"><div class="gradient-bar-fill" id="fuelCaloriesBar" style="width:0%"></div></div>
+
+      <div class="gradient-stat-row">
+        <div class="gradient-stat-row-head"><span>Protein</span><span><strong id="fuelProteinNow">0g</strong> <span>/ <span id="fuelProteinTarget">–</span></span></span></div>
+        <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="fuelProteinBar" style="width:0%"></div></div>
+      </div>
+      <div class="gradient-stat-row">
+        <div class="gradient-stat-row-head"><span>Water</span><span><strong id="fuelWaterNow">0</strong> <span>/ <span id="fuelWaterTarget">–</span> cups</span></span></div>
+        <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="fuelWaterBar" style="width:0%"></div></div>
+      </div>
+
+      <div class="dashed-empty" id="nutTargetsEmpty" hidden style="margin-top:12px;">
+        <div class="dashed-empty-icon">▤</div>
+        <p>Initialize profile sequence in <strong>Bio Terminal</strong> to calibrate target metrics.</p>
+        <button type="button" class="link-btn" id="btnGoToBioFromFuel">Go to Bio-Link</button>
+      </div>
     </div>
 
     <fieldset class="field-group">
-      <legend>Today's intake</legend>
+      <legend>Mod_input_01 today's intake log</legend>
       <label class="field">
         <span>Calories consumed</span>
-        <input type="number" id="nutCalories" placeholder="e.g. 2200">
+        <div class="input-unit-wrap"><input type="number" id="nutCalories" placeholder="e.g. 2200"><span class="input-unit">kcal</span></div>
       </label>
       <label class="field">
         <span>Protein (g)</span>
-        <input type="number" id="nutProtein" placeholder="e.g. 140">
+        <div class="input-unit-wrap"><input type="number" id="nutProtein" placeholder="e.g. 140"><span class="input-unit">grams</span></div>
       </label>
       <label class="field">
         <span>Water (16oz cups)</span>
-        <input type="number" id="nutWater" min="0" placeholder="e.g. 6">
+        <div class="input-unit-wrap"><input type="number" id="nutWater" min="0" placeholder="e.g. 6"><span class="input-unit">units</span></div>
       </label>
       <label class="field">
-        <span>Steps</span>
-        <input type="number" id="nutSteps" placeholder="e.g. 8000">
+        <span>Daily steps</span>
+        <div class="input-unit-wrap"><input type="number" id="nutSteps" placeholder="e.g. 8000"><span class="input-unit">walk</span></div>
       </label>
     </fieldset>
 
-    <button type="button" class="btn btn--primary" id="btnSaveNutrition">Save intake</button>
+    <button type="button" class="btn btn--primary" id="btnSaveNutrition">⟲ Sync fuel data</button>
     <p class="save-note" id="nutSaveNote"></p>
 
     <h2 class="section-title">Averages (7-day)</h2>
@@ -215,16 +257,22 @@
 
   <!-- ============ BIO ============ -->
   <section class="tab-panel" id="tab-bio" data-tab="bio" hidden>
+    <div class="hero-card">
+      <p class="hero-eyebrow">Sync status: optimal</p>
+      <h2 class="hero-title">Biometric Analytics</h2>
+      <p class="hero-sub">Terminal interface for entity protocol execution and biological data synchronization.</p>
+    </div>
+
     <label class="field">
       <span>Date</span>
       <input type="date" id="bioDate">
     </label>
 
     <fieldset class="field-group">
-      <legend>Today's biometrics</legend>
+      <p class="mod-tag">Mod_bio_log_01</p>
       <label class="field">
         <span>Morning weight</span>
-        <input type="number" step="0.01" id="bioWeight" placeholder="e.g. 79.5">
+        <div class="input-unit-wrap"><input type="number" step="0.01" id="bioWeight" placeholder="e.g. 79.5"><span class="input-unit" id="bioWeightUnitLabel">kg / lbs</span></div>
       </label>
       <label class="field field--checkbox" id="bioMenstruatingField">
         <input type="checkbox" id="bioMenstruating">
@@ -256,13 +304,18 @@
       </label>
     </fieldset>
 
-    <button type="button" class="btn btn--primary" id="btnSaveBio">Save biometrics</button>
+    <button type="button" class="btn btn--primary" id="btnSaveBio">Initialize sync</button>
     <p class="save-note" id="bioSaveNote"></p>
 
     <div class="chart-card">
-      <div class="chart-card-head"><span class="chart-card-title">Sleep quality (7 days)</span></div>
+      <p class="mod-tag">Mod_sleep_viz_07</p>
+      <div class="chart-card-head"><span class="chart-card-title">Sleep Cycles (7D)</span></div>
       <div class="bar-chart" id="sleepBarChart"></div>
       <div class="bar-chart-labels" id="sleepBarLabels"></div>
+      <div class="sleep-stats-row">
+        <div><span class="stat-tile-label">Avg quality</span><div class="stat-tile-value" id="sleepAvgQuality">–</div></div>
+        <div><span class="stat-tile-label">Consistency</span><div class="stat-tile-value" id="sleepConsistency">–</div></div>
+      </div>
     </div>
 
     <div class="computed-card">
@@ -270,23 +323,24 @@
       <dl class="computed-list" id="computedList"></dl>
     </div>
 
-    <h2 class="section-title">Profile &amp; goals</h2>
+    <p class="mod-tag" style="margin:6px 0 -4px 2px;">Mod_entity_core_99</p>
+    <h2 class="section-title">Entity identity</h2>
     <form id="setupForm">
       <label class="field">
-        <span>Name</span>
+        <span>Entity designation (name)</span>
         <input type="text" id="setupName" placeholder="Optional">
       </label>
 
       <div class="field-row">
         <label class="field">
-          <span>Weight unit</span>
+          <span>Weight system</span>
           <select id="setupWeightUnit">
             <option value="kg">Kilograms (kg)</option>
             <option value="lb">Pounds (lb)</option>
           </select>
         </label>
         <label class="field">
-          <span>Height unit</span>
+          <span>Height system</span>
           <select id="setupHeightUnit">
             <option value="cm">Centimeters (cm)</option>
             <option value="ftin">Feet &amp; inches</option>
@@ -296,14 +350,14 @@
 
       <div class="field-row">
         <label class="field">
-          <span>Biological gender</span>
+          <span>Biological archetype</span>
           <select id="setupGender">
             <option value="male">Male</option>
             <option value="female">Female</option>
           </select>
         </label>
         <label class="field">
-          <span>Age</span>
+          <span>Temporal age</span>
           <input type="number" id="setupAge" min="10" max="100">
         </label>
       </div>
@@ -455,27 +509,27 @@
 
 <nav class="tab-bar">
   <button class="tab-btn is-active" data-target="status">
-    <svg viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="10" rx="1.5"/><rect x="14" y="3" width="7" height="6" rx="1.5"/><rect x="14" y="13" width="7" height="8" rx="1.5"/><rect x="3" y="17" width="7" height="4" rx="1.5"/></svg>
+    <svg viewBox="0 0 24 24" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="10" rx="1.5"/><rect x="14" y="3" width="7" height="6" rx="1.5"/><rect x="14" y="13" width="7" height="8" rx="1.5"/><rect x="3" y="17" width="7" height="4" rx="1.5"/></svg>
     <span>Status</span>
   </button>
   <button class="tab-btn" data-target="training">
-    <svg viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><g transform="rotate(45 12 12)"><line x1="6.5" y1="12" x2="17.5" y2="12"/><rect x="3.5" y="9" width="3" height="6" rx="1"/><rect x="17.5" y="9" width="3" height="6" rx="1"/><rect x="1.5" y="10.3" width="2" height="3.4" rx="0.6"/><rect x="20.5" y="10.3" width="2" height="3.4" rx="0.6"/></g></svg>
+    <svg viewBox="0 0 24 24" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><g transform="rotate(45 12 12)"><line x1="6.5" y1="12" x2="17.5" y2="12"/><rect x="3.5" y="9" width="3" height="6" rx="1"/><rect x="17.5" y="9" width="3" height="6" rx="1"/><rect x="1.5" y="10.3" width="2" height="3.4" rx="0.6"/><rect x="20.5" y="10.3" width="2" height="3.4" rx="0.6"/></g></svg>
     <span>Training</span>
   </button>
   <button class="tab-btn" data-target="nutrition">
-    <svg viewBox="0 0 24 24" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2v6a1.5 1.5 0 0 0 3 0V2M8.5 8v13"/><path d="M16 2c-1.7 0-3 1.8-3 4.5S14.3 11 16 11v11"/></svg>
+    <svg viewBox="0 0 24 24" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2v6a1.5 1.5 0 0 0 3 0V2M8.5 8v13"/><path d="M16 2c-1.7 0-3 1.8-3 4.5S14.3 11 16 11v11"/></svg>
     <span>Fuel</span>
   </button>
   <button class="tab-btn" data-target="bio">
-    <svg viewBox="0 0 24 24" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3c0 5 10 5 10 10s-10 5-10 10"/><path d="M17 3c0 5-10 5-10 10s10 5 10 10"/><path d="M8 7h8M7.5 12h9M8 17h8"/></svg>
+    <svg viewBox="0 0 24 24" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3c0 5 10 5 10 10s-10 5-10 10"/><path d="M17 3c0 5-10 5-10 10s10 5 10 10"/><path d="M8 7h8M7.5 12h9M8 17h8"/></svg>
     <span>DNA</span>
   </button>
   <button class="tab-btn" data-target="leaderboard">
-    <svg viewBox="0 0 24 24" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.3"/><circle cx="12" cy="4" r="1.8"/><circle cx="12" cy="20" r="1.8"/><circle cx="4" cy="12" r="1.8"/><circle cx="20" cy="12" r="1.8"/><path d="M12 6.3v3.4M12 14.3v3.4M9.7 12H6.3M14.3 12h3.4"/></svg>
+    <svg viewBox="0 0 24 24" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.3"/><circle cx="12" cy="4" r="1.8"/><circle cx="12" cy="20" r="1.8"/><circle cx="4" cy="12" r="1.8"/><circle cx="20" cy="12" r="1.8"/><path d="M12 6.3v3.4M12 14.3v3.4M9.7 12H6.3M14.3 12h3.4"/></svg>
     <span>Nexus</span>
   </button>
   <button class="tab-btn" id="btnOpenMore">
-    <svg viewBox="0 0 24 24" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.8"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6c.5-.13.9-.6 1-1.11V3a2 2 0 0 1 4 0v.09c.1.51.5.98 1 1.11.5.13 1.32.17 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06c-.4.79-.46 1.32-.33 1.82.13.5.6.9 1.11 1H21a2 2 0 0 1 0 4h-.09c-.51.1-.98.5-1.11 1z"/></svg>
+    <svg viewBox="0 0 24 24" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.8"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6c.5-.13.9-.6 1-1.11V3a2 2 0 0 1 4 0v.09c.1.51.5.98 1 1.11.5.13 1.32.17 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06c-.4.79-.46 1.32-.33 1.82.13.5.6.9 1.11 1H21a2 2 0 0 1 0 4h-.09c-.51.1-.98.5-1.11 1z"/></svg>
     <span>More</span>
   </button>
 </nav>
