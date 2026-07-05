@@ -324,6 +324,10 @@
         <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="fuelFiberBar" style="width:0%"></div></div>
       </div>
       <div class="gradient-stat-row">
+        <div class="gradient-stat-row-head"><span>Sodium</span><span><strong id="fuelSodiumNow">0mg</strong> <span>/ <span id="fuelSodiumTarget">–</span></span></span></div>
+        <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="fuelSodiumBar" style="width:0%"></div></div>
+      </div>
+      <div class="gradient-stat-row">
         <div class="gradient-stat-row-head"><span>Water</span><span><strong id="fuelWaterNow">0</strong> <span>/ <span id="fuelWaterTarget">–</span> cups</span></span></div>
         <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="fuelWaterBar" style="width:0%"></div></div>
       </div>
@@ -356,6 +360,10 @@
       <label class="field">
         <span>Fiber (g)</span>
         <div class="input-unit-wrap"><input type="number" id="nutFiber" placeholder="e.g. 28"><span class="input-unit">grams</span></div>
+      </label>
+      <label class="field">
+        <span>Sodium (mg)</span>
+        <div class="input-unit-wrap"><input type="number" id="nutSodium" placeholder="e.g. 1800"><span class="input-unit">mg</span></div>
       </label>
       <label class="field">
         <span>Water (16oz cups)</span>
@@ -428,7 +436,7 @@
       </label>
       <label class="field field--checkbox" id="bioMenstruatingField">
         <input type="checkbox" id="bioMenstruating">
-        <span>Menstruating today</span>
+        <span>Period</span>
       </label>
       <label class="field">
         <span>Sleep quality</span>
@@ -468,6 +476,13 @@
         <div><span class="stat-tile-label">Avg quality</span><div class="stat-tile-value" id="sleepAvgQuality">–</div></div>
         <div><span class="stat-tile-label">Consistency</span><div class="stat-tile-value" id="sleepConsistency">–</div></div>
       </div>
+    </div>
+
+    <div class="chart-card">
+      <p class="mod-tag">Mod_water_retain_04</p>
+      <div class="chart-card-head"><span class="chart-card-title">Edema Extrapolation</span></div>
+      <div class="ring-card ring-card--flush" id="waterRetentionOrb"></div>
+      <p class="hint">Illustrative estimate only — from today's carbs + sodium intake (glycogen-bound water) plus your stress/fatigue/sleep average, scaled against your Watson-formula total body water. Not a medical measurement.</p>
     </div>
 
     <div class="computed-card">

@@ -291,6 +291,7 @@ function initTabs() {
         const p = getProfile();
         if (p) renderComputedTargets(p);
         renderSleepBarChart();
+        renderWaterRetentionOrb();
       }
       if (target === 'leaderboard' && sbConfigured()) {
         pullLeaderboard().then(renderNexusRankings).catch(() => {});
@@ -523,10 +524,12 @@ function initBioLog() {
     setTimeout(() => { document.getElementById('bioSaveNote').textContent = ''; }, 2000);
     if (profile) renderComputedTargets(profile);
     renderSleepBarChart();
+    renderWaterRetentionOrb();
   });
 
   loadBioForDate(todayISO());
   renderSleepBarChart();
+  renderWaterRetentionOrb();
 }
 
 function renderSleepBarChart() {
@@ -556,6 +559,55 @@ function renderSleepBarChart() {
   const avgQuality = logged.length ? logged.reduce((s, d) => s + d.sleep, 0) / logged.length : null;
   document.getElementById('sleepAvgQuality').textContent = avgQuality != null ? `${avgQuality.toFixed(1)}/5.0` : '–';
   document.getElementById('sleepConsistency').textContent = `${round0((logged.length / 7) * 100)}%`;
+}
+
+/* Watson (1980) total body water formula, in liters. */
+function computeWatsonTBW(profile, kg) {
+  if (!profile || !kg || !profile.heightCm || !profile.age) return null;
+  const cm = profile.heightCm, age = profile.age;
+  if (profile.gender === 'female') {
+    return -2.097 + 0.1069 * cm + 0.2466 * kg;
+  }
+  return 2.447 - 0.09156 * age + 0.1074 * cm + 0.3362 * kg;
+}
+
+/* Illustrative estimate, not a medical measurement:
+   ((carbs_g + sodium_g) x 3) glycogen-bound water, plus 1%-5% of Watson TBW
+   scaled by today's 1-5 stress/fatigue/sleep average. */
+function renderWaterRetentionOrb() {
+  const container = document.getElementById('waterRetentionOrb');
+  if (!container) return;
+  const profile = getProfile();
+  const kg = profile ? currentWeightKg(profile) : null;
+  const tbwLiters = kg ? computeWatsonTBW(profile, kg) : null;
+
+  if (!tbwLiters) {
+    renderRing(container, 0, {
+      size: 130, stroke: 9, magenta: true, modTag: 'MOD_WATER_04',
+      centerText: '–', label: 'Edema extrapolation', sub: 'Complete Bio profile to estimate',
+    });
+    return;
+  }
+
+  const date = todayISO();
+  const entry = getLogs()[date] || {};
+  const carbsG = entry.carbs || 0;
+  const sodiumG = (entry.sodium || 0) / 1000;
+  const glycogenWaterG = (carbsG + sodiumG) * 3;
+
+  const avgLevel = ((entry.stress ?? 3) + (entry.fatigue ?? 3) + (entry.sleep ?? 3)) / 3;
+  const pct = avgLevel; // 1-5 scale maps directly to 1%-5%
+  const stateWaterG = (pct / 100) * tbwLiters * 1000;
+
+  const periodBonusG = (profile.gender === 'female' && entry.menstruating) ? 1750 : 0; // +1.5kg-2kg, midpoint
+
+  const totalG = glycogenWaterG + stateWaterG + periodBonusG;
+  const gaugePct = Math.min(100, (totalG / 3500) * 100);
+
+  renderRing(container, gaugePct, {
+    size: 130, stroke: 9, magenta: true, modTag: 'MOD_WATER_04',
+    centerText: round0(totalG) + 'g', label: 'Edema extrapolation', sub: `Estimate for ${fmtDate(parseISO(date))}`,
+  });
 }
 
 /* ---------------------------------------------------------------- */
@@ -1578,6 +1630,7 @@ function loadNutritionForDate(date) {
   document.getElementById('nutCarbs').value = e.carbs ?? '';
   document.getElementById('nutFat').value = e.fat ?? '';
   document.getElementById('nutFiber').value = e.fiber ?? '';
+  document.getElementById('nutSodium').value = e.sodium ?? '';
   document.getElementById('nutWater').value = e.water ?? '';
   document.getElementById('nutSteps').value = e.steps ?? '';
   document.getElementById('fuelDateLabel').textContent = fmtDate(parseISO(date));
@@ -1598,6 +1651,7 @@ function initNutrition() {
       carbs: parseIntOrNull(document.getElementById('nutCarbs').value),
       fat: parseIntOrNull(document.getElementById('nutFat').value),
       fiber: parseIntOrNull(document.getElementById('nutFiber').value),
+      sodium: parseIntOrNull(document.getElementById('nutSodium').value),
       water: parseIntOrNull(document.getElementById('nutWater').value),
       steps: parseIntOrNull(document.getElementById('nutSteps').value),
     });
@@ -1605,6 +1659,7 @@ function initNutrition() {
     setTimeout(() => { document.getElementById('nutSaveNote').textContent = ''; }, 2000);
     renderNutritionAverages();
     renderNutritionTargets();
+    renderWaterRetentionOrb();
   });
 
   loadNutritionForDate(todayISO());
@@ -1661,6 +1716,7 @@ function renderNutritionTargets() {
   const fatTarget = round0((calorieTarget * 0.3) / 9);
   const carbTarget = Math.max(0, round0((calorieTarget - proteinTarget * 4 - fatTarget * 9) / 4));
   const fiberTarget = round0((calorieTarget / 1000) * 14);
+  const sodiumTarget = 2300;
   const waterTarget = profile.waterGoal || 8;
 
   const date = document.getElementById('nutDate').value;
@@ -1670,6 +1726,7 @@ function renderNutritionTargets() {
   const carbsNow = entry.carbs ?? 0;
   const fatNow = entry.fat ?? 0;
   const fiberNow = entry.fiber ?? 0;
+  const sodiumNow = entry.sodium ?? 0;
   const waterNow = entry.water ?? 0;
 
   const caloriePct = Math.min(100, (caloriesNow / calorieTarget) * 100);
@@ -1720,6 +1777,10 @@ function renderNutritionTargets() {
   document.getElementById('fuelFiberNow').textContent = fiberNow + 'g';
   document.getElementById('fuelFiberTarget').textContent = fiberTarget + 'g';
   document.getElementById('fuelFiberBar').style.width = Math.min(100, (fiberNow / fiberTarget) * 100) + '%';
+
+  document.getElementById('fuelSodiumNow').textContent = sodiumNow + 'mg';
+  document.getElementById('fuelSodiumTarget').textContent = sodiumTarget + 'mg';
+  document.getElementById('fuelSodiumBar').style.width = Math.min(100, (sodiumNow / sodiumTarget) * 100) + '%';
 
   document.getElementById('fuelWaterNow').textContent = waterNow;
   document.getElementById('fuelWaterTarget').textContent = waterTarget;
