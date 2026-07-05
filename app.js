@@ -1983,6 +1983,21 @@ function initBetaLock() {
 }
 
 /* ---------------------------------------------------------------- */
+/* Review gate (honor system, unverified — see conversation notes)     */
+/* ---------------------------------------------------------------- */
+function initReviewGate() {
+  if (localStorage.getItem('wft_review_confirmed')) return;
+  if (!document.getElementById('lockOverlay').hidden) return; // beta already ended, skip
+
+  const overlay = document.getElementById('reviewGateOverlay');
+  overlay.hidden = false;
+  document.getElementById('btnReviewConfirm').addEventListener('click', () => {
+    localStorage.setItem('wft_review_confirmed', '1');
+    overlay.hidden = true;
+  });
+}
+
+/* ---------------------------------------------------------------- */
 /* Theme toggle                                                         */
 /* ---------------------------------------------------------------- */
 function applyTheme(theme) {
@@ -2023,6 +2038,7 @@ loadSetupForm();
 loadCheckinForm();
 renderDashboard();
 initBetaLock();
+initReviewGate();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
