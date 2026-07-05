@@ -79,6 +79,17 @@
     <div class="perf-grid" id="perfGrid"></div>
 
     <div class="chart-card">
+      <div class="chart-card-head"><span class="chart-card-title">Steps vs Calories (7D)</span></div>
+      <p class="hint" style="margin-top:-2px;">Each bar shows % of your daily goal reached — taller bars mean better follow-through, and a big gap between the two means one habit is lagging behind the other.</p>
+      <div class="dual-bar-chart" id="stepsCaloriesChart"></div>
+      <div class="bar-chart-labels" id="stepsCaloriesLabels"></div>
+      <div class="chart-legend">
+        <span><span class="legend-swatch" style="background:var(--cyan)"></span>Steps</span>
+        <span><span class="legend-swatch" style="background:var(--violet)"></span>Calories</span>
+      </div>
+    </div>
+
+    <div class="chart-card">
       <p class="mod-tag">Synchronization pulse</p>
       <div class="bar-chart bar-chart--sparkline" id="pulseSparkline"></div>
     </div>
@@ -278,6 +289,26 @@
         <div class="stat-tile-label">Water</div>
       </div>
     </div>
+
+    <h2 class="section-title">Coach assignment</h2>
+    <p class="hint">Contact Coach Win for assessment to get a new assignment next week.</p>
+    <fieldset class="field-group">
+      <legend>Assigned targets (optional override)</legend>
+      <label class="field">
+        <span>Calorie intake assignment (kcal)</span>
+        <input type="number" id="coachCalorieInput" placeholder="e.g. 2000">
+      </label>
+      <label class="field">
+        <span>Steps target assignment</span>
+        <input type="number" id="coachStepsInput" placeholder="e.g. 10000">
+      </label>
+      <label class="field">
+        <span>Workouts per week assignment</span>
+        <input type="number" id="coachWorkoutsInput" min="0" max="14" placeholder="e.g. 4">
+      </label>
+      <button type="button" class="btn btn--primary" id="btnSaveCoachAssignment">Save assignment</button>
+      <p class="save-note" id="coachAssignmentNote"></p>
+    </fieldset>
   </section>
 
   <!-- ============ BIO ============ -->
@@ -465,10 +496,16 @@
         </label>
       </div>
 
-      <label class="field">
-        <span>Daily water goal (16oz cups)</span>
-        <input type="number" id="setupWaterGoal" value="8" min="1">
-      </label>
+      <div class="field-row">
+        <label class="field">
+          <span>Daily water goal (16oz cups)</span>
+          <input type="number" id="setupWaterGoal" value="8" min="1">
+        </label>
+        <label class="field">
+          <span>Daily step goal</span>
+          <input type="number" id="setupStepGoal" value="8000" min="1000" step="500">
+        </label>
+      </div>
 
       <fieldset class="field-group">
         <legend>Custom extra habits (optional, up to 5)</legend>
@@ -528,6 +565,33 @@
         <button type="button" class="btn btn--primary btn--sm" id="btnLbChatSend">➤</button>
       </div>
     </div>
+
+    <footer class="app-footer">
+      <div class="footer-brand">
+        <img src="icons/icon-192.png" alt="" width="40" height="40">
+        <div class="footer-brand-name">WINFINITYFITNESS</div>
+        <p class="footer-tagline">"There is no such thing as maintenance, it's either you keep moving forward, or eventually slip backwards"</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <h4>About</h4>
+          <span class="footer-link-static">Team</span>
+          <span class="footer-link-static">Affiliate</span>
+          <span class="footer-link-static">Careers</span>
+        </div>
+        <div class="footer-col">
+          <h4>Privacy</h4>
+          <span class="footer-link-static">Privacy Policy</span>
+          <span class="footer-link-static">Terms and Conditions</span>
+          <button type="button" class="footer-link-btn" id="btnFooterContact">Contact Us</button>
+        </div>
+        <div class="footer-col">
+          <h4>Social</h4>
+          <a class="footer-link" href="https://www.facebook.com/winfinityfit/" target="_blank" rel="noopener noreferrer">Facebook</a>
+          <a class="footer-link" href="https://www.instagram.com/windalchamp/" target="_blank" rel="noopener noreferrer">Instagram</a>
+        </div>
+      </div>
+    </footer>
   </section>
 
 </main>
@@ -674,6 +738,18 @@
   </div>
 </div>
 
+<!-- ============ ONBOARDING (first run) ============ -->
+<div class="sheet-overlay" id="onboardingOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Welcome — Entity Setup</h2>
+    </div>
+    <p class="hint" style="margin-top:0;">Before you begin, tell us a bit about yourself so we can calibrate your targets. You can always edit this later on the DNA page.</p>
+    <div id="onboardingFormMount"></div>
+  </div>
+</div>
+
 <!-- ============ BETA LOCK ============ -->
 <div class="lock-overlay" id="lockOverlay" hidden>
   <div class="lock-card">
@@ -683,6 +759,23 @@
     <div class="btn-row">
       <button class="btn btn--primary" id="btnLockExportCSV">Export data (CSV)</button>
       <button class="btn" id="btnLockExportBackup">Save backup (JSON)</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ CONTACT US ============ -->
+<div class="sheet-overlay" id="contactOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Contact Us</h2>
+      <button class="sheet-close" id="btnCloseContact">✕</button>
+    </div>
+    <div class="contact-list">
+      <div class="contact-row"><span class="contact-label">Viber</span><span class="contact-value">0915 370 3821</span></div>
+      <div class="contact-row"><span class="contact-label">WhatsApp</span><span class="contact-value">0915 370 3821</span></div>
+      <div class="contact-row"><span class="contact-label">Telegram</span><span class="contact-value">0915 370 3821</span></div>
+      <div class="contact-row"><span class="contact-label">Email</span><span class="contact-value">winfinityfitness@gmail.com</span></div>
     </div>
   </div>
 </div>

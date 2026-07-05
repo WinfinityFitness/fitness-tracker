@@ -359,6 +359,33 @@ body {
 .bar-chart-labels { display: flex; gap: 4px; margin-top: 6px; }
 .bar-chart-labels span { flex: 1; text-align: center; font-family: var(--font-mono); font-size: 0.58rem; color: var(--text-muted); }
 .sleep-stats-row { display: flex; justify-content: space-between; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-soft); }
+
+/* Dual bar chart (Steps vs Calories) */
+.dual-bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 100px;
+  position: relative;
+}
+.dual-bar-chart::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 76.9%;
+  border-top: 1px dashed var(--baseline);
+}
+.dual-bar-day {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  height: 100%;
+}
+.dual-bar { width: 40%; min-height: 2px; border-radius: 2px 2px 1px 1px; }
+.dual-bar--steps { background: var(--cyan); box-shadow: 0 0 6px var(--cyan-glow); }
+.dual-bar--calories { background: var(--violet); box-shadow: 0 0 6px rgba(139,107,242,0.4); }
 .sleep-stats-row .stat-tile-value { font-size: 1.1rem; margin-top: 2px; }
 
 /* ---------------- Goal progress bar ---------------- */
@@ -931,6 +958,82 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .switch input:checked + .switch-track { background: var(--cyan); border-color: transparent; box-shadow: 0 0 10px var(--cyan-glow); }
 .switch input:checked + .switch-track .switch-thumb { transform: translateX(20px); background: #04181a; }
 .switch input:focus-visible + .switch-track { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+/* ---------------- Footer (Nexus) ---------------- */
+.app-footer {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.footer-brand-name {
+  font-family: var(--font-mono);
+  font-weight: 800;
+  font-size: 0.95rem;
+  letter-spacing: 0.12em;
+  color: var(--text-primary);
+  margin-top: 10px;
+}
+.footer-tagline {
+  color: var(--cyan);
+  font-style: italic;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  margin: 10px 0 0;
+}
+.footer-links {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+.footer-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.footer-col h4 {
+  margin: 0 0 2px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.footer-link, .footer-link-static, .footer-link-btn {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font-family: inherit;
+  cursor: default;
+}
+.footer-link, .footer-link-btn { cursor: pointer; }
+.footer-link:hover, .footer-link-btn:hover { color: var(--cyan); }
+
+/* ---------------- Contact Us ---------------- */
+.contact-list { display: flex; flex-direction: column; gap: 10px; }
+.contact-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.contact-label {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.contact-value {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--cyan);
+  font-size: 0.88rem;
+}
 
 /* ---------------- Modal (More panel) ---------------- */
 .sheet-overlay {

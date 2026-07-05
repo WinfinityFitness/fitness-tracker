@@ -89,6 +89,22 @@ function computeTargets(profile, currentKg) {
   };
 }
 
+/* A coach-assigned value (set on the Fuel page) overrides the computed default
+   wherever a single-number target is needed, until the coach updates it again. */
+function getEffectiveCalorieTarget(profile) {
+  if (!profile) return null;
+  if (profile.coachCalorieTarget) return profile.coachCalorieTarget;
+  const kg = currentWeightKg(profile);
+  const targets = kg ? computeTargets(profile, kg) : null;
+  if (!targets) return null;
+  const range = profile.goalMode === 'bulk' ? targets.bulking : targets.cutting;
+  return round0((range[0] + range[1]) / 2);
+}
+function getEffectiveStepGoal(profile) {
+  if (!profile) return 8000;
+  return profile.coachStepGoal || profile.stepGoal || 8000;
+}
+
 function sortedLogsArray() {
   return Object.values(getLogs()).sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -261,6 +277,13 @@ function initSheet() {
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
 }
 
+function initContact() {
+  const overlay = document.getElementById('contactOverlay');
+  document.getElementById('btnFooterContact').addEventListener('click', () => { overlay.hidden = false; });
+  document.getElementById('btnCloseContact').addEventListener('click', () => { overlay.hidden = true; });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+}
+
 /* ---------------------------------------------------------------- */
 /* Bio: profile form                                                   */
 /* ---------------------------------------------------------------- */
@@ -309,6 +332,7 @@ function initSetupForm() {
       startDate: document.getElementById('setupStartDate').value || null,
       programDays: parseInt(document.getElementById('setupProgramDays').value, 10) || 100,
       waterGoal: parseInt(document.getElementById('setupWaterGoal').value, 10) || 8,
+      stepGoal: parseInt(document.getElementById('setupStepGoal').value, 10) || 8000,
       extraHabits,
     };
     saveProfile(profile);
@@ -353,6 +377,7 @@ function loadSetupForm() {
   document.getElementById('setupStartDate').value = p.startDate || '';
   document.getElementById('setupProgramDays').value = p.programDays || 100;
   document.getElementById('setupWaterGoal').value = p.waterGoal || 8;
+  document.getElementById('setupStepGoal').value = p.stepGoal || 8000;
   (p.extraHabits || []).forEach((v, i) => {
     const el = document.querySelector(`.extraHabitInput[data-idx="${i}"]`);
     if (el) el.value = v;
@@ -532,6 +557,50 @@ function loadCheckinForm() {
 /* ---------------------------------------------------------------- */
 /* Status: dashboard rendering                                         */
 /* ---------------------------------------------------------------- */
+function renderStepsCaloriesChart() {
+  const profile = getProfile();
+  const stepGoal = getEffectiveStepGoal(profile);
+  const calorieTarget = getEffectiveCalorieTarget(profile) || 2000;
+
+  const logsArr = sortedLogsArray();
+  const MAX_SCALE = 130; // % of goal a bar can visually reach before being capped
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const entry = logsArr.find(l => l.date === iso);
+    const stepsPct = entry && entry.steps != null ? (entry.steps / stepGoal) * 100 : 0;
+    const calPct = entry && entry.calories != null ? (entry.calories / calorieTarget) * 100 : 0;
+    days.push({ dateObj: d, stepsPct, calPct });
+  }
+
+  const container = document.getElementById('stepsCaloriesChart');
+  const labels = document.getElementById('stepsCaloriesLabels');
+  container.innerHTML = ''; labels.innerHTML = '';
+  days.forEach(d => {
+    const col = document.createElement('div');
+    col.className = 'dual-bar-day';
+
+    const stepsBar = document.createElement('div');
+    stepsBar.className = 'dual-bar dual-bar--steps';
+    stepsBar.style.height = `${Math.min(100, (d.stepsPct / MAX_SCALE) * 100)}%`;
+    stepsBar.title = `Steps: ${round0(d.stepsPct)}% of daily goal`;
+
+    const calBar = document.createElement('div');
+    calBar.className = 'dual-bar dual-bar--calories';
+    calBar.style.height = `${Math.min(100, (d.calPct / MAX_SCALE) * 100)}%`;
+    calBar.title = `Calories: ${round0(d.calPct)}% of daily target`;
+
+    col.appendChild(stepsBar);
+    col.appendChild(calBar);
+    container.appendChild(col);
+
+    const lbl = document.createElement('span');
+    lbl.textContent = d.dateObj.toLocaleDateString(undefined, { weekday: 'narrow' });
+    labels.appendChild(lbl);
+  });
+}
+
 function renderPulseSparkline() {
   const logsArr = sortedLogsArray();
   const days = [];
@@ -619,6 +688,7 @@ function renderDashboard() {
   renderWeightChart(trendSeries, wu);
   renderGoalProgress(profile, kgNow, wu);
   renderPulseSparkline();
+  renderStepsCaloriesChart();
 }
 
 /* ---- Weight chart (SVG, hover tooltip) ---- */
@@ -1025,7 +1095,9 @@ function renderTrainingStats() {
   const recent = logsArr.filter(l => parseISO(l.date) >= cutoff);
   const workouts = recent.filter(l => l.exercises && l.exercises.some(ex => ex.sets.some(s => s.completed))).length;
   const sets = recent.reduce((sum, l) => sum + (l.exercises || []).reduce((s, ex) => s + ex.sets.filter(st => st.completed).length, 0), 0);
-  document.getElementById('statWorkoutsWeek').textContent = workouts;
+  const profile = getProfile();
+  const workoutTarget = profile && profile.coachWorkoutsPerWeek;
+  document.getElementById('statWorkoutsWeek').textContent = workoutTarget ? `${workouts} / ${workoutTarget}` : workouts;
   document.getElementById('statSetsWeek').textContent = sets;
   renderPRBoard();
 }
@@ -1396,6 +1468,35 @@ function initNutrition() {
   loadNutritionForDate(todayISO());
   renderNutritionTargets();
   renderNutritionAverages();
+  initCoachAssignment();
+}
+
+function loadCoachAssignment() {
+  const profile = getProfile();
+  document.getElementById('coachCalorieInput').value = (profile && profile.coachCalorieTarget) || '';
+  document.getElementById('coachStepsInput').value = (profile && profile.coachStepGoal) || '';
+  document.getElementById('coachWorkoutsInput').value = (profile && profile.coachWorkoutsPerWeek) || '';
+}
+
+function initCoachAssignment() {
+  loadCoachAssignment();
+  document.getElementById('btnSaveCoachAssignment').addEventListener('click', () => {
+    const profile = getProfile();
+    const note = document.getElementById('coachAssignmentNote');
+    if (!profile) {
+      alert('Set up your profile in DNA first, then assign coach targets here.');
+      return;
+    }
+    profile.coachCalorieTarget = parseIntOrNull(document.getElementById('coachCalorieInput').value);
+    profile.coachStepGoal = parseIntOrNull(document.getElementById('coachStepsInput').value);
+    profile.coachWorkoutsPerWeek = parseIntOrNull(document.getElementById('coachWorkoutsInput').value);
+    saveProfile(profile);
+    note.textContent = 'Assignment saved.';
+    setTimeout(() => { note.textContent = ''; }, 2500);
+    renderNutritionTargets();
+    renderDashboard();
+    renderTrainingStats();
+  });
 }
 
 function renderNutritionTargets() {
@@ -1413,8 +1514,7 @@ function renderNutritionTargets() {
   emptyBox.hidden = true;
   statRows.forEach(el => el.style.display = '');
 
-  const range = profile.goalMode === 'bulk' ? targets.bulking : targets.cutting;
-  const calorieTarget = round0((range[0] + range[1]) / 2);
+  const calorieTarget = getEffectiveCalorieTarget(profile);
   const proteinTarget = round0((targets.protein[0] + targets.protein[1]) / 2);
   const waterTarget = profile.waterGoal || 8;
 
@@ -1970,6 +2070,41 @@ function initLeaderboard() {
 }
 
 /* ---------------------------------------------------------------- */
+/* Onboarding (first run — borrows the real Bio/DNA profile form)      */
+/* ---------------------------------------------------------------- */
+function initOnboarding(onComplete) {
+  if (getProfile()) { if (onComplete) onComplete(); return; }
+
+  const overlay = document.getElementById('onboardingOverlay');
+  const mount = document.getElementById('onboardingFormMount');
+  const form = document.getElementById('setupForm');
+  const originalParent = form.parentElement;
+  const originalNextSibling = form.nextSibling;
+
+  mount.appendChild(form);
+  overlay.hidden = false;
+
+  form.addEventListener('submit', () => {
+    setTimeout(() => {
+      const name = document.getElementById('setupName').value.trim();
+      const age = document.getElementById('setupAge').value;
+      const startWeight = document.getElementById('setupStartWeight').value;
+      const heightOk = document.getElementById('heightCmField').hidden
+        ? document.getElementById('setupHeightFt').value
+        : document.getElementById('setupHeightCm').value;
+      if (!name || !age || !startWeight || !heightOk) {
+        alert('Please fill in at least your name, age, height, and starting weight to continue.');
+        return;
+      }
+      if (originalNextSibling) originalParent.insertBefore(form, originalNextSibling);
+      else originalParent.appendChild(form);
+      overlay.hidden = true;
+      if (onComplete) onComplete();
+    }, 0);
+  });
+}
+
+/* ---------------------------------------------------------------- */
 /* Beta lock                                                            */
 /* ---------------------------------------------------------------- */
 const BETA_END_DATE = new Date(2026, 6, 31, 23, 59, 59); // end of day, July 31, 2026
@@ -2025,6 +2160,7 @@ document.getElementById('btnGoToBioFromChart').addEventListener('click', () => {
   document.querySelector('.tab-btn[data-target="bio"]').click();
 });
 initSheet();
+initContact();
 initSetupForm();
 initCheckin();
 initTraining();
@@ -2038,22 +2174,13 @@ loadSetupForm();
 loadCheckinForm();
 renderDashboard();
 initBetaLock();
-initReviewGate();
+if (document.getElementById('lockOverlay').hidden) {
+  initOnboarding(() => initReviewGate());
+}
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   });
 }
-
-
-
-if (location.hash.startsWith('#tab=')) {
-  const t = location.hash.slice(5);
-  const btn = document.querySelector(`.tab-btn[data-target="${t}"]`);
-  if (btn) btn.click();
-}
-
-
-
 
