@@ -1288,6 +1288,43 @@ function renderTrainingStats() {
   document.getElementById('statWorkoutsWeek').textContent = workoutTarget ? `${workouts} / ${workoutTarget}` : workouts;
   document.getElementById('statSetsWeek').textContent = sets;
   renderPRBoard();
+  renderVolumeTrendChart();
+}
+
+function computeDayVolumeKg(entry) {
+  if (!entry || !entry.exercises) return 0;
+  return entry.exercises.reduce((sum, ex) =>
+    sum + (ex.sets || []).filter(s => s.completed && s.weightKg != null && s.reps != null)
+      .reduce((s2, s) => s2 + s.weightKg * s.reps, 0), 0);
+}
+
+function renderVolumeTrendChart() {
+  const profile = getProfile();
+  const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
+  const logsArr = sortedLogsArray();
+  const gymDays = logsArr.filter(l => l.exercises && l.exercises.some(ex => ex.sets.some(s => s.completed))).slice(-8);
+  const chart = document.getElementById('volumeTrendChart');
+  const labels = document.getElementById('volumeTrendLabels');
+  const emptyNote = document.getElementById('volumeTrendEmptyNote');
+  chart.innerHTML = ''; labels.innerHTML = '';
+  if (!gymDays.length) {
+    emptyNote.hidden = false;
+    return;
+  }
+  emptyNote.hidden = true;
+  const volumes = gymDays.map(l => fromKg(computeDayVolumeKg(l), wu));
+  const max = Math.max(...volumes, 1);
+  gymDays.forEach((l, i) => {
+    const col = document.createElement('div');
+    col.className = 'bar-chart-col has-value';
+    col.style.height = `${Math.max(6, (volumes[i] / max) * 100)}%`;
+    col.title = `${fmtDate(parseISO(l.date))}: ${round0(volumes[i])} ${wu}`;
+    chart.appendChild(col);
+    const lbl = document.createElement('span');
+    const d = parseISO(l.date);
+    lbl.textContent = `${d.getMonth() + 1}/${d.getDate()}`;
+    labels.appendChild(lbl);
+  });
 }
 
 /* ---- Session templates ---- */
