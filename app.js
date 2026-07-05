@@ -242,7 +242,7 @@ function renderRing(container, pct, opts) {
   const center = opts.centerHtml || `<span style="font-size:${Math.round(size * 0.22)}px;font-weight:800;font-family:var(--font-mono);color:var(--text-primary);">${opts.centerText || ''}</span>`;
   const gradId = `ringGrad${ringGradCounter++}`;
   const strokeAttr = opts.gradient ? `url(#${gradId})` : '';
-  const glow = opts.gradient ? `filter: drop-shadow(0 0 6px var(--gradient-glow));` : '';
+  const glow = opts.gradient ? `filter: drop-shadow(0 0 6.6px var(--gradient-glow));` : '';
   container.innerHTML = `
     ${opts.modTag ? `<p class="mod-tag">${opts.modTag}</p>` : ''}
     <div style="position:relative;width:${size}px;height:${size}px;">
