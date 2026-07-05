@@ -162,6 +162,33 @@ function statusForLevel(field, value) {
   return 'critical';
 }
 
+function labelForLevel(field, value) {
+  if (value == null) return 'N/A';
+  if (field === 'sleep') {
+    if (value >= 4) return 'Good';
+    if (value >= 3) return 'Fair';
+    return 'Poor';
+  }
+  if (value <= 2) return 'Low';
+  if (value <= 3) return 'Moderate';
+  if (value <= 4) return 'Elevated';
+  return 'High';
+}
+
+function last7DailyValues(field) {
+  const logs = getLogs();
+  const base = parseISO(todayISO());
+  const arr = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(base);
+    d.setDate(d.getDate() - i);
+    const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const e = logs[iso];
+    arr.push(e && e[field] != null ? e[field] : null);
+  }
+  return arr;
+}
+
 function getCurrentWeekReview() {
   const reviews = getReviews();
   const today = new Date(todayISO());
@@ -579,47 +606,11 @@ function loadCheckinForm() {
 /* ---------------------------------------------------------------- */
 /* Status: body measurement scan                                       */
 /* ---------------------------------------------------------------- */
-function buildMeasureGuideSVG(gender) {
-  const isFemale = gender === 'female';
-  const torsoPoints = isFemale
-    ? '146,50 194,50 186,100 192,140 186,180 192,230 148,230 154,180 148,140 154,100'
-    : '144,50 196,50 192,140 192,230 148,230 148,140';
-
-  const lines = [
-    { y: 58, label: 'SHOULDER' },
-    { y: 72, label: 'CHEST (NIPPLE)' },
-    { y: 100, label: 'BICEP (L/R)' },
-    { y: 122, label: '2" ABOVE NAVEL' },
-    { y: 148, label: 'STOMACH (NAVEL)' },
-    { y: 174, label: '2" BELOW NAVEL' },
-  ];
-  if (isFemale) lines.push({ y: 205, label: 'HIPS' });
-  lines.push({ y: 280, label: 'THIGH (L/R)' });
-  lines.push({ y: 370, label: 'CALF (L/R)' });
-
-  const lineSvg = lines.map(l => `
-    <line class="measure-guide-line" x1="105" y1="${l.y}" x2="235" y2="${l.y}"></line>
-    <text class="measure-guide-label" x="4" y="${l.y + 3}">${l.label}</text>
-  `).join('');
-
-  return `<svg viewBox="0 0 320 420">
-    <circle class="measure-guide-body" cx="170" cy="26" r="15"></circle>
-    <line class="measure-guide-body" x1="170" y1="41" x2="170" y2="50"></line>
-    <polygon class="measure-guide-body" points="${torsoPoints}"></polygon>
-    <polyline class="measure-guide-body" points="144,55 120,150 116,215"></polyline>
-    <polyline class="measure-guide-body" points="196,55 220,150 224,215"></polyline>
-    <line class="measure-guide-body" x1="154" y1="230" x2="148" y2="400"></line>
-    <line class="measure-guide-body" x1="186" y1="230" x2="192" y2="400"></line>
-    <line class="measure-guide-body" x1="138" y1="400" x2="158" y2="400"></line>
-    <line class="measure-guide-body" x1="182" y1="400" x2="202" y2="400"></line>
-    ${lineSvg}
-  </svg>`;
-}
-
 function renderMeasureGuide() {
   const profile = getProfile();
   const gender = profile ? profile.gender : 'male';
-  document.getElementById('measureGuide').innerHTML = buildMeasureGuideSVG(gender);
+  const src = gender === 'female' ? 'icons/measure-guide-female.jpg' : 'icons/measure-guide-male.jpg';
+  document.getElementById('measureGuide').innerHTML = `<img src="${src}" alt="${gender === 'female' ? 'Female' : 'Male'} measurement slice guide">`;
   document.getElementById('hipsField').hidden = gender !== 'female';
 }
 
@@ -813,14 +804,20 @@ function renderDashboard() {
   ];
   perfItems.forEach(([label, val, field]) => {
     const status = statusForLevel(field, val);
-    const pct = val != null ? Math.max(0, Math.min(100, (val / 5) * 100)) : 0;
+    const days = last7DailyValues(field);
+    const bars = days.map((v, i) => {
+      const h = v != null ? Math.max(6, Math.round((v / 5) * 100)) : 4;
+      const dayStatus = statusForLevel(field, v);
+      const today = i === days.length - 1;
+      return `<div class="perf-spark-bar status-${dayStatus}${today ? ' is-today' : ''}" style="height:${h}%"></div>`;
+    }).join('');
     const tile = document.createElement('div');
     tile.className = 'perf-tile';
     tile.innerHTML = `<div class="perf-tile-head">
         <span class="perf-tile-label">${label}</span>
-        <span class="perf-tile-value"><span class="status-dot status-${status}"></span>${val != null ? val.toFixed(1) + ' / 5' : 'N/A'}</span>
+        <span class="perf-tile-value"><span class="status-dot status-${status}"></span>${labelForLevel(field, val)}</span>
       </div>
-      <div class="perf-bar"><div class="perf-bar-fill status-${status}" style="width:${pct}%"></div></div>`;
+      <div class="perf-spark">${bars}</div>`;
     perfGrid.appendChild(tile);
   });
 
