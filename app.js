@@ -162,14 +162,34 @@ function statusForLevel(field, value) {
   return 'critical';
 }
 
+function getCurrentWeekReview() {
+  const reviews = getReviews();
+  const today = new Date(todayISO());
+  let best = null;
+  Object.values(reviews).forEach(r => {
+    const diffDays = (today - new Date(r.date)) / 86400000;
+    if (diffDays >= 0 && diffDays < 7 && (!best || r.date > best.date)) best = r;
+  });
+  return best;
+}
+
 function computeHabitCompletion(profile, entry) {
-  let total = 3; // reviewed goals, planned tomorrow, workout done
-  let done = 0;
-  if (entry) {
-    if (entry.reviewedGoals) done++;
-    if (entry.plannedTomorrow) done++;
-    if (entry.exercises && entry.exercises.length > 0) done++;
-  }
+  const review = getCurrentWeekReview();
+  const checks = [
+    !!(entry && entry.exercises && entry.exercises.length > 0), // workout progress
+    !!(entry && entry.steps != null && entry.steps >= getEffectiveStepGoal(profile)), // steps target
+    !!(entry && entry.struggles && entry.struggles.trim() !== ''), // struggles today
+    !!(entry && entry.improveTomorrow && entry.improveTomorrow.trim() !== ''), // how to do better tomorrow
+    !!(entry && entry.weightKg != null), // weight input
+    localStorage.getItem('wft_lb_optin') === '1', // nexus synced
+    !!(review && review.adjustments && review.adjustments.trim() !== ''), // adjustments made to keep progress on track
+    !!(review && review.wins && review.wins.trim() !== ''), // wins this week
+    !!(review && review.improvements && review.improvements.trim() !== ''), // improvements this week
+    !!(review && review.focus && review.focus.length >= 1 && review.focus.length <= 2), // pick 1-2 focus for next week
+    localStorage.getItem('wft_drive_last_backup') === todayISO(), // back up now
+  ];
+  let total = checks.length;
+  let done = checks.filter(Boolean).length;
   (profile ? profile.extraHabits || [] : []).forEach((label, i) => {
     if (!label) return;
     total++;
@@ -272,6 +292,7 @@ function initSheet() {
   document.getElementById('btnOpenMore').addEventListener('click', () => {
     overlay.hidden = false;
     renderHistory();
+    renderMeasureHistory();
   });
   document.getElementById('btnCloseSheet').addEventListener('click', () => { overlay.hidden = true; });
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
@@ -343,6 +364,7 @@ function initSetupForm() {
     document.getElementById('bioMenstruatingField').hidden = profile.gender !== 'female';
     renderNutritionTargets();
     renderDashboard();
+    renderMeasureGuide();
     updateCodeNameHint();
   });
 }
@@ -555,6 +577,106 @@ function loadCheckinForm() {
 }
 
 /* ---------------------------------------------------------------- */
+/* Status: body measurement scan                                       */
+/* ---------------------------------------------------------------- */
+function buildMeasureGuideSVG(gender) {
+  const isFemale = gender === 'female';
+  const torsoPoints = isFemale
+    ? '146,50 194,50 186,100 192,140 186,180 192,230 148,230 154,180 148,140 154,100'
+    : '144,50 196,50 192,140 192,230 148,230 148,140';
+
+  const lines = [
+    { y: 58, label: 'SHOULDER' },
+    { y: 72, label: 'CHEST (NIPPLE)' },
+    { y: 100, label: 'BICEP (L/R)' },
+    { y: 122, label: '2" ABOVE NAVEL' },
+    { y: 148, label: 'STOMACH (NAVEL)' },
+    { y: 174, label: '2" BELOW NAVEL' },
+  ];
+  if (isFemale) lines.push({ y: 205, label: 'HIPS' });
+  lines.push({ y: 280, label: 'THIGH (L/R)' });
+  lines.push({ y: 370, label: 'CALF (L/R)' });
+
+  const lineSvg = lines.map(l => `
+    <line class="measure-guide-line" x1="105" y1="${l.y}" x2="235" y2="${l.y}"></line>
+    <text class="measure-guide-label" x="4" y="${l.y + 3}">${l.label}</text>
+  `).join('');
+
+  return `<svg viewBox="0 0 320 420">
+    <circle class="measure-guide-body" cx="170" cy="26" r="15"></circle>
+    <line class="measure-guide-body" x1="170" y1="41" x2="170" y2="50"></line>
+    <polygon class="measure-guide-body" points="${torsoPoints}"></polygon>
+    <polyline class="measure-guide-body" points="144,55 120,150 116,215"></polyline>
+    <polyline class="measure-guide-body" points="196,55 220,150 224,215"></polyline>
+    <line class="measure-guide-body" x1="154" y1="230" x2="148" y2="400"></line>
+    <line class="measure-guide-body" x1="186" y1="230" x2="192" y2="400"></line>
+    <line class="measure-guide-body" x1="138" y1="400" x2="158" y2="400"></line>
+    <line class="measure-guide-body" x1="182" y1="400" x2="202" y2="400"></line>
+    ${lineSvg}
+  </svg>`;
+}
+
+function renderMeasureGuide() {
+  const profile = getProfile();
+  const gender = profile ? profile.gender : 'male';
+  document.getElementById('measureGuide').innerHTML = buildMeasureGuideSVG(gender);
+  document.getElementById('hipsField').hidden = gender !== 'female';
+}
+
+function loadMeasurementsForDate(date) {
+  const logs = getLogs();
+  const m = (logs[date] && logs[date].measurements) || {};
+  document.getElementById('measureChest').value = m.chest ?? '';
+  document.getElementById('measureShoulder').value = m.shoulder ?? '';
+  document.getElementById('measureLBicep').value = m.lBicep ?? '';
+  document.getElementById('measureRBicep').value = m.rBicep ?? '';
+  document.getElementById('measureAbdSupra').value = m.abdSupra ?? '';
+  document.getElementById('measureStomach').value = m.stomach ?? '';
+  document.getElementById('measureAbdInfra').value = m.abdInfra ?? '';
+  document.getElementById('measureHips').value = m.hips ?? '';
+  document.getElementById('measureLThigh').value = m.lThigh ?? '';
+  document.getElementById('measureRThigh').value = m.rThigh ?? '';
+  document.getElementById('measureLCalf').value = m.lCalf ?? '';
+  document.getElementById('measureRCalf').value = m.rCalf ?? '';
+}
+
+function initMeasurements() {
+  renderMeasureGuide();
+  document.getElementById('measureDate').value = todayISO();
+  document.getElementById('measureDate').addEventListener('change', e => loadMeasurementsForDate(e.target.value));
+
+  document.getElementById('btnSaveMeasurements').addEventListener('click', () => {
+    const date = document.getElementById('measureDate').value;
+    const val = id => {
+      const n = parseFloat(document.getElementById(id).value);
+      return isNaN(n) ? null : Math.round(n * 10) / 10;
+    };
+    updateLogFields(date, {
+      measurements: {
+        chest: val('measureChest'),
+        shoulder: val('measureShoulder'),
+        lBicep: val('measureLBicep'),
+        rBicep: val('measureRBicep'),
+        abdSupra: val('measureAbdSupra'),
+        stomach: val('measureStomach'),
+        abdInfra: val('measureAbdInfra'),
+        hips: val('measureHips'),
+        lThigh: val('measureLThigh'),
+        rThigh: val('measureRThigh'),
+        lCalf: val('measureLCalf'),
+        rCalf: val('measureRCalf'),
+      },
+    });
+    renderMeasureHistory();
+    const note = document.getElementById('measureSaveNote');
+    note.textContent = 'Saved measurements for ' + date;
+    setTimeout(() => { note.textContent = ''; }, 2500);
+  });
+
+  loadMeasurementsForDate(todayISO());
+}
+
+/* ---------------------------------------------------------------- */
 /* Status: dashboard rendering                                         */
 /* ---------------------------------------------------------------- */
 function renderStepsCaloriesChart() {
@@ -649,8 +771,21 @@ function renderDashboard() {
   const waterGoal = (profile && profile.waterGoal) || 8;
   const waterToday = (todayEntry && todayEntry.water != null) ? todayEntry.water : 0;
   const waterPct = waterGoal > 0 ? (waterToday / waterGoal) * 100 : 0;
-  renderRing(document.getElementById('ringHydrationCard'), waterPct, {
-    size: 140, stroke: 9, magenta: true, modTag: 'MOD_FUEL_02', centerText: Math.round(Math.min(100, waterPct)) + '%', label: 'Hydration', sub: `${waterToday} / ${waterGoal} cups`,
+
+  const calorieTarget = getEffectiveCalorieTarget(profile) || 2000;
+  const caloriesToday = (todayEntry && todayEntry.calories != null) ? todayEntry.calories : 0;
+  const caloriePct = calorieTarget > 0 ? (caloriesToday / calorieTarget) * 100 : 0;
+
+  const kgForFuel = currentWeightKg(profile);
+  const targetsForFuel = (profile && kgForFuel) ? computeTargets(profile, kgForFuel) : null;
+  const proteinTarget = targetsForFuel ? round0((targetsForFuel.protein[0] + targetsForFuel.protein[1]) / 2) : null;
+  const proteinToday = (todayEntry && todayEntry.protein != null) ? todayEntry.protein : 0;
+  const proteinPct = proteinTarget ? (proteinToday / proteinTarget) * 100 : 0;
+
+  const lifeFuelPct = Math.round((Math.min(100, waterPct) + Math.min(100, caloriePct) + Math.min(100, proteinPct)) / 3);
+  const fuelMetCount = [waterPct, caloriePct, proteinPct].filter(p => p >= 100).length;
+  renderRing(document.getElementById('ringHydrationCard'), lifeFuelPct, {
+    size: 140, stroke: 9, magenta: true, modTag: 'MOD_FUEL_02', centerText: lifeFuelPct + '%', label: 'Life Fuel', sub: `${fuelMetCount}/3 today`,
   });
 
   document.getElementById('avgSteps').textContent = fmtOrDash(avgOfLastNDays(logsArr, 'steps', 7), v => round0(v));
@@ -678,10 +813,14 @@ function renderDashboard() {
   ];
   perfItems.forEach(([label, val, field]) => {
     const status = statusForLevel(field, val);
+    const pct = val != null ? Math.max(0, Math.min(100, (val / 5) * 100)) : 0;
     const tile = document.createElement('div');
     tile.className = 'perf-tile';
-    tile.innerHTML = `<span class="perf-tile-label">${label}</span>
-      <span class="perf-tile-value"><span class="status-dot status-${status}"></span>${val != null ? val.toFixed(1) + ' / 5' : 'N/A'}</span>`;
+    tile.innerHTML = `<div class="perf-tile-head">
+        <span class="perf-tile-label">${label}</span>
+        <span class="perf-tile-value"><span class="status-dot status-${status}"></span>${val != null ? val.toFixed(1) + ' / 5' : 'N/A'}</span>
+      </div>
+      <div class="perf-bar"><div class="perf-bar-fill status-${status}" style="width:${pct}%"></div></div>`;
     perfGrid.appendChild(tile);
   });
 
@@ -1598,6 +1737,34 @@ function renderHistory() {
   });
 }
 
+function renderMeasureHistory() {
+  const logsArr = sortedLogsArray().slice().reverse().filter(l => l.measurements);
+  const body = document.getElementById('measureHistoryBody');
+  const emptyNote = document.getElementById('measureHistoryEmptyNote');
+  body.innerHTML = '';
+  if (!logsArr.length) { emptyNote.hidden = false; return; }
+  emptyNote.hidden = true;
+  logsArr.forEach(l => {
+    const m = l.measurements || {};
+    const c = v => v ?? '–';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${l.date}</td>
+      <td>${c(m.chest)}</td>
+      <td>${c(m.shoulder)}</td>
+      <td>${c(m.lBicep)}</td>
+      <td>${c(m.rBicep)}</td>
+      <td>${c(m.abdSupra)}</td>
+      <td>${c(m.stomach)}</td>
+      <td>${c(m.abdInfra)}</td>
+      <td>${c(m.hips)}</td>
+      <td>${c(m.lThigh)}</td>
+      <td>${c(m.rThigh)}</td>
+      <td>${c(m.lCalf)}</td>
+      <td>${c(m.rCalf)}</td>`;
+    body.appendChild(tr);
+  });
+}
+
 /* ---------------------------------------------------------------- */
 /* CSV export + share                                                  */
 /* ---------------------------------------------------------------- */
@@ -1679,6 +1846,8 @@ function downloadBackupJSON() {
   a.href = url; a.download = `fitness-backup-${todayISO()}.json`;
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
+  localStorage.setItem('wft_drive_last_backup', todayISO());
+  renderDashboard();
 }
 
 function initExport() {
@@ -1707,6 +1876,7 @@ function initExport() {
       loadCheckinForm();
       renderDashboard();
       renderHistory();
+      renderMeasureHistory();
     } catch (err) {
       alert('Could not read that backup file.');
     }
@@ -1827,7 +1997,9 @@ async function saveToDrive(manual) {
       const json = await res.json();
       if (json.id) localStorage.setItem('wft_drive_file_id', json.id);
     }
+    localStorage.setItem('wft_drive_last_backup', todayISO());
     setDriveStatus('Last synced ' + new Date().toLocaleTimeString());
+    renderDashboard();
   } catch (e) {
     setDriveStatus('Sync failed — will retry on next save.');
   }
@@ -2163,6 +2335,7 @@ initSheet();
 initContact();
 initSetupForm();
 initCheckin();
+initMeasurements();
 initTraining();
 initNutrition();
 initBioLog();

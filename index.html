@@ -138,6 +138,76 @@
       <button type="submit" class="btn btn--primary">Save check-in</button>
       <p class="save-note" id="checkinSaveNote"></p>
     </form>
+
+    <h2 class="section-title">Body measurement scan</h2>
+    <div class="chart-card">
+      <p class="mod-tag">MOD_BIOSCAN_10</p>
+      <div class="measure-guide" id="measureGuide"></div>
+    </div>
+
+    <fieldset class="field-group">
+      <legend>Measurement log (cm, to nearest 0.1)</legend>
+      <label class="field">
+        <span>Date</span>
+        <input type="date" id="measureDate">
+      </label>
+      <label class="field">
+        <span>Chest (on nipple)</span>
+        <input type="number" step="0.1" id="measureChest" placeholder="e.g. 92.5">
+      </label>
+      <label class="field">
+        <span>Shoulder</span>
+        <input type="number" step="0.1" id="measureShoulder" placeholder="e.g. 110.0">
+      </label>
+      <div class="field-row">
+        <label class="field">
+          <span>R. Bicep</span>
+          <input type="number" step="0.1" id="measureRBicep" placeholder="e.g. 30.0">
+        </label>
+        <label class="field">
+          <span>L. Bicep</span>
+          <input type="number" step="0.1" id="measureLBicep" placeholder="e.g. 30.0">
+        </label>
+      </div>
+      <label class="field">
+        <span>2" Above Navel</span>
+        <input type="number" step="0.1" id="measureAbdSupra" placeholder="e.g. 80.0">
+      </label>
+      <label class="field">
+        <span>Stomach (navel)</span>
+        <input type="number" step="0.1" id="measureStomach" placeholder="e.g. 85.0">
+      </label>
+      <label class="field">
+        <span>2" Below Navel</span>
+        <input type="number" step="0.1" id="measureAbdInfra" placeholder="e.g. 88.0">
+      </label>
+      <label class="field" id="hipsField">
+        <span>Hips</span>
+        <input type="number" step="0.1" id="measureHips" placeholder="e.g. 95.0">
+      </label>
+      <div class="field-row">
+        <label class="field">
+          <span>R. Thigh</span>
+          <input type="number" step="0.1" id="measureRThigh" placeholder="e.g. 55.0">
+        </label>
+        <label class="field">
+          <span>L. Thigh</span>
+          <input type="number" step="0.1" id="measureLThigh" placeholder="e.g. 55.0">
+        </label>
+      </div>
+      <div class="field-row">
+        <label class="field">
+          <span>R. Calf</span>
+          <input type="number" step="0.1" id="measureRCalf" placeholder="e.g. 36.0">
+        </label>
+        <label class="field">
+          <span>L. Calf</span>
+          <input type="number" step="0.1" id="measureLCalf" placeholder="e.g. 36.0">
+        </label>
+      </div>
+      <button type="button" class="btn btn--primary" id="btnSaveMeasurements">Save measurements</button>
+      <p class="save-note" id="measureSaveNote"></p>
+    </fieldset>
   </section>
 
   <!-- ============ TRAINING ============ -->
@@ -709,7 +779,7 @@
     </div>
 
     <div class="sheet-section">
-      <h2 class="section-title">Log history</h2>
+      <h2 class="section-title">Accomplishment log history</h2>
       <div class="table-wrap">
         <table id="historyTable">
           <thead>
@@ -719,6 +789,23 @@
         </table>
       </div>
       <p class="empty-note" id="historyEmptyNote">No logs yet.</p>
+    </div>
+
+    <div class="sheet-section">
+      <h2 class="section-title">Measurement log history</h2>
+      <div class="table-wrap">
+        <table id="measureHistoryTable">
+          <thead>
+            <tr>
+              <th>Date</th><th>Chest</th><th>Shoulder</th><th>L.Bicep</th><th>R.Bicep</th>
+              <th>2" Above</th><th>Stomach</th><th>2" Below</th><th>Hips</th>
+              <th>L.Thigh</th><th>R.Thigh</th><th>L.Calf</th><th>R.Calf</th>
+            </tr>
+          </thead>
+          <tbody id="measureHistoryBody"></tbody>
+        </table>
+      </div>
+      <p class="empty-note" id="measureHistoryEmptyNote">No measurements logged yet.</p>
     </div>
   </div>
 </div>

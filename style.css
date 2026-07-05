@@ -293,11 +293,14 @@ body {
   border-radius: var(--card-radius);
   padding: 12px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 6px;
 }
+.perf-tile-head { display: flex; align-items: center; justify-content: space-between; }
 .perf-tile-label { font-size: 0.8rem; color: var(--text-secondary); }
 .perf-tile-value { font-family: var(--font-mono); font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 6px; }
+.perf-bar { position: relative; height: 6px; border-radius: 3px; background: var(--gridline); overflow: hidden; }
+.perf-bar-fill { position: absolute; inset: 0 auto 0 0; height: 100%; border-radius: 3px; transition: width 0.3s ease; }
 .status-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; box-shadow: 0 0 6px currentColor; }
 .status-good { background: var(--good); color: var(--good); }
 .status-warning { background: var(--warning); color: var(--warning); }
@@ -958,6 +961,19 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .switch input:checked + .switch-track { background: var(--cyan); border-color: transparent; box-shadow: 0 0 10px var(--cyan-glow); }
 .switch input:checked + .switch-track .switch-thumb { transform: translateX(20px); background: #04181a; }
 .switch input:focus-visible + .switch-track { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+/* ---------------- Body measurement guide ---------------- */
+.measure-guide { display: flex; justify-content: center; }
+.measure-guide svg { width: 100%; max-width: 260px; height: auto; }
+.measure-guide-line { stroke: var(--critical); stroke-width: 1.5; stroke-dasharray: 3 2; }
+.measure-guide-body { stroke: var(--cyan); fill: none; stroke-width: 1.4; filter: drop-shadow(0 0 4px var(--cyan-glow)); }
+.measure-guide-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  fill: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
 
 /* ---------------- Footer (Nexus) ---------------- */
 .app-footer {
