@@ -299,15 +299,29 @@
       <div class="chart-card-head"><p class="mod-tag" style="margin:0;">Current performance</p><span class="target-icon">◎</span></div>
       <h3 class="fuel-status-title">Daily Fuel Status</h3>
 
-      <div class="fuel-hero-stat">
-        <span class="fuel-hero-value" id="fuelCaloriesNow">0</span>
-        <span class="fuel-hero-of">of <span id="fuelCaloriesTarget">–</span> kcal</span>
+      <div class="fuel-cal-row">
+        <div class="fuel-cal-ring" id="fuelCalorieRing"></div>
+        <div class="fuel-macro-pie-wrap">
+          <div class="fuel-macro-pie" id="fuelMacroPie"></div>
+          <ul class="fuel-macro-legend" id="fuelMacroLegend"></ul>
+        </div>
       </div>
-      <div class="gradient-bar"><div class="gradient-bar-fill" id="fuelCaloriesBar" style="width:0%"></div></div>
 
       <div class="gradient-stat-row">
         <div class="gradient-stat-row-head"><span>Protein</span><span><strong id="fuelProteinNow">0g</strong> <span>/ <span id="fuelProteinTarget">–</span></span></span></div>
         <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="fuelProteinBar" style="width:0%"></div></div>
+      </div>
+      <div class="gradient-stat-row">
+        <div class="gradient-stat-row-head"><span>Carbs</span><span><strong id="fuelCarbsNow">0g</strong> <span>/ <span id="fuelCarbsTarget">–</span></span></span></div>
+        <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="fuelCarbsBar" style="width:0%"></div></div>
+      </div>
+      <div class="gradient-stat-row">
+        <div class="gradient-stat-row-head"><span>Fat</span><span><strong id="fuelFatNow">0g</strong> <span>/ <span id="fuelFatTarget">–</span></span></span></div>
+        <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="fuelFatBar" style="width:0%"></div></div>
+      </div>
+      <div class="gradient-stat-row">
+        <div class="gradient-stat-row-head"><span>Fiber</span><span><strong id="fuelFiberNow">0g</strong> <span>/ <span id="fuelFiberTarget">–</span></span></span></div>
+        <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="fuelFiberBar" style="width:0%"></div></div>
       </div>
       <div class="gradient-stat-row">
         <div class="gradient-stat-row-head"><span>Water</span><span><strong id="fuelWaterNow">0</strong> <span>/ <span id="fuelWaterTarget">–</span> cups</span></span></div>
@@ -330,6 +344,18 @@
       <label class="field">
         <span>Protein (g)</span>
         <div class="input-unit-wrap"><input type="number" id="nutProtein" placeholder="e.g. 140"><span class="input-unit">grams</span></div>
+      </label>
+      <label class="field">
+        <span>Carbs (g)</span>
+        <div class="input-unit-wrap"><input type="number" id="nutCarbs" placeholder="e.g. 220"><span class="input-unit">grams</span></div>
+      </label>
+      <label class="field">
+        <span>Fat (g)</span>
+        <div class="input-unit-wrap"><input type="number" id="nutFat" placeholder="e.g. 65"><span class="input-unit">grams</span></div>
+      </label>
+      <label class="field">
+        <span>Fiber (g)</span>
+        <div class="input-unit-wrap"><input type="number" id="nutFiber" placeholder="e.g. 28"><span class="input-unit">grams</span></div>
       </label>
       <label class="field">
         <span>Water (16oz cups)</span>

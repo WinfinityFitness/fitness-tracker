@@ -1575,6 +1575,9 @@ function loadNutritionForDate(date) {
   const e = logs[date] || {};
   document.getElementById('nutCalories').value = e.calories ?? '';
   document.getElementById('nutProtein').value = e.protein ?? '';
+  document.getElementById('nutCarbs').value = e.carbs ?? '';
+  document.getElementById('nutFat').value = e.fat ?? '';
+  document.getElementById('nutFiber').value = e.fiber ?? '';
   document.getElementById('nutWater').value = e.water ?? '';
   document.getElementById('nutSteps').value = e.steps ?? '';
   document.getElementById('fuelDateLabel').textContent = fmtDate(parseISO(date));
@@ -1592,6 +1595,9 @@ function initNutrition() {
     updateLogFields(date, {
       calories: parseIntOrNull(document.getElementById('nutCalories').value),
       protein: parseIntOrNull(document.getElementById('nutProtein').value),
+      carbs: parseIntOrNull(document.getElementById('nutCarbs').value),
+      fat: parseIntOrNull(document.getElementById('nutFat').value),
+      fiber: parseIntOrNull(document.getElementById('nutFiber').value),
       water: parseIntOrNull(document.getElementById('nutWater').value),
       steps: parseIntOrNull(document.getElementById('nutSteps').value),
     });
@@ -1638,7 +1644,7 @@ function initCoachAssignment() {
 function renderNutritionTargets() {
   const profile = getProfile();
   const emptyBox = document.getElementById('nutTargetsEmpty');
-  const statRows = document.querySelectorAll('#fuelStatusCard .fuel-hero-stat, #fuelStatusCard .gradient-bar, #fuelStatusCard .gradient-stat-row');
+  const statRows = document.querySelectorAll('#fuelStatusCard .fuel-cal-row, #fuelStatusCard .gradient-stat-row');
   const kg = profile ? currentWeightKg(profile) : null;
   const targets = (profile && kg) ? computeTargets(profile, kg) : null;
 
@@ -1652,21 +1658,68 @@ function renderNutritionTargets() {
 
   const calorieTarget = getEffectiveCalorieTarget(profile);
   const proteinTarget = round0((targets.protein[0] + targets.protein[1]) / 2);
+  const fatTarget = round0((calorieTarget * 0.3) / 9);
+  const carbTarget = Math.max(0, round0((calorieTarget - proteinTarget * 4 - fatTarget * 9) / 4));
+  const fiberTarget = round0((calorieTarget / 1000) * 14);
   const waterTarget = profile.waterGoal || 8;
 
   const date = document.getElementById('nutDate').value;
   const entry = getLogs()[date] || {};
   const caloriesNow = entry.calories ?? 0;
   const proteinNow = entry.protein ?? 0;
+  const carbsNow = entry.carbs ?? 0;
+  const fatNow = entry.fat ?? 0;
+  const fiberNow = entry.fiber ?? 0;
   const waterNow = entry.water ?? 0;
 
-  document.getElementById('fuelCaloriesNow').textContent = caloriesNow;
-  document.getElementById('fuelCaloriesTarget').textContent = calorieTarget;
-  document.getElementById('fuelCaloriesBar').style.width = Math.min(100, (caloriesNow / calorieTarget) * 100) + '%';
+  const caloriePct = Math.min(100, (caloriesNow / calorieTarget) * 100);
+  renderRing(document.getElementById('fuelCalorieRing'), caloriePct, {
+    size: 120, stroke: 10, gradient: true, centerText: Math.round(caloriePct) + '%', label: 'Calories', sub: `${caloriesNow} / ${calorieTarget} kcal`,
+  });
+
+  const proteinKcal = proteinNow * 4;
+  const carbKcal = carbsNow * 4;
+  const fatKcal = fatNow * 9;
+  const macroKcalTotal = proteinKcal + carbKcal + fatKcal;
+  const macroPie = document.getElementById('fuelMacroPie');
+  const macroLegend = document.getElementById('fuelMacroLegend');
+  const macros = [
+    { label: 'Protein', kcal: proteinKcal, colorVar: '--cyan', dot: 'macro-protein' },
+    { label: 'Carbs', kcal: carbKcal, colorVar: '--violet', dot: 'macro-carbs' },
+    { label: 'Fat', kcal: fatKcal, colorVar: '--warning', dot: 'macro-fat' },
+  ];
+  if (macroKcalTotal > 0) {
+    let acc = 0;
+    const stops = macros.map(m => {
+      const start = (acc / macroKcalTotal) * 100;
+      acc += m.kcal;
+      const end = (acc / macroKcalTotal) * 100;
+      return `var(${m.colorVar}) ${start}% ${end}%`;
+    }).join(', ');
+    macroPie.style.background = `conic-gradient(${stops})`;
+  } else {
+    macroPie.style.background = 'var(--gridline)';
+  }
+  macroLegend.innerHTML = macros.map(m => {
+    const pctOfIntake = caloriesNow > 0 ? Math.round((m.kcal / caloriesNow) * 100) : 0;
+    return `<li><span class="macro-dot ${m.dot}"></span>${m.label} <strong>${pctOfIntake}%</strong> of intake</li>`;
+  }).join('');
 
   document.getElementById('fuelProteinNow').textContent = proteinNow + 'g';
   document.getElementById('fuelProteinTarget').textContent = proteinTarget + 'g';
   document.getElementById('fuelProteinBar').style.width = Math.min(100, (proteinNow / proteinTarget) * 100) + '%';
+
+  document.getElementById('fuelCarbsNow').textContent = carbsNow + 'g';
+  document.getElementById('fuelCarbsTarget').textContent = carbTarget + 'g';
+  document.getElementById('fuelCarbsBar').style.width = Math.min(100, (carbsNow / carbTarget) * 100) + '%';
+
+  document.getElementById('fuelFatNow').textContent = fatNow + 'g';
+  document.getElementById('fuelFatTarget').textContent = fatTarget + 'g';
+  document.getElementById('fuelFatBar').style.width = Math.min(100, (fatNow / fatTarget) * 100) + '%';
+
+  document.getElementById('fuelFiberNow').textContent = fiberNow + 'g';
+  document.getElementById('fuelFiberTarget').textContent = fiberTarget + 'g';
+  document.getElementById('fuelFiberBar').style.width = Math.min(100, (fiberNow / fiberTarget) * 100) + '%';
 
   document.getElementById('fuelWaterNow').textContent = waterNow;
   document.getElementById('fuelWaterTarget').textContent = waterTarget;
