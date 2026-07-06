@@ -121,14 +121,11 @@ body {
   50% { transform: scale(1.06); }
 }
 .splash-caption {
-  position: absolute;
-  bottom: 36px;
-  left: 24px;
-  right: 24px;
   font-family: var(--font-mono);
   font-size: 0.8rem;
   line-height: 1.5;
   color: var(--text-secondary);
+  max-width: 320px;
 }
 @media (prefers-reduced-motion: reduce) {
   .splash-logo { animation: none; }
@@ -798,8 +795,35 @@ tbody tr:nth-child(even) { background: rgba(255,255,255,0.02); }
   background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--border-soft);
   border-radius: 8px; font-family: var(--font-mono); font-size: 0.72rem; padding: 3px 4px;
 }
+.ex-card-menu-wrap { position: relative; }
 .ex-card-remove { background: none; border: none; color: var(--text-muted); font-size: 1.1rem; line-height: 1; cursor: pointer; padding: 2px 8px; }
 .ex-card-remove:hover { color: var(--critical); }
+.ex-card-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
+  min-width: 130px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+}
+.ex-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+.ex-menu-item:hover { background: var(--surface-1); }
+.ex-menu-delete { color: var(--critical); }
 .ex-card-notes {
   width: 100%; font-size: 0.85rem; padding: 8px 10px; margin-bottom: 8px;
   border-radius: 8px; border: 1px solid var(--border-soft); background: var(--surface-2); color: var(--text-secondary);

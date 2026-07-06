@@ -1219,15 +1219,27 @@ function renderExerciseCards() {
     }).join('');
 
     const timerInfo = exTimerDisplayFor(date, exIdx);
+    const completedSets = ex.sets.filter(s => s.completed && s.weightKg != null && s.reps != null);
+    const bestOneRM = completedSets.reduce((max, s) => Math.max(max, estOneRM(s.weightKg, s.reps)), 0);
+    const historicalBest = bestHistoricalOneRM(ex.name, date);
+    const isPR = completedSets.length > 0 && historicalBest > 0 && bestOneRM > historicalBest + 0.01;
     card.innerHTML = `
       <p class="mod-tag">MOD_P_${String(exIdx + 1).padStart(2, '0')}</p>
       <div class="ex-card-head">
         <div class="ex-card-title">${escapeHtml(ex.name)}</div>
         <div class="ex-card-rest">
+          ${isPR ? '<span class="pr-pill">🏆 PR</span>' : ''}
           <span class="ex-rest-timer ${timerInfo.state}" data-ex="${exIdx}">${timerInfo.text}</span>
           ⏱ <select class="ex-rest-select" data-ex="${exIdx}">${restOptions}</select>
         </div>
-        <button type="button" class="ex-card-remove" data-ex="${exIdx}">⋮</button>
+        <div class="ex-card-menu-wrap">
+          <button type="button" class="ex-card-remove" data-ex="${exIdx}">⋮</button>
+          <div class="ex-card-menu" data-ex="${exIdx}" hidden>
+            <button type="button" class="ex-menu-item ex-menu-rename" data-ex="${exIdx}">Rename</button>
+            <button type="button" class="ex-menu-item ex-menu-reset" data-ex="${exIdx}">Reset</button>
+            <button type="button" class="ex-menu-item ex-menu-delete" data-ex="${exIdx}">Delete</button>
+          </div>
+        </div>
       </div>
       <input type="text" class="ex-card-notes" data-ex="${exIdx}" placeholder="Add notes here…" value="${escapeHtml(ex.notes || '')}">
       <table class="ex-sets-table">
@@ -1271,6 +1283,12 @@ function initTraining() {
     nameInput.focus();
   });
 
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.ex-card-menu-wrap')) {
+      document.querySelectorAll('.ex-card-menu').forEach(m => { m.hidden = true; });
+    }
+  });
+
   const cards = document.getElementById('exerciseCards');
 
   cards.addEventListener('click', e => {
@@ -1284,10 +1302,53 @@ function initTraining() {
       return;
     }
 
-    const removeExBtn = e.target.closest('.ex-card-remove');
-    if (removeExBtn) {
-      currentExercises.splice(parseInt(removeExBtn.dataset.ex, 10), 1);
-      persistExercises(); renderExerciseCards(); return;
+    const menuToggleBtn = e.target.closest('.ex-card-remove');
+    if (menuToggleBtn) {
+      const menu = menuToggleBtn.closest('.ex-card-menu-wrap').querySelector('.ex-card-menu');
+      const wasOpen = !menu.hidden;
+      document.querySelectorAll('.ex-card-menu').forEach(m => { m.hidden = true; });
+      menu.hidden = wasOpen;
+      return;
+    }
+
+    const renameBtn = e.target.closest('.ex-menu-rename');
+    if (renameBtn) {
+      const exIdx = parseInt(renameBtn.dataset.ex, 10);
+      const newName = prompt('Rename exercise', currentExercises[exIdx].name);
+      if (newName && newName.trim()) {
+        currentExercises[exIdx].name = newName.trim();
+        persistExercises();
+        renderExerciseCards();
+        renderExerciseNameOptions();
+      }
+      return;
+    }
+
+    const resetBtn = e.target.closest('.ex-menu-reset');
+    if (resetBtn) {
+      const exIdx = parseInt(resetBtn.dataset.ex, 10);
+      if (confirm('Reset all sets for this exercise? Completed checkmarks will be cleared.')) {
+        currentExercises[exIdx].sets.forEach(s => { s.completed = false; });
+        persistExercises();
+        const date = document.getElementById('trainDate').value;
+        const allTimers = getExTimers();
+        if (allTimers[date]) { delete allTimers[date][exIdx]; saveExTimers(allTimers); }
+        renderExerciseCards();
+        renderTrainingStats();
+      }
+      return;
+    }
+
+    const deleteBtn = e.target.closest('.ex-menu-delete');
+    if (deleteBtn) {
+      const exIdx = parseInt(deleteBtn.dataset.ex, 10);
+      if (confirm('Delete this exercise from today\'s session?')) {
+        currentExercises.splice(exIdx, 1);
+        persistExercises();
+        renderExerciseCards();
+        renderTrainingStats();
+      }
+      return;
     }
 
     const addSetBtn = e.target.closest('.ex-add-set');
@@ -1640,8 +1701,43 @@ function showRestToast(message) {
   const toast = document.getElementById('restToast');
   toast.textContent = message;
   toast.hidden = false;
-  clearTimeout(showRestToast._t);
-  showRestToast._t = setTimeout(() => { toast.hidden = true; }, 4000);
+  clearTimeout(toast._hideTimer);
+  toast._hideTimer = setTimeout(() => { toast.hidden = true; }, 4000);
+}
+
+function showAppReminder(message) {
+  const toast = document.getElementById('restToast');
+  toast.textContent = message;
+  toast.hidden = false;
+  clearTimeout(toast._hideTimer);
+  toast._hideTimer = setTimeout(() => { toast.hidden = true; }, 7000);
+}
+
+function checkDataReminder() {
+  const profile = getProfile();
+  if (!profile) return;
+  if (sessionStorage.getItem('wft_data_reminder_shown')) return;
+
+  const logs = getLogs();
+  const completeDates = Object.keys(logs)
+    .filter(d => logs[d].calories != null && logs[d].weightKg != null)
+    .sort();
+  const lastComplete = completeDates.length ? completeDates[completeDates.length - 1] : null;
+
+  const today = parseISO(todayISO());
+  let daysSince;
+  if (lastComplete) {
+    daysSince = Math.round((today - parseISO(lastComplete)) / 86400000);
+  } else if (profile.startDate) {
+    daysSince = Math.round((today - parseISO(profile.startDate)) / 86400000);
+  } else {
+    return;
+  }
+
+  if (daysSince > 3) {
+    sessionStorage.setItem('wft_data_reminder_shown', '1');
+    showAppReminder('Fill up the fuel datas and weigh ins at least completely to keep the app working, thank you.');
+  }
 }
 
 function fireRestComplete(exName) {
@@ -2554,6 +2650,7 @@ setTimeout(() => {
   if (!splash) return;
   splash.classList.add('splash-hide');
   setTimeout(() => { splash.hidden = true; }, 400);
+  checkDataReminder();
 }, 3000);
 
 if ('serviceWorker' in navigator) {
