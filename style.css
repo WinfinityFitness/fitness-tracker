@@ -245,6 +245,20 @@ body {
   margin: 6px 2px -4px;
   color: var(--text-secondary);
 }
+.section-title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 6px 0 -4px; }
+.section-title-row .section-title { margin: 0; }
+.unit-switch { display: flex; border: 1px solid var(--border-soft); border-radius: 8px; overflow: hidden; flex: none; }
+.unit-switch-btn {
+  background: var(--surface-2);
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.unit-switch-btn.is-active { background: var(--cyan); color: #04181a; }
 
 /* ---------------- Current date & time card ---------------- */
 .datetime-card {
@@ -256,29 +270,37 @@ body {
   align-items: center;
   gap: 16px;
 }
-.datetime-info { flex: 1; min-width: 0; }
+.datetime-info { flex: 7; min-width: 0; }
 .datetime-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin: 0 0 6px;
 }
 .datetime-date {
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   font-weight: 800;
   color: var(--text-primary);
   margin: 0 0 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .datetime-clock {
   font-family: var(--font-mono);
-  font-size: 1.6rem;
+  font-size: 1.5rem;
   font-weight: 800;
   color: var(--cyan);
   text-shadow: 0 0 12px var(--cyan-glow);
   margin: 0;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .datetime-divider { width: 1px; align-self: stretch; background: var(--border-soft); flex: none; }
 .datetime-tz-btn {
@@ -287,8 +309,28 @@ body {
   border: none;
   color: var(--cyan);
   cursor: pointer;
-  padding: 6px;
-  filter: drop-shadow(0 0 6px var(--cyan-glow));
+  padding: 2px;
+  line-height: 0;
+  filter: drop-shadow(0 0 4px var(--cyan-glow));
+}
+.weather-widget {
+  flex: 3;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 2px;
+}
+.weather-widget .datetime-label { justify-content: center; margin-bottom: 4px; }
+.weather-icon { font-size: 1.7rem; line-height: 1; }
+.weather-temp {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  white-space: nowrap;
 }
 
 /* ---------------- Rings ---------------- */
@@ -649,6 +691,12 @@ body {
   color: var(--text-secondary);
   padding: 0 4px;
 }
+.field-group-heading {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  margin: 0 0 10px;
+}
 .field-group .extraHabitInput {
   display: block;
   width: 100%;
@@ -687,6 +735,7 @@ body {
 .btn--ghost { background: transparent; border-color: var(--border); color: var(--cyan); }
 .btn--file { cursor: pointer; }
 .btn--sm { padding: 8px 12px; font-size: 0.8rem; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
 .btn--danger { color: var(--critical); }
 .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
 .btn-row .btn { flex: 1; min-width: 140px; }
@@ -801,6 +850,29 @@ body {
   position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
   font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-muted);
   text-transform: uppercase; letter-spacing: 0.04em; pointer-events: none;
+}
+.input-unit-wrap .input-icon {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  font-size: 0.9rem; pointer-events: none;
+}
+.input-unit-wrap:has(.input-icon) input { padding-left: 40px !important; }
+
+/* ---------------- Custom habit protocol rows ---------------- */
+.proto-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.proto-index {
+  font-family: var(--font-mono); font-size: 0.62rem; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.03em; flex: none; width: 62px;
+}
+.proto-row .extraHabitInput { flex: 1; min-width: 0; }
+.proto-delete {
+  flex: none; background: rgba(255,77,106,0.12); border: 1px solid rgba(255,77,106,0.3);
+  border-radius: 8px; color: var(--critical); padding: 8px 10px; cursor: pointer; font-size: 0.85rem;
+}
+.proto-delete:hover { background: rgba(255,77,106,0.2); }
+
+.form-flavor-note {
+  font-family: var(--font-mono); font-size: 0.64rem; color: var(--text-muted);
+  text-align: center; margin: 6px 0 0; text-transform: uppercase; letter-spacing: 0.03em;
 }
 
 /* ---------------- History table ---------------- */
@@ -1277,7 +1349,7 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 /* ---------------- Modal (More panel) ---------------- */
 .sheet-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.6);
-  z-index: 30; display: flex; align-items: flex-end;
+  z-index: 150; display: flex; align-items: flex-end;
 }
 .sheet-overlay[hidden] { display: none; }
 .sheet {

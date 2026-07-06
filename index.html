@@ -48,19 +48,26 @@
 
     <div class="datetime-card">
       <div class="datetime-info">
-        <p class="datetime-label">Current Date &amp; Time</p>
+        <p class="datetime-label">
+          <span>Current Date &amp; Time</span>
+          <button type="button" class="datetime-tz-btn" id="btnTimezone" aria-label="Choose timezone">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+              <line x1="8" y1="2.5" x2="8" y2="6"></line>
+              <line x1="16" y1="2.5" x2="16" y2="6"></line>
+            </svg>
+          </button>
+        </p>
         <p class="datetime-date" id="dtDate">–</p>
         <p class="datetime-clock" id="dtClock">--:--:--</p>
       </div>
       <div class="datetime-divider"></div>
-      <button type="button" class="datetime-tz-btn" id="btnTimezone" aria-label="Choose timezone">
-        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="5" width="18" height="16" rx="2"></rect>
-          <line x1="3" y1="10" x2="21" y2="10"></line>
-          <line x1="8" y1="2.5" x2="8" y2="6"></line>
-          <line x1="16" y1="2.5" x2="16" y2="6"></line>
-        </svg>
-      </button>
+      <div class="weather-widget" id="weatherWidget">
+        <p class="datetime-label">Weather</p>
+        <div class="weather-icon" id="weatherIcon">⛅</div>
+        <div class="weather-temp" id="weatherTemp">--°</div>
+      </div>
     </div>
 
     <div class="ring-row">
@@ -68,7 +75,7 @@
       <div class="ring-card" id="ringHydrationCard"></div>
     </div>
 
-    <div class="stat-grid">
+    <div class="stat-grid stat-grid--3">
       <div class="stat-tile">
         <div class="stat-tile-value" id="avgSteps">–</div>
         <div class="stat-tile-label">Avg steps (7d)</div>
@@ -77,7 +84,12 @@
         <div class="stat-tile-value" id="currentBMI">–</div>
         <div class="stat-tile-label">Current BMI</div>
       </div>
+      <div class="stat-tile" id="adjustedBmiTile" hidden>
+        <div class="stat-tile-value" id="adjustedBMI">–</div>
+        <div class="stat-tile-label">Adjusted BMI (est.)</div>
+      </div>
     </div>
+    <p class="hint" id="adjustedBmiHint" hidden>Adjusted BMI factors in your training intensity and step activity as a rough proxy for muscle mass vs. body fat — not a clinical measurement.</p>
 
     <h2 class="section-title">Quick log</h2>
     <div class="chart-card">
@@ -183,7 +195,8 @@
     </div>
 
     <fieldset class="field-group">
-      <legend>Measurement log (cm, to nearest 0.1)</legend>
+      <p class="mod-tag">Mod_measure_11</p>
+      <p class="field-group-heading">Measurement Log (CM, to nearest 0.1)</p>
       <label class="field">
         <span>Date</span>
         <input type="date" id="measureDate">
@@ -294,7 +307,13 @@
       </div>
     </div>
 
-    <h2 class="section-title">Protocol execution queue</h2>
+    <div class="section-title-row">
+      <h2 class="section-title">Protocol execution queue</h2>
+      <div class="unit-switch">
+        <button type="button" class="unit-switch-btn" data-unit="kg" id="btnUnitKg">KG</button>
+        <button type="button" class="unit-switch-btn" data-unit="lb" id="btnUnitLb">LB</button>
+      </div>
+    </div>
     <div class="exercise-cards" id="exerciseCards"></div>
     <p class="empty-note" id="exerciseEmptyNote">No exercises logged for this date yet.</p>
 
@@ -358,7 +377,7 @@
         <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="fuelSodiumBar" style="width:0%"><span class="gradient-bar-dot"></span></div></div>
       </div>
       <div class="gradient-stat-row">
-        <div class="gradient-stat-row-head"><span>Water</span><span><strong id="fuelWaterNow">0</strong> <span>/ <span id="fuelWaterTarget">–</span> cups</span></span></div>
+        <div class="gradient-stat-row-head"><span>Water</span><span><strong id="fuelWaterNow">0</strong> <span>/ <span id="fuelWaterTarget">–</span> mL</span></span></div>
         <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="fuelWaterBar" style="width:0%"><span class="gradient-bar-dot"></span></div></div>
       </div>
 
@@ -370,7 +389,8 @@
     </div>
 
     <fieldset class="field-group">
-      <legend>Mod_input_01 today's intake log</legend>
+      <p class="mod-tag">Mod_input_01</p>
+      <p class="field-group-heading">Today's Intake Log</p>
       <label class="field">
         <span>Calories consumed</span>
         <div class="input-unit-wrap"><input type="number" id="nutCalories" placeholder="e.g. 2200"><span class="input-unit">kcal</span></div>
@@ -396,8 +416,8 @@
         <div class="input-unit-wrap"><input type="number" id="nutSodium" placeholder="e.g. 1800"><span class="input-unit">mg</span></div>
       </label>
       <label class="field">
-        <span>Water (16oz cups)</span>
-        <div class="input-unit-wrap"><input type="number" id="nutWater" min="0" placeholder="e.g. 6"><span class="input-unit">units</span></div>
+        <span>Water (mL)</span>
+        <div class="input-unit-wrap"><input type="number" id="nutWater" min="0" step="50" placeholder="e.g. 3000"><span class="input-unit">mL</span></div>
       </label>
       <label class="field">
         <span>Daily steps</span>
@@ -427,7 +447,8 @@
     <h2 class="section-title">Coach assignment</h2>
     <p class="hint">Contact Coach Win for assessment to get a new assignment next week.</p>
     <fieldset class="field-group">
-      <legend>Assigned targets (optional override)</legend>
+      <p class="mod-tag">Mod_coach_07</p>
+      <p class="field-group-heading">Assigned Targets (Optional Override)</p>
       <label class="field">
         <span>Calorie intake assignment (kcal)</span>
         <input type="number" id="coachCalorieInput" placeholder="e.g. 2000">
@@ -520,144 +541,170 @@
       <dl class="computed-list" id="computedList"></dl>
     </div>
 
-    <p class="mod-tag" style="margin:6px 0 -4px 2px;">Mod_entity_core_99</p>
-    <h2 class="section-title">Entity identity</h2>
+    <p class="hero-eyebrow">System config</p>
+    <h2 class="hero-title" style="margin-bottom:10px;">Entity Identity</h2>
     <form id="setupForm">
-      <label class="field">
-        <span>Entity designation (name)</span>
-        <input type="text" id="setupName" placeholder="Optional">
-      </label>
-
-      <div class="field-row">
+      <fieldset class="field-group">
+        <p class="mod-tag">Mod_io_core_01</p>
         <label class="field">
-          <span>Weight system</span>
-          <select id="setupWeightUnit">
-            <option value="kg">Kilograms (kg)</option>
-            <option value="lb">Pounds (lb)</option>
-          </select>
+          <span>Entity Designation</span>
+          <input type="text" id="setupName" placeholder="ENTER IDENTIFIER...">
         </label>
-        <label class="field">
-          <span>Height system</span>
-          <select id="setupHeightUnit">
-            <option value="cm">Centimeters (cm)</option>
-            <option value="ftin">Feet &amp; inches</option>
-          </select>
-        </label>
-      </div>
-
-      <div class="field-row">
-        <label class="field">
-          <span>Biological archetype</span>
-          <select id="setupGender">
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>Temporal age</span>
-          <input type="number" id="setupAge" min="10" max="100">
-        </label>
-      </div>
-
-      <div id="heightCmField">
-        <label class="field">
-          <span>Height (cm)</span>
-          <input type="number" id="setupHeightCm" step="0.1">
-        </label>
-      </div>
-      <div id="heightFtInField" hidden>
         <div class="field-row">
           <label class="field">
-            <span>Height (ft)</span>
-            <input type="number" id="setupHeightFt" min="0" max="8">
+            <span>Temporal Age</span>
+            <input type="number" id="setupAge" min="10" max="100" placeholder="YY">
           </label>
           <label class="field">
-            <span>Height (in)</span>
-            <input type="number" id="setupHeightIn" min="0" max="11" step="0.1">
+            <span>Biological Archetype</span>
+            <select id="setupGender">
+              <option value="male">MALE_01</option>
+              <option value="female">FEMALE_01</option>
+            </select>
           </label>
         </div>
-      </div>
+        <div class="field-row">
+          <label class="field">
+            <span>Weight System</span>
+            <select id="setupWeightUnit">
+              <option value="kg">KG</option>
+              <option value="lb">LB</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Height System</span>
+            <select id="setupHeightUnit">
+              <option value="cm">CM</option>
+              <option value="ftin">FT_IN</option>
+            </select>
+          </label>
+        </div>
+      </fieldset>
 
-      <label class="field">
-        <span>Starting weight</span>
-        <input type="number" step="0.01" id="setupStartWeight">
-      </label>
+      <fieldset class="field-group">
+        <p class="mod-tag">Mod_biom_02</p>
+        <div id="heightCmField">
+          <label class="field">
+            <span>Height (CM)</span>
+            <div class="input-unit-wrap"><input type="number" id="setupHeightCm" step="0.1" placeholder="000"><span class="input-unit">CM</span></div>
+          </label>
+        </div>
+        <div id="heightFtInField" hidden>
+          <div class="field-row">
+            <label class="field">
+              <span>Height (ft)</span>
+              <input type="number" id="setupHeightFt" min="0" max="8">
+            </label>
+            <label class="field">
+              <span>Height (in)</span>
+              <input type="number" id="setupHeightIn" min="0" max="11" step="0.1">
+            </label>
+          </div>
+        </div>
 
-      <div class="field-row">
         <label class="field">
-          <span>Activity level</span>
+          <span>Current Weight</span>
+          <div class="input-unit-wrap"><input type="number" step="0.01" id="setupStartWeight" placeholder="00.0"><span class="input-unit" id="setupWeightUnitLabel">KG</span></div>
+        </label>
+
+        <label class="field">
+          <span>Activity Protocol</span>
           <select id="setupActivity">
-            <option value="1.2">Sedentary (under 8k steps/day)</option>
-            <option value="1.375">Lightly active (8k–10k steps/day)</option>
-            <option value="1.55">Moderately active (10k–12k steps/day)</option>
-            <option value="1.725">Very active (12k+ steps/day)</option>
+            <option value="1.2">SEDENTARY_STASIS</option>
+            <option value="1.375">LIGHT_ACTIVITY</option>
+            <option value="1.55">MODERATE_ACTIVITY</option>
+            <option value="1.725">HIGH_INTENSITY</option>
           </select>
         </label>
         <label class="field">
           <span>Goal</span>
           <select id="setupGoalMode">
-            <option value="cut">Cutting</option>
-            <option value="bulk">Bulking</option>
+            <option value="cut">CUTTING</option>
+            <option value="bulk">BULKING</option>
           </select>
         </label>
-      </div>
-
-      <label class="field">
-        <span>Lifting sessions per week</span>
-        <select id="setupLifting">
-          <option value="0-2">0–2 sessions</option>
-          <option value="3-6" selected>3–6 sessions</option>
-          <option value="7+">7+ sessions</option>
-        </select>
-      </label>
-
-      <div class="field-row">
         <label class="field">
-          <span>Minimum goal weight</span>
-          <input type="number" step="0.01" id="setupGoalMin">
+          <span>Weekly Sessions</span>
+          <select id="setupLifting">
+            <option value="0-2">0-2_SESSIONS</option>
+            <option value="3-6" selected>3-6_SESSIONS</option>
+            <option value="7+">7+_SESSIONS</option>
+          </select>
         </label>
-        <label class="field">
-          <span>Target goal weight</span>
-          <input type="number" step="0.01" id="setupGoalTarget">
-        </label>
-        <label class="field">
-          <span>Dream goal weight</span>
-          <input type="number" step="0.01" id="setupGoalDream">
-        </label>
-      </div>
-
-      <div class="field-row">
-        <label class="field">
-          <span>Challenge start date</span>
-          <input type="date" id="setupStartDate">
-        </label>
-        <label class="field">
-          <span>Challenge length (days)</span>
-          <input type="number" id="setupProgramDays" value="100" min="1">
-        </label>
-      </div>
-
-      <div class="field-row">
-        <label class="field">
-          <span>Daily water goal (16oz cups)</span>
-          <input type="number" id="setupWaterGoal" value="8" min="1">
-        </label>
-        <label class="field">
-          <span>Daily step goal</span>
-          <input type="number" id="setupStepGoal" value="8000" min="1000" step="500">
-        </label>
-      </div>
-
-      <fieldset class="field-group">
-        <legend>Custom extra habits (optional, up to 5)</legend>
-        <input type="text" class="extraHabitInput" data-idx="0" placeholder="e.g. Meditation">
-        <input type="text" class="extraHabitInput" data-idx="1" placeholder="e.g. No alcohol">
-        <input type="text" class="extraHabitInput" data-idx="2" placeholder="e.g. Read 10 pages">
-        <input type="text" class="extraHabitInput" data-idx="3" placeholder="Optional">
-        <input type="text" class="extraHabitInput" data-idx="4" placeholder="Optional">
       </fieldset>
 
-      <button type="submit" class="btn btn--primary">Save profile</button>
+      <fieldset class="field-group">
+        <p class="mod-tag">Mod_goal_03</p>
+        <div class="field-row">
+          <label class="field">
+            <span>Min Goal</span>
+            <input type="number" step="0.01" id="setupGoalMin" placeholder="00">
+          </label>
+          <label class="field">
+            <span>Target</span>
+            <input type="number" step="0.01" id="setupGoalTarget" placeholder="00">
+          </label>
+          <label class="field">
+            <span>Dream</span>
+            <input type="number" step="0.01" id="setupGoalDream" placeholder="00">
+          </label>
+        </div>
+        <div class="field-row">
+          <label class="field">
+            <span>Challenge Start</span>
+            <input type="date" id="setupStartDate">
+          </label>
+          <label class="field">
+            <span>Duration (Days)</span>
+            <input type="number" id="setupProgramDays" value="100" min="1">
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="field-group">
+        <p class="mod-tag">Mod_daily_04</p>
+        <label class="field">
+          <span>Hydration Goal (ML)</span>
+          <div class="input-unit-wrap"><span class="input-icon">💧</span><input type="number" id="setupWaterGoal" value="3000" min="500" step="50"></div>
+        </label>
+        <label class="field">
+          <span>Kinetic Output (Steps)</span>
+          <div class="input-unit-wrap"><span class="input-icon">👣</span><input type="number" id="setupStepGoal" value="8000" min="1000" step="500"></div>
+        </label>
+      </fieldset>
+
+      <fieldset class="field-group">
+        <p class="mod-tag">Mod_ext_05</p>
+        <p class="field-group-heading">Custom Habit Protocols</p>
+        <div class="proto-row">
+          <span class="proto-index">PROTO_01</span>
+          <input type="text" class="extraHabitInput" data-idx="0" placeholder="e.g. FASTING_16_8">
+          <button type="button" class="proto-delete" data-idx="0" aria-label="Clear slot">🗑</button>
+        </div>
+        <div class="proto-row">
+          <span class="proto-index">PROTO_02</span>
+          <input type="text" class="extraHabitInput" data-idx="1" placeholder="e.g. NO_CAFFEINE_PM">
+          <button type="button" class="proto-delete" data-idx="1" aria-label="Clear slot">🗑</button>
+        </div>
+        <div class="proto-row">
+          <span class="proto-index">PROTO_03</span>
+          <input type="text" class="extraHabitInput" data-idx="2" placeholder="e.g. READ_10_PAGES">
+          <button type="button" class="proto-delete" data-idx="2" aria-label="Clear slot">🗑</button>
+        </div>
+        <div class="proto-row">
+          <span class="proto-index">PROTO_04</span>
+          <input type="text" class="extraHabitInput" data-idx="3" placeholder="Optional">
+          <button type="button" class="proto-delete" data-idx="3" aria-label="Clear slot">🗑</button>
+        </div>
+        <div class="proto-row">
+          <span class="proto-index">PROTO_05</span>
+          <input type="text" class="extraHabitInput" data-idx="4" placeholder="Optional">
+          <button type="button" class="proto-delete" data-idx="4" aria-label="Clear slot">🗑</button>
+        </div>
+      </fieldset>
+
+      <button type="submit" class="btn btn--primary">⟲ Initialize Profile Sync</button>
+      <p class="form-flavor-note">Encrypting bio-signature data... 100% secure</p>
       <p class="save-note" id="setupSaveNote"></p>
     </form>
   </section>
@@ -786,7 +833,8 @@
     </div>
 
     <div class="sheet-section">
-      <h2 class="section-title">Weekly review</h2>
+      <p class="mod-tag">Mod_review_12</p>
+      <p class="field-group-heading">Weekly Review</p>
       <form id="reviewForm">
         <label class="field">
           <span>Week ending</span>
@@ -805,7 +853,7 @@
           <textarea id="reviewImprovements" rows="2"></textarea>
         </label>
         <fieldset class="field-group">
-          <legend>Focus for next week (pick 1–2)</legend>
+          <p class="field-group-heading" style="font-size:0.8rem;">Focus for Next Week (pick 1-2)</p>
           <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="consistency"><span>Be more consistent with logging</span></label>
           <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="accuracy"><span>Be more accurate measuring food</span></label>
           <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="calorieTarget"><span>Do better hitting calorie target</span></label>
@@ -823,7 +871,8 @@
     </div>
 
     <div class="sheet-section">
-      <h2 class="section-title">Export &amp; email</h2>
+      <p class="mod-tag">Mod_export_13</p>
+      <p class="field-group-heading">Export &amp; Email</p>
       <div class="btn-row">
         <button class="btn btn--primary" id="btnExportWeek">Export last 7 days (CSV)</button>
         <button class="btn" id="btnExportAll">Export all logs (CSV)</button>
@@ -832,7 +881,8 @@
     </div>
 
     <div class="sheet-section">
-      <h2 class="section-title">Backup</h2>
+      <p class="mod-tag">Mod_backup_14</p>
+      <p class="field-group-heading">Backup</p>
       <div class="btn-row">
         <button class="btn" id="btnBackup">Save backup (JSON)</button>
         <label class="btn btn--file">
@@ -844,7 +894,8 @@
     </div>
 
     <div class="sheet-section">
-      <h2 class="section-title">Google Drive backup</h2>
+      <p class="mod-tag">Mod_gdrive_15</p>
+      <p class="field-group-heading">Google Drive Backup</p>
       <p class="hint" id="driveStatus">Not connected.</p>
       <div class="btn-row">
         <button class="btn btn--primary" id="btnDriveConnect">Sign in with Google</button>
@@ -854,7 +905,8 @@
     </div>
 
     <div class="sheet-section">
-      <h2 class="section-title">Accomplishment log history</h2>
+      <p class="mod-tag">Mod_history_16</p>
+      <p class="field-group-heading">Accomplishment Log History</p>
       <div class="table-wrap">
         <table id="historyTable">
           <thead>
@@ -867,7 +919,8 @@
     </div>
 
     <div class="sheet-section">
-      <h2 class="section-title">Measurement log history</h2>
+      <p class="mod-tag">Mod_mhistory_17</p>
+      <p class="field-group-heading">Measurement Log History</p>
       <div class="table-wrap">
         <table id="measureHistoryTable">
           <thead>
@@ -1102,6 +1155,23 @@
       <a class="btn btn--primary" href="https://www.facebook.com/winfinityfit/" target="_blank" rel="noopener noreferrer">Open Facebook Page</a>
     </div>
     <button type="button" class="btn" id="btnReviewConfirm" style="margin-top:10px;width:100%;">I've left a review — Continue</button>
+  </div>
+</div>
+
+<div class="lock-overlay" id="consentGateOverlay" hidden>
+  <div class="lock-card">
+    <div class="lock-icon">📜</div>
+    <h2>Privacy &amp; Terms</h2>
+    <p>Before you continue, please review our Privacy Policy and Terms of Service.</p>
+    <div class="btn-row">
+      <button type="button" class="btn" id="btnConsentViewPrivacy">View Privacy Policy</button>
+      <button type="button" class="btn" id="btnConsentViewTerms">View Terms of Service</button>
+    </div>
+    <label class="field field--checkbox" style="text-align:left;margin-top:14px;">
+      <input type="checkbox" id="consentCheckbox">
+      <span>I have read and agree to the Privacy Policy and Terms of Service.</span>
+    </label>
+    <button type="button" class="btn btn--primary" id="btnConsentAgree" style="width:100%;margin-top:14px;" disabled>Agree &amp; Continue</button>
   </div>
 </div>
 

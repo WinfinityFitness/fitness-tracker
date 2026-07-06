@@ -17,6 +17,28 @@ function getLogs() {
 }
 function saveLogs(logs) { localStorage.setItem(KEYS.logs, JSON.stringify(logs)); }
 
+/* One-time migration: water tracking switched from 16oz cups to milliliters. */
+function migrateWaterUnitsIfNeeded() {
+  if (localStorage.getItem('wft_water_migrated_v1')) return;
+  const CUP_ML = 473;
+  const profile = getProfile();
+  if (profile && profile.waterGoal != null && profile.waterGoal < 100) {
+    profile.waterGoal = Math.round((profile.waterGoal * CUP_ML) / 50) * 50;
+    saveProfile(profile);
+  }
+  const logs = getLogs();
+  let changed = false;
+  Object.keys(logs).forEach(date => {
+    const e = logs[date];
+    if (e.water != null && e.water < 100) {
+      e.water = Math.round((e.water * CUP_ML) / 50) * 50;
+      changed = true;
+    }
+  });
+  if (changed) saveLogs(logs);
+  localStorage.setItem('wft_water_migrated_v1', '1');
+}
+
 function updateLogFields(date, partial) {
   const logs = getLogs();
   logs[date] = Object.assign({ date }, logs[date] || {}, partial);
@@ -41,6 +63,14 @@ const ftInToCm = (ft, inch) => (ft * 12 + inch) * 2.54;
 
 function toKg(value, unit) { return unit === 'lb' ? lbToKg(value) : value; }
 function fromKg(kg, unit) { return unit === 'lb' ? kgToLb(kg) : kg; }
+
+function getTrainUnit() {
+  const stored = localStorage.getItem('wft_train_unit');
+  if (stored === 'kg' || stored === 'lb') return stored;
+  const profile = getProfile();
+  return profile ? (profile.weightUnit || 'kg') : 'kg';
+}
+function setTrainUnit(u) { localStorage.setItem('wft_train_unit', u); }
 
 function todayISO() {
   const d = new Date();
@@ -71,6 +101,34 @@ function computeBMI(kg, cm) {
   if (!kg || !cm) return null;
   const m = cm / 100;
   return kg / (m * m);
+}
+
+/* Illustrative estimate, not a clinical measurement:
+   nudges the standard BMI down for users showing high training intensity and step
+   activity (a rough proxy for muscle mass BMI alone can't distinguish from fat),
+   with a small extra credit if trend weight is falling alongside heavy training
+   (suggesting fat loss/recomposition rather than plain weight loss). */
+function computeAdjustedBMI(profile, baseBMI, logsArr) {
+  const cutoff7 = new Date(); cutoff7.setDate(cutoff7.getDate() - 6); cutoff7.setHours(0, 0, 0, 0);
+  const recent7 = logsArr.filter(l => parseISO(l.date) >= cutoff7);
+
+  const workouts7d = recent7.filter(l => l.exercises && l.exercises.some(ex => ex.sets.some(s => s.completed))).length;
+  const workoutIntensity = Math.min(1, workouts7d / 5);
+
+  const avgSteps = avgOfLastNDays(logsArr, 'steps', 7);
+  const stepGoal = getEffectiveStepGoal(profile);
+  const stepsIndex = avgSteps != null ? Math.min(1, avgSteps / stepGoal) : 0;
+
+  const trendSeries = computeTrendSeries(logsArr);
+  const delta14 = trendDeltaDaysAgo(trendSeries, 14);
+  const losingWeight = delta14 != null && delta14 < -0.2;
+
+  let activityIndex = (workoutIntensity + stepsIndex) / 2;
+  if (losingWeight && workoutIntensity > 0.5) activityIndex = Math.min(1, activityIndex + 0.15);
+
+  const adjustment = -2.5 * activityIndex;
+  const adjustedBMI = Math.max(15, baseBMI + adjustment);
+  return { adjustedBMI, activityIndex };
 }
 function computeBMR(kg, cm, age, gender) {
   if (!kg || !cm || !age) return null;
@@ -404,6 +462,56 @@ function initTimezonePicker() {
 }
 
 /* ---------------------------------------------------------------- */
+/* Status: weather widget (Open-Meteo, no API key required)            */
+/* ---------------------------------------------------------------- */
+function weatherIconFor(code) {
+  if (code === 0) return '☀️';
+  if (code <= 3) return '⛅';
+  if (code <= 48) return '🌫️';
+  if (code <= 67) return '🌧️';
+  if (code <= 77) return '❄️';
+  if (code <= 82) return '🌦️';
+  return '⛈️';
+}
+
+async function fetchWeather(lat, lon) {
+  const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code`);
+  if (!res.ok) throw new Error('weather fetch failed');
+  const data = await res.json();
+  return { tempC: data.current.temperature_2m, code: data.current.weather_code };
+}
+
+function renderWeather(w) {
+  document.getElementById('weatherIcon').textContent = weatherIconFor(w.code);
+  document.getElementById('weatherTemp').textContent = Math.round(w.tempC) + '°C';
+}
+
+function initWeatherWidget() {
+  let cached = null;
+  try { cached = JSON.parse(localStorage.getItem('wft_weather_cache')); } catch (e) { /* ignore */ }
+  if (cached && Date.now() - cached.time < 30 * 60 * 1000) renderWeather(cached);
+
+  if (!navigator.geolocation) {
+    if (!cached) { document.getElementById('weatherIcon').textContent = '❔'; document.getElementById('weatherTemp').textContent = 'N/A'; }
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      fetchWeather(pos.coords.latitude, pos.coords.longitude).then(w => {
+        renderWeather(w);
+        localStorage.setItem('wft_weather_cache', JSON.stringify({ ...w, time: Date.now() }));
+      }).catch(() => {
+        if (!cached) { document.getElementById('weatherIcon').textContent = '⚠️'; document.getElementById('weatherTemp').textContent = '--°'; }
+      });
+    },
+    () => {
+      if (!cached) { document.getElementById('weatherIcon').textContent = '📍'; document.getElementById('weatherTemp').textContent = 'Off'; }
+    },
+    { timeout: 8000 }
+  );
+}
+
+/* ---------------------------------------------------------------- */
 /* Bio: profile form                                                   */
 /* ---------------------------------------------------------------- */
 function initSetupForm() {
@@ -411,10 +519,23 @@ function initSetupForm() {
   const heightUnitSel = document.getElementById('setupHeightUnit');
   const cmField = document.getElementById('heightCmField');
   const ftInField = document.getElementById('heightFtInField');
+  const weightUnitSel = document.getElementById('setupWeightUnit');
 
   heightUnitSel.addEventListener('change', () => {
     cmField.hidden = heightUnitSel.value !== 'cm';
     ftInField.hidden = heightUnitSel.value !== 'ftin';
+  });
+
+  weightUnitSel.addEventListener('change', () => {
+    document.getElementById('setupWeightUnitLabel').textContent = weightUnitSel.value.toUpperCase();
+  });
+
+  form.querySelectorAll('.proto-delete').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = btn.dataset.idx;
+      const input = form.querySelector(`.extraHabitInput[data-idx="${idx}"]`);
+      if (input) { input.value = ''; input.focus(); }
+    });
   });
 
   form.addEventListener('submit', e => {
@@ -450,7 +571,7 @@ function initSetupForm() {
       goalDreamKg: goalDreamRaw != null ? toKg(goalDreamRaw, weightUnit) : null,
       startDate: document.getElementById('setupStartDate').value || null,
       programDays: parseInt(document.getElementById('setupProgramDays').value, 10) || 100,
-      waterGoal: parseInt(document.getElementById('setupWaterGoal').value, 10) || 8,
+      waterGoal: parseInt(document.getElementById('setupWaterGoal').value, 10) || 3000,
       stepGoal: parseInt(document.getElementById('setupStepGoal').value, 10) || 8000,
       extraHabits,
     };
@@ -472,6 +593,7 @@ function loadSetupForm() {
   if (!p) { renderExtraHabitFields({ extraHabits: [] }); return; }
   document.getElementById('setupName').value = p.name || '';
   document.getElementById('setupWeightUnit').value = p.weightUnit || 'kg';
+  document.getElementById('setupWeightUnitLabel').textContent = (p.weightUnit || 'kg').toUpperCase();
   document.getElementById('setupHeightUnit').value = p.heightUnit || 'cm';
   document.getElementById('setupGender').value = p.gender || 'male';
   document.getElementById('setupAge').value = p.age || '';
@@ -496,7 +618,7 @@ function loadSetupForm() {
   if (p.goalDreamKg != null) document.getElementById('setupGoalDream').value = round2(fromKg(p.goalDreamKg, wu));
   document.getElementById('setupStartDate').value = p.startDate || '';
   document.getElementById('setupProgramDays').value = p.programDays || 100;
-  document.getElementById('setupWaterGoal').value = p.waterGoal || 8;
+  document.getElementById('setupWaterGoal').value = p.waterGoal || 3000;
   document.getElementById('setupStepGoal').value = p.stepGoal || 8000;
   (p.extraHabits || []).forEach((v, i) => {
     const el = document.querySelector(`.extraHabitInput[data-idx="${i}"]`);
@@ -918,7 +1040,7 @@ function renderDashboard() {
     size: 140, stroke: 9, modTag: 'MOD_HABIT_01', centerText: habit.pct + '%', label: 'Habit completion', sub: `${habit.done}/${habit.total} today`,
   });
 
-  const waterGoal = (profile && profile.waterGoal) || 8;
+  const waterGoal = (profile && profile.waterGoal) || 3000;
   const waterToday = (todayEntry && todayEntry.water != null) ? todayEntry.water : 0;
   const waterPct = waterGoal > 0 ? (waterToday / waterGoal) * 100 : 0;
 
@@ -942,6 +1064,18 @@ function renderDashboard() {
   const kgNow = currentWeightKg(profile);
   const bmi = profile ? computeBMI(kgNow, profile.heightCm) : null;
   document.getElementById('currentBMI').textContent = bmi ? bmi.toFixed(1) : '–';
+
+  const adjTile = document.getElementById('adjustedBmiTile');
+  const adjHint = document.getElementById('adjustedBmiHint');
+  const adjusted = (profile && bmi) ? computeAdjustedBMI(profile, bmi, logsArr) : null;
+  if (adjusted) {
+    adjTile.hidden = false;
+    adjHint.hidden = false;
+    document.getElementById('adjustedBMI').textContent = adjusted.adjustedBMI.toFixed(1);
+  } else {
+    adjTile.hidden = true;
+    adjHint.hidden = true;
+  }
 
   const trendSeries = computeTrendSeries(logsArr);
   ['7', '14', '21'].forEach(n => {
@@ -1263,7 +1397,7 @@ function renderExerciseCards() {
   const emptyNote = document.getElementById('exerciseEmptyNote');
   const newProtocolBox = document.getElementById('newProtocolBox');
   const profile = getProfile();
-  const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
+  const wu = getTrainUnit();
   const date = document.getElementById('trainDate').value;
   container.innerHTML = '';
 
@@ -1343,6 +1477,19 @@ function getActiveTrainingDate() {
   const logs = getLogs();
   const hasData = logs[stored] && logs[stored].exercises && logs[stored].exercises.length > 0;
   return (hasData && !isSessionFinished(stored)) ? stored : todayISO();
+}
+
+function initTrainUnitToggle() {
+  const btnKg = document.getElementById('btnUnitKg');
+  const btnLb = document.getElementById('btnUnitLb');
+  const sync = () => {
+    const u = getTrainUnit();
+    btnKg.classList.toggle('is-active', u === 'kg');
+    btnLb.classList.toggle('is-active', u === 'lb');
+  };
+  btnKg.addEventListener('click', () => { setTrainUnit('kg'); sync(); renderExerciseCards(); });
+  btnLb.addEventListener('click', () => { setTrainUnit('lb'); sync(); renderExerciseCards(); });
+  sync();
 }
 
 function initTraining() {
@@ -1473,7 +1620,7 @@ function initTraining() {
   });
 
   cards.addEventListener('change', e => {
-    const wu = (getProfile() || {}).weightUnit || 'kg';
+    const wu = getTrainUnit();
     if (e.target.classList.contains('ex-set-reps')) {
       const exIdx = parseInt(e.target.dataset.ex, 10), setIdx = parseInt(e.target.dataset.set, 10);
       currentExercises[exIdx].sets[setIdx].reps = parseIntOrNull(e.target.value);
@@ -1672,10 +1819,10 @@ function renderPRBoard() {
   board.innerHTML = '';
   if (!rows.length) { empty.hidden = false; return; }
   empty.hidden = true;
+  const fmtBoth = (weightKg, reps) => `${round2(weightKg)}kg / ${round2(kgToLb(weightKg))}lb × ${reps}`;
   rows.forEach(r => {
-    const wu = r.wu;
-    const curText = `${round2(fromKg(r.current.weightKg, wu))}${wu} × ${r.current.reps}`;
-    const prevText = r.previous ? `${round2(fromKg(r.previous.weightKg, wu))}${wu} × ${r.previous.reps}` : '–';
+    const curText = fmtBoth(r.current.weightKg, r.current.reps);
+    const prevText = r.previous ? fmtBoth(r.previous.weightKg, r.previous.reps) : '–';
     const deltaPct = r.previous ? round2(((r.current.oneRM - r.previous.oneRM) / r.previous.oneRM) * 100) : null;
     const row = document.createElement('div');
     row.className = 'pr-board-row';
@@ -1990,7 +2137,7 @@ function renderNutritionTargets() {
   const carbTarget = Math.max(0, round0((calorieTarget - proteinTarget * 4 - fatTarget * 9) / 4));
   const fiberTarget = round0((calorieTarget / 1000) * 14);
   const sodiumTarget = 2300;
-  const waterTarget = profile.waterGoal || 8;
+  const waterTarget = profile.waterGoal || 3000;
 
   const date = document.getElementById('nutDate').value;
   const entry = getLogs()[date] || {};
@@ -2174,7 +2321,7 @@ function buildCSV(logsArr, profile) {
   const wu = profile ? profile.weightUnit || 'kg' : 'kg';
   const habitLabels = (profile ? profile.extraHabits || [] : []).map((l, i) => ({ label: l, idx: i })).filter(h => h.label);
   const headers = ['Date', `Weight (${wu})`, 'Sleep Quality (1-5)', 'Stress (1-5)', 'Fatigue (1-5)', 'Hunger (1-5)',
-    'Steps', 'Calories', 'Protein (g)', 'Water (16oz cups)', 'Workout Done', 'Exercises', 'Menstruating',
+    'Steps', 'Calories', 'Protein (g)', 'Water (mL)', 'Workout Done', 'Exercises', 'Menstruating',
     'Reviewed Goals', 'Planned Tomorrow', ...habitLabels.map(h => h.label), 'Struggles', 'Improve Tomorrow'];
   const rows = [headers];
   logsArr.forEach(l => {
@@ -2684,14 +2831,42 @@ function initBetaLock() {
 /* ---------------------------------------------------------------- */
 /* Review gate (honor system, unverified — see conversation notes)     */
 /* ---------------------------------------------------------------- */
-function initReviewGate() {
-  if (localStorage.getItem('wft_review_confirmed')) return;
+function initReviewGate(onComplete) {
   if (!document.getElementById('lockOverlay').hidden) return; // beta already ended, skip
+
+  if (localStorage.getItem('wft_review_confirmed')) {
+    if (onComplete) onComplete();
+    return;
+  }
 
   const overlay = document.getElementById('reviewGateOverlay');
   overlay.hidden = false;
   document.getElementById('btnReviewConfirm').addEventListener('click', () => {
     localStorage.setItem('wft_review_confirmed', '1');
+    overlay.hidden = true;
+    if (onComplete) onComplete();
+  });
+}
+
+/* ---------------------------------------------------------------- */
+/* Consent gate (Privacy Policy + Terms of Service clickwrap)         */
+/* ---------------------------------------------------------------- */
+function initConsentGate() {
+  if (localStorage.getItem('wft_consent_agreed')) return;
+  if (!document.getElementById('lockOverlay').hidden) return; // beta already ended, skip
+
+  const overlay = document.getElementById('consentGateOverlay');
+  const checkbox = document.getElementById('consentCheckbox');
+  const agreeBtn = document.getElementById('btnConsentAgree');
+  overlay.hidden = false;
+
+  checkbox.addEventListener('change', () => { agreeBtn.disabled = !checkbox.checked; });
+  document.getElementById('btnConsentViewPrivacy').addEventListener('click', () => { document.getElementById('privacyOverlay').hidden = false; });
+  document.getElementById('btnConsentViewTerms').addEventListener('click', () => { document.getElementById('termsOverlay').hidden = false; });
+  agreeBtn.addEventListener('click', () => {
+    if (!checkbox.checked) return;
+    localStorage.setItem('wft_consent_agreed', '1');
+    localStorage.setItem('wft_consent_agreed_at', new Date().toISOString());
     overlay.hidden = true;
   });
 }
@@ -2719,6 +2894,7 @@ initThemeToggle();
 /* ---------------------------------------------------------------- */
 document.getElementById('headerToday').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
 
+migrateWaterUnitsIfNeeded();
 initTabs();
 document.getElementById('btnGoToBioFromChart').addEventListener('click', () => {
   document.querySelector('.tab-btn[data-target="bio"]').click();
@@ -2729,11 +2905,13 @@ initPrivacyPolicy();
 initTermsOfService();
 initDateTimeWidget();
 initTimezonePicker();
+initWeatherWidget();
 initSetupForm();
 initCheckin();
 initQuickLog();
 initMeasurements();
 initTraining();
+initTrainUnitToggle();
 initNutrition();
 initBioLog();
 initReviewForm();
@@ -2746,7 +2924,7 @@ loadQuickLog();
 renderDashboard();
 initBetaLock();
 if (document.getElementById('lockOverlay').hidden) {
-  initOnboarding(() => initReviewGate());
+  initOnboarding(() => initReviewGate(() => initConsentGate()));
 }
 
 setTimeout(() => {
