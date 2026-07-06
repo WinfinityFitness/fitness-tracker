@@ -246,6 +246,51 @@ body {
   color: var(--text-secondary);
 }
 
+/* ---------------- Current date & time card ---------------- */
+.datetime-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.datetime-info { flex: 1; min-width: 0; }
+.datetime-label {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 6px;
+}
+.datetime-date {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0 0 2px;
+}
+.datetime-clock {
+  font-family: var(--font-mono);
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--cyan);
+  text-shadow: 0 0 12px var(--cyan-glow);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.datetime-divider { width: 1px; align-self: stretch; background: var(--border-soft); flex: none; }
+.datetime-tz-btn {
+  flex: none;
+  background: none;
+  border: none;
+  color: var(--cyan);
+  cursor: pointer;
+  padding: 6px;
+  filter: drop-shadow(0 0 6px var(--cyan-glow));
+}
+
 /* ---------------- Rings ---------------- */
 .ring-row {
   display: grid;

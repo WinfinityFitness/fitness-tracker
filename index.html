@@ -40,14 +40,27 @@
       <h2 class="hero-title">Welcome back, <span class="accent" id="heroName">Operator</span>.</h2>
       <div class="chip-row">
         <div class="chip">
-          <span class="chip-label">Sync_status</span>
-          <span class="chip-value" id="syncStatusValue">Synchronized</span>
-        </div>
-        <div class="chip">
           <span class="chip-label">Challenge_day</span>
           <span class="chip-value" id="daysLeftValue">–</span>
         </div>
       </div>
+    </div>
+
+    <div class="datetime-card">
+      <div class="datetime-info">
+        <p class="datetime-label">Current Date &amp; Time</p>
+        <p class="datetime-date" id="dtDate">–</p>
+        <p class="datetime-clock" id="dtClock">--:--:--</p>
+      </div>
+      <div class="datetime-divider"></div>
+      <button type="button" class="datetime-tz-btn" id="btnTimezone" aria-label="Choose timezone">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+          <line x1="8" y1="2.5" x2="8" y2="6"></line>
+          <line x1="16" y1="2.5" x2="16" y2="6"></line>
+        </svg>
+      </button>
     </div>
 
     <div class="ring-row">
@@ -1043,6 +1056,22 @@
       <h3>8. Governing Law</h3>
       <p>These Terms shall be governed by and construed in accordance with the laws of the Republic of the Philippines. Any disputes arising under or in connection with these Terms shall be subject to the exclusive jurisdiction of the courts located in Limay, Bataan, Philippines.</p>
     </div>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="timezoneOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Choose Timezone</h2>
+      <button class="sheet-close" id="btnCloseTimezone">✕</button>
+    </div>
+    <label class="field">
+      <span>Region / timezone</span>
+      <select id="timezoneSelect"></select>
+    </label>
+    <button type="button" class="btn btn--primary" id="btnSaveTimezone">Save</button>
+    <p class="save-note" id="timezoneSaveNote"></p>
   </div>
 </div>
 

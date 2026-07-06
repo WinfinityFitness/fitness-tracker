@@ -355,6 +355,54 @@ function initTermsOfService() {
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
 }
 
+function getSavedTimezone() {
+  return localStorage.getItem('wft_timezone') || Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+function renderDateTimeClock() {
+  const tz = getSavedTimezone();
+  const now = new Date();
+  try {
+    document.getElementById('dtDate').textContent = now.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', timeZone: tz });
+    document.getElementById('dtClock').textContent = now.toLocaleTimeString('en-GB', { timeZone: tz });
+  } catch (e) {
+    document.getElementById('dtDate').textContent = now.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+    document.getElementById('dtClock').textContent = now.toLocaleTimeString('en-GB');
+  }
+}
+
+function initDateTimeWidget() {
+  renderDateTimeClock();
+  setInterval(renderDateTimeClock, 1000);
+}
+
+function initTimezonePicker() {
+  const overlay = document.getElementById('timezoneOverlay');
+  const select = document.getElementById('timezoneSelect');
+  let zones = [];
+  try { zones = Intl.supportedValuesOf('timeZone'); } catch (e) {
+    zones = ['UTC', 'Asia/Manila', 'Asia/Singapore', 'Asia/Tokyo', 'Asia/Shanghai', 'Asia/Dubai', 'Asia/Kolkata',
+      'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'America/New_York', 'America/Chicago', 'America/Denver',
+      'America/Los_Angeles', 'America/Sao_Paulo', 'Australia/Sydney', 'Pacific/Auckland'];
+  }
+  select.innerHTML = zones.map(z => `<option value="${z}">${z.replace(/_/g, ' ')}</option>`).join('');
+
+  document.getElementById('btnTimezone').addEventListener('click', () => {
+    select.value = getSavedTimezone();
+    overlay.hidden = false;
+  });
+  document.getElementById('btnCloseTimezone').addEventListener('click', () => { overlay.hidden = true; });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+  document.getElementById('btnSaveTimezone').addEventListener('click', () => {
+    localStorage.setItem('wft_timezone', select.value);
+    renderDateTimeClock();
+    const note = document.getElementById('timezoneSaveNote');
+    note.textContent = 'Timezone saved.';
+    setTimeout(() => { note.textContent = ''; }, 2000);
+    overlay.hidden = true;
+  });
+}
+
 /* ---------------------------------------------------------------- */
 /* Bio: profile form                                                   */
 /* ---------------------------------------------------------------- */
@@ -1736,17 +1784,32 @@ function checkDataReminder() {
 
   if (daysSince > 3) {
     sessionStorage.setItem('wft_data_reminder_shown', '1');
-    showAppReminder('Fill up the fuel datas and weigh ins at least completely to keep the app working, thank you.');
+    const message = 'Fill up the fuel datas and weigh ins at least completely to keep the app working, thank you.';
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    playBeep();
+    showAppReminder(message);
+    if (window.Notification && Notification.permission === 'default' && !notifyPermissionAsked) {
+      notifyPermissionAsked = true;
+      Notification.requestPermission().then(() => fireSystemNotification('Winfinity Tracker', message)).catch(() => {});
+    } else {
+      fireSystemNotification('Winfinity Tracker', message);
+    }
   }
+}
+
+function fireSystemNotification(title, body) {
+  if (!window.Notification || Notification.permission !== 'granted') return;
+  try {
+    const n = new Notification(title, { body });
+    n.onclick = () => { n.close(); window.focus(); };
+  } catch (e) { /* ignore */ }
 }
 
 function fireRestComplete(exName) {
   if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
   playBeep();
   showRestToast(`⏱ Rest complete — ${exName || 'back to it'}!`);
-  if (window.Notification && Notification.permission === 'granted') {
-    try { new Notification('Rest complete', { body: `${exName || 'Exercise'} — time to lift!` }); } catch (e) { /* ignore */ }
-  }
+  fireSystemNotification('Rest complete', `${exName || 'Exercise'} — time to lift!`);
 }
 
 function renderExerciseTimerDisplays() {
@@ -2627,6 +2690,8 @@ initSheet();
 initContact();
 initPrivacyPolicy();
 initTermsOfService();
+initDateTimeWidget();
+initTimezonePicker();
 initSetupForm();
 initCheckin();
 initMeasurements();
@@ -2652,6 +2717,7 @@ setTimeout(() => {
   setTimeout(() => { splash.hidden = true; }, 400);
   checkDataReminder();
 }, 3000);
+
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
