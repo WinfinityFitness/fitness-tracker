@@ -79,6 +79,23 @@
       </div>
     </div>
 
+    <h2 class="section-title">Quick log</h2>
+    <div class="chart-card">
+      <p class="mod-tag">MOD_QUICK_05</p>
+      <label class="field">
+        <span>Morning weight</span>
+        <div class="input-unit-wrap"><input type="number" step="0.01" id="statusWeight" placeholder="e.g. 79.5"><span class="input-unit" id="statusWeightUnitLabel">kg / lbs</span></div>
+      </label>
+      <label class="field">
+        <span>Sleep quality</span>
+        <input type="range" id="statusSleep" min="1" max="5" step="1" value="3">
+        <output id="statusSleepOut">3</output>
+        <div class="slider-endpoints"><span>Restless</span><span>Optimal</span></div>
+      </label>
+      <button type="button" class="btn btn--primary" id="btnSaveQuickLog">Save</button>
+      <p class="save-note" id="quickLogSaveNote"></p>
+    </div>
+
     <h2 class="section-title">Weight change (trend weight)</h2>
     <div class="stat-grid stat-grid--3">
       <div class="stat-tile">

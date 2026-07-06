@@ -275,7 +275,7 @@ function initTabs() {
       const target = btn.dataset.target;
       document.querySelectorAll('.tab-panel').forEach(p => p.hidden = p.dataset.tab !== target);
       btns.forEach(b => b.classList.toggle('is-active', b === btn));
-      if (target === 'status') { loadCheckinForm(); renderDashboard(); }
+      if (target === 'status') { loadCheckinForm(); loadQuickLog(); renderDashboard(); }
       if (target === 'training') {
         loadTrainingForDate(document.getElementById('trainDate').value);
         renderTrainingStats();
@@ -595,6 +595,7 @@ function initBioLog() {
     if (profile) renderComputedTargets(profile);
     renderSleepBarChart();
     renderWaterRetentionOrb();
+    if (date === todayISO()) { loadQuickLog(); renderDashboard(); }
   });
 
   loadBioForDate(todayISO());
@@ -722,6 +723,42 @@ function loadCheckinForm() {
     if (!label) return;
     const el = document.getElementById('checkinExtra' + i);
     if (el) el.checked = !!(e.extra && e.extra[i]);
+  });
+}
+
+/* ---------------------------------------------------------------- */
+/* Status: quick log (morning weight + sleep quality)                  */
+/* ---------------------------------------------------------------- */
+function loadQuickLog() {
+  const profile = getProfile();
+  const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
+  const e = getLogs()[todayISO()] || {};
+  document.getElementById('statusWeight').value = e.weightKg != null ? round2(fromKg(e.weightKg, wu)) : '';
+  document.getElementById('statusWeightUnitLabel').textContent = wu;
+  document.getElementById('statusSleep').value = e.sleep ?? 3;
+  document.getElementById('statusSleepOut').textContent = e.sleep ?? 3;
+}
+
+function initQuickLog() {
+  const sleepInput = document.getElementById('statusSleep');
+  const sleepOut = document.getElementById('statusSleepOut');
+  sleepInput.addEventListener('input', () => { sleepOut.textContent = sleepInput.value; });
+
+  document.getElementById('btnSaveQuickLog').addEventListener('click', () => {
+    const profile = getProfile();
+    const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
+    const date = todayISO();
+    const weightRaw = parseFloat(document.getElementById('statusWeight').value);
+    updateLogFields(date, {
+      weightKg: isNaN(weightRaw) ? null : toKg(weightRaw, wu),
+      sleep: parseInt(sleepInput.value, 10),
+    });
+    document.getElementById('quickLogSaveNote').textContent = 'Saved.';
+    setTimeout(() => { document.getElementById('quickLogSaveNote').textContent = ''; }, 2000);
+    renderDashboard();
+    if (profile) renderComputedTargets(profile);
+    renderSleepBarChart();
+    if (document.getElementById('bioDate').value === date) loadBioForDate(date);
   });
 }
 
@@ -2694,6 +2731,7 @@ initDateTimeWidget();
 initTimezonePicker();
 initSetupForm();
 initCheckin();
+initQuickLog();
 initMeasurements();
 initTraining();
 initNutrition();
@@ -2704,6 +2742,7 @@ initDrive();
 initLeaderboard();
 loadSetupForm();
 loadCheckinForm();
+loadQuickLog();
 renderDashboard();
 initBetaLock();
 if (document.getElementById('lockOverlay').hidden) {
