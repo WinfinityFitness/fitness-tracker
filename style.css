@@ -93,6 +93,47 @@ body {
   background-attachment: fixed;
 }
 
+/* ---------------- Splash screen ---------------- */
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 40px 24px;
+  text-align: center;
+  transition: opacity 0.4s ease;
+}
+.splash-screen.splash-hide { opacity: 0; pointer-events: none; }
+.splash-logo {
+  width: 96px;
+  height: 96px;
+  border-radius: 20%;
+  filter: drop-shadow(0 0 18px var(--cyan-glow));
+  animation: splash-pulse 1.8s ease-in-out infinite;
+}
+@keyframes splash-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+.splash-caption {
+  position: absolute;
+  bottom: 36px;
+  left: 24px;
+  right: 24px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+@media (prefers-reduced-motion: reduce) {
+  .splash-logo { animation: none; }
+}
+
 /* ---------------- Header ---------------- */
 .app-header {
   position: sticky;
@@ -835,36 +876,68 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   white-space: nowrap;
 }
 
-/* ---------------- Timer ---------------- */
-.timer-card {
+/* ---------------- Nexus presence ---------------- */
+.nexus-presence {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--card-radius);
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  padding: 10px 14px;
+  margin: -4px 0 4px;
 }
-.timer-ring-wrap { position: relative; }
-.timer-display {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
+.nexus-presence strong { color: var(--text-primary); }
+.nexus-presence .status-dot { margin-right: 5px; }
+
+/* ---------------- Finished session summary ---------------- */
+.session-done-card {
+  background: var(--surface-1);
+  border: 1px solid var(--good);
+  border-radius: var(--card-radius);
+  padding: 20px;
   text-align: center;
 }
-.timer-time {
+.session-done-title { font-size: 1.05rem; font-weight: 800; color: var(--good); margin: 0 0 4px; }
+.session-done-meta { font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-secondary); margin: 0 0 14px; }
+
+/* ---------------- Per-exercise rest timer ---------------- */
+.ex-rest-timer {
   font-family: var(--font-mono);
-  font-size: 2rem;
-  font-weight: 800;
-  color: var(--cyan);
-  text-shadow: 0 0 14px var(--cyan-glow);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  min-width: 32px;
+  text-align: right;
 }
-.timer-time.is-done { color: var(--critical); text-shadow: 0 0 14px rgba(255,77,106,0.6); }
-.timer-status { font-family: var(--font-mono); font-size: 0.64rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
-.timer-controls { display: flex; gap: 10px; margin-top: 18px; width: 100%; }
-.timer-controls .btn { flex: 1; }
-.timer-duration { width: 100%; margin-top: 14px; }
-.timer-duration-row { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); margin-bottom: 4px; }
+.ex-rest-timer.is-active { color: var(--cyan); text-shadow: 0 0 6px var(--cyan-glow); }
+.ex-rest-timer.is-done { color: var(--critical); text-shadow: 0 0 8px rgba(255,77,106,0.6); }
+
+/* ---------------- Rest-complete toast ---------------- */
+.rest-toast {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  background: var(--surface-1);
+  border: 1px solid var(--cyan);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  padding: 10px 16px;
+  border-radius: 10px;
+  box-shadow: 0 0 16px var(--cyan-glow);
+  max-width: 90vw;
+  text-align: center;
+  animation: rest-toast-in 0.25s ease;
+}
+@keyframes rest-toast-in {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
 
 /* ---------------- Nav bar ---------------- */
 .tab-bar {
@@ -1101,6 +1174,14 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 
 /* ---------------- Contact Us ---------------- */
 .contact-list { display: flex; flex-direction: column; gap: 10px; }
+.legal-doc { font-size: 0.85rem; line-height: 1.55; color: var(--text-secondary); }
+.legal-doc .legal-updated { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); margin-bottom: 14px; }
+.legal-doc h3 { font-size: 0.92rem; color: var(--cyan); margin: 18px 0 6px; }
+.legal-doc h3:first-of-type { margin-top: 0; }
+.legal-doc h4 { font-size: 0.85rem; color: var(--text-primary); margin: 14px 0 4px; }
+.legal-doc p { margin: 0 0 8px; }
+.legal-doc ul { margin: 0 0 8px; padding-left: 20px; }
+.legal-doc li { margin-bottom: 4px; }
 .contact-row {
   display: flex;
   justify-content: space-between;

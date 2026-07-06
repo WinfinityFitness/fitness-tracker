@@ -279,7 +279,7 @@ function initTabs() {
       if (target === 'training') {
         loadTrainingForDate(document.getElementById('trainDate').value);
         renderTrainingStats();
-        renderTimerRing();
+        renderExerciseTimerDisplays();
       }
       if (target === 'nutrition') {
         loadNutritionForDate(document.getElementById('nutDate').value);
@@ -305,14 +305,22 @@ function initTabs() {
 }
 
 let nexusPollId = null;
+let nexusFastUntil = 0;
 function startNexusPolling() {
   stopNexusPolling();
+  const interval = Date.now() < nexusFastUntil ? 1500 : 5000;
   nexusPollId = setInterval(() => {
     fetchChatMessages().then(renderChatMessages).catch(() => {});
-  }, 5000);
+    if (interval !== 5000 && Date.now() >= nexusFastUntil) startNexusPolling();
+  }, interval);
 }
 function stopNexusPolling() {
   if (nexusPollId) { clearInterval(nexusPollId); nexusPollId = null; }
+}
+function activateNexusFastChat() {
+  nexusFastUntil = Date.now() + 3 * 60 * 1000;
+  const lbTab = document.querySelector('.tab-btn[data-target="leaderboard"]');
+  if (lbTab && lbTab.classList.contains('is-active')) startNexusPolling();
 }
 
 function initSheet() {
@@ -330,6 +338,20 @@ function initContact() {
   const overlay = document.getElementById('contactOverlay');
   document.getElementById('btnFooterContact').addEventListener('click', () => { overlay.hidden = false; });
   document.getElementById('btnCloseContact').addEventListener('click', () => { overlay.hidden = true; });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+}
+
+function initPrivacyPolicy() {
+  const overlay = document.getElementById('privacyOverlay');
+  document.getElementById('btnFooterPrivacy').addEventListener('click', () => { overlay.hidden = false; });
+  document.getElementById('btnClosePrivacy').addEventListener('click', () => { overlay.hidden = true; });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+}
+
+function initTermsOfService() {
+  const overlay = document.getElementById('termsOverlay');
+  document.getElementById('btnFooterTerms').addEventListener('click', () => { overlay.hidden = false; });
+  document.getElementById('btnCloseTerms').addEventListener('click', () => { overlay.hidden = true; });
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
 }
 
@@ -1121,16 +1143,59 @@ function bestHistoricalOneRM(name, beforeDate) {
   return best;
 }
 
+function initExerciseNameAutocomplete() {
+  renderExerciseNameOptions();
+}
+
+function renderExerciseNameOptions() {
+  const logs = getLogs();
+  const seen = new Map();
+  Object.keys(logs).forEach(date => {
+    (logs[date].exercises || []).forEach(ex => {
+      if (!ex.name) return;
+      const key = ex.name.trim().toLowerCase();
+      const existing = seen.get(key);
+      if (!existing || date > existing.lastDate) seen.set(key, { name: ex.name.trim(), lastDate: date });
+    });
+  });
+  const names = Array.from(seen.values()).sort((a, b) => b.lastDate.localeCompare(a.lastDate)).map(v => v.name);
+  const datalist = document.getElementById('exerciseNameList');
+  if (datalist) datalist.innerHTML = names.map(n => `<option value="${escapeHtml(n)}"></option>`).join('');
+}
+
+function getFinishedDates() {
+  try { return JSON.parse(localStorage.getItem('wft_finished_dates')) || {}; } catch (e) { return {}; }
+}
+function setSessionFinished(date, val) {
+  const all = getFinishedDates();
+  if (val) all[date] = true; else delete all[date];
+  localStorage.setItem('wft_finished_dates', JSON.stringify(all));
+}
+function isSessionFinished(date) { return !!getFinishedDates()[date]; }
+
 function renderExerciseCards() {
   const container = document.getElementById('exerciseCards');
   const emptyNote = document.getElementById('exerciseEmptyNote');
+  const newProtocolBox = document.getElementById('newProtocolBox');
   const profile = getProfile();
   const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
   const date = document.getElementById('trainDate').value;
   container.innerHTML = '';
 
-  if (!currentExercises.length) { emptyNote.hidden = false; return; }
+  if (!currentExercises.length) { emptyNote.hidden = false; newProtocolBox.hidden = false; return; }
   emptyNote.hidden = true;
+
+  if (isSessionFinished(date)) {
+    newProtocolBox.hidden = true;
+    const totalSets = currentExercises.reduce((n, ex) => n + ex.sets.filter(s => s.completed).length, 0);
+    container.innerHTML = `<div class="session-done-card">
+      <p class="session-done-title">✓ Workout finished</p>
+      <p class="session-done-meta">${currentExercises.length} exercise${currentExercises.length !== 1 ? 's' : ''} · ${totalSets} set${totalSets !== 1 ? 's' : ''} logged</p>
+      <button type="button" class="btn btn--primary" id="btnContinueSession">Continue / edit this session</button>
+    </div>`;
+    return;
+  }
+  newProtocolBox.hidden = false;
 
   currentExercises.forEach((ex, exIdx) => {
     const prevSets = findPreviousSets(ex.name, date);
@@ -1153,11 +1218,15 @@ function renderExerciseCards() {
       </tr>`;
     }).join('');
 
+    const timerInfo = exTimerDisplayFor(date, exIdx);
     card.innerHTML = `
       <p class="mod-tag">MOD_P_${String(exIdx + 1).padStart(2, '0')}</p>
       <div class="ex-card-head">
         <div class="ex-card-title">${escapeHtml(ex.name)}</div>
-        <div class="ex-card-rest">⏱ <select class="ex-rest-select" data-ex="${exIdx}">${restOptions}</select></div>
+        <div class="ex-card-rest">
+          <span class="ex-rest-timer ${timerInfo.state}" data-ex="${exIdx}">${timerInfo.text}</span>
+          ⏱ <select class="ex-rest-select" data-ex="${exIdx}">${restOptions}</select>
+        </div>
         <button type="button" class="ex-card-remove" data-ex="${exIdx}">⋮</button>
       </div>
       <input type="text" class="ex-card-notes" data-ex="${exIdx}" placeholder="Add notes here…" value="${escapeHtml(ex.notes || '')}">
@@ -1171,9 +1240,21 @@ function renderExerciseCards() {
   });
 }
 
+function getActiveTrainingDate() {
+  const stored = localStorage.getItem('wft_active_train_date');
+  if (!stored) return todayISO();
+  const logs = getLogs();
+  const hasData = logs[stored] && logs[stored].exercises && logs[stored].exercises.length > 0;
+  return (hasData && !isSessionFinished(stored)) ? stored : todayISO();
+}
+
 function initTraining() {
-  document.getElementById('trainDate').value = todayISO();
-  document.getElementById('trainDate').addEventListener('change', e => loadTrainingForDate(e.target.value));
+  document.getElementById('trainDate').value = getActiveTrainingDate();
+  localStorage.setItem('wft_active_train_date', document.getElementById('trainDate').value);
+  document.getElementById('trainDate').addEventListener('change', e => {
+    localStorage.setItem('wft_active_train_date', e.target.value);
+    loadTrainingForDate(e.target.value);
+  });
 
   document.getElementById('btnAddExercise').addEventListener('click', () => {
     const nameInput = document.getElementById('exerciseName');
@@ -1185,6 +1266,7 @@ function initTraining() {
     currentExercises.push({ name, restSeconds: 180, notes: '', sets: [firstSet] });
     persistExercises();
     renderExerciseCards();
+    renderExerciseNameOptions();
     nameInput.value = '';
     nameInput.focus();
   });
@@ -1193,6 +1275,14 @@ function initTraining() {
 
   cards.addEventListener('click', e => {
     const wu = (getProfile() || {}).weightUnit || 'kg';
+
+    const continueBtn = e.target.closest('#btnContinueSession');
+    if (continueBtn) {
+      const date = document.getElementById('trainDate').value;
+      setSessionFinished(date, false);
+      renderExerciseCards();
+      return;
+    }
 
     const removeExBtn = e.target.closest('.ex-card-remove');
     if (removeExBtn) {
@@ -1231,7 +1321,7 @@ function initTraining() {
       persistExercises();
       renderExerciseCards();
       renderTrainingStats();
-      if (set.completed) autoStartRestTimer(currentExercises[exIdx].restSeconds || 180);
+      if (set.completed) startExerciseTimer(exIdx, currentExercises[exIdx].restSeconds || 180);
       return;
     }
   });
@@ -1264,6 +1354,8 @@ function initTraining() {
     const summary = computeWorkoutSummary(date);
     renderWorkoutSummary(summary);
     document.getElementById('summaryOverlay').hidden = false;
+    if (currentExercises.length) setSessionFinished(date, true);
+    renderExerciseCards();
     renderTrainingStats();
     saveToDrive();
   });
@@ -1271,10 +1363,11 @@ function initTraining() {
   document.getElementById('btnCloseSummary').addEventListener('click', () => { document.getElementById('summaryOverlay').hidden = true; });
   document.getElementById('btnDoneSummary').addEventListener('click', () => { document.getElementById('summaryOverlay').hidden = true; });
 
-  loadTrainingForDate(todayISO());
+  loadTrainingForDate(document.getElementById('trainDate').value);
   renderTrainingStats();
-  initTimer();
+  ensureExTimerTicking();
   initSessionTemplates();
+  initExerciseNameAutocomplete();
 }
 
 function renderTrainingStats() {
@@ -1379,6 +1472,7 @@ function initSessionTemplates() {
       sets: ex.sets.map(s => ({ reps: s.reps, weightKg: s.weightKg, completed: false })),
     }));
     persistExercises();
+    setSessionFinished(document.getElementById('trainDate').value, false);
     renderExerciseCards();
     renderTrainingStats();
     const note = document.getElementById('sessionTemplateNote');
@@ -1499,9 +1593,9 @@ function renderWorkoutSummary(summary) {
   content.innerHTML = html;
 }
 
-/* ---- Rest timer ---- */
-const timerState = { remaining: 180, duration: 180, running: false, endAt: null };
-let timerTickId = null;
+/* ---- Per-exercise rest timers ---- */
+let exTimerTickId = null;
+let notifyPermissionAsked = false;
 
 function formatTime(sec) {
   const m = Math.floor(sec / 60);
@@ -1509,133 +1603,79 @@ function formatTime(sec) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-function saveTimerState() {
-  localStorage.setItem('wft_timer_state', JSON.stringify({
-    duration: timerState.duration, running: timerState.running, endAt: timerState.endAt, remaining: timerState.remaining,
-  }));
+function getExTimers() {
+  try { return JSON.parse(localStorage.getItem('wft_ex_timers')) || {}; } catch (e) { return {}; }
+}
+function saveExTimers(obj) { localStorage.setItem('wft_ex_timers', JSON.stringify(obj)); }
+
+function exTimerDisplayFor(date, exIdx) {
+  const day = getExTimers()[date];
+  const t = day && day[exIdx];
+  if (!t) return { text: '—', state: '' };
+  const remaining = Math.max(0, Math.round((t.endAt - Date.now()) / 1000));
+  if (remaining <= 0) return { text: 'Done', state: 'is-done' };
+  return { text: formatTime(remaining), state: 'is-active' };
 }
 
-function loadTimerState() {
-  let saved = null;
-  try { saved = JSON.parse(localStorage.getItem('wft_timer_state')); } catch (e) { /* ignore */ }
-  if (!saved) return;
-  timerState.duration = saved.duration || 180;
-  if (saved.running && saved.endAt) {
-    const remaining = Math.round((saved.endAt - Date.now()) / 1000);
-    if (remaining > 0) {
-      timerState.running = true;
-      timerState.endAt = saved.endAt;
-      timerState.remaining = remaining;
-    } else {
-      timerState.running = false;
-      timerState.endAt = null;
-      timerState.remaining = 0;
-    }
-  } else {
-    timerState.running = false;
-    timerState.endAt = null;
-    timerState.remaining = saved.remaining != null ? saved.remaining : timerState.duration;
+function startExerciseTimer(exIdx, seconds) {
+  const date = document.getElementById('trainDate').value;
+  const all = getExTimers();
+  if (!all[date]) all[date] = {};
+  all[date][exIdx] = { endAt: Date.now() + seconds * 1000, duration: seconds, done: false, exName: (currentExercises[exIdx] || {}).name || '' };
+  saveExTimers(all);
+  if (window.Notification && Notification.permission === 'default' && !notifyPermissionAsked) {
+    notifyPermissionAsked = true;
+    Notification.requestPermission().catch(() => {});
   }
+  ensureExTimerTicking();
+  renderExerciseTimerDisplays();
 }
 
-function ensureTicking() {
-  if (timerTickId) return;
-  timerTickId = setInterval(() => {
-    if (timerState.running) {
-      timerState.remaining = Math.max(0, Math.round((timerState.endAt - Date.now()) / 1000));
-      if (timerState.remaining <= 0) {
-        timerState.running = false;
-        timerState.endAt = null;
-        document.getElementById('btnTimerStart').textContent = 'Start';
-        saveTimerState();
-        onTimerComplete();
-      }
-    }
-    renderTimerRing();
-  }, 1000);
+function ensureExTimerTicking() {
+  if (exTimerTickId) return;
+  exTimerTickId = setInterval(renderExerciseTimerDisplays, 1000);
 }
 
-function renderTimerRing() {
-  const pct = timerState.duration > 0 ? ((timerState.duration - timerState.remaining) / timerState.duration) * 100 : 0;
-  const statusText = timerState.remaining === 0 ? 'Done' : (timerState.running ? 'Resting' : 'Ready');
-  const centerHtml = `<div><div class="timer-time${timerState.remaining === 0 ? ' is-done' : ''}">${formatTime(timerState.remaining)}</div><div class="timer-status">${statusText}</div></div>`;
-  renderRing(document.getElementById('timerRingWrap'), pct, { size: 192, stroke: 9, gradient: true, centerHtml });
+function showRestToast(message) {
+  const toast = document.getElementById('restToast');
+  toast.textContent = message;
+  toast.hidden = false;
+  clearTimeout(showRestToast._t);
+  showRestToast._t = setTimeout(() => { toast.hidden = true; }, 4000);
 }
 
-function initTimer() {
-  const durationInput = document.getElementById('timerDuration');
-  const label = document.getElementById('timerDurationLabel');
-
-  loadTimerState();
-  const restoredMins = Math.max(1, Math.min(15, Math.round(timerState.duration / 60)));
-  durationInput.value = restoredMins;
-  label.textContent = `${restoredMins}:00 min`;
-  document.getElementById('btnTimerStart').textContent = timerState.running
-    ? 'Pause'
-    : (timerState.remaining > 0 && timerState.remaining < timerState.duration ? 'Resume' : 'Start');
-
-  durationInput.addEventListener('input', () => {
-    const mins = parseInt(durationInput.value, 10);
-    label.textContent = `${mins}:00 min`;
-    if (!timerState.running) {
-      timerState.duration = mins * 60;
-      timerState.remaining = mins * 60;
-      saveTimerState();
-      renderTimerRing();
-    }
-  });
-
-  document.getElementById('btnTimerStart').addEventListener('click', toggleTimer);
-  document.getElementById('btnTimerReset').addEventListener('click', resetTimer);
-
-  if (timerState.running) ensureTicking();
-  renderTimerRing();
-}
-
-function toggleTimer() {
-  const btn = document.getElementById('btnTimerStart');
-  if (timerState.running) {
-    timerState.remaining = Math.max(0, Math.round((timerState.endAt - Date.now()) / 1000));
-    timerState.running = false;
-    timerState.endAt = null;
-    btn.textContent = 'Resume';
-  } else {
-    if (timerState.remaining <= 0) timerState.remaining = timerState.duration;
-    timerState.running = true;
-    timerState.endAt = Date.now() + timerState.remaining * 1000;
-    btn.textContent = 'Pause';
-    ensureTicking();
-  }
-  saveTimerState();
-  renderTimerRing();
-}
-
-function resetTimer() {
-  timerState.running = false;
-  timerState.endAt = null;
-  timerState.remaining = timerState.duration;
-  document.getElementById('btnTimerStart').textContent = 'Start';
-  saveTimerState();
-  renderTimerRing();
-}
-
-function onTimerComplete() {
+function fireRestComplete(exName) {
   if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
   playBeep();
+  showRestToast(`⏱ Rest complete — ${exName || 'back to it'}!`);
+  if (window.Notification && Notification.permission === 'granted') {
+    try { new Notification('Rest complete', { body: `${exName || 'Exercise'} — time to lift!` }); } catch (e) { /* ignore */ }
+  }
 }
 
-function autoStartRestTimer(seconds) {
-  timerState.duration = seconds;
-  timerState.remaining = seconds;
-  timerState.running = true;
-  timerState.endAt = Date.now() + seconds * 1000;
-  const mins = Math.max(1, Math.min(15, Math.round(seconds / 60)));
-  document.getElementById('timerDuration').value = mins;
-  document.getElementById('timerDurationLabel').textContent = `${mins}:00 min`;
-  document.getElementById('btnTimerStart').textContent = 'Pause';
-  ensureTicking();
-  saveTimerState();
-  renderTimerRing();
+function renderExerciseTimerDisplays() {
+  const date = document.getElementById('trainDate').value;
+  const all = getExTimers();
+  const day = all[date] || {};
+  let anyActive = false;
+  let changed = false;
+  Object.keys(day).forEach(exIdx => {
+    const t = day[exIdx];
+    const remaining = Math.max(0, Math.round((t.endAt - Date.now()) / 1000));
+    const el = document.querySelector(`.ex-rest-timer[data-ex="${exIdx}"]`);
+    if (remaining > 0) {
+      anyActive = true;
+      if (el) { el.textContent = formatTime(remaining); el.classList.add('is-active'); el.classList.remove('is-done'); }
+    } else {
+      if (el) { el.textContent = 'Done'; el.classList.remove('is-active'); el.classList.add('is-done'); }
+      if (!t.done) {
+        t.done = true;
+        changed = true;
+        fireRestComplete(t.exName);
+      }
+    }
+  });
+  if (changed) saveExTimers(all);
 }
 
 function playBeep() {
@@ -2148,6 +2188,7 @@ async function saveToDrive(manual) {
     localStorage.setItem('wft_drive_last_backup', todayISO());
     setDriveStatus('Last synced ' + new Date().toLocaleTimeString());
     renderDashboard();
+    activateNexusFastChat();
   } catch (e) {
     setDriveStatus('Sync failed — will retry on next save.');
   }
@@ -2270,7 +2311,7 @@ function renderRankList(containerId, rows, opts) {
     container.innerHTML = '<p class="empty-note">No data yet.</p>';
     return;
   }
-  rows.slice(0, 5).forEach((r, i) => {
+  rows.slice(0, 10).forEach((r, i) => {
     const row = document.createElement('div');
     row.className = 'rank-row' + (i === 0 ? ' is-top' : '');
     row.innerHTML = `<span class="rank-num">${String(i + 1).padStart(2, '0')}</span>
@@ -2282,6 +2323,11 @@ function renderRankList(containerId, rows, opts) {
 
 function renderNexusRankings(rows) {
   document.getElementById('lbEmptyNote').hidden = rows.length > 0;
+
+  const ONLINE_WINDOW_MS = 5 * 60 * 1000;
+  const onlineNow = rows.filter(r => r.updated_at && (Date.now() - new Date(r.updated_at).getTime()) < ONLINE_WINDOW_MS).length;
+  document.getElementById('nexusTotalUsers').textContent = rows.length;
+  document.getElementById('nexusOnlineUsers').textContent = onlineNow;
 
   const bySteps = rows.filter(r => r.steps != null).sort((a, b) => b.steps - a.steps);
   renderRankList('lbStepsRanking', bySteps, { formatValue: r => r.steps >= 1000 ? (r.steps / 1000).toFixed(1) + 'k' : String(r.steps) });
@@ -2299,8 +2345,10 @@ function renderNexusRankings(rows) {
 }
 
 async function fetchChatMessages() {
+  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
   const { data, error } = await sb.from('chat_messages')
     .select('code_name, message, created_at')
+    .gte('created_at', cutoff)
     .order('created_at', { ascending: false })
     .limit(50);
   if (error) throw error;
@@ -2481,6 +2529,8 @@ document.getElementById('btnGoToBioFromChart').addEventListener('click', () => {
 });
 initSheet();
 initContact();
+initPrivacyPolicy();
+initTermsOfService();
 initSetupForm();
 initCheckin();
 initMeasurements();
@@ -2498,6 +2548,13 @@ initBetaLock();
 if (document.getElementById('lockOverlay').hidden) {
   initOnboarding(() => initReviewGate());
 }
+
+setTimeout(() => {
+  const splash = document.getElementById('splashScreen');
+  if (!splash) return;
+  splash.classList.add('splash-hide');
+  setTimeout(() => { splash.hidden = true; }, 400);
+}, 3000);
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

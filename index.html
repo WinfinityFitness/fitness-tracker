@@ -15,6 +15,11 @@
 </head>
 <body>
 
+<div class="splash-screen" id="splashScreen">
+  <img class="splash-logo" src="icons/icon-512.png" alt="Winfinity">
+  <p class="splash-caption">Masarap talaga kumain at matulog, pero mas masarap if ikaw mismo masarap din</p>
+</div>
+
 <header class="app-header">
   <div class="brand">
     <img class="brand-logo" src="icons/icon-192.png" alt="" width="28" height="28">
@@ -22,6 +27,8 @@
   </div>
   <span class="app-header-sub" id="headerToday"></span>
 </header>
+
+<div class="rest-toast" id="restToast" hidden></div>
 
 <main id="app">
 
@@ -257,30 +264,15 @@
       </div>
     </div>
 
-    <div class="timer-card">
-      <p class="mod-tag" style="align-self:flex-start;">MOD_TIMER_08</p>
-      <div class="timer-ring-wrap" id="timerRingWrap"></div>
-      <div class="timer-duration">
-        <div class="timer-duration-row">
-          <span>Rest duration</span>
-          <span id="timerDurationLabel">3:00 min</span>
-        </div>
-        <input type="range" id="timerDuration" min="1" max="15" step="1" value="3">
-      </div>
-      <div class="timer-controls">
-        <button class="btn btn--primary" id="btnTimerStart">Start</button>
-        <button class="btn" id="btnTimerReset">Reset</button>
-      </div>
-    </div>
-
     <h2 class="section-title">Protocol execution queue</h2>
     <div class="exercise-cards" id="exerciseCards"></div>
     <p class="empty-note" id="exerciseEmptyNote">No exercises logged for this date yet.</p>
 
-    <div class="new-protocol-box">
+    <div class="new-protocol-box" id="newProtocolBox">
       <p class="mod-tag">+ New_protocol_sequence</p>
       <label class="field">
-        <input type="text" id="exerciseName" placeholder="Protocol Name (e.g., Deadlift)">
+        <input type="text" id="exerciseName" list="exerciseNameList" placeholder="Protocol Name (e.g., Deadlift)" autocomplete="off">
+        <datalist id="exerciseNameList"></datalist>
       </label>
       <button type="button" class="btn" id="btnAddExercise">Synchronize new exercise</button>
     </div>
@@ -655,6 +647,10 @@
 
     <button type="button" class="btn btn--primary" id="btnLbUpdate">Sync to Nexus</button>
     <p class="save-note" id="lbSaveNote"></p>
+    <div class="nexus-presence" id="nexusPresence">
+      <span><strong id="nexusTotalUsers">–</strong> operators synced</span>
+      <span><span class="status-dot status-good"></span><strong id="nexusOnlineUsers">–</strong> online now</span>
+    </div>
     <p class="empty-note" id="lbEmptyNote" hidden>No Nexus data yet. Tap Sync to share and see others.</p>
 
     <div class="chart-card">
@@ -695,13 +691,13 @@
         <div class="footer-col">
           <h4>About</h4>
           <span class="footer-link-static">Team</span>
-          <span class="footer-link-static">Affiliate</span>
+          <a class="footer-link" href="http://www.facebook.com/aldruz3dsign" target="_blank" rel="noopener noreferrer">Affiliate</a>
           <span class="footer-link-static">Careers</span>
         </div>
         <div class="footer-col">
           <h4>Privacy</h4>
-          <span class="footer-link-static">Privacy Policy</span>
-          <span class="footer-link-static">Terms and Conditions</span>
+          <button type="button" class="footer-link-btn" id="btnFooterPrivacy">Privacy Policy</button>
+          <button type="button" class="footer-link-btn" id="btnFooterTerms">Terms and Services</button>
           <button type="button" class="footer-link-btn" id="btnFooterContact">Contact Us</button>
         </div>
         <div class="footer-col">
@@ -912,6 +908,140 @@
       <div class="contact-row"><span class="contact-label">WhatsApp</span><span class="contact-value">0915 370 3821</span></div>
       <div class="contact-row"><span class="contact-label">Telegram</span><span class="contact-value">0915 370 3821</span></div>
       <div class="contact-row"><span class="contact-label">Email</span><span class="contact-value">winfinityfitness@gmail.com</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="privacyOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Privacy Policy</h2>
+      <button class="sheet-close" id="btnClosePrivacy">✕</button>
+    </div>
+    <div class="legal-doc">
+      <p class="legal-updated">Last Updated: July 6, 2026</p>
+
+      <h3>1. Introduction</h3>
+      <p>Winfinity Fitness ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your personal information when you use our online fitness coaching services.</p>
+
+      <h3>2. Information We Collect</h3>
+      <p>We collect information to provide personalized fitness coaching, which may include:</p>
+      <ul>
+        <li><strong>Personal Identification:</strong> Name, age, gender, and contact details.</li>
+        <li><strong>Health &amp; Fitness Data:</strong> Weight, measurements, fitness goals, medical history relevant to physical activity, and workout logs.</li>
+        <li><strong>Usage Data:</strong> How you interact with the app, device information, and IP address.</li>
+      </ul>
+
+      <h3>3. How We Use Your Information</h3>
+      <p>We use your data solely to:</p>
+      <ul>
+        <li>Develop and monitor your personalized fitness and nutrition programs.</li>
+        <li>Communicate updates, progress reports, and coaching feedback.</li>
+        <li>Improve app functionality and user experience.</li>
+      </ul>
+
+      <h3>4. Health Disclaimer</h3>
+      <p>By using this app, you acknowledge that:</p>
+      <ul>
+        <li>Fitness activities involve physical exertion. You should consult with a physician or healthcare professional before beginning any new exercise or nutrition program, especially if you have a history of health conditions.</li>
+        <li>You assume all risk of injury resulting from your participation in the programs provided. We are not responsible for any injuries or adverse health effects resulting from your use of the information provided within this app.</li>
+      </ul>
+
+      <h3>5. Data Security and Sharing</h3>
+      <p>We implement industry-standard security measures to protect your data. We do not sell your personal information to third parties. We may share data only if required by law, to protect our legal rights, or with service providers who assist in operating our app (and are bound by confidentiality agreements).</p>
+
+      <h3>6. User Responsibilities</h3>
+      <p>You are responsible for:</p>
+      <ul>
+        <li>Maintaining the confidentiality of your account credentials.</li>
+        <li>Ensuring that the information you provide is accurate.</li>
+        <li>Not using this app for any unlawful or prohibited activities. Misuse, including the distribution of our proprietary workout content, may result in the immediate termination of your access.</li>
+      </ul>
+
+      <h3>7. Limitation of Liability</h3>
+      <p>To the maximum extent permitted by law, Winfinity Fitness shall not be liable for any indirect, incidental, or consequential damages arising from the use or inability to use our services, even if we have been advised of the possibility of such damages.</p>
+
+      <h3>8. Changes to this Policy</h3>
+      <p>We reserve the right to update this policy. Any changes will be posted within the app, and your continued use of the service constitutes acceptance of those changes.</p>
+
+      <h3>Health &amp; Liability Disclaimer</h3>
+      <p><strong>Please read this carefully before using our services.</strong></p>
+
+      <h4>1. No Medical Advice</h4>
+      <p>The fitness and nutritional information provided by Winfinity Fitness is for educational and informational purposes only. It is not intended to be, and does not constitute, professional medical advice, diagnosis, or treatment. We are fitness coaches, not doctors or licensed medical practitioners.</p>
+
+      <h4>2. Mandatory Physician Consultation</h4>
+      <p>You should always consult with a physician or other healthcare professional before starting any fitness or nutrition program, especially if you:</p>
+      <ul>
+        <li>Have any pre-existing medical conditions, injuries, or health concerns.</li>
+        <li>Are pregnant or nursing.</li>
+        <li>Are currently taking medication.</li>
+        <li>Have a family history of heart disease or other chronic health issues.</li>
+      </ul>
+      <p>If you experience any pain, dizziness, shortness of breath, or discomfort during any exercise or activity suggested by our program, you must stop immediately and seek professional medical attention.</p>
+
+      <h4>3. Assumption of Risk</h4>
+      <p>You acknowledge that physical exercise involves inherent risks of injury. By participating in the programs provided by Winfinity Fitness, you voluntarily assume full responsibility for all risks of injury, damage, or loss that you may sustain as a result of participating in any and all activities associated with this program.</p>
+
+      <h4>4. Waiver of Liability</h4>
+      <p>To the fullest extent permitted by law, Winfinity Fitness, its owners, employees, and agents shall not be held liable for any claim, demand, or cause of action arising out of:</p>
+      <ul>
+        <li>Any physical injury or health issue resulting from the use of our services.</li>
+        <li>Any reliance on the information provided within the app or our coaching materials.</li>
+        <li>Any unauthorized use of your account or misuse of our platform by you or third parties.</li>
+      </ul>
+      <p>By clicking "Agree" or continuing to use this app, you confirm that you are in good physical condition and are fully aware of the risks involved in participating in a fitness program.</p>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="termsOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Terms and Services</h2>
+      <button class="sheet-close" id="btnCloseTerms">✕</button>
+    </div>
+    <div class="legal-doc">
+      <p class="legal-updated">Last Updated: July 6, 2026</p>
+      <p>These Terms of Service ("Terms") govern your access to and use of the Winfinity Fitness application and related coaching services. By accessing or using our services, you agree to be bound by these Terms. If you do not agree, you must not use our services.</p>
+
+      <h3>1. Account Security</h3>
+      <p>You are responsible for maintaining the security of your account, including protecting your password. You agree to accept responsibility for all activities that occur under your account. You must notify us immediately if you suspect any unauthorized access to your account.</p>
+
+      <h3>2. Services and Coaching</h3>
+      <ul>
+        <li><strong>Scope:</strong> Our services consist of personalized fitness programming and nutritional guidance.</li>
+        <li><strong>Professionalism:</strong> You agree to provide accurate and truthful information regarding your health, fitness history, and goals. Failure to do so may result in the provision of an unsuitable program, for which Winfinity Fitness is not liable.</li>
+        <li><strong>Code of Conduct:</strong> You agree not to use the app to harass others, distribute malicious software, or misuse our proprietary content (videos, PDFs, training plans) by sharing or selling them to third parties.</li>
+      </ul>
+
+      <h3>3. Subscription and Payments</h3>
+      <ul>
+        <li><strong>Fees:</strong> Access to certain features of our app requires a paid subscription. You agree to pay all fees associated with your chosen plan.</li>
+        <li><strong>Cancellations:</strong> You may cancel your subscription at any time via your account settings. Cancellation will take effect at the end of your current billing cycle.</li>
+      </ul>
+
+      <h3>4. Intellectual Property</h3>
+      <p>All content, branding (including "Windalchamp" and "WINFINITY FITNESS"), logos, and training materials are the exclusive property of Winfinity Fitness. You are granted a limited, non-exclusive, non-transferable license to use these materials for your personal, non-commercial use only.</p>
+
+      <h3>5. Disclaimer of Warranties</h3>
+      <p>Our services are provided on an "as is" and "as available" basis. We make no warranties, express or implied, regarding the effectiveness of our programs or that the service will meet your specific health goals or expectations.</p>
+
+      <h3>6. Limitation of Liability</h3>
+      <p>To the maximum extent permitted by law, Winfinity Fitness and its coaches shall not be liable for any damages (direct, indirect, or consequential) resulting from:</p>
+      <ul>
+        <li>Your use or inability to use the service.</li>
+        <li>Any physical injury, illness, or health complication resulting from your participation.</li>
+        <li>Any unauthorized access to your personal data that is outside of our reasonable control.</li>
+      </ul>
+
+      <h3>7. Integration with Privacy Policy and Disclaimer</h3>
+      <p>These Terms incorporate our Privacy Policy and our Health &amp; Liability Disclaimer by reference. By agreeing to these Terms, you acknowledge that you have read, understood, and consented to the data practices and the risk assumptions detailed in those documents.</p>
+
+      <h3>8. Governing Law</h3>
+      <p>These Terms shall be governed by and construed in accordance with the laws of the Republic of the Philippines. Any disputes arising under or in connection with these Terms shall be subject to the exclusive jurisdiction of the courts located in Limay, Bataan, Philippines.</p>
     </div>
   </div>
 </div>
