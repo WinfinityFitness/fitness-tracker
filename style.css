@@ -1283,6 +1283,18 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 
 /* ---------------- Rank list (Nexus) ---------------- */
 .rank-list { display: flex; flex-direction: column; gap: 6px; }
+.rank-list-toggle {
+  background: none;
+  border: none;
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 6px 2px 0;
+  cursor: pointer;
+  text-align: center;
+}
 .rank-row {
   display: flex;
   align-items: center;

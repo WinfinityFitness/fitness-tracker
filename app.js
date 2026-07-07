@@ -1945,6 +1945,7 @@ function stopCardioTracking() {
   document.getElementById('btnShareCardio').hidden = false;
   renderCardioMap(cardioTrack);
   renderCardioHistory();
+  autoSyncLeaderboardIfOptedIn();
 }
 
 let cardioMapInstance = null;
@@ -2450,6 +2451,7 @@ function initTraining() {
     if (currentExercises.length) setSessionFinished(date, true);
     renderExerciseCards();
     renderTrainingStats();
+    autoSyncLeaderboardIfOptedIn();
   });
 
   document.getElementById('btnCloseSummary').addEventListener('click', () => { document.getElementById('summaryOverlay').hidden = true; });
@@ -2512,13 +2514,16 @@ function renderVolumeTrendChart() {
   const chart = document.getElementById('volumeTrendChart');
   const labels = document.getElementById('volumeTrendLabels');
   const emptyNote = document.getElementById('volumeTrendEmptyNote');
+  const totalLabel = document.getElementById('volumeTrendTotal');
   chart.innerHTML = ''; labels.innerHTML = '';
   if (!gymDays.length) {
     emptyNote.hidden = false;
+    totalLabel.textContent = '';
     return;
   }
   emptyNote.hidden = true;
   const volumes = gymDays.map(l => fromKg(computeDayVolumeKg(l), wu));
+  totalLabel.textContent = `${round0(volumes.reduce((s, v) => s + v, 0)).toLocaleString()} ${wu} total`;
   const max = Math.max(...volumes, 1);
   const w = 280, h = 90, pad = 6;
   const stepX = gymDays.length > 1 ? w / (gymDays.length - 1) : 0;
@@ -3454,6 +3459,12 @@ function computeLeaderboardStats() {
   const volumeKg = logsArr.filter(l => parseISO(l.date) >= cutoff).reduce((sum, l) =>
     sum + (l.exercises || []).reduce((s, ex) =>
       s + ex.sets.filter(st => st.completed && st.weightKg != null && st.reps != null).reduce((ss, st) => ss + st.weightKg * st.reps, 0), 0), 0);
+
+  const allRuns = logsArr.reduce((acc, l) => acc.concat((l.cardioSessions || []).filter(s => s.type === 'run')), []);
+  const furthestRunKm = allRuns.length ? Math.max(...allRuns.map(s => s.distanceKm)) : null;
+  const pacedRuns = allRuns.filter(s => s.distanceKm >= 1 && s.durationSec > 0);
+  const fastestRunPaceSec = pacedRuns.length ? Math.min(...pacedRuns.map(s => s.durationSec / s.distanceKm)) : null;
+
   return {
     weight: kgNow != null ? round2(fromKg(kgNow, wu)) : null,
     weightUnit: wu,
@@ -3462,6 +3473,8 @@ function computeLeaderboardStats() {
     steps: steps != null ? round0(steps) : null,
     volume: round0(fromKg(volumeKg, wu)),
     volumeUnit: wu,
+    furthestRunKm: furthestRunKm != null ? round2(furthestRunKm) : null,
+    fastestRunPaceSec: fastestRunPaceSec != null ? Math.round(fastestRunPaceSec) : null,
   };
 }
 
@@ -3496,6 +3509,21 @@ async function pushLeaderboardEntry() {
   if (error) throw error;
   try { await sb.rpc('set_public_id', { p_share_key: shareKey, p_public_id: getOrCreatePublicId() }); }
   catch (e) { /* best effort — group-chat invites just won't resolve until this succeeds */ }
+  try {
+    await sb.rpc('set_run_records', {
+      p_share_key: shareKey,
+      p_furthest_run_km: stats.furthestRunKm,
+      p_fastest_run_pace_sec: stats.fastestRunPaceSec,
+    });
+  } catch (e) { /* best effort — Furthest/Fastest Run rankings just won't update until this succeeds */ }
+}
+
+async function autoSyncLeaderboardIfOptedIn() {
+  if (!sbConfigured() || localStorage.getItem('wft_lb_optin') !== '1') return;
+  try {
+    await pushLeaderboardEntry();
+    document.getElementById('nexusTotalUsers') && pullLeaderboard().then(renderNexusRankings).catch(() => {});
+  } catch (e) { /* best effort — don't block the training flow on Nexus sync failure */ }
 }
 
 async function autoSyncDriveBackupToNexus() {
@@ -3509,7 +3537,7 @@ async function autoSyncDriveBackupToNexus() {
 
 async function pullLeaderboard() {
   const { data, error } = await sb.from('leaderboard')
-    .select('code_name, weight, weight_unit, weight_progress, weight_progress_pct, steps, volume_lifted, volume_unit, updated_at')
+    .select('code_name, weight, weight_unit, weight_progress, weight_progress_pct, steps, volume_lifted, volume_unit, furthest_run_km, fastest_run_pace_sec, updated_at')
     .order('updated_at', { ascending: false });
   if (error) throw error;
   return data || [];
@@ -3532,6 +3560,8 @@ function timeAgo(iso) {
   return Math.round(hrs / 24) + 'd ago';
 }
 
+const rankListExpanded = {};
+
 function renderRankList(containerId, rows, opts) {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
@@ -3539,7 +3569,10 @@ function renderRankList(containerId, rows, opts) {
     container.innerHTML = '<p class="empty-note">No data yet.</p>';
     return;
   }
-  rows.slice(0, 10).forEach((r, i) => {
+  const top10 = rows.slice(0, 10);
+  const expanded = !!rankListExpanded[containerId];
+  const visible = expanded ? top10 : top10.slice(0, 3);
+  visible.forEach((r, i) => {
     const row = document.createElement('div');
     row.className = 'rank-row' + (i === 0 ? ' is-top' : '');
     row.innerHTML = `<span class="rank-num">${String(i + 1).padStart(2, '0')}</span>
@@ -3547,6 +3580,17 @@ function renderRankList(containerId, rows, opts) {
       <span class="rank-value">${opts.formatValue(r)}</span>`;
     container.appendChild(row);
   });
+  if (top10.length > 3) {
+    const toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.className = 'rank-list-toggle';
+    toggleBtn.textContent = expanded ? 'Show top 3' : `Show top ${top10.length}`;
+    toggleBtn.addEventListener('click', () => {
+      rankListExpanded[containerId] = !expanded;
+      renderRankList(containerId, rows, opts);
+    });
+    container.appendChild(toggleBtn);
+  }
 }
 
 function renderNexusRankings(rows) {
@@ -3570,6 +3614,12 @@ function renderNexusRankings(rows) {
   renderRing(document.getElementById('lbBioRing'), avgPct != null ? Math.min(100, Math.abs(avgPct) * 5) : 0, {
     size: 96, stroke: 8, centerText: avgPct != null ? round2(avgPct) + '%' : '–', sub: '',
   });
+
+  const byFurthestRun = rows.filter(r => r.furthest_run_km != null).sort((a, b) => b.furthest_run_km - a.furthest_run_km);
+  renderRankList('lbFurthestRunRanking', byFurthestRun, { formatValue: r => round2(r.furthest_run_km) + ' km' });
+
+  const byFastestRun = rows.filter(r => r.fastest_run_pace_sec != null).sort((a, b) => a.fastest_run_pace_sec - b.fastest_run_pace_sec);
+  renderRankList('lbFastestRunRanking', byFastestRun, { formatValue: r => formatPaceSecPerUnit(r.fastest_run_pace_sec) + ' /km' });
 }
 
 let currentChatRoomId = localStorage.getItem('wft_chat_room') || null;
