@@ -12,6 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
 
@@ -152,7 +153,7 @@
     <div class="chart-card">
       <p class="mod-tag">Synchronization pulse</p>
       <p class="hint">7-day steps trend, scaled relative to your highest day in this window.</p>
-      <div class="bar-chart bar-chart--sparkline" id="pulseSparkline"></div>
+      <svg class="pulse-linechart" id="pulseSparkline" viewBox="0 0 280 50" preserveAspectRatio="none"></svg>
     </div>
 
     <div class="chart-card">
@@ -194,7 +195,7 @@
     <div class="chart-card">
       <p class="mod-tag">MOD_VOLUME_TREND_08</p>
       <div class="chart-card-head"><span class="chart-card-title">Total Lift Volume (Last 8 Gym Days)</span></div>
-      <div class="bar-chart" id="volumeTrendChart"></div>
+      <svg class="volume-linechart" id="volumeTrendChart" viewBox="0 0 280 90" preserveAspectRatio="none"></svg>
       <div class="bar-chart-labels" id="volumeTrendLabels"></div>
       <p class="empty-note" id="volumeTrendEmptyNote" hidden>Log and complete sets across a few workouts to see your volume trend.</p>
     </div>
@@ -209,13 +210,10 @@
       Temporal Mission Log
     </button>
 
-    <div class="training-topbar">
-      <label class="field">
-        <span>Date</span>
-        <input type="date" id="trainDate">
-      </label>
-      <button type="button" class="btn btn--finish" id="btnFinishWorkout">Finish</button>
-    </div>
+    <label class="field">
+      <span>Date</span>
+      <input type="date" id="trainDate">
+    </label>
 
     <fieldset class="field-group">
       <legend>Session templates</legend>
@@ -246,6 +244,29 @@
       </div>
     </div>
 
+    <div class="section-title-row">
+      <h2 class="section-title">Protocol execution queue</h2>
+      <div class="unit-switch">
+        <button type="button" class="unit-switch-btn" data-unit="kg" id="btnUnitKg">KG</button>
+        <button type="button" class="unit-switch-btn" data-unit="lb" id="btnUnitLb">LB</button>
+      </div>
+    </div>
+    <div class="exercise-cards" id="exerciseCards"></div>
+    <p class="empty-note" id="exerciseEmptyNote">No exercises logged for this date yet.</p>
+
+    <div class="new-protocol-box" id="newProtocolBox">
+      <p class="mod-tag">+ New_protocol_sequence</p>
+      <label class="field">
+        <input type="text" id="exerciseName" list="exerciseNameList" placeholder="Protocol Name (e.g., Deadlift)" autocomplete="off">
+        <datalist id="exerciseNameList"></datalist>
+      </label>
+      <button type="button" class="btn" id="btnAddExercise">Synchronize new exercise</button>
+    </div>
+
+    <button type="button" class="btn btn--finish" id="btnFinishWorkout">Finish</button>
+
+    <button type="button" class="btn btn--primary" id="btnOpenPRBoard">🏆 Personal Records</button>
+
     <h2 class="section-title">Outdoor activity tracker</h2>
     <div class="chart-card" id="cardioCard">
       <p class="mod-tag">Mod_gps_09</p>
@@ -272,6 +293,7 @@
         </div>
       </div>
       <svg id="cardioRouteSketch" class="cardio-route-sketch" viewBox="0 0 300 160"></svg>
+      <div id="cardioMapView" class="cardio-map-view" hidden></div>
       <p class="hint">Keep this app open and your screen on while tracking — GPS pauses if you lock the phone or switch apps.</p>
       <div class="btn-row">
         <button type="button" class="btn btn--primary" id="btnCardioStart">Start tracking</button>
@@ -287,27 +309,6 @@
     <h2 class="section-title">Activity history</h2>
     <div class="cardio-history" id="cardioHistory"></div>
     <p class="empty-note" id="cardioHistoryEmpty">No outdoor activities logged yet.</p>
-
-    <div class="section-title-row">
-      <h2 class="section-title">Protocol execution queue</h2>
-      <div class="unit-switch">
-        <button type="button" class="unit-switch-btn" data-unit="kg" id="btnUnitKg">KG</button>
-        <button type="button" class="unit-switch-btn" data-unit="lb" id="btnUnitLb">LB</button>
-      </div>
-    </div>
-    <div class="exercise-cards" id="exerciseCards"></div>
-    <p class="empty-note" id="exerciseEmptyNote">No exercises logged for this date yet.</p>
-
-    <div class="new-protocol-box" id="newProtocolBox">
-      <p class="mod-tag">+ New_protocol_sequence</p>
-      <label class="field">
-        <input type="text" id="exerciseName" list="exerciseNameList" placeholder="Protocol Name (e.g., Deadlift)" autocomplete="off">
-        <datalist id="exerciseNameList"></datalist>
-      </label>
-      <button type="button" class="btn" id="btnAddExercise">Synchronize new exercise</button>
-    </div>
-
-    <button type="button" class="btn btn--primary" id="btnOpenPRBoard">🏆 Personal Records</button>
   </section>
 
   <!-- ============ NUTRITION / FUEL ============ -->
@@ -1339,7 +1340,7 @@
       <button type="button" id="btnMissionLogNext" aria-label="Next month">›</button>
     </div>
     <div class="mission-log-weekdays">
-      <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+      <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
     </div>
     <div class="mission-log-grid" id="missionLogGrid"></div>
   </div>
@@ -1410,6 +1411,7 @@
 
 <script src="config.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="app.js"></script>
 </body>

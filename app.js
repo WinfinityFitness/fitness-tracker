@@ -1248,14 +1248,22 @@ function renderPulseSparkline() {
     days.push(entry && entry.steps != null ? entry.steps : 0);
   }
   const max = Math.max(...days, 1);
-  const container = document.getElementById('pulseSparkline');
-  container.innerHTML = '';
-  days.forEach(v => {
-    const col = document.createElement('div');
-    col.className = 'bar-chart-col' + (v > 0 ? ' has-value' : '');
-    col.style.height = v > 0 ? `${Math.max(6, (v / max) * 100)}%` : '4%';
-    container.appendChild(col);
-  });
+  const w = 280, h = 50, pad = 4;
+  const stepX = w / (days.length - 1);
+  const points = days.map((v, i) => ({
+    x: i * stepX,
+    y: h - pad - (v / max) * (h - pad * 2),
+  }));
+  const linePath = points.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const areaPath = `M${points[0].x.toFixed(1)},${h} ${linePath.replace(/^M/, 'L')} L${points[points.length - 1].x.toFixed(1)},${h} Z`;
+  const last = points[points.length - 1];
+
+  const svg = document.getElementById('pulseSparkline');
+  svg.innerHTML = `
+    <path d="${areaPath}" fill="var(--cyan)" opacity="0.12"></path>
+    <path d="${linePath}" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+    <circle cx="${last.x.toFixed(1)}" cy="${last.y.toFixed(1)}" r="3.2" fill="var(--cyan)"></circle>
+  `;
 }
 
 
@@ -1840,6 +1848,8 @@ function startCardioTracking() {
   document.getElementById('cardioDuration').textContent = '00:00';
   document.getElementById('cardioDistance').textContent = '0.00';
   document.getElementById('cardioPace').textContent = '--:--';
+  document.getElementById('cardioRouteSketch').hidden = false;
+  document.getElementById('cardioMapView').hidden = true;
   renderCardioRouteSketch();
 
   cardioWatchId = navigator.geolocation.watchPosition(pos => {
@@ -1893,7 +1903,158 @@ function stopCardioTracking() {
   document.getElementById('cardioSaveNote').textContent = 'Activity saved.';
   setTimeout(() => { document.getElementById('cardioSaveNote').textContent = ''; }, 2500);
   document.getElementById('btnShareCardio').hidden = false;
+  renderCardioMap(cardioTrack);
   renderCardioHistory();
+}
+
+let cardioMapInstance = null;
+
+function renderCardioMap(track) {
+  const sketch = document.getElementById('cardioRouteSketch');
+  const mapEl = document.getElementById('cardioMapView');
+  if (!window.L || track.length < 2) return; // no internet/Leaflet, or nothing to plot — keep the offline sketch visible
+  sketch.hidden = true;
+  mapEl.hidden = false;
+
+  if (cardioMapInstance) { cardioMapInstance.remove(); cardioMapInstance = null; }
+  const map = L.map(mapEl, { zoomControl: false, attributionControl: true });
+  cardioMapInstance = map;
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors',
+  }).addTo(map);
+
+  const latlngs = track.map(p => [p.lat, p.lon]);
+  const path = L.polyline(latlngs, { color: '#33c8cc', weight: 4, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+  L.circleMarker(latlngs[0], { radius: 7, weight: 2, color: '#fff', fillColor: '#34bd7c', fillOpacity: 1 }).addTo(map);
+  L.circleMarker(latlngs[latlngs.length - 1], { radius: 7, weight: 2, color: '#fff', fillColor: '#e6516a', fillOpacity: 1 }).addTo(map);
+  map.fitBounds(path.getBounds(), { padding: [20, 20] });
+}
+
+function lonToPixelX(lon, zoom) { return (lon + 180) / 360 * 256 * Math.pow(2, zoom); }
+function latToPixelY(lat, zoom) {
+  const latRad = lat * Math.PI / 180;
+  return (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * 256 * Math.pow(2, zoom);
+}
+
+function pickMapZoom(track, mapW, mapH) {
+  const lats = track.map(p => p.lat), lons = track.map(p => p.lon);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const minLon = Math.min(...lons), maxLon = Math.max(...lons);
+  for (let z = 18; z >= 1; z--) {
+    const w = lonToPixelX(maxLon, z) - lonToPixelX(minLon, z);
+    const h = latToPixelY(minLat, z) - latToPixelY(maxLat, z);
+    if (w <= mapW * 0.8 && h <= mapH * 0.8) return z;
+  }
+  return 1;
+}
+
+function loadImage(src) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+async function drawMapBackground(ctx, track, mapW, mapH) {
+  const zoom = pickMapZoom(track, mapW, mapH);
+  const lats = track.map(p => p.lat), lons = track.map(p => p.lon);
+  const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+  const centerLon = (Math.min(...lons) + Math.max(...lons)) / 2;
+  const originX = lonToPixelX(centerLon, zoom) - mapW / 2;
+  const originY = latToPixelY(centerLat, zoom) - mapH / 2;
+
+  const tileMin = { x: Math.floor(originX / 256), y: Math.floor(originY / 256) };
+  const tileMax = { x: Math.floor((originX + mapW) / 256), y: Math.floor((originY + mapH) / 256) };
+  const subdomains = ['a', 'b', 'c'];
+  let sIdx = 0;
+  const loads = [];
+  for (let tx = tileMin.x; tx <= tileMax.x; tx++) {
+    for (let ty = tileMin.y; ty <= tileMax.y; ty++) {
+      const s = subdomains[sIdx++ % subdomains.length];
+      const url = `https://${s}.tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`;
+      loads.push(loadImage(url).then(img => ({ img, tx, ty })));
+    }
+  }
+  const tiles = await Promise.all(loads);
+  tiles.forEach(({ img, tx, ty }) => {
+    if (!img) return;
+    ctx.drawImage(img, tx * 256 - originX, ty * 256 - originY, 256, 256);
+  });
+
+  return { zoom, originX, originY };
+}
+
+function projectTrackToMap(track, proj) {
+  return track.map(p => ({
+    x: lonToPixelX(p.lon, proj.zoom) - proj.originX,
+    y: latToPixelY(p.lat, proj.zoom) - proj.originY,
+  }));
+}
+
+async function generateCardioShareCardWithMap(track, { emoji, title, stats }) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 600; canvas.height = 600;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#171f24';
+  ctx.fillRect(0, 0, 600, 600);
+
+  let proj = null;
+  if (track.length > 1) {
+    try { proj = await drawMapBackground(ctx, track, 600, 600); } catch (e) { proj = null; }
+  }
+  if (!proj) return generateShareCardBlob({ emoji, title, stats }); // offline or track too short — plain card instead
+
+  {
+    const pts = projectTrackToMap(track, proj);
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = 7;
+    ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.stroke();
+    ctx.strokeStyle = '#33c8cc';
+    ctx.lineWidth = 4;
+    ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.stroke();
+
+    [{ p: pts[0], color: '#34bd7c' }, { p: pts[pts.length - 1], color: '#e6516a' }].forEach(({ p, color }) => {
+      ctx.beginPath(); ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff'; ctx.fill();
+      ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+      ctx.fillStyle = color; ctx.fill();
+    });
+  }
+
+  const gradient = ctx.createLinearGradient(0, 380, 0, 600);
+  gradient.addColorStop(0, 'rgba(10,14,18,0)');
+  gradient.addColorStop(1, 'rgba(10,14,18,0.92)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 380, 600, 220);
+
+  ctx.textAlign = 'left';
+  ctx.font = '38px sans-serif';
+  ctx.fillText(emoji, 30, 445);
+  ctx.fillStyle = '#33c8cc';
+  ctx.font = 'bold 26px sans-serif';
+  ctx.fillText(title, 82, 440);
+  ctx.fillStyle = '#5a686e';
+  ctx.font = '13px monospace';
+  ctx.fillText('WINFINITY TRACKER', 82, 462);
+
+  let x = 30;
+  stats.forEach(s => {
+    ctx.fillStyle = '#7e8e95';
+    ctx.font = '13px monospace';
+    ctx.fillText(s.label.toUpperCase(), x, 505);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 24px sans-serif';
+    ctx.fillText(s.value, x, 535);
+    x += 190;
+  });
+
+  return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
 }
 
 async function shareCardioSession() {
@@ -1905,7 +2066,7 @@ async function shareCardioSession() {
   const text = `${emoji} Just finished a ${dist.toFixed(2)} ${unit} ${typeLabel} in ${formatCardioDuration(lastCardioSession.durationSec)} with Winfinity Tracker!`;
   const paceMin = lastCardioSession.distanceKm > 0 ? (lastCardioSession.durationSec / 60) / dist : 0;
   const paceText = paceMin > 0 ? `${Math.floor(paceMin)}:${String(Math.round((paceMin % 1) * 60)).padStart(2, '0')} /${unit}` : '--';
-  const blob = await generateShareCardBlob({
+  const blob = await generateCardioShareCardWithMap(cardioTrack, {
     emoji,
     title: `${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} complete!`,
     stats: [
@@ -2006,7 +2167,7 @@ function renderMissionLogCalendar() {
   document.getElementById('missionLogPeriodLegend').hidden = !showPeriod;
 
   const firstOfMonth = new Date(year, month, 1);
-  const firstWeekday = (firstOfMonth.getDay() + 6) % 7; // Monday-first index
+  const firstWeekday = firstOfMonth.getDay(); // Sunday-first index
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const daysInPrevMonth = new Date(year, month, 0).getDate();
 
@@ -2258,7 +2419,6 @@ function initTraining() {
     if (currentExercises.length) setSessionFinished(date, true);
     renderExerciseCards();
     renderTrainingStats();
-    saveToDrive();
   });
 
   document.getElementById('btnCloseSummary').addEventListener('click', () => { document.getElementById('summaryOverlay').hidden = true; });
@@ -2329,12 +2489,26 @@ function renderVolumeTrendChart() {
   emptyNote.hidden = true;
   const volumes = gymDays.map(l => fromKg(computeDayVolumeKg(l), wu));
   const max = Math.max(...volumes, 1);
-  gymDays.forEach((l, i) => {
-    const col = document.createElement('div');
-    col.className = 'bar-chart-col has-value';
-    col.style.height = `${Math.max(6, (volumes[i] / max) * 100)}%`;
-    col.title = `${fmtDate(parseISO(l.date))}: ${round0(volumes[i])} ${wu}`;
-    chart.appendChild(col);
+  const w = 280, h = 90, pad = 6;
+  const stepX = gymDays.length > 1 ? w / (gymDays.length - 1) : 0;
+  const points = volumes.map((v, i) => ({
+    x: gymDays.length > 1 ? i * stepX : w / 2,
+    y: h - pad - (v / max) * (h - pad * 2),
+  }));
+  const linePath = points.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const areaPath = `M${points[0].x.toFixed(1)},${h} ${linePath.replace(/^M/, 'L')} L${points[points.length - 1].x.toFixed(1)},${h} Z`;
+
+  const dots = points.map((p, i) => {
+    const tip = `${fmtDate(parseISO(gymDays[i].date))}: ${round0(volumes[i])} ${wu}`;
+    return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4"><title>${escapeHtml(tip)}</title></circle>`;
+  }).join('');
+
+  chart.innerHTML = `
+    <path d="${areaPath}" fill="var(--cyan)" opacity="0.12"></path>
+    <path d="${linePath}" fill="none" stroke="var(--cyan)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path>
+    <g fill="var(--cyan)">${dots}</g>
+  `;
+  gymDays.forEach(l => {
     const lbl = document.createElement('span');
     const d = parseISO(l.date);
     lbl.textContent = `${d.getMonth() + 1}/${d.getDate()}`;
@@ -3421,7 +3595,7 @@ function initDigitalId() {
 async function refreshChatRooms() {
   const shareKey = localStorage.getItem('wft_lb_share_key');
   if (!shareKey || !sbConfigured()) { renderChatRoomOptions([]); renderInvitesPopover([]); return; }
-  sb.rpc('cleanup_stale_solo_rooms').catch(() => {}); // best effort, opportunistic
+  try { await sb.rpc('cleanup_stale_solo_rooms'); } catch (e) { /* best effort, opportunistic */ }
   const { data, error } = await sb.from('chat_room_members')
     .select('status, room_id, chat_rooms(id, name)')
     .eq('share_key', shareKey);

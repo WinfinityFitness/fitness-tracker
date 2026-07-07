@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320">
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(10,163,189,0.16)" stroke-width="0.6"/>
+    </pattern>
+  </defs>
+  <rect width="320" height="320" fill="url(#grid)"/>
+
+  <path d="M0,80 L40,80 L60,60 L140,60" fill="none" stroke="rgba(10,163,189,0.22)" stroke-width="1"/>
+  <path d="M320,200 L260,200 L240,220 L160,220" fill="none" stroke="rgba(10,163,189,0.22)" stroke-width="1"/>
+  <path d="M0,280 L80,280 L100,260" fill="none" stroke="rgba(10,163,189,0.18)" stroke-width="1"/>
+
+  <circle cx="60" cy="120" r="3" fill="rgba(10,163,189,0.32)"/>
+  <circle cx="252" cy="40" r="14" fill="none" stroke="rgba(10,163,189,0.22)" stroke-width="1"/>
+  <circle cx="252" cy="40" r="8" fill="none" stroke="rgba(10,163,189,0.28)" stroke-width="1"/>
+  <circle cx="200" cy="260" r="4" fill="rgba(10,163,189,0.28)"/>
+  <circle cx="200" cy="260" r="10" fill="none" stroke="rgba(10,163,189,0.18)" stroke-width="1"/>
+  <circle cx="30" cy="220" r="2.4" fill="rgba(10,163,189,0.28)"/>
+
+  <g font-family="ui-monospace, Menlo, monospace" font-size="6" fill="rgba(10,163,189,0.26)" letter-spacing="0.5">
+    <text x="180" y="20">A3B87 2D93A</text>
+    <text x="180" y="30">97821 1D8647</text>
+    <text x="8" y="150">0087A 9B0D0F</text>
+    <text x="8" y="160">31820 3D0091</text>
+    <text x="120" y="300">08887 9B0D01</text>
+    <text x="230" y="110">26A87 20BA87</text>
+  </g>
+</svg>
