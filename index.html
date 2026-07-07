@@ -37,13 +37,21 @@
     <div class="hero-card">
       <p class="sys-version">SYS_V.4.2</p>
       <p class="hero-eyebrow">System check-in</p>
-      <h2 class="hero-title">Welcome back, <span class="accent" id="heroName">Operator</span>.</h2>
+      <h2 class="hero-title"><span class="hero-title-shrink">Welcome back, </span><span class="accent" id="heroName">Operator</span><span class="hero-title-shrink">.</span></h2>
       <div class="chip-row">
         <div class="chip">
           <span class="chip-label">Challenge_day</span>
           <span class="chip-value" id="daysLeftValue">–</span>
         </div>
+        <div class="chip chip--id">
+          <span class="chip-label">Digital_id</span>
+          <span class="chip-value" id="digitalIdValue">–</span>
+          <button type="button" class="chip-copy-btn" id="btnCopyDigitalId" aria-label="Copy digital ID" title="Copy Digital ID">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          </button>
+        </div>
       </div>
+      <p class="hint">Share your Digital ID with a friend so they can invite you to a group chat on the Nexus tab — it stays the same even if you change your display name.</p>
     </div>
 
     <div class="datetime-card">
@@ -64,7 +72,10 @@
       </div>
       <div class="datetime-divider"></div>
       <div class="weather-widget" id="weatherWidget">
-        <p class="datetime-label">Weather</p>
+        <p class="datetime-label">
+          <span>Weather</span>
+          <button type="button" class="datetime-tz-btn" id="btnWeatherLocation" aria-label="Choose location">📍</button>
+        </p>
         <div class="weather-icon" id="weatherIcon">⛅</div>
         <div class="weather-temp" id="weatherTemp">--°</div>
       </div>
@@ -140,12 +151,13 @@
 
     <div class="chart-card">
       <p class="mod-tag">Synchronization pulse</p>
+      <p class="hint">7-day steps trend, scaled relative to your highest day in this window.</p>
       <div class="bar-chart bar-chart--sparkline" id="pulseSparkline"></div>
     </div>
 
     <div class="chart-card">
       <div class="chart-card-head">
-        <span class="chart-card-title">Entity weight journey</span>
+        <span class="chart-card-title">ENTITY WEIGHT JOURNEY</span>
         <span class="chart-card-sub" id="chartRange"></span>
       </div>
       <div id="weightChart" class="weight-chart"></div>
@@ -165,99 +177,16 @@
       <fieldset class="field-group" id="extraHabitsGroup">
         <legend>Extra habits</legend>
       </fieldset>
-      <fieldset class="field-group">
-        <legend>Operational protocol</legend>
-        <label class="field field--checkbox">
-          <input type="checkbox" id="statusReviewedGoals">
-          <span>Reviewed mission objectives and future-vision calibration</span>
-        </label>
-        <label class="field field--checkbox">
-          <input type="checkbox" id="statusPlannedTomorrow">
-          <span>Projected T+1 strategy (training, fuel, recovery)</span>
-        </label>
-        <label class="field">
-          <span>Struggles today</span>
-          <textarea id="statusStruggles" rows="2"></textarea>
-        </label>
-        <label class="field">
-          <span>How to do better tomorrow</span>
-          <textarea id="statusImprove" rows="2"></textarea>
-        </label>
-      </fieldset>
       <button type="submit" class="btn btn--primary">Save check-in</button>
       <p class="save-note" id="checkinSaveNote"></p>
     </form>
 
     <h2 class="section-title">Body measurement scan</h2>
-    <div class="chart-card">
+    <div class="chart-card" style="position:relative;">
       <p class="mod-tag">MOD_BIOSCAN_10</p>
+      <button type="button" class="measure-entry-btn" id="btnOpenMeasureEntry">User Entry</button>
       <div class="measure-guide" id="measureGuide"></div>
     </div>
-
-    <fieldset class="field-group">
-      <p class="mod-tag">Mod_measure_11</p>
-      <p class="field-group-heading">Measurement Log (CM, to nearest 0.1)</p>
-      <label class="field">
-        <span>Date</span>
-        <input type="date" id="measureDate">
-      </label>
-      <label class="field">
-        <span>Chest (on nipple)</span>
-        <input type="number" step="0.1" id="measureChest" placeholder="e.g. 92.5">
-      </label>
-      <label class="field">
-        <span>Shoulder</span>
-        <input type="number" step="0.1" id="measureShoulder" placeholder="e.g. 110.0">
-      </label>
-      <div class="field-row">
-        <label class="field">
-          <span>R. Bicep</span>
-          <input type="number" step="0.1" id="measureRBicep" placeholder="e.g. 30.0">
-        </label>
-        <label class="field">
-          <span>L. Bicep</span>
-          <input type="number" step="0.1" id="measureLBicep" placeholder="e.g. 30.0">
-        </label>
-      </div>
-      <label class="field">
-        <span>2" Above Navel</span>
-        <input type="number" step="0.1" id="measureAbdSupra" placeholder="e.g. 80.0">
-      </label>
-      <label class="field">
-        <span>Stomach (navel)</span>
-        <input type="number" step="0.1" id="measureStomach" placeholder="e.g. 85.0">
-      </label>
-      <label class="field">
-        <span>2" Below Navel</span>
-        <input type="number" step="0.1" id="measureAbdInfra" placeholder="e.g. 88.0">
-      </label>
-      <label class="field" id="hipsField">
-        <span>Hips</span>
-        <input type="number" step="0.1" id="measureHips" placeholder="e.g. 95.0">
-      </label>
-      <div class="field-row">
-        <label class="field">
-          <span>R. Thigh</span>
-          <input type="number" step="0.1" id="measureRThigh" placeholder="e.g. 55.0">
-        </label>
-        <label class="field">
-          <span>L. Thigh</span>
-          <input type="number" step="0.1" id="measureLThigh" placeholder="e.g. 55.0">
-        </label>
-      </div>
-      <div class="field-row">
-        <label class="field">
-          <span>R. Calf</span>
-          <input type="number" step="0.1" id="measureRCalf" placeholder="e.g. 36.0">
-        </label>
-        <label class="field">
-          <span>L. Calf</span>
-          <input type="number" step="0.1" id="measureLCalf" placeholder="e.g. 36.0">
-        </label>
-      </div>
-      <button type="button" class="btn btn--primary" id="btnSaveMeasurements">Save measurements</button>
-      <p class="save-note" id="measureSaveNote"></p>
-    </fieldset>
   </section>
 
   <!-- ============ TRAINING ============ -->
@@ -269,6 +198,16 @@
       <div class="bar-chart-labels" id="volumeTrendLabels"></div>
       <p class="empty-note" id="volumeTrendEmptyNote" hidden>Log and complete sets across a few workouts to see your volume trend.</p>
     </div>
+
+    <button type="button" class="btn mission-log-btn" id="btnOpenMissionLog">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+        <line x1="3" y1="10" x2="21" y2="10"></line>
+        <line x1="8" y1="2.5" x2="8" y2="6"></line>
+        <line x1="16" y1="2.5" x2="16" y2="6"></line>
+      </svg>
+      Temporal Mission Log
+    </button>
 
     <div class="training-topbar">
       <label class="field">
@@ -307,6 +246,48 @@
       </div>
     </div>
 
+    <h2 class="section-title">Outdoor activity tracker</h2>
+    <div class="chart-card" id="cardioCard">
+      <p class="mod-tag">Mod_gps_09</p>
+      <label class="field">
+        <span>Activity type</span>
+        <select id="cardioType">
+          <option value="run">Run</option>
+          <option value="walk">Walk</option>
+          <option value="ride">Ride</option>
+        </select>
+      </label>
+      <div class="cardio-stats">
+        <div class="cardio-stat">
+          <div class="cardio-stat-value" id="cardioDuration">00:00</div>
+          <div class="cardio-stat-label">Duration</div>
+        </div>
+        <div class="cardio-stat">
+          <div class="cardio-stat-value" id="cardioDistance">0.00</div>
+          <div class="cardio-stat-label" id="cardioDistanceLabel">Distance (km)</div>
+        </div>
+        <div class="cardio-stat">
+          <div class="cardio-stat-value" id="cardioPace">--:--</div>
+          <div class="cardio-stat-label" id="cardioPaceLabel">Pace /km</div>
+        </div>
+      </div>
+      <svg id="cardioRouteSketch" class="cardio-route-sketch" viewBox="0 0 300 160"></svg>
+      <p class="hint">Keep this app open and your screen on while tracking — GPS pauses if you lock the phone or switch apps.</p>
+      <div class="btn-row">
+        <button type="button" class="btn btn--primary" id="btnCardioStart">Start tracking</button>
+        <button type="button" class="btn" id="btnCardioStop" hidden>Stop &amp; save</button>
+      </div>
+      <p class="save-note" id="cardioSaveNote"></p>
+      <button type="button" class="btn share-result-btn" id="btnShareCardio" hidden>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
+        Share activity
+      </button>
+    </div>
+
+    <h2 class="section-title">Activity history</h2>
+    <div class="cardio-history" id="cardioHistory"></div>
+    <p class="empty-note" id="cardioHistoryEmpty">No outdoor activities logged yet.</p>
+
     <div class="section-title-row">
       <h2 class="section-title">Protocol execution queue</h2>
       <div class="unit-switch">
@@ -326,9 +307,7 @@
       <button type="button" class="btn" id="btnAddExercise">Synchronize new exercise</button>
     </div>
 
-    <h2 class="section-title">Personal records</h2>
-    <div class="pr-board" id="prBoard"></div>
-    <p class="empty-note" id="prBoardEmpty">Log completed sets to start tracking personal records.</p>
+    <button type="button" class="btn btn--primary" id="btnOpenPRBoard">🏆 Personal Records</button>
   </section>
 
   <!-- ============ NUTRITION / FUEL ============ -->
@@ -388,45 +367,7 @@
       </div>
     </div>
 
-    <fieldset class="field-group">
-      <p class="mod-tag">Mod_input_01</p>
-      <p class="field-group-heading">Today's Intake Log</p>
-      <label class="field">
-        <span>Calories consumed</span>
-        <div class="input-unit-wrap"><input type="number" id="nutCalories" placeholder="e.g. 2200"><span class="input-unit">kcal</span></div>
-      </label>
-      <label class="field">
-        <span>Protein (g)</span>
-        <div class="input-unit-wrap"><input type="number" id="nutProtein" placeholder="e.g. 140"><span class="input-unit">grams</span></div>
-      </label>
-      <label class="field">
-        <span>Carbs (g)</span>
-        <div class="input-unit-wrap"><input type="number" id="nutCarbs" placeholder="e.g. 220"><span class="input-unit">grams</span></div>
-      </label>
-      <label class="field">
-        <span>Fat (g)</span>
-        <div class="input-unit-wrap"><input type="number" id="nutFat" placeholder="e.g. 65"><span class="input-unit">grams</span></div>
-      </label>
-      <label class="field">
-        <span>Fiber (g)</span>
-        <div class="input-unit-wrap"><input type="number" id="nutFiber" placeholder="e.g. 28"><span class="input-unit">grams</span></div>
-      </label>
-      <label class="field">
-        <span>Sodium (mg)</span>
-        <div class="input-unit-wrap"><input type="number" id="nutSodium" placeholder="e.g. 1800"><span class="input-unit">mg</span></div>
-      </label>
-      <label class="field">
-        <span>Water (mL)</span>
-        <div class="input-unit-wrap"><input type="number" id="nutWater" min="0" step="50" placeholder="e.g. 3000"><span class="input-unit">mL</span></div>
-      </label>
-      <label class="field">
-        <span>Daily steps</span>
-        <div class="input-unit-wrap"><input type="number" id="nutSteps" placeholder="e.g. 8000"><span class="input-unit">walk</span></div>
-      </label>
-    </fieldset>
-
-    <button type="button" class="btn btn--primary" id="btnSaveNutrition">⟲ Sync fuel data</button>
-    <p class="save-note" id="nutSaveNote"></p>
+    <button type="button" class="btn btn--primary" id="btnOpenIntakeLog">Today Intake Log Entry</button>
 
     <h2 class="section-title">Averages (7-day)</h2>
     <div class="stat-grid stat-grid--3">
@@ -541,8 +482,301 @@
       <dl class="computed-list" id="computedList"></dl>
     </div>
 
+    <button type="button" class="btn entity-identity-btn" id="btnOpenEntityIdentity">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+      Entity Identity
+    </button>
+  </section>
+
+  <!-- ============ GLOBAL NEXUS ============ -->
+  <section class="tab-panel" id="tab-leaderboard" data-tab="leaderboard" hidden>
+    <div class="hero-card">
+      <p class="hero-eyebrow">System status: active</p>
+      <h2 class="hero-title">Global Nexus</h2>
+      <label class="field field--checkbox" style="margin-top:12px;">
+        <input type="checkbox" id="lbOptIn">
+        <span>Share my progress</span>
+      </label>
+      <p class="hint" id="lbCodeNameHint">Not sharing.</p>
+      <p class="hint">Uses the name from your Bio tab, visible to everyone on the Nexus. Set a name in Bio before sharing.</p>
+    </div>
+
+    <button type="button" class="btn btn--primary" id="btnLbUpdate">Sync to Nexus</button>
+    <p class="save-note" id="lbSaveNote"></p>
+    <div class="nexus-presence" id="nexusPresence">
+      <span><strong id="nexusTotalUsers">–</strong> operators synced</span>
+      <span><span class="status-dot status-good"></span><strong id="nexusOnlineUsers">–</strong> online now</span>
+    </div>
+    <p class="empty-note" id="lbEmptyNote" hidden>No Nexus data yet. Tap Sync to share and see others.</p>
+
+    <div class="chart-card">
+      <p class="mod-tag">MOD_CHRONOS_01</p>
+      <div class="chart-card-head"><span class="chart-card-title">Steps Ranking</span></div>
+      <div class="rank-list" id="lbStepsRanking"></div>
+    </div>
+
+    <div class="chart-card">
+      <p class="mod-tag">MOD_FORCE_02</p>
+      <div class="chart-card-head"><span class="chart-card-title">Training Volume</span></div>
+      <div class="rank-list" id="lbVolumeRanking"></div>
+    </div>
+
+    <div class="chart-card">
+      <p class="mod-tag">MOD_BIO_03</p>
+      <div class="chart-card-head"><span class="chart-card-title">Bio-Adaptation</span></div>
+      <div class="ring-card" id="lbBioRing" style="border:none;padding:8px 0;"></div>
+      <div class="rank-list" id="lbBioRanking"></div>
+    </div>
+
+    <div class="chart-card" id="chatCard">
+      <div class="chart-card-head">
+        <p class="mod-tag" style="margin:0;">Comms channel // uplink stable</p>
+        <div class="chat-head-actions">
+          <div class="chat-bell-wrap">
+            <button type="button" class="chat-bell-btn" id="btnChatInvites" aria-label="Group invites" title="Group invites">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              <span class="chat-bell-badge" id="chatBellBadge" hidden>0</span>
+            </button>
+            <div class="chat-invites-popover" id="chatInvitesPopover" hidden></div>
+          </div>
+          <button type="button" class="chat-expand-btn" id="btnChatExpand" aria-label="Expand chat" title="Expand">⤢</button>
+        </div>
+      </div>
+
+      <div class="chat-room-row">
+        <select id="chatRoomSelect">
+          <option value="">🌐 Public Chat</option>
+        </select>
+        <button type="button" class="btn btn--sm" id="btnLeaveGroup" hidden>Leave</button>
+        <button type="button" class="btn btn--sm" id="btnNewGroup">+ Group</button>
+      </div>
+
+      <div class="chat-new-group" id="chatNewGroupPanel" hidden>
+        <label class="field">
+          <span>Group name</span>
+          <input type="text" id="newGroupName" maxlength="40" placeholder="e.g. Morning Runners">
+        </label>
+        <label class="field">
+          <span>Invite by Digital ID</span>
+          <div class="input-unit-wrap"><input type="text" id="newGroupInviteInput" placeholder="e.g. WF-7K2P9Q"><button type="button" class="btn btn--sm" id="btnAddInvitee">Add</button></div>
+        </label>
+        <p class="hint">Ask a friend to copy their Digital ID from their Status tab and send it to you.</p>
+        <div id="newGroupInviteChips" class="new-group-invite-chips"></div>
+        <div class="btn-row">
+          <button type="button" class="btn btn--primary" id="btnCreateGroup">Create &amp; invite</button>
+          <button type="button" class="btn" id="btnCancelGroup">Cancel</button>
+        </div>
+        <p class="save-note" id="newGroupNote"></p>
+      </div>
+
+      <div id="lbChatList" class="chat-list"></div>
+      <div class="chat-input-row">
+        <input type="text" id="lbChatInput" maxlength="280" placeholder="Transmit message…">
+        <button type="button" class="btn btn--primary btn--sm" id="btnLbChatSend">➤</button>
+      </div>
+    </div>
+
+    <footer class="app-footer">
+      <button type="button" class="footer-share-btn" id="btnFooterShare" aria-label="Share app">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="18" cy="5" r="3"></circle>
+          <circle cx="6" cy="12" r="3"></circle>
+          <circle cx="18" cy="19" r="3"></circle>
+          <line x1="8.6" y1="10.6" x2="15.4" y2="6.4"></line>
+          <line x1="8.6" y1="13.4" x2="15.4" y2="17.6"></line>
+        </svg>
+        Share
+      </button>
+      <div class="footer-brand">
+        <img src="icons/icon-192.png" alt="" width="40" height="40">
+        <div class="footer-brand-name">WINFINITYFITNESS</div>
+        <p class="footer-tagline">"There is no such thing as maintenance, it's either you keep moving forward, or eventually slip backwards"</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <h4>About</h4>
+          <span class="footer-link-static">Team</span>
+          <a class="footer-link" href="http://www.facebook.com/aldruz3dsign" target="_blank" rel="noopener noreferrer">Affiliate</a>
+          <span class="footer-link-static">Careers</span>
+        </div>
+        <div class="footer-col">
+          <h4>Privacy</h4>
+          <button type="button" class="footer-link-btn" id="btnFooterPrivacy">Privacy Policy</button>
+          <button type="button" class="footer-link-btn" id="btnFooterTerms">Terms and Services</button>
+          <button type="button" class="footer-link-btn" id="btnFooterContact">Contact Us</button>
+        </div>
+        <div class="footer-col">
+          <h4>Social</h4>
+          <a class="footer-link" href="http://winfinityfitness.com" target="_blank" rel="noopener noreferrer">Webpage</a>
+          <a class="footer-link" href="https://www.facebook.com/winfinityfit/" target="_blank" rel="noopener noreferrer">Facebook</a>
+          <a class="footer-link" href="https://www.instagram.com/windalchamp/" target="_blank" rel="noopener noreferrer">Instagram</a>
+        </div>
+      </div>
+    </footer>
+  </section>
+
+  <!-- ============ MENU ============ -->
+  <section class="tab-panel" id="tab-menu" data-tab="menu" hidden>
+    <div class="hero-card">
+      <p class="hero-eyebrow">Sys_menu_v1.0</p>
+      <h2 class="hero-title">System Menu</h2>
+      <p class="hero-sub">Reviews, data export, backups and configuration.</p>
+    </div>
+
+    <button type="button" class="btn settings-btn" id="btnOpenSettings">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.8"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6c.5-.13.9-.6 1-1.11V3a2 2 0 0 1 4 0v.09c.1.51.5.98 1 1.11.5.13 1.32.17 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06c-.4.79-.46 1.32-.33 1.82.13.5.6.9 1.11 1H21a2 2 0 0 1 0 4h-.09c-.51.1-.98.5-1.11 1z"/></svg>
+      Settings
+    </button>
+
+    <div class="sheet-section">
+      <p class="mod-tag">Mod_review_12</p>
+      <p class="field-group-heading">Weekly Review</p>
+      <form id="reviewForm">
+        <label class="field">
+          <span>Week ending</span>
+          <input type="date" id="reviewDate" required>
+        </label>
+        <label class="field">
+          <span>Adjustments made to keep progress on track</span>
+          <textarea id="reviewAdjustments" rows="2"></textarea>
+        </label>
+        <label class="field">
+          <span>Wins this week</span>
+          <textarea id="reviewWins" rows="2"></textarea>
+        </label>
+        <label class="field">
+          <span>Improvements this week</span>
+          <textarea id="reviewImprovements" rows="2"></textarea>
+        </label>
+        <fieldset class="field-group">
+          <p class="field-group-heading" style="font-size:0.8rem;">Focus for Next Week (pick 1-2)</p>
+          <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="consistency"><span>Be more consistent with logging</span></label>
+          <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="accuracy"><span>Be more accurate measuring food</span></label>
+          <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="calorieTarget"><span>Do better hitting calorie target</span></label>
+          <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="stepTarget"><span>Hit step target</span></label>
+          <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="workoutTarget"><span>Hit workout target</span></label>
+          <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="other"><span>Other (detail below)</span></label>
+        </fieldset>
+        <label class="field">
+          <span>Other changes for next week</span>
+          <textarea id="reviewOther" rows="2"></textarea>
+        </label>
+        <button type="submit" class="btn btn--primary">Save weekly review</button>
+        <p class="save-note" id="reviewSaveNote"></p>
+      </form>
+    </div>
+
+    <div class="sheet-section">
+      <p class="mod-tag">Mod_export_13</p>
+      <p class="field-group-heading">Export &amp; Email</p>
+      <div class="btn-row">
+        <button class="btn btn--primary" id="btnExportWeek">Export last 7 days (CSV)</button>
+        <button class="btn" id="btnExportAll">Export all logs (CSV)</button>
+      </div>
+      <p class="hint">Tap Export, then choose your email app from the share sheet to send the CSV as an attachment. If sharing isn't supported, the file downloads and you can attach it manually.</p>
+    </div>
+
+    <div class="sheet-section">
+      <p class="mod-tag">Mod_backup_14</p>
+      <p class="field-group-heading">Backup</p>
+      <div class="btn-row">
+        <button class="btn" id="btnBackup">Save backup (JSON)</button>
+        <label class="btn btn--file">
+          Restore backup
+          <input type="file" id="fileRestore" accept="application/json" hidden>
+        </label>
+      </div>
+      <p class="hint">Your data lives only on this device. Save a backup occasionally in case you clear browser data or switch phones.</p>
+    </div>
+
+    <div class="sheet-section">
+      <p class="mod-tag">Mod_gdrive_15</p>
+      <p class="field-group-heading">Google Drive Backup</p>
+      <p class="hint" id="driveStatus">Not connected.</p>
+      <div class="btn-row">
+        <button class="btn btn--primary" id="btnDriveConnect">Sign in with Google</button>
+        <button class="btn" id="btnDriveSyncNow" hidden>Backup now</button>
+      </div>
+      <p class="hint">Once connected, finishing a workout automatically backs up your data to a file named "winfinity-fitness-backup.json" in your Drive. Requires an internet connection.</p>
+    </div>
+
+    <div class="sheet-section">
+      <p class="mod-tag">Mod_history_16</p>
+      <p class="field-group-heading">Accomplishment Log History</p>
+      <div class="table-wrap">
+        <table id="historyTable">
+          <thead>
+            <tr><th>Date</th><th>Weight</th><th>Steps</th><th>Cal</th><th>Protein</th><th>Sleep</th><th>Exercises</th></tr>
+          </thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div>
+      <p class="empty-note" id="historyEmptyNote">No logs yet.</p>
+    </div>
+
+    <div class="sheet-section">
+      <p class="mod-tag">Mod_mhistory_17</p>
+      <p class="field-group-heading">Measurement Log History</p>
+      <div class="table-wrap">
+        <table id="measureHistoryTable">
+          <thead>
+            <tr>
+              <th>Date</th><th>Chest</th><th>Shoulder</th><th>L.Bicep</th><th>R.Bicep</th>
+              <th>2" Above</th><th>Stomach</th><th>2" Below</th><th>Hips</th>
+              <th>L.Thigh</th><th>R.Thigh</th><th>L.Calf</th><th>R.Calf</th>
+            </tr>
+          </thead>
+          <tbody id="measureHistoryBody"></tbody>
+        </table>
+      </div>
+      <p class="empty-note" id="measureHistoryEmptyNote">No measurements logged yet.</p>
+    </div>
+  </section>
+
+</main>
+
+<nav class="tab-bar">
+  <button class="tab-btn is-active" data-target="status">
+    <svg viewBox="0 0 24 24" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="10" rx="1.5"/><rect x="14" y="3" width="7" height="6" rx="1.5"/><rect x="14" y="13" width="7" height="8" rx="1.5"/><rect x="3" y="17" width="7" height="4" rx="1.5"/></svg>
+    <span>Status</span>
+    <span class="tab-dot" hidden></span>
+  </button>
+  <button class="tab-btn" data-target="training">
+    <svg viewBox="0 0 24 24" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><g transform="rotate(45 12 12)"><line x1="6.5" y1="12" x2="17.5" y2="12"/><rect x="3.5" y="9" width="3" height="6" rx="1"/><rect x="17.5" y="9" width="3" height="6" rx="1"/><rect x="1.5" y="10.3" width="2" height="3.4" rx="0.6"/><rect x="20.5" y="10.3" width="2" height="3.4" rx="0.6"/></g></svg>
+    <span>Training</span>
+    <span class="tab-dot" hidden></span>
+  </button>
+  <button class="tab-btn" data-target="nutrition">
+    <svg viewBox="0 0 24 24" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2v6a1.5 1.5 0 0 0 3 0V2M8.5 8v13"/><path d="M16 2c-1.7 0-3 1.8-3 4.5S14.3 11 16 11v11"/></svg>
+    <span>Fuel</span>
+    <span class="tab-dot" hidden></span>
+  </button>
+  <button class="tab-btn" data-target="bio">
+    <svg viewBox="0 0 24 24" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3c0 5 10 5 10 10s-10 5-10 10"/><path d="M17 3c0 5-10 5-10 10s10 5 10 10"/><path d="M8 7h8M7.5 12h9M8 17h8"/></svg>
+    <span>DNA</span>
+    <span class="tab-dot" hidden></span>
+  </button>
+  <button class="tab-btn" data-target="leaderboard">
+    <svg viewBox="0 0 24 24" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.3"/><circle cx="12" cy="4" r="1.8"/><circle cx="12" cy="20" r="1.8"/><circle cx="4" cy="12" r="1.8"/><circle cx="20" cy="12" r="1.8"/><path d="M12 6.3v3.4M12 14.3v3.4M9.7 12H6.3M14.3 12h3.4"/></svg>
+    <span>Nexus</span>
+  </button>
+  <button class="tab-btn" data-target="menu">
+    <svg viewBox="0 0 24 24" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+    <span>Menu</span>
+    <span class="tab-dot" hidden></span>
+  </button>
+</nav>
+
+<!-- ============ ENTITY IDENTITY SHEET ============ -->
+<div class="sheet-overlay" id="entityIdentityOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Entity Identity</h2>
+      <button class="sheet-close" id="btnCloseEntityIdentity">✕</button>
+    </div>
+
     <p class="hero-eyebrow">System config</p>
-    <h2 class="hero-title" style="margin-bottom:10px;">Entity Identity</h2>
     <form id="setupForm">
       <fieldset class="field-group">
         <p class="mod-tag">Mod_io_core_01</p>
@@ -707,233 +941,54 @@
       <p class="form-flavor-note">Encrypting bio-signature data... 100% secure</p>
       <p class="save-note" id="setupSaveNote"></p>
     </form>
-  </section>
+  </div>
+</div>
 
-  <!-- ============ GLOBAL NEXUS ============ -->
-  <section class="tab-panel" id="tab-leaderboard" data-tab="leaderboard" hidden>
-    <div class="hero-card">
-      <p class="hero-eyebrow">System status: active</p>
-      <h2 class="hero-title">Global Nexus</h2>
-      <label class="field field--checkbox" style="margin-top:12px;">
-        <input type="checkbox" id="lbOptIn">
-        <span>Share my progress</span>
-      </label>
-      <p class="hint" id="lbCodeNameHint">Not sharing.</p>
-      <p class="hint">Uses the name from your Bio tab, visible to everyone on the Nexus. Set a name in Bio before sharing.</p>
-    </div>
-
-    <button type="button" class="btn btn--primary" id="btnLbUpdate">Sync to Nexus</button>
-    <p class="save-note" id="lbSaveNote"></p>
-    <div class="nexus-presence" id="nexusPresence">
-      <span><strong id="nexusTotalUsers">–</strong> operators synced</span>
-      <span><span class="status-dot status-good"></span><strong id="nexusOnlineUsers">–</strong> online now</span>
-    </div>
-    <p class="empty-note" id="lbEmptyNote" hidden>No Nexus data yet. Tap Sync to share and see others.</p>
-
-    <div class="chart-card">
-      <p class="mod-tag">MOD_CHRONOS_01</p>
-      <div class="chart-card-head"><span class="chart-card-title">Steps Ranking</span></div>
-      <div class="rank-list" id="lbStepsRanking"></div>
-    </div>
-
-    <div class="chart-card">
-      <p class="mod-tag">MOD_FORCE_02</p>
-      <div class="chart-card-head"><span class="chart-card-title">Training Volume</span></div>
-      <div class="rank-list" id="lbVolumeRanking"></div>
-    </div>
-
-    <div class="chart-card">
-      <p class="mod-tag">MOD_BIO_03</p>
-      <div class="chart-card-head"><span class="chart-card-title">Bio-Adaptation</span></div>
-      <div class="ring-card" id="lbBioRing" style="border:none;padding:8px 0;"></div>
-      <div class="rank-list" id="lbBioRanking"></div>
-    </div>
-
-    <div class="chart-card">
-      <p class="mod-tag">Public channel // uplink stable</p>
-      <div id="lbChatList" class="chat-list"></div>
-      <div class="chat-input-row">
-        <input type="text" id="lbChatInput" maxlength="280" placeholder="Transmit message…">
-        <button type="button" class="btn btn--primary btn--sm" id="btnLbChatSend">➤</button>
-      </div>
-    </div>
-
-    <footer class="app-footer">
-      <div class="footer-brand">
-        <img src="icons/icon-192.png" alt="" width="40" height="40">
-        <div class="footer-brand-name">WINFINITYFITNESS</div>
-        <p class="footer-tagline">"There is no such thing as maintenance, it's either you keep moving forward, or eventually slip backwards"</p>
-      </div>
-      <div class="footer-links">
-        <div class="footer-col">
-          <h4>About</h4>
-          <span class="footer-link-static">Team</span>
-          <a class="footer-link" href="http://www.facebook.com/aldruz3dsign" target="_blank" rel="noopener noreferrer">Affiliate</a>
-          <span class="footer-link-static">Careers</span>
-        </div>
-        <div class="footer-col">
-          <h4>Privacy</h4>
-          <button type="button" class="footer-link-btn" id="btnFooterPrivacy">Privacy Policy</button>
-          <button type="button" class="footer-link-btn" id="btnFooterTerms">Terms and Services</button>
-          <button type="button" class="footer-link-btn" id="btnFooterContact">Contact Us</button>
-        </div>
-        <div class="footer-col">
-          <h4>Social</h4>
-          <a class="footer-link" href="https://www.facebook.com/winfinityfit/" target="_blank" rel="noopener noreferrer">Facebook</a>
-          <a class="footer-link" href="https://www.instagram.com/windalchamp/" target="_blank" rel="noopener noreferrer">Instagram</a>
-        </div>
-      </div>
-    </footer>
-  </section>
-
-</main>
-
-<nav class="tab-bar">
-  <button class="tab-btn is-active" data-target="status">
-    <svg viewBox="0 0 24 24" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="10" rx="1.5"/><rect x="14" y="3" width="7" height="6" rx="1.5"/><rect x="14" y="13" width="7" height="8" rx="1.5"/><rect x="3" y="17" width="7" height="4" rx="1.5"/></svg>
-    <span>Status</span>
-  </button>
-  <button class="tab-btn" data-target="training">
-    <svg viewBox="0 0 24 24" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><g transform="rotate(45 12 12)"><line x1="6.5" y1="12" x2="17.5" y2="12"/><rect x="3.5" y="9" width="3" height="6" rx="1"/><rect x="17.5" y="9" width="3" height="6" rx="1"/><rect x="1.5" y="10.3" width="2" height="3.4" rx="0.6"/><rect x="20.5" y="10.3" width="2" height="3.4" rx="0.6"/></g></svg>
-    <span>Training</span>
-  </button>
-  <button class="tab-btn" data-target="nutrition">
-    <svg viewBox="0 0 24 24" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2v6a1.5 1.5 0 0 0 3 0V2M8.5 8v13"/><path d="M16 2c-1.7 0-3 1.8-3 4.5S14.3 11 16 11v11"/></svg>
-    <span>Fuel</span>
-  </button>
-  <button class="tab-btn" data-target="bio">
-    <svg viewBox="0 0 24 24" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3c0 5 10 5 10 10s-10 5-10 10"/><path d="M17 3c0 5-10 5-10 10s10 5 10 10"/><path d="M8 7h8M7.5 12h9M8 17h8"/></svg>
-    <span>DNA</span>
-  </button>
-  <button class="tab-btn" data-target="leaderboard">
-    <svg viewBox="0 0 24 24" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.3"/><circle cx="12" cy="4" r="1.8"/><circle cx="12" cy="20" r="1.8"/><circle cx="4" cy="12" r="1.8"/><circle cx="20" cy="12" r="1.8"/><path d="M12 6.3v3.4M12 14.3v3.4M9.7 12H6.3M14.3 12h3.4"/></svg>
-    <span>Nexus</span>
-  </button>
-  <button class="tab-btn" id="btnOpenMore">
-    <svg viewBox="0 0 24 24" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.8"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6c.5-.13.9-.6 1-1.11V3a2 2 0 0 1 4 0v.09c.1.51.5.98 1 1.11.5.13 1.32.17 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06c-.4.79-.46 1.32-.33 1.82.13.5.6.9 1.11 1H21a2 2 0 0 1 0 4h-.09c-.51.1-.98.5-1.11 1z"/></svg>
-    <span>More</span>
-  </button>
-</nav>
-
-<!-- ============ MORE SHEET ============ -->
-<div class="sheet-overlay" id="sheetOverlay" hidden>
+<!-- ============ SETTINGS SHEET ============ -->
+<div class="sheet-overlay" id="settingsOverlay" hidden>
   <div class="sheet">
     <div class="sheet-handle"></div>
     <div class="sheet-head">
-      <h2>More</h2>
-      <button class="sheet-close" id="btnCloseSheet">✕</button>
-    </div>
-
-    <div class="theme-toggle-row">
-      <span class="theme-icon" id="themeIcon">🌙</span>
-      <label class="switch">
-        <input type="checkbox" id="themeToggle">
-        <span class="switch-track"><span class="switch-thumb"></span></span>
-      </label>
+      <h2>Settings</h2>
+      <button class="sheet-close" id="btnCloseSettings">✕</button>
     </div>
 
     <div class="sheet-section">
-      <p class="mod-tag">Mod_review_12</p>
-      <p class="field-group-heading">Weekly Review</p>
-      <form id="reviewForm">
-        <label class="field">
-          <span>Week ending</span>
-          <input type="date" id="reviewDate" required>
-        </label>
-        <label class="field">
-          <span>Adjustments made to keep progress on track</span>
-          <textarea id="reviewAdjustments" rows="2"></textarea>
-        </label>
-        <label class="field">
-          <span>Wins this week</span>
-          <textarea id="reviewWins" rows="2"></textarea>
-        </label>
-        <label class="field">
-          <span>Improvements this week</span>
-          <textarea id="reviewImprovements" rows="2"></textarea>
-        </label>
-        <fieldset class="field-group">
-          <p class="field-group-heading" style="font-size:0.8rem;">Focus for Next Week (pick 1-2)</p>
-          <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="consistency"><span>Be more consistent with logging</span></label>
-          <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="accuracy"><span>Be more accurate measuring food</span></label>
-          <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="calorieTarget"><span>Do better hitting calorie target</span></label>
-          <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="stepTarget"><span>Hit step target</span></label>
-          <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="workoutTarget"><span>Hit workout target</span></label>
-          <label class="field field--checkbox"><input type="checkbox" class="reviewFocus" value="other"><span>Other (detail below)</span></label>
-        </fieldset>
-        <label class="field">
-          <span>Other changes for next week</span>
-          <textarea id="reviewOther" rows="2"></textarea>
-        </label>
-        <button type="submit" class="btn btn--primary">Save weekly review</button>
-        <p class="save-note" id="reviewSaveNote"></p>
-      </form>
-    </div>
-
-    <div class="sheet-section">
-      <p class="mod-tag">Mod_export_13</p>
-      <p class="field-group-heading">Export &amp; Email</p>
-      <div class="btn-row">
-        <button class="btn btn--primary" id="btnExportWeek">Export last 7 days (CSV)</button>
-        <button class="btn" id="btnExportAll">Export all logs (CSV)</button>
-      </div>
-      <p class="hint">Tap Export, then choose your email app from the share sheet to send the CSV as an attachment. If sharing isn't supported, the file downloads and you can attach it manually.</p>
-    </div>
-
-    <div class="sheet-section">
-      <p class="mod-tag">Mod_backup_14</p>
-      <p class="field-group-heading">Backup</p>
-      <div class="btn-row">
-        <button class="btn" id="btnBackup">Save backup (JSON)</button>
-        <label class="btn btn--file">
-          Restore backup
-          <input type="file" id="fileRestore" accept="application/json" hidden>
+      <p class="field-group-heading">Appearance</p>
+      <div class="theme-toggle-row">
+        <span class="theme-icon" id="themeIcon">🌙</span>
+        <label class="switch">
+          <input type="checkbox" id="themeToggle">
+          <span class="switch-track"><span class="switch-thumb"></span></span>
         </label>
       </div>
-      <p class="hint">Your data lives only on this device. Save a backup occasionally in case you clear browser data or switch phones.</p>
     </div>
 
     <div class="sheet-section">
-      <p class="mod-tag">Mod_gdrive_15</p>
-      <p class="field-group-heading">Google Drive Backup</p>
-      <p class="hint" id="driveStatus">Not connected.</p>
-      <div class="btn-row">
-        <button class="btn btn--primary" id="btnDriveConnect">Sign in with Google</button>
-        <button class="btn" id="btnDriveSyncNow" hidden>Backup now</button>
+      <p class="field-group-heading">Reminder Alarm Tone</p>
+      <p class="hint">Browsers can't read your phone's actual ringtone library, so pick from these built-in alarm tones instead — used for rest timers and reminders.</p>
+      <div class="tone-picker" id="tonePicker">
+        <label class="tone-row">
+          <input type="radio" name="alarmTone" value="chime">
+          <span>Chime</span>
+          <button type="button" class="btn tone-preview-btn" data-tone="chime">▶</button>
+        </label>
+        <label class="tone-row">
+          <input type="radio" name="alarmTone" value="beep">
+          <span>Beep</span>
+          <button type="button" class="btn tone-preview-btn" data-tone="beep">▶</button>
+        </label>
+        <label class="tone-row">
+          <input type="radio" name="alarmTone" value="digital">
+          <span>Digital</span>
+          <button type="button" class="btn tone-preview-btn" data-tone="digital">▶</button>
+        </label>
+        <label class="tone-row">
+          <input type="radio" name="alarmTone" value="bell">
+          <span>Bell</span>
+          <button type="button" class="btn tone-preview-btn" data-tone="bell">▶</button>
+        </label>
       </div>
-      <p class="hint">Once connected, finishing a workout automatically backs up your data to a file named "winfinity-fitness-backup.json" in your Drive. Requires an internet connection.</p>
-    </div>
-
-    <div class="sheet-section">
-      <p class="mod-tag">Mod_history_16</p>
-      <p class="field-group-heading">Accomplishment Log History</p>
-      <div class="table-wrap">
-        <table id="historyTable">
-          <thead>
-            <tr><th>Date</th><th>Weight</th><th>Steps</th><th>Cal</th><th>Protein</th><th>Sleep</th><th>Exercises</th></tr>
-          </thead>
-          <tbody id="historyBody"></tbody>
-        </table>
-      </div>
-      <p class="empty-note" id="historyEmptyNote">No logs yet.</p>
-    </div>
-
-    <div class="sheet-section">
-      <p class="mod-tag">Mod_mhistory_17</p>
-      <p class="field-group-heading">Measurement Log History</p>
-      <div class="table-wrap">
-        <table id="measureHistoryTable">
-          <thead>
-            <tr>
-              <th>Date</th><th>Chest</th><th>Shoulder</th><th>L.Bicep</th><th>R.Bicep</th>
-              <th>2" Above</th><th>Stomach</th><th>2" Below</th><th>Hips</th>
-              <th>L.Thigh</th><th>R.Thigh</th><th>L.Calf</th><th>R.Calf</th>
-            </tr>
-          </thead>
-          <tbody id="measureHistoryBody"></tbody>
-        </table>
-      </div>
-      <p class="empty-note" id="measureHistoryEmptyNote">No measurements logged yet.</p>
     </div>
   </div>
 </div>
@@ -948,6 +1003,10 @@
     </div>
     <div id="summaryContent"></div>
     <div class="btn-row" style="margin-top:16px;">
+      <button class="btn" id="btnShareSummary">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
+        Share
+      </button>
       <button class="btn btn--primary" id="btnDoneSummary">Done</button>
     </div>
   </div>
@@ -1129,6 +1188,163 @@
   </div>
 </div>
 
+<div class="sheet-overlay" id="prBoardOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Personal Records</h2>
+      <button class="sheet-close" id="btnClosePRBoard">✕</button>
+    </div>
+    <div class="pr-board" id="prBoard"></div>
+    <p class="empty-note" id="prBoardEmpty">Log completed sets to start tracking personal records.</p>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="intakeLogOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Today Intake Log Entry</h2>
+      <button class="sheet-close" id="btnCloseIntakeLog">✕</button>
+    </div>
+    <fieldset class="field-group">
+      <p class="mod-tag">Mod_input_01</p>
+      <label class="field">
+        <span>Calories consumed</span>
+        <div class="input-unit-wrap"><input type="number" id="nutCalories" placeholder="e.g. 2200"><span class="input-unit">kcal</span></div>
+      </label>
+      <label class="field">
+        <span>Protein (g)</span>
+        <div class="input-unit-wrap"><input type="number" id="nutProtein" placeholder="e.g. 140"><span class="input-unit">grams</span></div>
+      </label>
+      <label class="field">
+        <span>Carbs (g)</span>
+        <div class="input-unit-wrap"><input type="number" id="nutCarbs" placeholder="e.g. 220"><span class="input-unit">grams</span></div>
+      </label>
+      <label class="field">
+        <span>Fat (g)</span>
+        <div class="input-unit-wrap"><input type="number" id="nutFat" placeholder="e.g. 65"><span class="input-unit">grams</span></div>
+      </label>
+      <label class="field">
+        <span>Fiber (g)</span>
+        <div class="input-unit-wrap"><input type="number" id="nutFiber" placeholder="e.g. 28"><span class="input-unit">grams</span></div>
+      </label>
+      <label class="field">
+        <span>Sodium (mg)</span>
+        <div class="input-unit-wrap"><input type="number" id="nutSodium" placeholder="e.g. 1800"><span class="input-unit">mg</span></div>
+      </label>
+      <label class="field">
+        <span>Water (mL)</span>
+        <div class="input-unit-wrap"><input type="number" id="nutWater" min="0" step="50" placeholder="e.g. 3000"><span class="input-unit">mL</span></div>
+      </label>
+      <label class="field">
+        <span>Daily steps</span>
+        <div class="input-unit-wrap"><input type="number" id="nutSteps" placeholder="e.g. 8000"><span class="input-unit">walk</span></div>
+      </label>
+    </fieldset>
+    <button type="button" class="btn btn--primary" id="btnSaveNutrition">⟲ Sync fuel data</button>
+    <p class="save-note" id="nutSaveNote"></p>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="measureEntryOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Measurement Log Entry</h2>
+      <button class="sheet-close" id="btnCloseMeasureEntry">✕</button>
+    </div>
+    <fieldset class="field-group">
+      <p class="mod-tag">Mod_measure_11</p>
+      <p class="field-group-heading">Measurement Log (CM, to nearest 0.1)</p>
+      <label class="field">
+        <span>Date</span>
+        <input type="date" id="measureDate">
+      </label>
+      <label class="field">
+        <span>Chest (on nipple)</span>
+        <input type="number" step="0.1" id="measureChest" placeholder="e.g. 92.5">
+      </label>
+      <label class="field">
+        <span>Shoulder</span>
+        <input type="number" step="0.1" id="measureShoulder" placeholder="e.g. 110.0">
+      </label>
+      <div class="field-row">
+        <label class="field">
+          <span>R. Bicep</span>
+          <input type="number" step="0.1" id="measureRBicep" placeholder="e.g. 30.0">
+        </label>
+        <label class="field">
+          <span>L. Bicep</span>
+          <input type="number" step="0.1" id="measureLBicep" placeholder="e.g. 30.0">
+        </label>
+      </div>
+      <label class="field">
+        <span>2" Above Navel</span>
+        <input type="number" step="0.1" id="measureAbdSupra" placeholder="e.g. 80.0">
+      </label>
+      <label class="field">
+        <span>Stomach (navel)</span>
+        <input type="number" step="0.1" id="measureStomach" placeholder="e.g. 85.0">
+      </label>
+      <label class="field">
+        <span>2" Below Navel</span>
+        <input type="number" step="0.1" id="measureAbdInfra" placeholder="e.g. 88.0">
+      </label>
+      <label class="field" id="hipsField">
+        <span>Hips</span>
+        <input type="number" step="0.1" id="measureHips" placeholder="e.g. 95.0">
+      </label>
+      <div class="field-row">
+        <label class="field">
+          <span>R. Thigh</span>
+          <input type="number" step="0.1" id="measureRThigh" placeholder="e.g. 55.0">
+        </label>
+        <label class="field">
+          <span>L. Thigh</span>
+          <input type="number" step="0.1" id="measureLThigh" placeholder="e.g. 55.0">
+        </label>
+      </div>
+      <div class="field-row">
+        <label class="field">
+          <span>R. Calf</span>
+          <input type="number" step="0.1" id="measureRCalf" placeholder="e.g. 36.0">
+        </label>
+        <label class="field">
+          <span>L. Calf</span>
+          <input type="number" step="0.1" id="measureLCalf" placeholder="e.g. 36.0">
+        </label>
+      </div>
+      <button type="button" class="btn btn--primary" id="btnSaveMeasurements">Save measurements</button>
+      <p class="save-note" id="measureSaveNote"></p>
+    </fieldset>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="missionLogOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Temporal Mission Log</h2>
+      <button class="sheet-close" id="btnCloseMissionLog">✕</button>
+    </div>
+    <div class="mission-log-legend">
+      <span><span class="status-dot status-good"></span>Strike_active</span>
+      <span><span class="status-dot status-muted"></span>Strike_inactive</span>
+      <span id="missionLogPeriodLegend" hidden><span class="status-dot status-critical"></span>Period</span>
+    </div>
+    <div class="mission-log-nav">
+      <button type="button" id="btnMissionLogPrev" aria-label="Previous month">‹</button>
+      <span id="missionLogMonthLabel">–</span>
+      <button type="button" id="btnMissionLogNext" aria-label="Next month">›</button>
+    </div>
+    <div class="mission-log-weekdays">
+      <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+    </div>
+    <div class="mission-log-grid" id="missionLogGrid"></div>
+  </div>
+</div>
+
 <div class="sheet-overlay" id="timezoneOverlay" hidden>
   <div class="sheet">
     <div class="sheet-handle"></div>
@@ -1142,6 +1358,23 @@
     </label>
     <button type="button" class="btn btn--primary" id="btnSaveTimezone">Save</button>
     <p class="save-note" id="timezoneSaveNote"></p>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="weatherLocationOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Choose Location</h2>
+      <button class="sheet-close" id="btnCloseWeatherLocation">✕</button>
+    </div>
+    <label class="field">
+      <span>Search city / municipality</span>
+      <input type="text" id="weatherLocationSearch" placeholder="e.g. Limay, Bataan">
+    </label>
+    <div id="weatherLocationResults" class="weather-location-results"></div>
+    <button type="button" class="btn" id="btnWeatherLocationAuto">Use my current location (GPS)</button>
+    <p class="save-note" id="weatherLocationNote"></p>
   </div>
 </div>
 

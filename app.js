@@ -263,8 +263,6 @@ function computeHabitCompletion(profile, entry) {
   const checks = [
     !!(entry && entry.exercises && entry.exercises.length > 0), // workout progress
     !!(entry && entry.steps != null && entry.steps >= getEffectiveStepGoal(profile)), // steps target
-    !!(entry && entry.struggles && entry.struggles.trim() !== ''), // struggles today
-    !!(entry && entry.improveTomorrow && entry.improveTomorrow.trim() !== ''), // how to do better tomorrow
     !!(entry && entry.weightKg != null), // weight input
     localStorage.getItem('wft_lb_optin') === '1', // nexus synced
     !!(review && review.adjustments && review.adjustments.trim() !== ''), // adjustments made to keep progress on track
@@ -326,6 +324,33 @@ function renderRing(container, pct, opts) {
 /* ---------------------------------------------------------------- */
 /* Tab + sheet navigation                                              */
 /* ---------------------------------------------------------------- */
+function initSwipeNavigation() {
+  const app = document.getElementById('app');
+  const noSwipeSelector = 'input[type="range"], .weight-chart, .table-wrap, .tab-bar';
+  let startX = 0, startY = 0, tracking = false;
+
+  app.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1 || e.target.closest(noSwipeSelector)) { tracking = false; return; }
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    tracking = true;
+  }, { passive: true });
+
+  app.addEventListener('touchend', e => {
+    if (!tracking) return;
+    tracking = false;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    const btns = Array.from(document.querySelectorAll('.tab-btn[data-target]'));
+    const activeIdx = btns.findIndex(b => b.classList.contains('is-active'));
+    if (activeIdx === -1) return;
+    const nextIdx = Math.max(0, Math.min(btns.length - 1, dx < 0 ? activeIdx + 1 : activeIdx - 1));
+    if (nextIdx !== activeIdx) btns[nextIdx].click();
+  }, { passive: true });
+}
+
 function initTabs() {
   const btns = document.querySelectorAll('.tab-btn[data-target]');
   btns.forEach(btn => {
@@ -338,6 +363,7 @@ function initTabs() {
         loadTrainingForDate(document.getElementById('trainDate').value);
         renderTrainingStats();
         renderExerciseTimerDisplays();
+        checkTrainingIdle();
       }
       if (target === 'nutrition') {
         loadNutritionForDate(document.getElementById('nutDate').value);
@@ -354,11 +380,41 @@ function initTabs() {
       if (target === 'leaderboard' && sbConfigured()) {
         pullLeaderboard().then(renderNexusRankings).catch(() => {});
         fetchChatMessages().then(renderChatMessages).catch(() => {});
+        refreshChatRooms();
         startNexusPolling();
       } else {
         stopNexusPolling();
       }
+      if (target === 'menu') {
+        renderHistory();
+        renderMeasureHistory();
+      }
+      updateTabDots();
     });
+  });
+}
+
+function isProfileComplete(p) {
+  return !!(p && p.name && p.gender && p.age && p.heightCm && p.startWeightKg != null && p.activity && p.goalTargetKg != null);
+}
+
+function getTabCompletionMap() {
+  const profile = getProfile();
+  const entry = getLogs()[todayISO()] || {};
+  return {
+    status: entry.weightKg != null && entry.sleep != null,
+    training: !!(entry.exercises && entry.exercises.length > 0),
+    nutrition: entry.calories != null,
+    bio: entry.stress != null && entry.fatigue != null && entry.hunger != null,
+    menu: isProfileComplete(profile),
+  };
+}
+
+function updateTabDots() {
+  const map = getTabCompletionMap();
+  Object.keys(map).forEach(tab => {
+    const dot = document.querySelector(`.tab-btn[data-target="${tab}"] .tab-dot`);
+    if (dot) dot.hidden = map[tab];
   });
 }
 
@@ -381,15 +437,22 @@ function activateNexusFastChat() {
   if (lbTab && lbTab.classList.contains('is-active')) startNexusPolling();
 }
 
-function initSheet() {
-  const overlay = document.getElementById('sheetOverlay');
-  document.getElementById('btnOpenMore').addEventListener('click', () => {
-    overlay.hidden = false;
-    renderHistory();
-    renderMeasureHistory();
-  });
-  document.getElementById('btnCloseSheet').addEventListener('click', () => { overlay.hidden = true; });
+function initSettingsOverlay() {
+  const overlay = document.getElementById('settingsOverlay');
+  document.getElementById('btnOpenSettings').addEventListener('click', () => { overlay.hidden = false; });
+  document.getElementById('btnCloseSettings').addEventListener('click', () => { overlay.hidden = true; });
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+
+  const saved = localStorage.getItem('wft_alarm_tone') || 'chime';
+  document.querySelectorAll('input[name="alarmTone"]').forEach(radio => {
+    radio.checked = radio.value === saved;
+    radio.addEventListener('change', () => {
+      if (radio.checked) localStorage.setItem('wft_alarm_tone', radio.value);
+    });
+  });
+  document.querySelectorAll('.tone-preview-btn').forEach(btn => {
+    btn.addEventListener('click', () => playAlarmTone(btn.dataset.tone));
+  });
 }
 
 function initContact() {
@@ -397,6 +460,80 @@ function initContact() {
   document.getElementById('btnFooterContact').addEventListener('click', () => { overlay.hidden = false; });
   document.getElementById('btnCloseContact').addEventListener('click', () => { overlay.hidden = true; });
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+}
+
+function generateShareCardBlob({ emoji, title, stats }) {
+  return new Promise(resolve => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 600; canvas.height = 600;
+    const ctx = canvas.getContext('2d');
+
+    const bg = ctx.createLinearGradient(0, 0, 600, 600);
+    bg.addColorStop(0, '#171f24');
+    bg.addColorStop(1, '#0a0e12');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, 600, 600);
+    ctx.strokeStyle = 'rgba(51,200,204,0.4)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(8, 8, 584, 584);
+
+    ctx.textAlign = 'center';
+    ctx.font = '76px sans-serif';
+    ctx.fillText(emoji, 300, 140);
+    ctx.fillStyle = '#33c8cc';
+    ctx.font = 'bold 32px sans-serif';
+    ctx.fillText(title, 300, 205);
+    ctx.fillStyle = '#5a686e';
+    ctx.font = '15px monospace';
+    ctx.fillText('WINFINITY TRACKER', 300, 240);
+
+    ctx.textAlign = 'left';
+    let y = 310;
+    const colW = 260, startX = 55;
+    stats.forEach((s, i) => {
+      const x = startX + (i % 2) * colW;
+      if (i % 2 === 0 && i > 0) y += 110;
+      ctx.fillStyle = '#7e8e95';
+      ctx.font = '15px monospace';
+      ctx.fillText(s.label.toUpperCase(), x, y);
+      ctx.fillStyle = '#dde3e5';
+      ctx.font = 'bold 30px sans-serif';
+      ctx.fillText(s.value, x, y + 36);
+    });
+
+    canvas.toBlob(blob => resolve(blob), 'image/png');
+  });
+}
+
+async function shareViaWebShare(shareData, imageBlob) {
+  if (imageBlob && navigator.canShare) {
+    const file = new File([imageBlob], 'winfinity-activity.png', { type: 'image/png' });
+    if (navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ title: shareData.title, text: shareData.text, files: [file] });
+        return;
+      } catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+  }
+  if (navigator.share) {
+    try { await navigator.share(shareData); } catch (e) { /* user cancelled or share failed — no-op */ }
+  } else if (navigator.clipboard) {
+    try {
+      await navigator.clipboard.writeText(shareData.text ? `${shareData.text} ${shareData.url || ''}`.trim() : shareData.url);
+      showRestToast('Copied — paste it anywhere to share!');
+    } catch (e) { /* ignore */ }
+  }
+}
+
+function initFooterShare() {
+  const shareUrl = 'https://winfinityfitness.github.io/fitness-tracker';
+  document.getElementById('btnFooterShare').addEventListener('click', () => {
+    shareViaWebShare({
+      title: 'Winfinity Tracker',
+      text: 'Check out Winfinity Tracker — my fitness tracking app:',
+      url: shareUrl,
+    });
+  });
 }
 
 function initPrivacyPolicy() {
@@ -410,6 +547,23 @@ function initTermsOfService() {
   const overlay = document.getElementById('termsOverlay');
   document.getElementById('btnFooterTerms').addEventListener('click', () => { overlay.hidden = false; });
   document.getElementById('btnCloseTerms').addEventListener('click', () => { overlay.hidden = true; });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+}
+
+function initPRBoardOverlay() {
+  const overlay = document.getElementById('prBoardOverlay');
+  document.getElementById('btnOpenPRBoard').addEventListener('click', () => {
+    renderPRBoard();
+    overlay.hidden = false;
+  });
+  document.getElementById('btnClosePRBoard').addEventListener('click', () => { overlay.hidden = true; });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+}
+
+function initIntakeLogOverlay() {
+  const overlay = document.getElementById('intakeLogOverlay');
+  document.getElementById('btnOpenIntakeLog').addEventListener('click', () => { overlay.hidden = false; });
+  document.getElementById('btnCloseIntakeLog').addEventListener('click', () => { overlay.hidden = true; });
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
 }
 
@@ -486,10 +640,25 @@ function renderWeather(w) {
   document.getElementById('weatherTemp').textContent = Math.round(w.tempC) + '°C';
 }
 
+function getManualWeatherLocation() {
+  try { return JSON.parse(localStorage.getItem('wft_weather_location')); } catch (e) { return null; }
+}
+
 function initWeatherWidget() {
   let cached = null;
   try { cached = JSON.parse(localStorage.getItem('wft_weather_cache')); } catch (e) { /* ignore */ }
   if (cached && Date.now() - cached.time < 30 * 60 * 1000) renderWeather(cached);
+
+  const manualLoc = getManualWeatherLocation();
+  if (manualLoc) {
+    fetchWeather(manualLoc.lat, manualLoc.lon).then(w => {
+      renderWeather(w);
+      localStorage.setItem('wft_weather_cache', JSON.stringify({ ...w, time: Date.now() }));
+    }).catch(() => {
+      if (!cached) { document.getElementById('weatherIcon').textContent = '⚠️'; document.getElementById('weatherTemp').textContent = '--°'; }
+    });
+    return;
+  }
 
   if (!navigator.geolocation) {
     if (!cached) { document.getElementById('weatherIcon').textContent = '❔'; document.getElementById('weatherTemp').textContent = 'N/A'; }
@@ -509,6 +678,65 @@ function initWeatherWidget() {
     },
     { timeout: 8000 }
   );
+}
+
+async function searchWeatherLocations(query) {
+  const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=8&language=en&format=json`);
+  if (!res.ok) throw new Error('geocoding failed');
+  const data = await res.json();
+  return data.results || [];
+}
+
+function renderWeatherLocationResults(results) {
+  const container = document.getElementById('weatherLocationResults');
+  if (!results.length) { container.innerHTML = '<p class="empty-note">No matches found.</p>'; return; }
+  container.innerHTML = results.map(r => {
+    const label = [r.name, r.admin2, r.admin1, r.country].filter(Boolean).join(', ');
+    return `<button type="button" class="weather-location-row" data-lat="${r.latitude}" data-lon="${r.longitude}" data-label="${escapeHtml(label)}">${escapeHtml(label)}</button>`;
+  }).join('');
+}
+
+function initWeatherLocationPicker() {
+  const overlay = document.getElementById('weatherLocationOverlay');
+  const searchInput = document.getElementById('weatherLocationSearch');
+  let debounceId = null;
+
+  document.getElementById('btnWeatherLocation').addEventListener('click', () => { overlay.hidden = false; });
+  document.getElementById('btnCloseWeatherLocation').addEventListener('click', () => { overlay.hidden = true; });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+
+  searchInput.addEventListener('input', () => {
+    clearTimeout(debounceId);
+    const q = searchInput.value.trim();
+    if (q.length < 2) { document.getElementById('weatherLocationResults').innerHTML = ''; return; }
+    debounceId = setTimeout(() => {
+      searchWeatherLocations(q).then(renderWeatherLocationResults).catch(() => {
+        document.getElementById('weatherLocationResults').innerHTML = '<p class="empty-note">Search failed — check your connection.</p>';
+      });
+    }, 400);
+  });
+
+  document.getElementById('weatherLocationResults').addEventListener('click', e => {
+    const row = e.target.closest('.weather-location-row');
+    if (!row) return;
+    const lat = parseFloat(row.dataset.lat), lon = parseFloat(row.dataset.lon);
+    localStorage.setItem('wft_weather_location', JSON.stringify({ lat, lon, label: row.dataset.label }));
+    localStorage.removeItem('wft_weather_cache');
+    fetchWeather(lat, lon).then(w => {
+      renderWeather(w);
+      localStorage.setItem('wft_weather_cache', JSON.stringify({ ...w, time: Date.now() }));
+    }).catch(() => {});
+    const note = document.getElementById('weatherLocationNote');
+    note.textContent = `Location set to ${row.dataset.label}.`;
+    setTimeout(() => { overlay.hidden = true; note.textContent = ''; }, 1200);
+  });
+
+  document.getElementById('btnWeatherLocationAuto').addEventListener('click', () => {
+    localStorage.removeItem('wft_weather_location');
+    localStorage.removeItem('wft_weather_cache');
+    initWeatherWidget();
+    overlay.hidden = true;
+  });
 }
 
 /* ---------------------------------------------------------------- */
@@ -585,6 +813,11 @@ function initSetupForm() {
     renderDashboard();
     renderMeasureGuide();
     updateCodeNameHint();
+    updateTabDots();
+    setTimeout(() => {
+      const overlay = document.getElementById('entityIdentityOverlay');
+      if (overlay && !overlay.hidden) overlay.hidden = true;
+    }, 600);
   });
 }
 
@@ -718,6 +951,7 @@ function initBioLog() {
     renderSleepBarChart();
     renderWaterRetentionOrb();
     if (date === todayISO()) { loadQuickLog(); renderDashboard(); }
+    updateTabDots();
   });
 
   loadBioForDate(todayISO());
@@ -818,13 +1052,7 @@ function initCheckin() {
       const el = document.getElementById('checkinExtra' + i);
       if (el) extra[i] = el.checked;
     });
-    updateLogFields(date, {
-      extra,
-      reviewedGoals: document.getElementById('statusReviewedGoals').checked,
-      plannedTomorrow: document.getElementById('statusPlannedTomorrow').checked,
-      struggles: document.getElementById('statusStruggles').value,
-      improveTomorrow: document.getElementById('statusImprove').value,
-    });
+    updateLogFields(date, { extra });
     document.getElementById('checkinSaveNote').textContent = 'Check-in saved.';
     setTimeout(() => { document.getElementById('checkinSaveNote').textContent = ''; }, 2000);
     renderDashboard();
@@ -837,10 +1065,6 @@ function loadCheckinForm() {
   const date = todayISO();
   const logs = getLogs();
   const e = logs[date] || {};
-  document.getElementById('statusReviewedGoals').checked = !!e.reviewedGoals;
-  document.getElementById('statusPlannedTomorrow').checked = !!e.plannedTomorrow;
-  document.getElementById('statusStruggles').value = e.struggles || '';
-  document.getElementById('statusImprove').value = e.improveTomorrow || '';
   (profile ? profile.extraHabits || [] : []).forEach((label, i) => {
     if (!label) return;
     const el = document.getElementById('checkinExtra' + i);
@@ -881,6 +1105,7 @@ function initQuickLog() {
     if (profile) renderComputedTargets(profile);
     renderSleepBarChart();
     if (document.getElementById('bioDate').value === date) loadBioForDate(date);
+    updateTabDots();
   });
 }
 
@@ -942,10 +1167,28 @@ function initMeasurements() {
     renderMeasureHistory();
     const note = document.getElementById('measureSaveNote');
     note.textContent = 'Saved measurements for ' + date;
-    setTimeout(() => { note.textContent = ''; }, 2500);
+    setTimeout(() => {
+      note.textContent = '';
+      const overlay = document.getElementById('measureEntryOverlay');
+      if (overlay && !overlay.hidden) overlay.hidden = true;
+    }, 900);
   });
 
   loadMeasurementsForDate(todayISO());
+}
+
+function initMeasureEntryOverlay() {
+  const overlay = document.getElementById('measureEntryOverlay');
+  document.getElementById('btnOpenMeasureEntry').addEventListener('click', () => { overlay.hidden = false; });
+  document.getElementById('btnCloseMeasureEntry').addEventListener('click', () => { overlay.hidden = true; });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+}
+
+function initEntityIdentityOverlay() {
+  const overlay = document.getElementById('entityIdentityOverlay');
+  document.getElementById('btnOpenEntityIdentity').addEventListener('click', () => { overlay.hidden = false; });
+  document.getElementById('btnCloseEntityIdentity').addEventListener('click', () => { overlay.hidden = true; });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
 }
 
 /* ---------------------------------------------------------------- */
@@ -1121,7 +1364,10 @@ function renderDashboard() {
 }
 
 /* ---- Weight chart (SVG, hover tooltip) ---- */
-function renderWeightChart(series, wu) {
+let weightChartFullJourney = false;
+
+function renderWeightChart(fullSeries, wu) {
+  const series = weightChartFullJourney ? fullSeries : fullSeries.slice(-60);
   const container = document.getElementById('weightChart');
   const legend = document.getElementById('chartLegend');
   const emptyNote = document.getElementById('chartEmptyNote');
@@ -1238,8 +1484,13 @@ function renderWeightChart(series, wu) {
     const pt = series[i];
     tooltip.innerHTML = `<strong>${fmtDate(pt.dateObj)}</strong><br>Weight: ${round2(fromKg(pt.actualKg, wu))} ${wu}<br>Trend: ${round2(fromKg(pt.trendKg, wu))} ${wu}`;
     tooltip.style.display = 'block';
-    const pctX = (x / W) * 100;
-    tooltip.style.left = `calc(${pctX}% + 8px)`;
+    const containerWidth = container.clientWidth || W;
+    const pxX = (x / W) * containerWidth;
+    const tooltipWidth = tooltip.offsetWidth;
+    let left = pxX + 8;
+    if (left + tooltipWidth > containerWidth) left = pxX - tooltipWidth - 8;
+    if (left < 4) left = 4;
+    tooltip.style.left = `${left}px`;
     tooltip.style.top = '4px';
   }
   function pointerToIndex(evt) {
@@ -1257,7 +1508,17 @@ function renderWeightChart(series, wu) {
   showAt(series.length - 1);
 
   legend.innerHTML = `<span><span class="legend-swatch" style="background:var(--series-1)"></span>Actual weight</span>
-    <span><span class="legend-dash"></span>Trend (7-day avg)</span>`;
+    <span><span class="legend-dash"></span>Trend (7-day avg)</span>
+    <button type="button" id="chartFullJourneyToggle" class="chart-toggle-link">${weightChartFullJourney ? 'Show recent' : 'Full journey'}</button>`;
+}
+
+function initWeightChartToggle() {
+  document.getElementById('chartLegend').addEventListener('click', e => {
+    if (e.target.closest('#chartFullJourneyToggle')) {
+      weightChartFullJourney = !weightChartFullJourney;
+      renderDashboard();
+    }
+  });
 }
 
 /* ---- Goal progress bar ---- */
@@ -1328,6 +1589,32 @@ function persistExercises() {
   const date = document.getElementById('trainDate').value;
   const completedCount = currentExercises.reduce((n, ex) => n + ex.sets.filter(s => s.completed).length, 0);
   updateLogFields(date, { exercises: JSON.parse(JSON.stringify(currentExercises)), workout: completedCount > 0 });
+  markTrainingActivity();
+  if (date === todayISO()) updateTabDots();
+}
+
+function markTrainingActivity() {
+  localStorage.setItem('wft_train_last_activity', Date.now().toString());
+  localStorage.removeItem('wft_train_idle_notified');
+}
+
+function checkTrainingIdle() {
+  const dateEl = document.getElementById('trainDate');
+  if (!dateEl) return;
+  const date = dateEl.value;
+  if (!currentExercises.length || isSessionFinished(date)) return;
+  const last = parseInt(localStorage.getItem('wft_train_last_activity'), 10);
+  if (!last) return;
+  const idleMs = Date.now() - last;
+  if (idleMs < 30 * 60 * 1000) return;
+  if (localStorage.getItem('wft_train_idle_notified') === String(last)) return;
+  localStorage.setItem('wft_train_idle_notified', String(last));
+
+  const message = 'Still training? Finish this session or keep going.';
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  playBeep();
+  showAppReminder(message);
+  fireSystemNotification('Winfinity Tracker', message);
 }
 
 function findPreviousSets(name, beforeDate) {
@@ -1410,7 +1697,15 @@ function renderExerciseCards() {
     container.innerHTML = `<div class="session-done-card">
       <p class="session-done-title">✓ Workout finished</p>
       <p class="session-done-meta">${currentExercises.length} exercise${currentExercises.length !== 1 ? 's' : ''} · ${totalSets} set${totalSets !== 1 ? 's' : ''} logged</p>
-      <button type="button" class="btn btn--primary" id="btnContinueSession">Continue / edit this session</button>
+      <div class="session-done-actions">
+        <button type="button" class="btn" id="btnSessionContinue">Continue</button>
+        <button type="button" class="btn" id="btnSessionEdit">Edit</button>
+        <button type="button" class="btn btn--danger" id="btnSessionCompleted">Completed</button>
+      </div>
+      <div class="session-edit-date-row" id="sessionEditDateRow" hidden>
+        <input type="date" id="sessionEditDate">
+        <button type="button" class="btn btn--primary btn--sm" id="btnSessionEditDateApply">Move to date</button>
+      </div>
     </div>`;
     return;
   }
@@ -1471,6 +1766,186 @@ function renderExerciseCards() {
   });
 }
 
+/* ---------------------------------------------------------------- */
+/* Training: outdoor activity tracker (GPS, foreground-only)          */
+/* ---------------------------------------------------------------- */
+let cardioWatchId = null;
+let cardioTickId = null;
+let cardioTrack = [];
+let cardioDistanceKm = 0;
+let cardioStartTime = null;
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function distUnitForProfile(profile) { return (profile && profile.weightUnit === 'lb') ? 'mi' : 'km'; }
+function kmToMi(km) { return km * 0.621371; }
+
+function formatCardioClock(sec) {
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function formatCardioDuration(sec) {
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m ${s}s`;
+}
+
+function renderCardioRouteSketch() {
+  const svg = document.getElementById('cardioRouteSketch');
+  if (cardioTrack.length < 2) { svg.innerHTML = ''; return; }
+  const lats = cardioTrack.map(p => p.lat), lons = cardioTrack.map(p => p.lon);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const minLon = Math.min(...lons), maxLon = Math.max(...lons);
+  const w = 300, h = 160, pad = 12;
+  const spanLat = Math.max(maxLat - minLat, 0.0001);
+  const spanLon = Math.max(maxLon - minLon, 0.0001);
+  const points = cardioTrack.map(p => {
+    const x = pad + ((p.lon - minLon) / spanLon) * (w - pad * 2);
+    const y = h - pad - ((p.lat - minLat) / spanLat) * (h - pad * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  svg.innerHTML = `<polyline points="${points}" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>`;
+}
+
+function updateCardioStats() {
+  const elapsed = Math.round((Date.now() - cardioStartTime) / 1000);
+  document.getElementById('cardioDuration').textContent = formatCardioClock(elapsed);
+  const unit = distUnitForProfile(getProfile());
+  const dist = unit === 'mi' ? kmToMi(cardioDistanceKm) : cardioDistanceKm;
+  document.getElementById('cardioDistance').textContent = dist.toFixed(2);
+  document.getElementById('cardioDistanceLabel').textContent = `Distance (${unit})`;
+  document.getElementById('cardioPaceLabel').textContent = `Pace /${unit}`;
+  if (dist > 0.05) {
+    const paceSecPerUnit = elapsed / dist;
+    const m = Math.floor(paceSecPerUnit / 60), s = Math.round(paceSecPerUnit % 60);
+    document.getElementById('cardioPace').textContent = `${m}:${String(s).padStart(2, '0')}`;
+  }
+}
+
+function startCardioTracking() {
+  if (!navigator.geolocation) { alert('Geolocation is not available on this device/browser.'); return; }
+  cardioTrack = [];
+  cardioDistanceKm = 0;
+  cardioStartTime = Date.now();
+  document.getElementById('btnCardioStart').hidden = true;
+  document.getElementById('btnCardioStop').hidden = false;
+  document.getElementById('btnShareCardio').hidden = true;
+  document.getElementById('cardioType').disabled = true;
+  document.getElementById('cardioDuration').textContent = '00:00';
+  document.getElementById('cardioDistance').textContent = '0.00';
+  document.getElementById('cardioPace').textContent = '--:--';
+  renderCardioRouteSketch();
+
+  cardioWatchId = navigator.geolocation.watchPosition(pos => {
+    const { latitude, longitude, accuracy } = pos.coords;
+    if (accuracy != null && accuracy > 50) return;
+    const point = { lat: latitude, lon: longitude, t: Date.now() };
+    if (cardioTrack.length) {
+      const last = cardioTrack[cardioTrack.length - 1];
+      const segKm = haversineKm(last.lat, last.lon, point.lat, point.lon);
+      if (segKm > 0.003) {
+        cardioDistanceKm += segKm;
+        cardioTrack.push(point);
+        renderCardioRouteSketch();
+      }
+    } else {
+      cardioTrack.push(point);
+    }
+  }, () => { /* GPS error: keep timer running, just no new distance */ }, {
+    enableHighAccuracy: true, maximumAge: 2000, timeout: 10000,
+  });
+
+  cardioTickId = setInterval(updateCardioStats, 1000);
+}
+
+let lastCardioSession = null;
+
+function stopCardioTracking() {
+  if (cardioWatchId != null) navigator.geolocation.clearWatch(cardioWatchId);
+  if (cardioTickId) clearInterval(cardioTickId);
+  cardioWatchId = null;
+  cardioTickId = null;
+
+  const elapsedSec = Math.round((Date.now() - cardioStartTime) / 1000);
+  const type = document.getElementById('cardioType').value;
+  const date = document.getElementById('trainDate').value;
+  const logs = getLogs();
+  const sessions = (logs[date] && logs[date].cardioSessions) || [];
+  const session = {
+    type,
+    distanceKm: round2(cardioDistanceKm),
+    durationSec: elapsedSec,
+    startedAt: new Date(cardioStartTime).toISOString(),
+  };
+  sessions.push(session);
+  updateLogFields(date, { cardioSessions: sessions });
+  lastCardioSession = session;
+
+  document.getElementById('btnCardioStart').hidden = false;
+  document.getElementById('btnCardioStop').hidden = true;
+  document.getElementById('cardioType').disabled = false;
+  document.getElementById('cardioSaveNote').textContent = 'Activity saved.';
+  setTimeout(() => { document.getElementById('cardioSaveNote').textContent = ''; }, 2500);
+  document.getElementById('btnShareCardio').hidden = false;
+  renderCardioHistory();
+}
+
+async function shareCardioSession() {
+  if (!lastCardioSession) return;
+  const unit = distUnitForProfile(getProfile());
+  const dist = unit === 'mi' ? kmToMi(lastCardioSession.distanceKm) : lastCardioSession.distanceKm;
+  const typeLabel = { run: 'run', walk: 'walk', ride: 'ride' }[lastCardioSession.type] || 'activity';
+  const emoji = { run: '🏃', walk: '🚶', ride: '🚴' }[lastCardioSession.type] || '🏁';
+  const text = `${emoji} Just finished a ${dist.toFixed(2)} ${unit} ${typeLabel} in ${formatCardioDuration(lastCardioSession.durationSec)} with Winfinity Tracker!`;
+  const paceMin = lastCardioSession.distanceKm > 0 ? (lastCardioSession.durationSec / 60) / dist : 0;
+  const paceText = paceMin > 0 ? `${Math.floor(paceMin)}:${String(Math.round((paceMin % 1) * 60)).padStart(2, '0')} /${unit}` : '--';
+  const blob = await generateShareCardBlob({
+    emoji,
+    title: `${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} complete!`,
+    stats: [
+      { label: 'Distance', value: `${dist.toFixed(2)} ${unit}` },
+      { label: 'Duration', value: formatCardioDuration(lastCardioSession.durationSec) },
+      { label: 'Pace', value: paceText },
+    ],
+  });
+  shareViaWebShare({ title: 'Winfinity Tracker — Activity', text }, blob);
+}
+
+function renderCardioHistory() {
+  const logsArr = sortedLogsArray().slice().reverse();
+  const unit = distUnitForProfile(getProfile());
+  const container = document.getElementById('cardioHistory');
+  const empty = document.getElementById('cardioHistoryEmpty');
+  const rows = [];
+  logsArr.forEach(l => { (l.cardioSessions || []).forEach(s => rows.push({ date: l.date, ...s })); });
+  container.innerHTML = '';
+  if (!rows.length) { empty.hidden = false; return; }
+  empty.hidden = true;
+  rows.slice(0, 10).forEach(s => {
+    const dist = unit === 'mi' ? kmToMi(s.distanceKm) : s.distanceKm;
+    const row = document.createElement('div');
+    row.className = 'cardio-history-row';
+    row.innerHTML = `<span class="cardio-history-date">${s.date}</span>
+      <span class="cardio-history-type">${s.type}</span>
+      <span class="cardio-history-dist">${dist.toFixed(2)} ${unit}</span>
+      <span class="cardio-history-dur">${formatCardioDuration(s.durationSec)}</span>`;
+    container.appendChild(row);
+  });
+}
+
+function initCardioTracker() {
+  document.getElementById('btnCardioStart').addEventListener('click', startCardioTracking);
+  document.getElementById('btnCardioStop').addEventListener('click', stopCardioTracking);
+  document.getElementById('btnShareCardio').addEventListener('click', shareCardioSession);
+  renderCardioHistory();
+}
+
 function getActiveTrainingDate() {
   const stored = localStorage.getItem('wft_active_train_date');
   if (!stored) return todayISO();
@@ -1490,6 +1965,91 @@ function initTrainUnitToggle() {
   btnKg.addEventListener('click', () => { setTrainUnit('kg'); sync(); renderExerciseCards(); });
   btnLb.addEventListener('click', () => { setTrainUnit('lb'); sync(); renderExerciseCards(); });
   sync();
+}
+
+/* ---------------------------------------------------------------- */
+/* Training: temporal mission log (calendar of workout days)          */
+/* ---------------------------------------------------------------- */
+let missionLogViewDate = new Date();
+
+function getWorkoutDaysSet() {
+  const logs = getLogs();
+  const set = new Set();
+  Object.keys(logs).forEach(date => {
+    const l = logs[date];
+    if (l.exercises && l.exercises.some(ex => ex.sets.some(s => s.completed))) set.add(date);
+  });
+  return set;
+}
+
+function getPeriodDaysSet() {
+  const logs = getLogs();
+  const set = new Set();
+  Object.keys(logs).forEach(date => {
+    if (logs[date].menstruating) set.add(date);
+  });
+  return set;
+}
+
+function renderMissionLogCalendar() {
+  const year = missionLogViewDate.getFullYear();
+  const month = missionLogViewDate.getMonth();
+  document.getElementById('missionLogMonthLabel').textContent =
+    missionLogViewDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+
+  const profile = getProfile();
+  const showPeriod = profile && profile.gender === 'female';
+  const workoutDays = getWorkoutDaysSet();
+  const periodDays = showPeriod ? getPeriodDaysSet() : new Set();
+  const todayIso = todayISO();
+
+  document.getElementById('missionLogPeriodLegend').hidden = !showPeriod;
+
+  const firstOfMonth = new Date(year, month, 1);
+  const firstWeekday = (firstOfMonth.getDay() + 6) % 7; // Monday-first index
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+  const cells = [];
+  for (let i = 0; i < firstWeekday; i++) {
+    cells.push({ day: daysInPrevMonth - firstWeekday + 1 + i, muted: true });
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    cells.push({ day: d, iso, isToday: iso === todayIso, isWorkout: workoutDays.has(iso), isPeriod: periodDays.has(iso) });
+  }
+  let nextDay = 1;
+  while (cells.length % 7 !== 0) { cells.push({ day: nextDay++, muted: true }); }
+
+  const grid = document.getElementById('missionLogGrid');
+  grid.innerHTML = cells.map(c => {
+    const classes = ['mission-log-day'];
+    if (c.muted) classes.push('is-muted');
+    if (c.isWorkout) classes.push('is-workout');
+    if (c.isToday) classes.push('is-today');
+    if (c.isPeriod) classes.push('is-period');
+    const dot = c.isPeriod ? '<span class="mission-log-period-dot"></span>' : '';
+    return `<div class="${classes.join(' ')}">${c.day}${dot}</div>`;
+  }).join('');
+}
+
+function initMissionLog() {
+  const overlay = document.getElementById('missionLogOverlay');
+  document.getElementById('btnOpenMissionLog').addEventListener('click', () => {
+    missionLogViewDate = new Date();
+    renderMissionLogCalendar();
+    overlay.hidden = false;
+  });
+  document.getElementById('btnCloseMissionLog').addEventListener('click', () => { overlay.hidden = true; });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+  document.getElementById('btnMissionLogPrev').addEventListener('click', () => {
+    missionLogViewDate = new Date(missionLogViewDate.getFullYear(), missionLogViewDate.getMonth() - 1, 1);
+    renderMissionLogCalendar();
+  });
+  document.getElementById('btnMissionLogNext').addEventListener('click', () => {
+    missionLogViewDate = new Date(missionLogViewDate.getFullYear(), missionLogViewDate.getMonth() + 1, 1);
+    renderMissionLogCalendar();
+  });
 }
 
 function initTraining() {
@@ -1526,11 +2086,57 @@ function initTraining() {
   cards.addEventListener('click', e => {
     const wu = (getProfile() || {}).weightUnit || 'kg';
 
-    const continueBtn = e.target.closest('#btnContinueSession');
-    if (continueBtn) {
+    const sessionContinueBtn = e.target.closest('#btnSessionContinue');
+    if (sessionContinueBtn) {
       const date = document.getElementById('trainDate').value;
       setSessionFinished(date, false);
       renderExerciseCards();
+      renderTrainingStats();
+      return;
+    }
+
+    const sessionEditBtn = e.target.closest('#btnSessionEdit');
+    if (sessionEditBtn) {
+      const row = document.getElementById('sessionEditDateRow');
+      document.getElementById('sessionEditDate').value = document.getElementById('trainDate').value;
+      row.hidden = !row.hidden;
+      return;
+    }
+
+    const sessionEditDateApplyBtn = e.target.closest('#btnSessionEditDateApply');
+    if (sessionEditDateApplyBtn) {
+      const oldDate = document.getElementById('trainDate').value;
+      const newDate = document.getElementById('sessionEditDate').value;
+      if (!newDate || newDate === oldDate) return;
+      const logs = getLogs();
+      const exercisesToMove = (logs[oldDate] && logs[oldDate].exercises) || [];
+      const wasFinished = isSessionFinished(oldDate);
+      const destExisting = (logs[newDate] && logs[newDate].exercises) || [];
+      updateLogFields(newDate, { exercises: destExisting.concat(exercisesToMove) });
+      updateLogFields(oldDate, { exercises: [] });
+      setSessionFinished(oldDate, false);
+      if (wasFinished) setSessionFinished(newDate, true);
+      const allTimers = getExTimers();
+      if (allTimers[oldDate]) { delete allTimers[oldDate]; saveExTimers(allTimers); }
+      document.getElementById('trainDate').value = newDate;
+      localStorage.setItem('wft_active_train_date', newDate);
+      loadTrainingForDate(newDate);
+      renderTrainingStats();
+      return;
+    }
+
+    const sessionCompletedBtn = e.target.closest('#btnSessionCompleted');
+    if (sessionCompletedBtn) {
+      if (confirm('Mark this session as fully completed and clear the queue? This cannot be undone.')) {
+        const date = document.getElementById('trainDate').value;
+        currentExercises = [];
+        persistExercises();
+        setSessionFinished(date, false);
+        const allTimers = getExTimers();
+        if (allTimers[date]) { delete allTimers[date]; saveExTimers(allTimers); }
+        renderExerciseCards();
+        renderTrainingStats();
+      }
       return;
     }
 
@@ -1641,10 +2247,12 @@ function initTraining() {
     }
   });
 
+  let lastWorkoutSummary = null;
   document.getElementById('btnFinishWorkout').addEventListener('click', () => {
     persistExercises();
     const date = document.getElementById('trainDate').value;
     const summary = computeWorkoutSummary(date);
+    lastWorkoutSummary = summary;
     renderWorkoutSummary(summary);
     document.getElementById('summaryOverlay').hidden = false;
     if (currentExercises.length) setSessionFinished(date, true);
@@ -1655,12 +2263,33 @@ function initTraining() {
 
   document.getElementById('btnCloseSummary').addEventListener('click', () => { document.getElementById('summaryOverlay').hidden = true; });
   document.getElementById('btnDoneSummary').addEventListener('click', () => { document.getElementById('summaryOverlay').hidden = true; });
+  document.getElementById('btnShareSummary').addEventListener('click', async () => {
+    if (!lastWorkoutSummary) return;
+    const wu = lastWorkoutSummary.wu;
+    const prCount = lastWorkoutSummary.exercises.filter(e => e.isPR).length;
+    const vol = round0(fromKg(lastWorkoutSummary.totalVolumeKg, wu));
+    let text = `💪 Just finished a Winfinity Tracker session: ${lastWorkoutSummary.exercises.length} exercises, ${lastWorkoutSummary.totalSets} sets, ${vol} ${wu} total volume.`;
+    if (prCount > 0) text += ` 🏆 ${prCount} new PR${prCount > 1 ? 's' : ''}!`;
+    const blob = await generateShareCardBlob({
+      emoji: prCount > 0 ? '🏆' : '💪',
+      title: 'Workout complete!',
+      stats: [
+        { label: 'Exercises', value: String(lastWorkoutSummary.exercises.length) },
+        { label: 'Sets', value: String(lastWorkoutSummary.totalSets) },
+        { label: `Volume (${wu})`, value: String(vol) },
+        { label: 'New PRs', value: String(prCount) },
+      ],
+    });
+    shareViaWebShare({ title: 'Winfinity Tracker — Workout Summary', text }, blob);
+  });
 
   loadTrainingForDate(document.getElementById('trainDate').value);
   renderTrainingStats();
   ensureExTimerTicking();
   initSessionTemplates();
   initExerciseNameAutocomplete();
+  checkTrainingIdle();
+  setInterval(checkTrainingIdle, 60000);
 }
 
 function renderTrainingStats() {
@@ -1981,6 +2610,30 @@ function checkDataReminder() {
   }
 }
 
+/* Best-effort only: a PWA can't wake up in the background at an exact time,
+   so this fires the first time the app happens to be opened on/after Sunday
+   8am, once per week (not a guaranteed exact-8am alarm). */
+function checkMeasurementReminder() {
+  const profile = getProfile();
+  if (!profile) return;
+  const now = new Date();
+  if (now.getDay() !== 0 || now.getHours() < 8) return;
+  const weekKey = todayISO();
+  if (localStorage.getItem('wft_measure_reminder_shown') === weekKey) return;
+  localStorage.setItem('wft_measure_reminder_shown', weekKey);
+
+  const message = 'Sunday check-in: update your body measurements today.';
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  playBeep();
+  showAppReminder(message);
+  if (window.Notification && Notification.permission === 'default' && !notifyPermissionAsked) {
+    notifyPermissionAsked = true;
+    Notification.requestPermission().then(() => fireSystemNotification('Winfinity Tracker', message)).catch(() => {});
+  } else {
+    fireSystemNotification('Winfinity Tracker', message);
+  }
+}
+
 function fireSystemNotification(title, body) {
   if (!window.Notification || Notification.permission !== 'granted') return;
   try {
@@ -2021,23 +2674,37 @@ function renderExerciseTimerDisplays() {
   if (changed) saveExTimers(all);
 }
 
-function playBeep() {
+const ALARM_TONE_PRESETS = {
+  chime: [{ freq: 880, t: 0 }, { freq: 880, t: 0.3 }, { freq: 880, t: 0.6 }],
+  beep: [{ freq: 1000, t: 0 }],
+  digital: [{ freq: 660, t: 0 }, { freq: 660, t: 0.12 }, { freq: 660, t: 0.24 }],
+  bell: [{ freq: 1200, t: 0 }, { freq: 900, t: 0.35 }],
+};
+
+function getAlarmTone() {
+  return localStorage.getItem('wft_alarm_tone') || 'chime';
+}
+
+function playAlarmTone(toneId) {
+  const notes = ALARM_TONE_PRESETS[toneId] || ALARM_TONE_PRESETS.chime;
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     const ctx = new Ctx();
-    [0, 0.3, 0.6].forEach(t => {
+    notes.forEach(({ freq, t }) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.frequency.value = 880;
+      osc.frequency.value = freq;
       osc.connect(gain); gain.connect(ctx.destination);
       gain.gain.setValueAtTime(0.001, ctx.currentTime + t);
       gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + t + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.2);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.3);
       osc.start(ctx.currentTime + t);
-      osc.stop(ctx.currentTime + t + 0.22);
+      osc.stop(ctx.currentTime + t + 0.32);
     });
   } catch (e) { /* Web Audio unavailable; vibration still fires */ }
 }
+
+function playBeep() { playAlarmTone(getAlarmTone()); }
 
 /* ---------------------------------------------------------------- */
 /* Nutrition                                                            */
@@ -2080,6 +2747,7 @@ function initNutrition() {
     renderNutritionAverages();
     renderNutritionTargets();
     renderWaterRetentionOrb();
+    updateTabDots();
   });
 
   loadNutritionForDate(todayISO());
@@ -2322,7 +2990,7 @@ function buildCSV(logsArr, profile) {
   const habitLabels = (profile ? profile.extraHabits || [] : []).map((l, i) => ({ label: l, idx: i })).filter(h => h.label);
   const headers = ['Date', `Weight (${wu})`, 'Sleep Quality (1-5)', 'Stress (1-5)', 'Fatigue (1-5)', 'Hunger (1-5)',
     'Steps', 'Calories', 'Protein (g)', 'Water (mL)', 'Workout Done', 'Exercises', 'Menstruating',
-    'Reviewed Goals', 'Planned Tomorrow', ...habitLabels.map(h => h.label), 'Struggles', 'Improve Tomorrow'];
+    ...habitLabels.map(h => h.label)];
   const rows = [headers];
   logsArr.forEach(l => {
     const row = [
@@ -2333,9 +3001,7 @@ function buildCSV(logsArr, profile) {
       l.workout ? 'Yes' : 'No',
       formatExercises(l.exercises, wu),
       l.menstruating ? 'Yes' : 'No',
-      l.reviewedGoals ? 'Yes' : 'No', l.plannedTomorrow ? 'Yes' : 'No',
       ...habitLabels.map(h => (l.extra && l.extra[h.idx]) ? 'Yes' : 'No'),
-      l.struggles || '', l.improveTomorrow || '',
     ];
     rows.push(row);
   });
@@ -2348,9 +3014,10 @@ async function exportCSV(logsArr, filenamePrefix) {
     alert('No log entries found for this range yet.');
     return;
   }
-  const csv = buildCSV(logsArr, profile);
+  const BOM = '﻿';
+  const csv = BOM + buildCSV(logsArr, profile);
   const filename = `${filenamePrefix}-${todayISO()}.csv`;
-  const blob = new Blob([csv], { type: 'text/csv' });
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const file = new File([blob], filename, { type: 'text/csv' });
 
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -2379,6 +3046,7 @@ function downloadBackupJSON() {
   URL.revokeObjectURL(url);
   localStorage.setItem('wft_drive_last_backup', todayISO());
   renderDashboard();
+  autoSyncDriveBackupToNexus();
 }
 
 function initExport() {
@@ -2532,6 +3200,7 @@ async function saveToDrive(manual) {
     setDriveStatus('Last synced ' + new Date().toLocaleTimeString());
     renderDashboard();
     activateNexusFastChat();
+    autoSyncDriveBackupToNexus();
   } catch (e) {
     setDriveStatus('Sync failed — will retry on next save.');
   }
@@ -2620,6 +3289,17 @@ async function pushLeaderboardEntry() {
     p_volume_unit: stats.volumeUnit,
   });
   if (error) throw error;
+  try { await sb.rpc('set_public_id', { p_share_key: shareKey, p_public_id: getOrCreatePublicId() }); }
+  catch (e) { /* best effort — group-chat invites just won't resolve until this succeeds */ }
+}
+
+async function autoSyncDriveBackupToNexus() {
+  if (!sbConfigured()) return;
+  getOrCreateShareKey();
+  try {
+    await pushLeaderboardEntry();
+    document.getElementById('nexusTotalUsers') && pullLeaderboard().then(renderNexusRankings).catch(() => {});
+  } catch (e) { /* best effort — don't block the backup flow on Nexus sync failure */ }
 }
 
 async function pullLeaderboard() {
@@ -2687,13 +3367,13 @@ function renderNexusRankings(rows) {
   });
 }
 
+let currentChatRoomId = localStorage.getItem('wft_chat_room') || null;
+
 async function fetchChatMessages() {
-  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
-  const { data, error } = await sb.from('chat_messages')
-    .select('code_name, message, created_at')
-    .gte('created_at', cutoff)
-    .order('created_at', { ascending: false })
-    .limit(50);
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  let q = sb.from('chat_messages').select('code_name, message, created_at').gte('created_at', cutoff);
+  q = currentChatRoomId ? q.eq('room_id', currentChatRoomId) : q.is('room_id', null);
+  const { data, error } = await q.order('created_at', { ascending: false }).limit(50);
   if (error) throw error;
   return (data || []).slice().reverse();
 }
@@ -2704,8 +3384,106 @@ async function postChatMessage(text) {
   const { error } = await sb.from('chat_messages').insert({
     code_name: effectiveLeaderboardName(),
     message: trimmed,
+    room_id: currentChatRoomId || null,
   });
   if (error) throw error;
+}
+
+function getOrCreateShareKey() {
+  if (!localStorage.getItem('wft_lb_share_key')) localStorage.setItem('wft_lb_share_key', generateShareKey());
+  return localStorage.getItem('wft_lb_share_key');
+}
+
+const ID_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no 0/O/1/I — avoids look-alike mistakes
+function generatePublicId() {
+  let code = '';
+  for (let i = 0; i < 6; i++) code += ID_CHARS[Math.floor(Math.random() * ID_CHARS.length)];
+  return `WF-${code}`;
+}
+function getOrCreatePublicId() {
+  if (!localStorage.getItem('wft_public_id')) localStorage.setItem('wft_public_id', generatePublicId());
+  return localStorage.getItem('wft_public_id');
+}
+
+function initDigitalId() {
+  document.getElementById('digitalIdValue').textContent = getOrCreatePublicId();
+  document.getElementById('btnCopyDigitalId').addEventListener('click', async function () {
+    if (!navigator.clipboard) return;
+    try {
+      await navigator.clipboard.writeText(getOrCreatePublicId());
+      this.classList.add('is-copied');
+      showRestToast('Digital ID copied!');
+      setTimeout(() => this.classList.remove('is-copied'), 1500);
+    } catch (e) { /* ignore */ }
+  });
+}
+
+async function refreshChatRooms() {
+  const shareKey = localStorage.getItem('wft_lb_share_key');
+  if (!shareKey || !sbConfigured()) { renderChatRoomOptions([]); renderInvitesPopover([]); return; }
+  sb.rpc('cleanup_stale_solo_rooms').catch(() => {}); // best effort, opportunistic
+  const { data, error } = await sb.from('chat_room_members')
+    .select('status, room_id, chat_rooms(id, name)')
+    .eq('share_key', shareKey);
+  if (error) return;
+  const rows = data || [];
+  renderChatRoomOptions(rows.filter(r => r.status === 'joined' && r.chat_rooms));
+  renderInvitesPopover(rows.filter(r => r.status === 'invited' && r.chat_rooms));
+}
+
+function renderChatRoomOptions(joinedRows) {
+  const select = document.getElementById('chatRoomSelect');
+  const prevValue = select.value;
+  select.innerHTML = '<option value="">🌐 Public Chat</option>';
+  joinedRows
+    .sort((a, b) => a.chat_rooms.name.localeCompare(b.chat_rooms.name))
+    .forEach(r => {
+      const opt = document.createElement('option');
+      opt.value = r.chat_rooms.id;
+      opt.textContent = '👥 ' + r.chat_rooms.name;
+      select.appendChild(opt);
+    });
+  const stillJoined = currentChatRoomId && joinedRows.some(r => r.chat_rooms.id === currentChatRoomId);
+  select.value = stillJoined ? currentChatRoomId : '';
+  if (select.value !== prevValue && !stillJoined) {
+    currentChatRoomId = null;
+    localStorage.removeItem('wft_chat_room');
+  }
+  document.getElementById('btnLeaveGroup').hidden = !stillJoined;
+}
+
+function renderInvitesPopover(invitedRows) {
+  const popover = document.getElementById('chatInvitesPopover');
+  const badge = document.getElementById('chatBellBadge');
+  if (!invitedRows.length) {
+    badge.hidden = true;
+    popover.hidden = true;
+    popover.innerHTML = '';
+    return;
+  }
+  badge.hidden = false;
+  badge.textContent = String(invitedRows.length);
+  popover.innerHTML = invitedRows.map(r => `
+    <div class="chat-invite-row">
+      <span>🔔 Invited to "${escapeHtml(r.chat_rooms.name)}"</span>
+      <button type="button" class="btn btn--primary" data-accept-room="${r.chat_rooms.id}">Accept</button>
+      <button type="button" class="btn" data-decline-room="${r.chat_rooms.id}">Decline</button>
+    </div>
+  `).join('');
+  popover.querySelectorAll('[data-accept-room]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const shareKey = localStorage.getItem('wft_lb_share_key');
+      await sb.from('chat_room_members').update({ status: 'joined' }).eq('room_id', btn.dataset.acceptRoom).eq('share_key', shareKey);
+      refreshChatRooms();
+    });
+  });
+  popover.querySelectorAll('[data-decline-room]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const shareKey = localStorage.getItem('wft_lb_share_key');
+      await sb.from('chat_room_members').delete().eq('room_id', btn.dataset.declineRoom).eq('share_key', shareKey);
+      refreshChatRooms();
+    });
+  });
 }
 
 function renderChatMessages(messages) {
@@ -2732,6 +3510,7 @@ async function updateLeaderboard() {
     if (localStorage.getItem('wft_lb_optin') === '1') await pushLeaderboardEntry();
     const rows = await pullLeaderboard();
     renderNexusRankings(rows);
+    await refreshChatRooms();
     const messages = await fetchChatMessages();
     renderChatMessages(messages);
     note.textContent = 'Synced ' + new Date().toLocaleTimeString();
@@ -2747,7 +3526,7 @@ function initLeaderboard() {
 
   optInEl.addEventListener('change', () => {
     if (optInEl.checked) {
-      if (!localStorage.getItem('wft_lb_share_key')) localStorage.setItem('wft_lb_share_key', generateShareKey());
+      getOrCreateShareKey();
       localStorage.setItem('wft_lb_optin', '1');
     } else {
       localStorage.setItem('wft_lb_optin', '0');
@@ -2772,12 +3551,128 @@ function initLeaderboard() {
     if (e.key === 'Enter') document.getElementById('btnLbChatSend').click();
   });
 
+  document.getElementById('btnChatExpand').addEventListener('click', () => {
+    const card = document.getElementById('chatCard');
+    const btn = document.getElementById('btnChatExpand');
+    const expanded = card.classList.toggle('is-expanded');
+    btn.textContent = expanded ? '⤡' : '⤢';
+    btn.title = expanded ? 'Minimize' : 'Expand';
+    btn.setAttribute('aria-label', expanded ? 'Minimize chat' : 'Expand chat');
+    if (expanded) document.getElementById('lbChatList').scrollTop = document.getElementById('lbChatList').scrollHeight;
+  });
+
   if (!sbConfigured()) {
     document.getElementById('lbSaveNote').textContent = 'Nexus not set up yet.';
     optInEl.disabled = true;
     document.getElementById('btnLbUpdate').disabled = true;
     document.getElementById('btnLbChatSend').disabled = true;
   }
+
+  initGroupChat();
+}
+
+let pendingInviteIds = [];
+
+function initGroupChat() {
+  const select = document.getElementById('chatRoomSelect');
+  select.addEventListener('change', async () => {
+    currentChatRoomId = select.value || null;
+    if (currentChatRoomId) localStorage.setItem('wft_chat_room', currentChatRoomId);
+    else localStorage.removeItem('wft_chat_room');
+    document.getElementById('btnLeaveGroup').hidden = !currentChatRoomId;
+    if (!sbConfigured()) return;
+    try {
+      const messages = await fetchChatMessages();
+      renderChatMessages(messages);
+    } catch (e) { /* best effort */ }
+  });
+
+  document.getElementById('btnLeaveGroup').addEventListener('click', async () => {
+    if (!currentChatRoomId || !sbConfigured()) return;
+    if (!confirm('Leave this group chat?')) return;
+    const shareKey = localStorage.getItem('wft_lb_share_key');
+    try {
+      await sb.rpc('leave_chat_room', { p_room_id: currentChatRoomId, p_share_key: shareKey });
+      currentChatRoomId = null;
+      localStorage.removeItem('wft_chat_room');
+      await refreshChatRooms();
+      const messages = await fetchChatMessages();
+      renderChatMessages(messages);
+    } catch (e) { /* best effort */ }
+  });
+
+  const bellBtn = document.getElementById('btnChatInvites');
+  const popover = document.getElementById('chatInvitesPopover');
+  bellBtn.addEventListener('click', () => { popover.hidden = !popover.hidden; });
+  document.addEventListener('click', e => {
+    if (!popover.hidden && !popover.contains(e.target) && e.target !== bellBtn && !bellBtn.contains(e.target)) popover.hidden = true;
+  });
+
+  const panel = document.getElementById('chatNewGroupPanel');
+  document.getElementById('btnNewGroup').addEventListener('click', () => {
+    panel.hidden = !panel.hidden;
+    if (!panel.hidden) { pendingInviteIds = []; renderInviteChips(); }
+  });
+  document.getElementById('btnCancelGroup').addEventListener('click', () => {
+    panel.hidden = true;
+    document.getElementById('newGroupName').value = '';
+    document.getElementById('newGroupInviteInput').value = '';
+    pendingInviteIds = [];
+    renderInviteChips();
+  });
+
+  const addInvitee = () => {
+    const input = document.getElementById('newGroupInviteInput');
+    const id = input.value.trim().toUpperCase();
+    if (id && !pendingInviteIds.includes(id)) pendingInviteIds.push(id);
+    input.value = '';
+    renderInviteChips();
+  };
+  document.getElementById('btnAddInvitee').addEventListener('click', addInvitee);
+  document.getElementById('newGroupInviteInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addInvitee(); }
+  });
+
+  document.getElementById('btnCreateGroup').addEventListener('click', async () => {
+    const name = document.getElementById('newGroupName').value.trim();
+    const note = document.getElementById('newGroupNote');
+    if (!name) { note.textContent = 'Enter a group name.'; return; }
+    if (!sbConfigured()) { note.textContent = 'Nexus not set up yet.'; return; }
+    const shareKey = getOrCreateShareKey();
+    note.textContent = 'Creating…';
+    try {
+      const { data, error } = await sb.rpc('create_chat_room', {
+        p_name: name,
+        p_creator_key: shareKey,
+        p_creator_name: effectiveLeaderboardName(),
+        p_invitee_ids: pendingInviteIds,
+      });
+      if (error) throw error;
+      panel.hidden = true;
+      document.getElementById('newGroupName').value = '';
+      pendingInviteIds = [];
+      renderInviteChips();
+      note.textContent = '';
+      currentChatRoomId = data;
+      localStorage.setItem('wft_chat_room', data);
+      await refreshChatRooms();
+      const messages = await fetchChatMessages();
+      renderChatMessages(messages);
+    } catch (e) { note.textContent = 'Could not create group: ' + (e.message || 'check your connection'); }
+  });
+}
+
+function renderInviteChips() {
+  const container = document.getElementById('newGroupInviteChips');
+  container.innerHTML = pendingInviteIds.map(id => `
+    <span class="invite-chip">${escapeHtml(id)}<button type="button" data-remove-id="${escapeHtml(id)}" aria-label="Remove">✕</button></span>
+  `).join('');
+  container.querySelectorAll('[data-remove-id]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      pendingInviteIds = pendingInviteIds.filter(id => id !== btn.dataset.removeId);
+      renderInviteChips();
+    });
+  });
 }
 
 /* ---------------------------------------------------------------- */
@@ -2896,22 +3791,33 @@ document.getElementById('headerToday').textContent = new Date().toLocaleDateStri
 
 migrateWaterUnitsIfNeeded();
 initTabs();
+initSwipeNavigation();
 document.getElementById('btnGoToBioFromChart').addEventListener('click', () => {
   document.querySelector('.tab-btn[data-target="bio"]').click();
 });
-initSheet();
+initSettingsOverlay();
+initDigitalId();
 initContact();
+initFooterShare();
 initPrivacyPolicy();
 initTermsOfService();
+initPRBoardOverlay();
+initIntakeLogOverlay();
+initMeasureEntryOverlay();
+initEntityIdentityOverlay();
 initDateTimeWidget();
 initTimezonePicker();
 initWeatherWidget();
+initWeatherLocationPicker();
 initSetupForm();
 initCheckin();
 initQuickLog();
 initMeasurements();
 initTraining();
 initTrainUnitToggle();
+initCardioTracker();
+initMissionLog();
+initWeightChartToggle();
 initNutrition();
 initBioLog();
 initReviewForm();
@@ -2922,6 +3828,7 @@ loadSetupForm();
 loadCheckinForm();
 loadQuickLog();
 renderDashboard();
+updateTabDots();
 initBetaLock();
 if (document.getElementById('lockOverlay').hidden) {
   initOnboarding(() => initReviewGate(() => initConsentGate()));
@@ -2933,7 +3840,8 @@ setTimeout(() => {
   splash.classList.add('splash-hide');
   setTimeout(() => { splash.hidden = true; }, 400);
   checkDataReminder();
-}, 3000);
+  setTimeout(checkMeasurementReminder, 6000);
+}, 2000);
 
 
 if ('serviceWorker' in navigator) {
