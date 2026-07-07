@@ -1702,17 +1702,14 @@ function renderExerciseCards() {
   if (isSessionFinished(date)) {
     newProtocolBox.hidden = true;
     const totalSets = currentExercises.reduce((n, ex) => n + ex.sets.filter(s => s.completed).length, 0);
+    const isToday = date === todayISO();
     container.innerHTML = `<div class="session-done-card">
       <p class="session-done-title">✓ Workout finished</p>
       <p class="session-done-meta">${currentExercises.length} exercise${currentExercises.length !== 1 ? 's' : ''} · ${totalSets} set${totalSets !== 1 ? 's' : ''} logged</p>
       <div class="session-done-actions">
-        <button type="button" class="btn" id="btnSessionContinue">Continue</button>
+        ${isToday ? '<button type="button" class="btn" id="btnSessionContinue">Continue</button>' : ''}
         <button type="button" class="btn" id="btnSessionEdit">Edit</button>
         <button type="button" class="btn btn--danger" id="btnSessionCompleted">Completed</button>
-      </div>
-      <div class="session-edit-date-row" id="sessionEditDateRow" hidden>
-        <input type="date" id="sessionEditDate">
-        <button type="button" class="btn btn--primary btn--sm" id="btnSessionEditDateApply">Move to date</button>
       </div>
     </div>`;
     return;
@@ -1828,6 +1825,14 @@ function formatPaceSecPerUnit(sec) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+const CARDIO_STRIDE_M = { run: 1.0, walk: 0.75 };
+
+function estimateCardioSteps(distanceKm, type) {
+  const stride = CARDIO_STRIDE_M[type];
+  if (!stride) return null; // e.g. "ride" — steps don't apply
+  return Math.round((distanceKm * 1000) / stride);
+}
+
 function updateCardioStats() {
   const elapsed = Math.round((Date.now() - cardioStartTime) / 1000);
   document.getElementById('cardioDuration').textContent = formatCardioClock(elapsed);
@@ -1853,6 +1858,11 @@ function updateCardioStats() {
     const bestPaceSecPerUnit = unit === 'mi' ? bestPaceSecPerKm / 0.621371 : bestPaceSecPerKm;
     document.getElementById('cardioBestPace').textContent = formatPaceSecPerUnit(bestPaceSecPerUnit);
   }
+
+  const type = document.getElementById('cardioType').value;
+  const steps = estimateCardioSteps(cardioDistanceKm, type);
+  document.getElementById('cardioStepsTile').hidden = steps == null;
+  if (steps != null) document.getElementById('cardioSteps').textContent = steps.toLocaleString();
 }
 
 function startCardioTracking() {
@@ -1871,6 +1881,8 @@ function startCardioTracking() {
   document.getElementById('cardioBestPace').textContent = '--:--';
   document.getElementById('cardioAvgSpeed').textContent = '0.0';
   document.getElementById('cardioMaxSpeed').textContent = '0.0';
+  document.getElementById('cardioSteps').textContent = '0';
+  document.getElementById('cardioStepsTile').hidden = estimateCardioSteps(0, document.getElementById('cardioType').value) == null;
   document.getElementById('cardioRouteSketch').hidden = false;
   document.getElementById('cardioMapView').hidden = true;
   renderCardioRouteSketch();
@@ -2292,6 +2304,7 @@ function initTraining() {
     if (sessionContinueBtn) {
       const date = document.getElementById('trainDate').value;
       setSessionFinished(date, false);
+      markTrainingActivity();
       renderExerciseCards();
       renderTrainingStats();
       return;
@@ -2299,43 +2312,20 @@ function initTraining() {
 
     const sessionEditBtn = e.target.closest('#btnSessionEdit');
     if (sessionEditBtn) {
-      const row = document.getElementById('sessionEditDateRow');
-      document.getElementById('sessionEditDate').value = document.getElementById('trainDate').value;
-      row.hidden = !row.hidden;
-      return;
-    }
-
-    const sessionEditDateApplyBtn = e.target.closest('#btnSessionEditDateApply');
-    if (sessionEditDateApplyBtn) {
-      const oldDate = document.getElementById('trainDate').value;
-      const newDate = document.getElementById('sessionEditDate').value;
-      if (!newDate || newDate === oldDate) return;
-      const logs = getLogs();
-      const exercisesToMove = (logs[oldDate] && logs[oldDate].exercises) || [];
-      const wasFinished = isSessionFinished(oldDate);
-      const destExisting = (logs[newDate] && logs[newDate].exercises) || [];
-      updateLogFields(newDate, { exercises: destExisting.concat(exercisesToMove) });
-      updateLogFields(oldDate, { exercises: [] });
-      setSessionFinished(oldDate, false);
-      if (wasFinished) setSessionFinished(newDate, true);
-      const allTimers = getExTimers();
-      if (allTimers[oldDate]) { delete allTimers[oldDate]; saveExTimers(allTimers); }
-      document.getElementById('trainDate').value = newDate;
-      localStorage.setItem('wft_active_train_date', newDate);
-      loadTrainingForDate(newDate);
+      const date = document.getElementById('trainDate').value;
+      setSessionFinished(date, false);
+      renderExerciseCards();
       renderTrainingStats();
       return;
     }
 
     const sessionCompletedBtn = e.target.closest('#btnSessionCompleted');
     if (sessionCompletedBtn) {
-      if (confirm('Mark this session as fully completed and clear the queue? This cannot be undone.')) {
+      if (confirm('Mark this session as completed? Your logged exercises stay saved in your history.')) {
         const date = document.getElementById('trainDate').value;
-        currentExercises = [];
-        persistExercises();
-        setSessionFinished(date, false);
         const allTimers = getExTimers();
         if (allTimers[date]) { delete allTimers[date]; saveExTimers(allTimers); }
+        showRestToast('Session completed — saved to your Accomplishment Log.');
         renderExerciseCards();
         renderTrainingStats();
       }

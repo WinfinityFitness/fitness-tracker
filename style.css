@@ -1133,9 +1133,6 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .session-done-meta { font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-secondary); margin: 0 0 14px; }
 .session-done-actions { display: flex; gap: 8px; }
 .session-done-actions .btn { flex: 1; min-width: 0; }
-.session-edit-date-row { display: flex; gap: 8px; margin-top: 12px; }
-.session-edit-date-row input[type="date"] { flex: 1; min-width: 0; }
-.session-edit-date-row .btn { flex: none; }
 
 /* ---------------- Per-exercise rest timer ---------------- */
 .ex-rest-timer {
