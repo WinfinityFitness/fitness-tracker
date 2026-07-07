@@ -3690,6 +3690,14 @@ function markDmRead(roomId) {
   if (chatRoomMeta[roomId]) chatRoomMeta[roomId].unread = false;
 }
 
+function updateRoomActionButtons(roomId) {
+  const meta = roomId ? chatRoomMeta[roomId] : null;
+  const shareKey = localStorage.getItem('wft_lb_share_key');
+  document.getElementById('btnLeaveGroup').hidden = !roomId;
+  document.getElementById('btnDeleteGroup').hidden = !(meta && !meta.isDm && meta.createdByKey === shareKey);
+  document.getElementById('btnInviteGroup').hidden = !(meta && !meta.isDm);
+}
+
 function renderChatRoomOptions(joinedRows) {
   const select = document.getElementById('chatRoomSelect');
   const prevValue = select.value;
@@ -3712,10 +3720,7 @@ function renderChatRoomOptions(joinedRows) {
     currentChatRoomId = null;
     localStorage.removeItem('wft_chat_room');
   }
-  const meta = currentChatRoomId ? chatRoomMeta[currentChatRoomId] : null;
-  document.getElementById('btnLeaveGroup').hidden = !stillJoined;
-  const shareKey = localStorage.getItem('wft_lb_share_key');
-  document.getElementById('btnDeleteGroup').hidden = !(meta && !meta.isDm && meta.createdByKey === shareKey);
+  updateRoomActionButtons(stillJoined ? currentChatRoomId : null);
 }
 
 function renderInvitesPopover(invitedRows) {
@@ -3797,8 +3802,7 @@ async function startDM(otherName) {
     await refreshChatRooms();
     document.getElementById('chatRoomSelect').value = data;
     markDmRead(data);
-    document.getElementById('btnLeaveGroup').hidden = false;
-    document.getElementById('btnDeleteGroup').hidden = true;
+    updateRoomActionButtons(data);
     const messages = await fetchChatMessages();
     renderChatMessages(messages);
   } catch (e) { showRestToast('Could not start DM: ' + (e.message || 'check your connection')); }
@@ -3873,6 +3877,7 @@ function initLeaderboard() {
 }
 
 let pendingInviteIds = [];
+let pendingInviteToGroupIds = [];
 
 function initGroupChat() {
   const select = document.getElementById('chatRoomSelect');
@@ -3884,10 +3889,7 @@ function initGroupChat() {
     } else {
       localStorage.removeItem('wft_chat_room');
     }
-    const meta = currentChatRoomId ? chatRoomMeta[currentChatRoomId] : null;
-    document.getElementById('btnLeaveGroup').hidden = !currentChatRoomId;
-    const shareKey = localStorage.getItem('wft_lb_share_key');
-    document.getElementById('btnDeleteGroup').hidden = !(meta && !meta.isDm && meta.createdByKey === shareKey);
+    updateRoomActionButtons(currentChatRoomId);
     if (!sbConfigured()) return;
     try {
       const messages = await fetchChatMessages();
@@ -3922,6 +3924,52 @@ function initGroupChat() {
       const messages = await fetchChatMessages();
       renderChatMessages(messages);
     } catch (e) { showRestToast('Could not delete group.'); }
+  });
+
+  const invitePanel = document.getElementById('inviteGroupPanel');
+  document.getElementById('btnInviteGroup').addEventListener('click', () => {
+    invitePanel.hidden = !invitePanel.hidden;
+    if (!invitePanel.hidden) { pendingInviteToGroupIds = []; renderInviteToGroupChips(); }
+  });
+  document.getElementById('btnCancelInviteGroup').addEventListener('click', () => {
+    invitePanel.hidden = true;
+    document.getElementById('inviteGroupInput').value = '';
+    pendingInviteToGroupIds = [];
+    renderInviteToGroupChips();
+  });
+
+  const addInviteeToGroup = () => {
+    const input = document.getElementById('inviteGroupInput');
+    const id = input.value.trim().toUpperCase();
+    if (id && !pendingInviteToGroupIds.includes(id)) pendingInviteToGroupIds.push(id);
+    input.value = '';
+    renderInviteToGroupChips();
+  };
+  document.getElementById('btnAddInviteGroup').addEventListener('click', addInviteeToGroup);
+  document.getElementById('inviteGroupInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addInviteeToGroup(); }
+  });
+
+  document.getElementById('btnSendInvites').addEventListener('click', async () => {
+    const note = document.getElementById('inviteGroupNote');
+    if (!currentChatRoomId) return;
+    if (!pendingInviteToGroupIds.length) { note.textContent = 'Add at least one Digital ID.'; return; }
+    if (!sbConfigured()) { note.textContent = 'Nexus not set up yet.'; return; }
+    const shareKey = getOrCreateShareKey();
+    note.textContent = 'Sending…';
+    try {
+      const { error } = await sb.rpc('invite_to_chat_room', {
+        p_room_id: currentChatRoomId,
+        p_inviter_key: shareKey,
+        p_invitee_ids: pendingInviteToGroupIds,
+      });
+      if (error) throw error;
+      invitePanel.hidden = true;
+      pendingInviteToGroupIds = [];
+      renderInviteToGroupChips();
+      note.textContent = '';
+      showRestToast('Invites sent!');
+    } catch (e) { note.textContent = 'Could not send invites: ' + (e.message || 'check your connection'); }
   });
 
   const bellBtn = document.getElementById('btnChatInvites');
@@ -3994,6 +4042,19 @@ function renderInviteChips() {
     btn.addEventListener('click', () => {
       pendingInviteIds = pendingInviteIds.filter(id => id !== btn.dataset.removeId);
       renderInviteChips();
+    });
+  });
+}
+
+function renderInviteToGroupChips() {
+  const container = document.getElementById('inviteGroupChips');
+  container.innerHTML = pendingInviteToGroupIds.map(id => `
+    <span class="invite-chip">${escapeHtml(id)}<button type="button" data-remove-id="${escapeHtml(id)}" aria-label="Remove">✕</button></span>
+  `).join('');
+  container.querySelectorAll('[data-remove-id]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      pendingInviteToGroupIds = pendingInviteToGroupIds.filter(id => id !== btn.dataset.removeId);
+      renderInviteToGroupChips();
     });
   });
 }

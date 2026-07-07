@@ -565,9 +565,24 @@
         <select id="chatRoomSelect">
           <option value="">🌐 Public Chat</option>
         </select>
+        <button type="button" class="btn btn--sm" id="btnInviteGroup" hidden>Invite</button>
         <button type="button" class="btn btn--sm" id="btnLeaveGroup" hidden>Leave</button>
         <button type="button" class="btn btn--sm btn--danger" id="btnDeleteGroup" hidden>Delete</button>
         <button type="button" class="btn btn--sm" id="btnNewGroup">+ Group</button>
+      </div>
+
+      <div class="chat-new-group" id="inviteGroupPanel" hidden>
+        <label class="field">
+          <span>Invite by Digital ID</span>
+          <div class="input-unit-wrap"><input type="text" id="inviteGroupInput" placeholder="e.g. WF-7K2P9Q"><button type="button" class="btn btn--sm" id="btnAddInviteGroup">Add</button></div>
+        </label>
+        <p class="hint">Ask a friend to copy their Digital ID from their Status tab and send it to you.</p>
+        <div id="inviteGroupChips" class="new-group-invite-chips"></div>
+        <div class="btn-row">
+          <button type="button" class="btn btn--primary" id="btnSendInvites">Send invites</button>
+          <button type="button" class="btn" id="btnCancelInviteGroup">Cancel</button>
+        </div>
+        <p class="save-note" id="inviteGroupNote"></p>
       </div>
 
       <div class="chat-new-group" id="chatNewGroupPanel" hidden>
