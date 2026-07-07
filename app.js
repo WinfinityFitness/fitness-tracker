@@ -379,7 +379,9 @@ function initTabs() {
       }
       if (target === 'leaderboard' && sbConfigured()) {
         pullLeaderboard().then(renderNexusRankings).catch(() => {});
-        fetchChatMessages().then(renderChatMessages).catch(() => {});
+        fetchChatMessages().then(renderChatMessages).then(() => {
+          if (!currentChatRoomId) markRoomRead('public');
+        }).catch(() => {});
         refreshChatRooms();
         startNexusPolling();
       } else {
@@ -3562,11 +3564,26 @@ function timeAgo(iso) {
 
 const rankListExpanded = {};
 
+// Keeps only each person's best-scoring row — a name that shows up more than
+// once (re-installs, case differences, etc.) shouldn't crowd out other people
+// with duplicate entries of the same person's other records.
+function dedupeRankRows(rows, isBetter) {
+  const bestByName = new Map();
+  rows.forEach(r => {
+    const key = (r.code_name || '').trim().toLowerCase();
+    const existing = bestByName.get(key);
+    if (!existing || isBetter(r, existing)) bestByName.set(key, r);
+  });
+  return Array.from(bestByName.values());
+}
+
 function renderRankList(containerId, rows, opts) {
   const container = document.getElementById(containerId);
+  const expandBtn = document.querySelector(`.rank-expand-btn[data-target="${containerId}"]`);
   container.innerHTML = '';
   if (!rows.length) {
     container.innerHTML = '<p class="empty-note">No data yet.</p>';
+    if (expandBtn) expandBtn.hidden = true;
     return;
   }
   const top10 = rows.slice(0, 10);
@@ -3580,16 +3597,14 @@ function renderRankList(containerId, rows, opts) {
       <span class="rank-value">${opts.formatValue(r)}</span>`;
     container.appendChild(row);
   });
-  if (top10.length > 3) {
-    const toggleBtn = document.createElement('button');
-    toggleBtn.type = 'button';
-    toggleBtn.className = 'rank-list-toggle';
-    toggleBtn.textContent = expanded ? 'Show top 3' : `Show top ${top10.length}`;
-    toggleBtn.addEventListener('click', () => {
+  if (expandBtn) {
+    expandBtn.hidden = top10.length <= 3;
+    expandBtn.textContent = expanded ? '⤡' : '⤢';
+    expandBtn.title = expanded ? 'Show top 3' : `Show top ${top10.length}`;
+    expandBtn.onclick = () => {
       rankListExpanded[containerId] = !expanded;
       renderRankList(containerId, rows, opts);
-    });
-    container.appendChild(toggleBtn);
+    };
   }
 }
 
@@ -3601,13 +3616,13 @@ function renderNexusRankings(rows) {
   document.getElementById('nexusTotalUsers').textContent = rows.length;
   document.getElementById('nexusOnlineUsers').textContent = onlineNow;
 
-  const bySteps = rows.filter(r => r.steps != null).sort((a, b) => b.steps - a.steps);
+  const bySteps = dedupeRankRows(rows.filter(r => r.steps != null), (a, b) => a.steps > b.steps).sort((a, b) => b.steps - a.steps);
   renderRankList('lbStepsRanking', bySteps, { formatValue: r => r.steps >= 1000 ? (r.steps / 1000).toFixed(1) + 'k' : String(r.steps) });
 
-  const byVolume = rows.filter(r => r.volume_lifted != null).sort((a, b) => b.volume_lifted - a.volume_lifted);
+  const byVolume = dedupeRankRows(rows.filter(r => r.volume_lifted != null), (a, b) => a.volume_lifted > b.volume_lifted).sort((a, b) => b.volume_lifted - a.volume_lifted);
   renderRankList('lbVolumeRanking', byVolume, { formatValue: r => round0(r.volume_lifted) + ' ' + (r.volume_unit || 'kg') });
 
-  const byProgress = rows.filter(r => r.weight_progress_pct != null).sort((a, b) => a.weight_progress_pct - b.weight_progress_pct);
+  const byProgress = dedupeRankRows(rows.filter(r => r.weight_progress_pct != null), (a, b) => a.weight_progress_pct < b.weight_progress_pct).sort((a, b) => a.weight_progress_pct - b.weight_progress_pct);
   renderRankList('lbBioRanking', byProgress, { formatValue: r => (r.weight_progress_pct > 0 ? '+' : '') + r.weight_progress_pct + '%' });
 
   const avgPct = byProgress.length ? byProgress.reduce((s, r) => s + r.weight_progress_pct, 0) / byProgress.length : null;
@@ -3615,10 +3630,10 @@ function renderNexusRankings(rows) {
     size: 96, stroke: 8, centerText: avgPct != null ? round2(avgPct) + '%' : '–', sub: '',
   });
 
-  const byFurthestRun = rows.filter(r => r.furthest_run_km != null).sort((a, b) => b.furthest_run_km - a.furthest_run_km);
+  const byFurthestRun = dedupeRankRows(rows.filter(r => r.furthest_run_km != null), (a, b) => a.furthest_run_km > b.furthest_run_km).sort((a, b) => b.furthest_run_km - a.furthest_run_km);
   renderRankList('lbFurthestRunRanking', byFurthestRun, { formatValue: r => round2(r.furthest_run_km) + ' km' });
 
-  const byFastestRun = rows.filter(r => r.fastest_run_pace_sec != null).sort((a, b) => a.fastest_run_pace_sec - b.fastest_run_pace_sec);
+  const byFastestRun = dedupeRankRows(rows.filter(r => r.fastest_run_pace_sec != null), (a, b) => a.fastest_run_pace_sec < b.fastest_run_pace_sec).sort((a, b) => a.fastest_run_pace_sec - b.fastest_run_pace_sec);
   renderRankList('lbFastestRunRanking', byFastestRun, { formatValue: r => formatPaceSecPerUnit(r.fastest_run_pace_sec) + ' /km' });
 }
 
@@ -3674,8 +3689,8 @@ function initDigitalId() {
 }
 
 let chatRoomMeta = {}; // roomId -> { name, isDm, createdByKey, otherName }
-let dmLastRead = {};
-try { dmLastRead = JSON.parse(localStorage.getItem('wft_dm_last_read')) || {}; } catch (e) { dmLastRead = {}; }
+let chatLastRead = {}; // roomId (or 'public') -> ISO timestamp
+try { chatLastRead = JSON.parse(localStorage.getItem('wft_chat_last_read')) || {}; } catch (e) { chatLastRead = {}; }
 
 async function refreshChatRooms() {
   const shareKey = localStorage.getItem('wft_lb_share_key');
@@ -3708,36 +3723,79 @@ async function refreshChatRooms() {
     };
   });
 
-  if (dmRoomIds.length) { try { await checkUnreadDms(dmRoomIds); } catch (e) { /* best effort — room list still renders without unread flags */ } }
+  try { await checkUnreadMessages(dmRoomIds); } catch (e) { /* best effort — room list still renders without unread flags */ }
   renderChatRoomOptions(joined);
   renderInvitesPopover(rows.filter(r => r.status === 'invited' && r.chat_rooms));
 }
 
-async function checkUnreadDms(dmRoomIds) {
-  const { data: msgs } = await sb.from('chat_messages')
-    .select('room_id, code_name, created_at')
-    .in('room_id', dmRoomIds)
-    .order('created_at', { ascending: false });
-  const myName = effectiveLeaderboardName();
-  const latestByRoom = {};
-  (msgs || []).forEach(m => { if (!latestByRoom[m.room_id]) latestByRoom[m.room_id] = m; });
-  let anyUnread = false;
-  Object.keys(latestByRoom).forEach(roomId => {
-    const m = latestByRoom[roomId];
-    if (m.code_name === myName) return;
-    const lastRead = dmLastRead[roomId];
-    if (!lastRead || new Date(m.created_at) > new Date(lastRead)) {
-      anyUnread = true;
-      if (chatRoomMeta[roomId]) chatRoomMeta[roomId].unread = true;
-    }
-  });
-  if (anyUnread) fireSystemNotification('Winfinity Tracker', 'You have a new direct message.');
+function isNexusTabActive() {
+  const btn = document.querySelector('.tab-btn[data-target="leaderboard"]');
+  return !!(btn && btn.classList.contains('is-active'));
 }
 
-function markDmRead(roomId) {
-  dmLastRead[roomId] = new Date().toISOString();
-  localStorage.setItem('wft_dm_last_read', JSON.stringify(dmLastRead));
-  if (chatRoomMeta[roomId]) chatRoomMeta[roomId].unread = false;
+async function checkUnreadMessages(dmRoomIds) {
+  const myName = effectiveLeaderboardName();
+  const nexusActive = isNexusTabActive();
+  let anyDmUnread = false;
+
+  if (dmRoomIds.length) {
+    const { data: msgs } = await sb.from('chat_messages')
+      .select('room_id, code_name, created_at')
+      .in('room_id', dmRoomIds)
+      .order('created_at', { ascending: false });
+    const latestByRoom = {};
+    (msgs || []).forEach(m => { if (!latestByRoom[m.room_id]) latestByRoom[m.room_id] = m; });
+    Object.keys(latestByRoom).forEach(roomId => {
+      const m = latestByRoom[roomId];
+      if (m.code_name === myName) return;
+      // Currently-open DM while Nexus is on-screen counts as read immediately,
+      // rather than flagging it and racing with a separate mark-read call.
+      if (nexusActive && roomId === currentChatRoomId) {
+        chatLastRead[roomId] = m.created_at;
+        if (chatRoomMeta[roomId]) chatRoomMeta[roomId].unread = false;
+        return;
+      }
+      const lastRead = chatLastRead[roomId];
+      if (!lastRead || new Date(m.created_at) > new Date(lastRead)) {
+        anyDmUnread = true;
+        if (chatRoomMeta[roomId]) chatRoomMeta[roomId].unread = true;
+      }
+    });
+    if (anyDmUnread) fireSystemNotification('Winfinity Tracker', 'You have a new direct message.');
+  }
+
+  let publicUnread = false;
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: publicMsgs } = await sb.from('chat_messages')
+    .select('code_name, created_at')
+    .is('room_id', null)
+    .gte('created_at', cutoff)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  const latestPublic = (publicMsgs || [])[0];
+  if (latestPublic && latestPublic.code_name !== myName) {
+    if (nexusActive && !currentChatRoomId) {
+      chatLastRead.public = latestPublic.created_at;
+    } else {
+      const lastRead = chatLastRead.public;
+      if (!lastRead || new Date(latestPublic.created_at) > new Date(lastRead)) publicUnread = true;
+    }
+  }
+
+  localStorage.setItem('wft_chat_last_read', JSON.stringify(chatLastRead));
+  document.getElementById('tabDotDm').hidden = !anyDmUnread;
+  document.getElementById('tabDotPublic').hidden = !publicUnread;
+}
+
+function markRoomRead(roomId) {
+  chatLastRead[roomId] = new Date().toISOString();
+  localStorage.setItem('wft_chat_last_read', JSON.stringify(chatLastRead));
+  if (roomId === 'public') document.getElementById('tabDotPublic').hidden = true;
+  else {
+    if (chatRoomMeta[roomId]) chatRoomMeta[roomId].unread = false;
+    const stillAnyDmUnread = Object.values(chatRoomMeta).some(m => m.isDm && m.unread);
+    document.getElementById('tabDotDm').hidden = !stillAnyDmUnread;
+  }
 }
 
 function updateRoomActionButtons(roomId) {
@@ -3851,7 +3909,7 @@ async function startDM(otherName) {
     localStorage.setItem('wft_chat_room', data);
     await refreshChatRooms();
     document.getElementById('chatRoomSelect').value = data;
-    markDmRead(data);
+    markRoomRead(data);
     updateRoomActionButtons(data);
     const messages = await fetchChatMessages();
     renderChatMessages(messages);
@@ -3935,9 +3993,10 @@ function initGroupChat() {
     currentChatRoomId = select.value || null;
     if (currentChatRoomId) {
       localStorage.setItem('wft_chat_room', currentChatRoomId);
-      if (chatRoomMeta[currentChatRoomId] && chatRoomMeta[currentChatRoomId].isDm) markDmRead(currentChatRoomId);
+      if (chatRoomMeta[currentChatRoomId] && chatRoomMeta[currentChatRoomId].isDm) markRoomRead(currentChatRoomId);
     } else {
       localStorage.removeItem('wft_chat_room');
+      markRoomRead('public');
     }
     updateRoomActionButtons(currentChatRoomId);
     if (!sbConfigured()) return;
@@ -4286,6 +4345,15 @@ setTimeout(() => {
   checkDataReminder();
   setTimeout(checkMeasurementReminder, 6000);
 }, 2000);
+
+// Background unread-message check so the Nexus tab dot can light up even while
+// the user is elsewhere — the Nexus tab's own polling only runs while it's active.
+function checkUnreadMessagesBackground() {
+  if (!sbConfigured() || !localStorage.getItem('wft_lb_share_key')) return Promise.resolve();
+  return refreshChatRooms().catch(() => {});
+}
+setTimeout(checkUnreadMessagesBackground, 5000);
+setInterval(checkUnreadMessagesBackground, 60000);
 
 
 if ('serviceWorker' in navigator) {

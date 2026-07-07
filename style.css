@@ -1226,6 +1226,8 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   box-shadow: 0 0 5px var(--critical);
 }
 .tab-dot[hidden] { display: none; }
+.tab-dot--public { margin-left: 2px; }
+.tab-dot--dm { margin-left: 11px; background: var(--good); box-shadow: 0 0 5px var(--good); }
 
 /* ---------------- Beta lock ---------------- */
 .lock-overlay {
@@ -1283,18 +1285,18 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 
 /* ---------------- Rank list (Nexus) ---------------- */
 .rank-list { display: flex; flex-direction: column; gap: 6px; }
-.rank-list-toggle {
+.rank-expand-btn {
   background: none;
   border: none;
   color: var(--cyan);
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 6px 2px 0;
   cursor: pointer;
-  text-align: center;
+  font-size: 1.05rem;
+  line-height: 1;
+  padding: 4px 6px;
+  flex: none;
+  filter: drop-shadow(0 0 4px var(--cyan-glow));
 }
+.rank-expand-btn[hidden] { display: none; }
 .rank-row {
   display: flex;
   align-items: center;
@@ -1421,7 +1423,7 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .chat-invite-row .btn { padding: 6px 10px; font-size: 0.76rem; }
 .chat-room-row { display: flex; gap: 8px; margin-bottom: 10px; }
 .chat-room-row select {
-  flex: 1;
+  flex: 0 0 60%;
   min-width: 0;
   padding: 10px;
   border-radius: 5px;
