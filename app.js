@@ -1781,6 +1781,7 @@ let cardioWatchId = null;
 let cardioTickId = null;
 let cardioTrack = [];
 let cardioDistanceKm = 0;
+let cardioMaxSpeedKmh = 0;
 let cardioStartTime = null;
 
 function haversineKm(lat1, lon1, lat2, lon2) {
@@ -1821,6 +1822,12 @@ function renderCardioRouteSketch() {
   svg.innerHTML = `<polyline points="${points}" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>`;
 }
 
+function formatPaceSecPerUnit(sec) {
+  if (!sec || !isFinite(sec)) return '--:--';
+  const m = Math.floor(sec / 60), s = Math.round(sec % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 function updateCardioStats() {
   const elapsed = Math.round((Date.now() - cardioStartTime) / 1000);
   document.getElementById('cardioDuration').textContent = formatCardioClock(elapsed);
@@ -1828,11 +1835,23 @@ function updateCardioStats() {
   const dist = unit === 'mi' ? kmToMi(cardioDistanceKm) : cardioDistanceKm;
   document.getElementById('cardioDistance').textContent = dist.toFixed(2);
   document.getElementById('cardioDistanceLabel').textContent = `Distance (${unit})`;
-  document.getElementById('cardioPaceLabel').textContent = `Pace /${unit}`;
+  document.getElementById('cardioPaceLabel').textContent = `Avg pace /${unit}`;
+  document.getElementById('cardioBestPaceLabel').textContent = `Fastest /${unit}`;
+  document.getElementById('cardioAvgSpeedLabel').textContent = `Avg speed ${unit === 'mi' ? 'mph' : 'km/h'}`;
+  document.getElementById('cardioMaxSpeedLabel').textContent = `Max speed ${unit === 'mi' ? 'mph' : 'km/h'}`;
+
   if (dist > 0.05) {
-    const paceSecPerUnit = elapsed / dist;
-    const m = Math.floor(paceSecPerUnit / 60), s = Math.round(paceSecPerUnit % 60);
-    document.getElementById('cardioPace').textContent = `${m}:${String(s).padStart(2, '0')}`;
+    document.getElementById('cardioPace').textContent = formatPaceSecPerUnit(elapsed / dist);
+  }
+  const avgSpeedKmh = elapsed > 0 ? cardioDistanceKm / (elapsed / 3600) : 0;
+  const avgSpeed = unit === 'mi' ? kmToMi(avgSpeedKmh) : avgSpeedKmh;
+  document.getElementById('cardioAvgSpeed').textContent = avgSpeed.toFixed(1);
+  const maxSpeed = unit === 'mi' ? kmToMi(cardioMaxSpeedKmh) : cardioMaxSpeedKmh;
+  document.getElementById('cardioMaxSpeed').textContent = maxSpeed.toFixed(1);
+  if (cardioMaxSpeedKmh > 0) {
+    const bestPaceSecPerKm = 3600 / cardioMaxSpeedKmh;
+    const bestPaceSecPerUnit = unit === 'mi' ? bestPaceSecPerKm / 0.621371 : bestPaceSecPerKm;
+    document.getElementById('cardioBestPace').textContent = formatPaceSecPerUnit(bestPaceSecPerUnit);
   }
 }
 
@@ -1840,6 +1859,7 @@ function startCardioTracking() {
   if (!navigator.geolocation) { alert('Geolocation is not available on this device/browser.'); return; }
   cardioTrack = [];
   cardioDistanceKm = 0;
+  cardioMaxSpeedKmh = 0;
   cardioStartTime = Date.now();
   document.getElementById('btnCardioStart').hidden = true;
   document.getElementById('btnCardioStop').hidden = false;
@@ -1848,6 +1868,9 @@ function startCardioTracking() {
   document.getElementById('cardioDuration').textContent = '00:00';
   document.getElementById('cardioDistance').textContent = '0.00';
   document.getElementById('cardioPace').textContent = '--:--';
+  document.getElementById('cardioBestPace').textContent = '--:--';
+  document.getElementById('cardioAvgSpeed').textContent = '0.0';
+  document.getElementById('cardioMaxSpeed').textContent = '0.0';
   document.getElementById('cardioRouteSketch').hidden = false;
   document.getElementById('cardioMapView').hidden = true;
   renderCardioRouteSketch();
@@ -1860,6 +1883,10 @@ function startCardioTracking() {
       const last = cardioTrack[cardioTrack.length - 1];
       const segKm = haversineKm(last.lat, last.lon, point.lat, point.lon);
       if (segKm > 0.003) {
+        const segHours = (point.t - last.t) / 3600000;
+        const segSpeedKmh = segHours > 0 ? segKm / segHours : 0;
+        const speedCap = document.getElementById('cardioType').value === 'ride' ? 80 : 45;
+        if (segSpeedKmh > 0 && segSpeedKmh <= speedCap) cardioMaxSpeedKmh = Math.max(cardioMaxSpeedKmh, segSpeedKmh);
         cardioDistanceKm += segKm;
         cardioTrack.push(point);
         renderCardioRouteSketch();
@@ -1892,6 +1919,7 @@ function stopCardioTracking() {
     distanceKm: round2(cardioDistanceKm),
     durationSec: elapsedSec,
     startedAt: new Date(cardioStartTime).toISOString(),
+    maxSpeedKmh: round2(cardioMaxSpeedKmh),
   };
   sessions.push(session);
   updateLogFields(date, { cardioSessions: sessions });
@@ -2027,31 +2055,34 @@ async function generateCardioShareCardWithMap(track, { emoji, title, stats }) {
     });
   }
 
-  const gradient = ctx.createLinearGradient(0, 380, 0, 600);
+  const bannerTop = stats.length > 3 ? 330 : 380;
+  const gradient = ctx.createLinearGradient(0, bannerTop, 0, 600);
   gradient.addColorStop(0, 'rgba(10,14,18,0)');
   gradient.addColorStop(1, 'rgba(10,14,18,0.92)');
   ctx.fillStyle = gradient;
-  ctx.fillRect(0, 380, 600, 220);
+  ctx.fillRect(0, bannerTop, 600, 600 - bannerTop);
 
   ctx.textAlign = 'left';
-  ctx.font = '38px sans-serif';
-  ctx.fillText(emoji, 30, 445);
+  ctx.font = '32px sans-serif';
+  ctx.fillText(emoji, 30, bannerTop + 55);
   ctx.fillStyle = '#33c8cc';
-  ctx.font = 'bold 26px sans-serif';
-  ctx.fillText(title, 82, 440);
+  ctx.font = 'bold 24px sans-serif';
+  ctx.fillText(title, 76, bannerTop + 50);
   ctx.fillStyle = '#5a686e';
-  ctx.font = '13px monospace';
-  ctx.fillText('WINFINITY TRACKER', 82, 462);
+  ctx.font = '12px monospace';
+  ctx.fillText('WINFINITY TRACKER', 76, bannerTop + 70);
 
-  let x = 30;
-  stats.forEach(s => {
+  const cols = [30, 220, 410];
+  const rowY = [bannerTop + 115, bannerTop + 175];
+  stats.forEach((s, i) => {
+    const x = cols[i % 3];
+    const y = rowY[Math.floor(i / 3)];
     ctx.fillStyle = '#7e8e95';
-    ctx.font = '13px monospace';
-    ctx.fillText(s.label.toUpperCase(), x, 505);
+    ctx.font = '12px monospace';
+    ctx.fillText(s.label.toUpperCase(), x, y);
     ctx.fillStyle = '#fff';
-    ctx.font = 'bold 24px sans-serif';
-    ctx.fillText(s.value, x, 535);
-    x += 190;
+    ctx.font = 'bold 21px sans-serif';
+    ctx.fillText(s.value, x, y + 28);
   });
 
   return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
@@ -2066,13 +2097,23 @@ async function shareCardioSession() {
   const text = `${emoji} Just finished a ${dist.toFixed(2)} ${unit} ${typeLabel} in ${formatCardioDuration(lastCardioSession.durationSec)} with Winfinity Tracker!`;
   const paceMin = lastCardioSession.distanceKm > 0 ? (lastCardioSession.durationSec / 60) / dist : 0;
   const paceText = paceMin > 0 ? `${Math.floor(paceMin)}:${String(Math.round((paceMin % 1) * 60)).padStart(2, '0')} /${unit}` : '--';
+  const avgSpeedKmh = lastCardioSession.durationSec > 0 ? lastCardioSession.distanceKm / (lastCardioSession.durationSec / 3600) : 0;
+  const avgSpeed = unit === 'mi' ? kmToMi(avgSpeedKmh) : avgSpeedKmh;
+  const maxSpeedKmh = lastCardioSession.maxSpeedKmh || 0;
+  const maxSpeed = unit === 'mi' ? kmToMi(maxSpeedKmh) : maxSpeedKmh;
+  const bestPaceSecPerUnit = maxSpeedKmh > 0 ? (unit === 'mi' ? (3600 / maxSpeedKmh) / 0.621371 : 3600 / maxSpeedKmh) : 0;
+  const bestPaceText = bestPaceSecPerUnit > 0 ? formatPaceSecPerUnit(bestPaceSecPerUnit) + ` /${unit}` : '--';
+  const speedUnit = unit === 'mi' ? 'mph' : 'km/h';
   const blob = await generateCardioShareCardWithMap(cardioTrack, {
     emoji,
     title: `${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} complete!`,
     stats: [
       { label: 'Distance', value: `${dist.toFixed(2)} ${unit}` },
       { label: 'Duration', value: formatCardioDuration(lastCardioSession.durationSec) },
-      { label: 'Pace', value: paceText },
+      { label: 'Avg pace', value: paceText },
+      { label: 'Fastest', value: bestPaceText },
+      { label: 'Avg speed', value: `${avgSpeed.toFixed(1)} ${speedUnit}` },
+      { label: 'Max speed', value: `${maxSpeed.toFixed(1)} ${speedUnit}` },
     ],
   });
   shareViaWebShare({ title: 'Winfinity Tracker — Activity', text }, blob);
@@ -3592,17 +3633,71 @@ function initDigitalId() {
   });
 }
 
+let chatRoomMeta = {}; // roomId -> { name, isDm, createdByKey, otherName }
+let dmLastRead = {};
+try { dmLastRead = JSON.parse(localStorage.getItem('wft_dm_last_read')) || {}; } catch (e) { dmLastRead = {}; }
+
 async function refreshChatRooms() {
   const shareKey = localStorage.getItem('wft_lb_share_key');
   if (!shareKey || !sbConfigured()) { renderChatRoomOptions([]); renderInvitesPopover([]); return; }
   try { await sb.rpc('cleanup_stale_solo_rooms'); } catch (e) { /* best effort, opportunistic */ }
   const { data, error } = await sb.from('chat_room_members')
-    .select('status, room_id, chat_rooms(id, name)')
+    .select('status, room_id, chat_rooms(id, name, is_dm, created_by_key)')
     .eq('share_key', shareKey);
   if (error) return;
   const rows = data || [];
-  renderChatRoomOptions(rows.filter(r => r.status === 'joined' && r.chat_rooms));
+  const joined = rows.filter(r => r.status === 'joined' && r.chat_rooms);
+
+  const dmRoomIds = joined.filter(r => r.chat_rooms.is_dm).map(r => r.chat_rooms.id);
+  const otherNameByRoom = {};
+  if (dmRoomIds.length) {
+    const { data: members } = await sb.from('chat_room_members')
+      .select('room_id, share_key, code_name')
+      .in('room_id', dmRoomIds);
+    (members || []).forEach(m => {
+      if (m.share_key !== shareKey) otherNameByRoom[m.room_id] = m.code_name;
+    });
+  }
+
+  chatRoomMeta = {};
+  joined.forEach(r => {
+    chatRoomMeta[r.chat_rooms.id] = {
+      name: r.chat_rooms.is_dm ? (otherNameByRoom[r.chat_rooms.id] || r.chat_rooms.name) : r.chat_rooms.name,
+      isDm: r.chat_rooms.is_dm,
+      createdByKey: r.chat_rooms.created_by_key,
+    };
+  });
+
+  if (dmRoomIds.length) { try { await checkUnreadDms(dmRoomIds); } catch (e) { /* best effort — room list still renders without unread flags */ } }
+  renderChatRoomOptions(joined);
   renderInvitesPopover(rows.filter(r => r.status === 'invited' && r.chat_rooms));
+}
+
+async function checkUnreadDms(dmRoomIds) {
+  const { data: msgs } = await sb.from('chat_messages')
+    .select('room_id, code_name, created_at')
+    .in('room_id', dmRoomIds)
+    .order('created_at', { ascending: false });
+  const myName = effectiveLeaderboardName();
+  const latestByRoom = {};
+  (msgs || []).forEach(m => { if (!latestByRoom[m.room_id]) latestByRoom[m.room_id] = m; });
+  let anyUnread = false;
+  Object.keys(latestByRoom).forEach(roomId => {
+    const m = latestByRoom[roomId];
+    if (m.code_name === myName) return;
+    const lastRead = dmLastRead[roomId];
+    if (!lastRead || new Date(m.created_at) > new Date(lastRead)) {
+      anyUnread = true;
+      if (chatRoomMeta[roomId]) chatRoomMeta[roomId].unread = true;
+    }
+  });
+  if (anyUnread) fireSystemNotification('Winfinity Tracker', 'You have a new direct message.');
+}
+
+function markDmRead(roomId) {
+  dmLastRead[roomId] = new Date().toISOString();
+  localStorage.setItem('wft_dm_last_read', JSON.stringify(dmLastRead));
+  if (chatRoomMeta[roomId]) chatRoomMeta[roomId].unread = false;
 }
 
 function renderChatRoomOptions(joinedRows) {
@@ -3610,11 +3705,15 @@ function renderChatRoomOptions(joinedRows) {
   const prevValue = select.value;
   select.innerHTML = '<option value="">🌐 Public Chat</option>';
   joinedRows
-    .sort((a, b) => a.chat_rooms.name.localeCompare(b.chat_rooms.name))
+    .slice()
+    .sort((a, b) => chatRoomMeta[a.chat_rooms.id].name.localeCompare(chatRoomMeta[b.chat_rooms.id].name))
     .forEach(r => {
+      const meta = chatRoomMeta[r.chat_rooms.id];
       const opt = document.createElement('option');
       opt.value = r.chat_rooms.id;
-      opt.textContent = '👥 ' + r.chat_rooms.name;
+      const icon = meta.isDm ? '💬' : '👥';
+      const label = meta.isDm ? `DM: ${meta.name}` : meta.name;
+      opt.textContent = `${icon} ${label}${meta.unread ? ' 🔴' : ''}`;
       select.appendChild(opt);
     });
   const stillJoined = currentChatRoomId && joinedRows.some(r => r.chat_rooms.id === currentChatRoomId);
@@ -3623,38 +3722,45 @@ function renderChatRoomOptions(joinedRows) {
     currentChatRoomId = null;
     localStorage.removeItem('wft_chat_room');
   }
+  const meta = currentChatRoomId ? chatRoomMeta[currentChatRoomId] : null;
   document.getElementById('btnLeaveGroup').hidden = !stillJoined;
+  const shareKey = localStorage.getItem('wft_lb_share_key');
+  document.getElementById('btnDeleteGroup').hidden = !(meta && !meta.isDm && meta.createdByKey === shareKey);
 }
 
 function renderInvitesPopover(invitedRows) {
   const popover = document.getElementById('chatInvitesPopover');
   const badge = document.getElementById('chatBellBadge');
-  if (!invitedRows.length) {
-    badge.hidden = true;
-    popover.hidden = true;
-    popover.innerHTML = '';
-    return;
-  }
-  badge.hidden = false;
+  badge.hidden = !invitedRows.length;
   badge.textContent = String(invitedRows.length);
-  popover.innerHTML = invitedRows.map(r => `
-    <div class="chat-invite-row">
-      <span>🔔 Invited to "${escapeHtml(r.chat_rooms.name)}"</span>
-      <button type="button" class="btn btn--primary" data-accept-room="${r.chat_rooms.id}">Accept</button>
-      <button type="button" class="btn" data-decline-room="${r.chat_rooms.id}">Decline</button>
-    </div>
-  `).join('');
+  // Never force-close/blank the popover here — a background refresh (e.g. Sync to
+  // Nexus) can call this while the user has it open, and yanking it away mid-tap
+  // is exactly what made Accept/Decline feel broken. Only the bell button toggles
+  // popover.hidden.
+  popover.innerHTML = invitedRows.length
+    ? invitedRows.map(r => `
+      <div class="chat-invite-row">
+        <span>🔔 Invited to "${escapeHtml(r.chat_rooms.name)}"</span>
+        <button type="button" class="btn btn--primary" data-accept-room="${r.chat_rooms.id}">Accept</button>
+        <button type="button" class="btn" data-decline-room="${r.chat_rooms.id}">Decline</button>
+      </div>
+    `).join('')
+    : '<p class="empty-note">No pending invites.</p>';
   popover.querySelectorAll('[data-accept-room]').forEach(btn => {
     btn.addEventListener('click', async () => {
+      btn.disabled = true;
       const shareKey = localStorage.getItem('wft_lb_share_key');
-      await sb.from('chat_room_members').update({ status: 'joined' }).eq('room_id', btn.dataset.acceptRoom).eq('share_key', shareKey);
+      const { error } = await sb.from('chat_room_members').update({ status: 'joined' }).eq('room_id', btn.dataset.acceptRoom).eq('share_key', shareKey);
+      if (error) { showRestToast('Could not accept invite: ' + error.message); btn.disabled = false; return; }
       refreshChatRooms();
     });
   });
   popover.querySelectorAll('[data-decline-room]').forEach(btn => {
     btn.addEventListener('click', async () => {
+      btn.disabled = true;
       const shareKey = localStorage.getItem('wft_lb_share_key');
-      await sb.from('chat_room_members').delete().eq('room_id', btn.dataset.declineRoom).eq('share_key', shareKey);
+      const { error } = await sb.from('chat_room_members').delete().eq('room_id', btn.dataset.declineRoom).eq('share_key', shareKey);
+      if (error) { showRestToast('Could not decline invite: ' + error.message); btn.disabled = false; return; }
       refreshChatRooms();
     });
   });
@@ -3667,14 +3773,45 @@ function renderChatMessages(messages) {
     list.innerHTML = '<p class="empty-note">No messages yet. Say hi!</p>';
     return;
   }
+  const myName = effectiveLeaderboardName();
+  const inDm = currentChatRoomId && chatRoomMeta[currentChatRoomId] && chatRoomMeta[currentChatRoomId].isDm;
   messages.forEach(m => {
     const row = document.createElement('div');
     row.className = 'chat-row';
     const time = new Date(m.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-    row.innerHTML = `<span class="chat-time">[${time}]</span> <span class="chat-name">${escapeHtml(m.code_name)}:</span> <span class="chat-msg">${escapeHtml(m.message)}</span>`;
+    const nameHtml = (!inDm && m.code_name !== myName)
+      ? `<span class="chat-name chat-name-link" data-dm-name="${escapeHtml(m.code_name)}">${escapeHtml(m.code_name)}</span>`
+      : `<span class="chat-name">${escapeHtml(m.code_name)}</span>`;
+    row.innerHTML = `<span class="chat-time">[${time}]</span> ${nameHtml}: <span class="chat-msg">${escapeHtml(m.message)}</span>`;
     list.appendChild(row);
   });
+  list.querySelectorAll('[data-dm-name]').forEach(el => {
+    el.addEventListener('click', () => startDM(el.dataset.dmName));
+  });
   list.scrollTop = list.scrollHeight;
+}
+
+async function startDM(otherName) {
+  if (!sbConfigured()) return;
+  const shareKey = getOrCreateShareKey();
+  try {
+    const { data, error } = await sb.rpc('start_dm_by_name', {
+      p_my_key: shareKey,
+      p_my_name: effectiveLeaderboardName(),
+      p_other_name: otherName,
+    });
+    if (error) throw error;
+    if (!data) { showRestToast(`Couldn't find "${otherName}" — they may not be synced to Nexus.`); return; }
+    currentChatRoomId = data;
+    localStorage.setItem('wft_chat_room', data);
+    await refreshChatRooms();
+    document.getElementById('chatRoomSelect').value = data;
+    markDmRead(data);
+    document.getElementById('btnLeaveGroup').hidden = false;
+    document.getElementById('btnDeleteGroup').hidden = true;
+    const messages = await fetchChatMessages();
+    renderChatMessages(messages);
+  } catch (e) { showRestToast('Could not start DM: ' + (e.message || 'check your connection')); }
 }
 
 async function updateLeaderboard() {
@@ -3751,9 +3888,16 @@ function initGroupChat() {
   const select = document.getElementById('chatRoomSelect');
   select.addEventListener('change', async () => {
     currentChatRoomId = select.value || null;
-    if (currentChatRoomId) localStorage.setItem('wft_chat_room', currentChatRoomId);
-    else localStorage.removeItem('wft_chat_room');
+    if (currentChatRoomId) {
+      localStorage.setItem('wft_chat_room', currentChatRoomId);
+      if (chatRoomMeta[currentChatRoomId] && chatRoomMeta[currentChatRoomId].isDm) markDmRead(currentChatRoomId);
+    } else {
+      localStorage.removeItem('wft_chat_room');
+    }
+    const meta = currentChatRoomId ? chatRoomMeta[currentChatRoomId] : null;
     document.getElementById('btnLeaveGroup').hidden = !currentChatRoomId;
+    const shareKey = localStorage.getItem('wft_lb_share_key');
+    document.getElementById('btnDeleteGroup').hidden = !(meta && !meta.isDm && meta.createdByKey === shareKey);
     if (!sbConfigured()) return;
     try {
       const messages = await fetchChatMessages();
@@ -3763,7 +3907,7 @@ function initGroupChat() {
 
   document.getElementById('btnLeaveGroup').addEventListener('click', async () => {
     if (!currentChatRoomId || !sbConfigured()) return;
-    if (!confirm('Leave this group chat?')) return;
+    if (!confirm('Leave this chat?')) return;
     const shareKey = localStorage.getItem('wft_lb_share_key');
     try {
       await sb.rpc('leave_chat_room', { p_room_id: currentChatRoomId, p_share_key: shareKey });
@@ -3773,6 +3917,21 @@ function initGroupChat() {
       const messages = await fetchChatMessages();
       renderChatMessages(messages);
     } catch (e) { /* best effort */ }
+  });
+
+  document.getElementById('btnDeleteGroup').addEventListener('click', async () => {
+    if (!currentChatRoomId || !sbConfigured()) return;
+    if (!confirm('Delete this group for everyone? This cannot be undone.')) return;
+    const shareKey = localStorage.getItem('wft_lb_share_key');
+    try {
+      const { error } = await sb.rpc('delete_chat_room', { p_room_id: currentChatRoomId, p_requester_key: shareKey });
+      if (error) { showRestToast('Could not delete group: ' + error.message); return; }
+      currentChatRoomId = null;
+      localStorage.removeItem('wft_chat_room');
+      await refreshChatRooms();
+      const messages = await fetchChatMessages();
+      renderChatMessages(messages);
+    } catch (e) { showRestToast('Could not delete group.'); }
   });
 
   const bellBtn = document.getElementById('btnChatInvites');

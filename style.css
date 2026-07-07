@@ -1333,6 +1333,7 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .chat-row { font-size: 0.8rem; line-height: 1.4; color: var(--text-secondary); }
 .chat-time { font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-muted); }
 .chat-name { color: var(--cyan); font-weight: 700; }
+.chat-name-link { cursor: pointer; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 2px; }
 .chat-msg { color: var(--text-primary); }
 .chat-input-row { display: flex; gap: 8px; }
 .chat-input-row input {

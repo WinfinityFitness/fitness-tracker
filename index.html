@@ -289,7 +289,19 @@
         </div>
         <div class="cardio-stat">
           <div class="cardio-stat-value" id="cardioPace">--:--</div>
-          <div class="cardio-stat-label" id="cardioPaceLabel">Pace /km</div>
+          <div class="cardio-stat-label" id="cardioPaceLabel">Avg pace /km</div>
+        </div>
+        <div class="cardio-stat">
+          <div class="cardio-stat-value" id="cardioBestPace">--:--</div>
+          <div class="cardio-stat-label" id="cardioBestPaceLabel">Fastest /km</div>
+        </div>
+        <div class="cardio-stat">
+          <div class="cardio-stat-value" id="cardioAvgSpeed">0.0</div>
+          <div class="cardio-stat-label" id="cardioAvgSpeedLabel">Avg speed km/h</div>
+        </div>
+        <div class="cardio-stat">
+          <div class="cardio-stat-value" id="cardioMaxSpeed">0.0</div>
+          <div class="cardio-stat-label" id="cardioMaxSpeedLabel">Max speed km/h</div>
         </div>
       </div>
       <svg id="cardioRouteSketch" class="cardio-route-sketch" viewBox="0 0 300 160"></svg>
@@ -549,6 +561,7 @@
           <option value="">🌐 Public Chat</option>
         </select>
         <button type="button" class="btn btn--sm" id="btnLeaveGroup" hidden>Leave</button>
+        <button type="button" class="btn btn--sm btn--danger" id="btnDeleteGroup" hidden>Delete</button>
         <button type="button" class="btn btn--sm" id="btnNewGroup">+ Group</button>
       </div>
 
