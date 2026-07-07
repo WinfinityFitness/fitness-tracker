@@ -565,10 +565,15 @@
         <select id="chatRoomSelect">
           <option value="">🌐 Public Chat</option>
         </select>
-        <button type="button" class="btn btn--sm" id="btnInviteGroup" hidden>Invite</button>
-        <button type="button" class="btn btn--sm" id="btnLeaveGroup" hidden>Leave</button>
-        <button type="button" class="btn btn--sm btn--danger" id="btnDeleteGroup" hidden>Delete</button>
-        <button type="button" class="btn btn--sm" id="btnNewGroup">+ Group</button>
+        <div class="chat-room-menu-wrap">
+          <button type="button" class="chat-room-menu-btn" id="btnChatRoomMenu" aria-label="Chat room options" title="More options">⋮</button>
+          <div class="chat-room-menu" id="chatRoomMenu" hidden>
+            <button type="button" class="chat-room-menu-item" id="btnNewGroup">+ New group</button>
+            <button type="button" class="chat-room-menu-item" id="btnInviteGroup" hidden>Invite people</button>
+            <button type="button" class="chat-room-menu-item" id="btnLeaveGroup" hidden>Leave</button>
+            <button type="button" class="chat-room-menu-item chat-room-menu-item--danger" id="btnDeleteGroup" hidden>Delete group</button>
+          </div>
+        </div>
       </div>
 
       <div class="chat-new-group" id="inviteGroupPanel" hidden>

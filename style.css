@@ -1420,6 +1420,47 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   font-size: 0.85rem;
 }
 .chat-room-row .btn { flex: none; }
+.chat-room-menu-wrap { position: relative; flex: none; }
+.chat-room-menu-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 5px;
+  border: 1px solid var(--border-soft);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.chat-room-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  min-width: 170px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+.chat-room-menu[hidden] { display: none; }
+.chat-room-menu-item {
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+.chat-room-menu-item:hover { background: var(--surface-2); }
+.chat-room-menu-item--danger { color: var(--critical); }
 .chat-new-group {
   background: var(--surface-2);
   border: 1px solid var(--border-soft);

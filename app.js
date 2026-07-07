@@ -3979,6 +3979,16 @@ function initGroupChat() {
     if (!popover.hidden && !popover.contains(e.target) && e.target !== bellBtn && !bellBtn.contains(e.target)) popover.hidden = true;
   });
 
+  const roomMenuBtn = document.getElementById('btnChatRoomMenu');
+  const roomMenu = document.getElementById('chatRoomMenu');
+  roomMenuBtn.addEventListener('click', () => { roomMenu.hidden = !roomMenu.hidden; });
+  roomMenu.querySelectorAll('.chat-room-menu-item').forEach(item => {
+    item.addEventListener('click', () => { roomMenu.hidden = true; });
+  });
+  document.addEventListener('click', e => {
+    if (!roomMenu.hidden && !roomMenu.contains(e.target) && e.target !== roomMenuBtn && !roomMenuBtn.contains(e.target)) roomMenu.hidden = true;
+  });
+
   const panel = document.getElementById('chatNewGroupPanel');
   document.getElementById('btnNewGroup').addEventListener('click', () => {
     panel.hidden = !panel.hidden;
