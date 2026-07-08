@@ -339,6 +339,16 @@ body {
   line-height: 0;
   filter: drop-shadow(0 0 4px var(--cyan-glow));
 }
+.wx-location-btn { filter: none; }
+.wx-location-dot {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
+.wx-location-dot circle {
+  fill: var(--magenta);
+  filter: drop-shadow(0 0 4px rgba(207,92,184,0.7));
+}
 .weather-widget {
   flex: 3;
   min-width: 0;
@@ -351,6 +361,7 @@ body {
 }
 .weather-widget .datetime-label { justify-content: center; margin-bottom: 4px; }
 .weather-icon { font-size: 1.7rem; line-height: 1; }
+.weather-icon .wx-icon { width: 30px; height: 30px; display: block; }
 .weather-temp {
   font-family: var(--font-mono);
   font-size: 0.95rem;
@@ -662,6 +673,20 @@ body {
   width: 100%;
 }
 .field input[type="date"] { color-scheme: dark; }
+.date-picker-trigger { cursor: pointer; caret-color: transparent; }
+.date-picker-trigger::-webkit-calendar-picker-indicator { display: none; }
+.food-diary-date-picker .date-picker-trigger::-webkit-calendar-picker-indicator { display: none; }
+.mission-log-day.is-selected { background: var(--cyan); color: #04181a; font-weight: 800; box-shadow: 0 0 8px var(--cyan-glow); }
+button.mission-log-day {
+  background: none;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+button.mission-log-day:hover { border-color: var(--cyan); }
 .field input[type="range"] {
   width: 100%;
   accent-color: var(--cyan);
@@ -799,6 +824,7 @@ body {
 .save-note { font-family: var(--font-mono); font-size: 0.78rem; color: var(--good); min-height: 1.1em; text-align: center; }
 .hint { font-size: 0.8rem; color: var(--text-muted); margin: 8px 0 4px; line-height: 1.4; }
 .hint--accent { color: var(--cyan); background: var(--surface-2); border: 1px solid var(--cyan-dim); border-radius: 5px; padding: 8px 10px; }
+.hint--warning { color: var(--warning); background: var(--surface-2); border: 1px solid var(--warning); border-radius: 5px; padding: 6px 10px; }
 
 .computed-card {
   background: var(--surface-1);
@@ -812,6 +838,8 @@ body {
 .computed-list dt { font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .computed-list dd { margin: 0; font-size: 1rem; font-weight: 700; color: var(--cyan); font-family: var(--font-mono); }
 .target-icon { color: var(--text-muted); font-size: 1rem; }
+.fuel-status-head-right { display: flex; align-items: center; gap: 8px; }
+.fuel-status-head-right .icon-btn { padding: 4px 7px; }
 
 /* ---------------- Gradient bars (Fuel status, Goal progress) ---------------- */
 .gradient-bar {
@@ -1068,25 +1096,23 @@ tbody tr:nth-child(even) { background: rgba(255,255,255,0.02); }
 tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .ex-add-set { width: 100%; margin-top: 8px; }
 
-.pr-board { display: flex; flex-direction: column; gap: 8px; }
+.pr-board { display: flex; flex-direction: column; gap: 5px; }
 .pr-board-row {
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--card-radius);
-  padding: 12px;
+  padding: 7px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-.pr-board-name { font-weight: 700; font-size: 0.9rem; margin-bottom: 8px; }
-.pr-board-compare { display: flex; align-items: center; gap: 10px; }
-.pr-board-col { flex: 1; text-align: center; }
-.pr-board-label {
-  display: block; font-family: var(--font-mono); font-size: 0.6rem; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px;
-}
-.pr-board-value { font-family: var(--font-mono); font-size: 0.9rem; font-weight: 700; color: var(--text-secondary); }
-.pr-board-value--current { color: var(--cyan); text-shadow: 0 0 8px var(--cyan-glow); }
-.pr-board-arrow { color: var(--text-muted); font-size: 1rem; }
+.pr-board-name { font-weight: 700; font-size: 0.76rem; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pr-board-compare { display: flex; align-items: center; gap: 5px; flex: none; }
+.pr-board-value { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700; color: var(--text-secondary); white-space: nowrap; }
+.pr-board-value--current { color: var(--cyan); text-shadow: 0 0 6px var(--cyan-glow); }
+.pr-board-arrow { color: var(--text-muted); font-size: 0.78rem; }
 .pr-board-delta {
-  margin-top: 8px; text-align: center; font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700;
+  flex: none; text-align: right; font-family: var(--font-mono); font-size: 0.64rem; font-weight: 700; min-width: 58px;
 }
 .pr-board-delta.is-up { color: var(--good); }
 .pr-board-delta.is-down { color: var(--critical); }
@@ -1434,28 +1460,28 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 }
 .chat-invite-row span { flex: 1 1 100%; font-size: 0.8rem; }
 .chat-invite-row .btn { padding: 6px 10px; font-size: 0.76rem; }
-.chat-room-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.chat-room-row { display: flex; gap: 6px; margin-bottom: 10px; align-items: center; }
 .chat-room-row select {
-  flex: 0 0 60%;
+  flex: 0 0 46%;
   min-width: 0;
-  padding: 10px;
+  padding: 6px 8px;
   border-radius: 5px;
   border: 1px solid var(--border-soft);
   background: var(--surface-2);
   color: var(--text-primary);
   font-family: inherit;
-  font-size: 0.85rem;
+  font-size: 0.74rem;
 }
-.chat-room-row .btn { flex: none; }
+.chat-room-row .btn { flex: none; padding: 6px 10px; font-size: 0.74rem; }
 .chat-room-menu-wrap { position: relative; flex: none; }
 .chat-room-menu-btn {
-  width: 40px;
-  height: 40px;
+  width: 30px;
+  height: 30px;
   border-radius: 5px;
   border: 1px solid var(--border-soft);
   background: var(--surface-2);
   color: var(--text-primary);
-  font-size: 1.2rem;
+  font-size: 1rem;
   line-height: 1;
   cursor: pointer;
 }
@@ -1799,11 +1825,13 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 }
 .sheet-overlay[hidden] { display: none; }
 .sheet-overlay--stacked { z-index: 160; }
+#datePickerOverlay { z-index: 170; }
 
 /* ---------------- Food Diary ---------------- */
 .meal-section { margin-bottom: 18px; }
 .meal-section-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
-.meal-section-title { font-weight: 700; font-size: 0.95rem; }
+.meal-section-title { font-weight: 700; font-size: 0.95rem; display: inline-flex; align-items: center; gap: 6px; }
+.meal-icon { width: 18px; height: 18px; flex: none; filter: drop-shadow(0 0 3px var(--cyan-glow)); }
 .meal-section-total { font-family: var(--font-mono); font-size: 0.78rem; color: var(--cyan); }
 .meal-items { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
 .meal-item-row {
@@ -1830,7 +1858,18 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 }
 .meal-item-remove { flex: none; background: none; border: none; color: var(--critical); font-size: 1rem; cursor: pointer; padding: 4px; }
 .meal-item-edit-btn { flex: none; background: none; border: none; color: var(--cyan); font-size: 0.95rem; cursor: pointer; padding: 4px; }
-.add-food-btn { width: 100%; }
+.add-food-btn {
+  width: 100%;
+  background: linear-gradient(155deg, rgba(255,255,255,0.08), rgba(255,255,255,0.015) 55%, rgba(0,0,0,0.06));
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  border: 1px solid rgba(255,255,255,0.13);
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.14),
+    inset 0 -1px 2px rgba(0,0,0,0.35),
+    0 1px 4px rgba(0,0,0,0.22);
+  color: var(--cyan);
+}
 
 .meal-item-row--edit { align-items: stretch; }
 .meal-item-edit-form { display: flex; flex-direction: column; gap: 8px; width: 100%; }
@@ -1849,13 +1888,24 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .meal-item-edit-form .field-row input { flex: 1; }
 .meal-item-edit-form .field-label { font-family: var(--font-mono); font-size: 0.62rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-bottom: 2px; }
 
+/* Frosted-glass / embossed-thin surface — used where neon line icons need a
+   subtle, translucent seat rather than a flat solid block. */
+.glass-emboss {
+  background: linear-gradient(155deg, rgba(255,255,255,0.08), rgba(255,255,255,0.015) 55%, rgba(0,0,0,0.06));
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  border: 1px solid rgba(255,255,255,0.13);
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.14),
+    inset 0 -1px 2px rgba(0,0,0,0.35),
+    0 1px 4px rgba(0,0,0,0.22);
+}
+
 .food-diary-date-nav { display: flex; align-items: center; gap: 4px; }
 .food-diary-date-picker {
   display: flex;
   align-items: center;
   gap: 4px;
-  background: var(--surface-2);
-  border: 1px solid var(--border-soft);
   border-radius: 5px;
   padding: 4px 8px;
   font-size: 0.8rem;
@@ -1870,10 +1920,9 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   width: 108px;
   color-scheme: dark;
 }
+.cal-icon { width: 15px; height: 15px; flex: none; filter: drop-shadow(0 0 3px var(--cyan-glow)); }
 .icon-btn {
   flex: none;
-  background: var(--surface-2);
-  border: 1px solid var(--border-soft);
   border-radius: 5px;
   color: var(--text-primary);
   font-size: 1rem;

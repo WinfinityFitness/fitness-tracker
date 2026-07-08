@@ -1,5 +1,9 @@
 'use strict';
 
+// Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
+// tab as a real build marker instead of decorative placeholder text.
+const APP_VERSION = 'WF_SYS_V.1.2';
+
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
 /* ---------------------------------------------------------------- */
@@ -156,6 +160,20 @@ function getEffectiveCalorieTarget(profile) {
   const range = profile.goalMode === 'bulk' ? targets.bulking : targets.cutting;
   return round0((range[0] + range[1]) / 2);
 }
+// One-day-back only (no compounding chain) — if yesterday went over target,
+// today's effective target shrinks by that overage, shown on the calorie ring.
+function getCalorieCarryoverDebt(date, profile) {
+  if (!profile) return 0;
+  const target = getEffectiveCalorieTarget(profile);
+  if (!target) return 0;
+  const prev = parseISO(date);
+  prev.setDate(prev.getDate() - 1);
+  const prevIso = prev.getFullYear() + '-' + String(prev.getMonth() + 1).padStart(2, '0') + '-' + String(prev.getDate()).padStart(2, '0');
+  const prevEntry = getLogs()[prevIso];
+  if (!prevEntry || prevEntry.calories == null) return 0;
+  return Math.max(0, prevEntry.calories - target);
+}
+
 function getEffectiveStepGoal(profile) {
   if (!profile) return 8000;
   return profile.coachStepGoal || profile.stepGoal || 8000;
@@ -297,6 +315,20 @@ function renderRing(container, pct, opts) {
   const gradId = `ringGrad${ringGradCounter++}`;
   const strokeAttr = opts.gradient ? `url(#${gradId})` : '';
   const glow = opts.gradient ? `filter: drop-shadow(0 0 6.6px var(--gradient-glow));` : '';
+
+  // Optional inset red arc showing progress beyond 100% (e.g. calories over target),
+  // drawn just inside the main ring so it stays within the same viewBox.
+  const overflowPct = Math.min(100, Math.max(0, opts.overflowPct || 0));
+  const overflowStroke = Math.max(3, Math.round(stroke * 0.4));
+  const overflowR = Math.max(4, r - stroke / 2 - overflowStroke / 2 - 3);
+  const overflowC = 2 * Math.PI * overflowR;
+  const overflowOffset = overflowC - (overflowPct / 100) * overflowC;
+  const overflowRing = overflowPct > 0
+    ? `<circle cx="${size / 2}" cy="${size / 2}" r="${overflowR}" stroke-width="${overflowStroke}" fill="none" stroke="var(--critical)"
+        stroke-dasharray="${overflowC.toFixed(2)}" stroke-dashoffset="${overflowOffset.toFixed(2)}" stroke-linecap="round"
+        transform="rotate(-90 ${size / 2} ${size / 2})" style="filter: drop-shadow(0 0 4px var(--critical));"></circle>`
+    : '';
+
   container.innerHTML = `
     ${opts.modTag ? `<p class="mod-tag">${opts.modTag}</p>` : ''}
     <div style="position:relative;width:${size}px;height:${size}px;">
@@ -311,6 +343,7 @@ function renderRing(container, pct, opts) {
           stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}"
           style="${strokeAttr ? `stroke:${strokeAttr};${glow}` : ''}"
           transform="rotate(-90 ${size / 2} ${size / 2})"></circle>
+        ${overflowRing}
       </svg>
       <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;">${center}</div>
     </div>
@@ -554,6 +587,21 @@ function initTermsOfService() {
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
 }
 
+async function sharePersonalRecords() {
+  const rows = computePRBoard();
+  if (!rows.length) return;
+  const top = rows
+    .slice()
+    .sort((a, b) => b.current.oneRM - a.current.oneRM)
+    .slice(0, 6);
+  const blob = await generateShareCardBlob({
+    emoji: '🏆',
+    title: 'Personal Records',
+    stats: top.map(r => ({ label: r.name, value: `${round2(r.current.weightKg)}kg × ${r.current.reps}` })),
+  });
+  shareViaWebShare({ title: 'Winfinity Tracker — Personal Records', text: '🏆 New personal records logged with Winfinity Tracker!' }, blob);
+}
+
 function initPRBoardOverlay() {
   const overlay = document.getElementById('prBoardOverlay');
   document.getElementById('btnOpenPRBoard').addEventListener('click', () => {
@@ -562,6 +610,7 @@ function initPRBoardOverlay() {
   });
   document.getElementById('btnClosePRBoard').addEventListener('click', () => { overlay.hidden = true; });
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+  document.getElementById('btnSharePR').addEventListener('click', sharePersonalRecords);
 }
 
 function getSavedTimezone() {
@@ -615,14 +664,30 @@ function initTimezonePicker() {
 /* ---------------------------------------------------------------- */
 /* Status: weather widget (Open-Meteo, no API key required)            */
 /* ---------------------------------------------------------------- */
+// Thin-line neon icons (cyan clouds/rain, amber sun/bolt) matching the app's
+// terminal aesthetic, replacing default-emoji weather glyphs.
+const WX_CLOUD_PATH = 'M6 15a4.5 4.5 0 0 1-.5-8.98A5.5 5.5 0 0 1 16 7.5a3.9 3.9 0 0 1-1 7.5H6z';
+const WX_SUN_RAYS = `<g stroke="var(--warning)" stroke-width="1.5" stroke-linecap="round">
+  <line x1="12" y1="1.6" x2="12" y2="3.8"/><line x1="12" y1="20.2" x2="12" y2="22.4"/>
+  <line x1="1.6" y1="12" x2="3.8" y2="12"/><line x1="20.2" y1="12" x2="22.4" y2="12"/>
+  <line x1="4.4" y1="4.4" x2="5.9" y2="5.9"/><line x1="18.1" y1="18.1" x2="19.6" y2="19.6"/>
+  <line x1="4.4" y1="19.6" x2="5.9" y2="18.1"/><line x1="18.1" y1="5.9" x2="19.6" y2="4.4"/>
+</g>`;
+function wxSvg(inner) { return `<svg viewBox="0 0 24 24" class="wx-icon" fill="none">${inner}</svg>`; }
+function wxCloud(cy) { return `<path d="${WX_CLOUD_PATH}" transform="translate(0 ${cy})" stroke="var(--cyan)" stroke-width="1.6" stroke-linejoin="round" style="filter:drop-shadow(0 0 3px var(--cyan-glow));"/>`; }
+function wxSun(r, cy) { return `<circle cx="12" cy="${cy}" r="${r}" stroke="var(--warning)" stroke-width="1.5" style="filter:drop-shadow(0 0 3px rgba(219,165,44,0.6));"/>`; }
+function wxRain(y) { return `<g stroke="var(--cyan)" stroke-width="1.6" stroke-linecap="round"><line x1="8" y1="${y}" x2="7" y2="${y + 3}"/><line x1="12" y1="${y}" x2="11" y2="${y + 3}"/><line x1="16" y1="${y}" x2="15" y2="${y + 3}"/></g>`; }
+function wxSnow(y) { return `<g stroke="var(--cyan)" stroke-width="2.2" stroke-linecap="round"><line x1="8" y1="${y}" x2="8" y2="${y + 0.1}"/><line x1="12" y1="${y + 1.5}" x2="12" y2="${y + 1.6}"/><line x1="16" y1="${y}" x2="16" y2="${y + 0.1}"/></g>`; }
+function wxBolt() { return `<path d="M12.8 12.5l-3.3 5.4h2.7l-1.6 4.2 4.4-6h-2.7l1.7-3.6z" fill="var(--warning)" stroke="var(--warning)" stroke-width="0.8" stroke-linejoin="round" style="filter:drop-shadow(0 0 3px rgba(219,165,44,0.7));"/>`; }
+
 function weatherIconFor(code) {
-  if (code === 0) return '☀️';
-  if (code <= 3) return '⛅';
-  if (code <= 48) return '🌫️';
-  if (code <= 67) return '🌧️';
-  if (code <= 77) return '❄️';
-  if (code <= 82) return '🌦️';
-  return '⛈️';
+  if (code === 0) return wxSvg(wxSun(4.6, 12) + WX_SUN_RAYS);
+  if (code <= 3) return wxSvg(wxSun(3, 7) + `<g stroke="var(--warning)" stroke-width="1.4" stroke-linecap="round"><line x1="7" y1="1.4" x2="7" y2="2.6"/><line x1="1.4" y1="7" x2="2.6" y2="7"/><line x1="3" y1="3" x2="3.9" y2="3.9"/></g>` + wxCloud(2));
+  if (code <= 48) return wxSvg(wxCloud(1) + `<g stroke="var(--cyan)" stroke-width="1.4" stroke-linecap="round" opacity="0.65"><line x1="4" y1="18" x2="20" y2="18"/><line x1="6.5" y1="20.5" x2="17.5" y2="20.5"/></g>`);
+  if (code <= 67) return wxSvg(wxCloud(-1) + wxRain(14));
+  if (code <= 77) return wxSvg(wxCloud(-1) + wxSnow(14));
+  if (code <= 82) return wxSvg(wxSun(2.8, 6) + wxCloud(1) + wxRain(15));
+  return wxSvg(wxCloud(-2) + wxBolt());
 }
 
 async function fetchWeather(lat, lon) {
@@ -633,7 +698,7 @@ async function fetchWeather(lat, lon) {
 }
 
 function renderWeather(w) {
-  document.getElementById('weatherIcon').textContent = weatherIconFor(w.code);
+  document.getElementById('weatherIcon').innerHTML = weatherIconFor(w.code);
   document.getElementById('weatherTemp').textContent = Math.round(w.tempC) + '°C';
   // Fresh weather feeds the auto-computed hydration target — refresh it if that's on.
   const profile = getProfile();
@@ -1010,12 +1075,8 @@ function loadBioForDate(date) {
   const profile = getProfile();
   const logs = getLogs();
   const e = logs[date] || {};
-  const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
 
-  document.getElementById('bioWeight').value = e.weightKg != null ? round2(fromKg(e.weightKg, wu)) : '';
   document.getElementById('bioMenstruating').checked = !!e.menstruating;
-  document.getElementById('bioSleep').value = e.sleep ?? 3;
-  document.getElementById('bioSleepOut').textContent = e.sleep ?? 3;
   document.getElementById('bioStress').value = e.stress ?? 3;
   document.getElementById('bioStressOut').textContent = e.stress ?? 3;
   document.getElementById('bioFatigue').value = e.fatigue ?? 3;
@@ -1023,14 +1084,13 @@ function loadBioForDate(date) {
   document.getElementById('bioHunger').value = e.hunger ?? 3;
   document.getElementById('bioHungerOut').textContent = e.hunger ?? 3;
   document.getElementById('bioMenstruatingField').hidden = !profile || profile.gender !== 'female';
-  document.getElementById('bioWeightUnitLabel').textContent = wu;
 }
 
 function initBioLog() {
   document.getElementById('bioDate').value = todayISO();
   document.getElementById('bioDate').addEventListener('change', e => loadBioForDate(e.target.value));
 
-  ['bioSleep', 'bioStress', 'bioFatigue', 'bioHunger'].forEach(id => {
+  ['bioStress', 'bioFatigue', 'bioHunger'].forEach(id => {
     const input = document.getElementById(id);
     const out = document.getElementById(id + 'Out');
     input.addEventListener('input', () => { out.textContent = input.value; });
@@ -1038,13 +1098,9 @@ function initBioLog() {
 
   document.getElementById('btnSaveBio').addEventListener('click', () => {
     const profile = getProfile();
-    const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
     const date = document.getElementById('bioDate').value;
-    const weightRaw = parseFloat(document.getElementById('bioWeight').value);
     updateLogFields(date, {
-      weightKg: isNaN(weightRaw) ? null : toKg(weightRaw, wu),
       menstruating: document.getElementById('bioMenstruating').checked,
-      sleep: parseInt(document.getElementById('bioSleep').value, 10),
       stress: parseInt(document.getElementById('bioStress').value, 10),
       fatigue: parseInt(document.getElementById('bioFatigue').value, 10),
       hunger: parseInt(document.getElementById('bioHunger').value, 10),
@@ -2453,6 +2509,90 @@ function initMissionLog() {
   });
 }
 
+/* ---------------------------------------------------------------- */
+/* Shared date-picker popup (same visual as Temporal Mission Log)     */
+/* Every readonly .date-picker-trigger input opens this instead of     */
+/* the native OS picker; selecting a day sets .value + fires change,  */
+/* so every existing change-listener keeps working unmodified.        */
+/* ---------------------------------------------------------------- */
+let datePickerViewDate = new Date();
+let datePickerTargetInput = null;
+
+function renderDatePickerGrid(selectedIso) {
+  const year = datePickerViewDate.getFullYear();
+  const month = datePickerViewDate.getMonth();
+  document.getElementById('datePickerMonthLabel').textContent =
+    datePickerViewDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+
+  const todayIso = todayISO();
+  const firstOfMonth = new Date(year, month, 1);
+  const firstWeekday = firstOfMonth.getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+  const cells = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push({ day: daysInPrevMonth - firstWeekday + 1 + i, muted: true });
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    cells.push({ day: d, iso, isToday: iso === todayIso, isSelected: iso === selectedIso });
+  }
+  let nextDay = 1;
+  while (cells.length % 7 !== 0) cells.push({ day: nextDay++, muted: true });
+
+  const grid = document.getElementById('datePickerGrid');
+  grid.innerHTML = cells.map(c => {
+    const classes = ['mission-log-day'];
+    if (c.isToday) classes.push('is-today');
+    if (c.isSelected) classes.push('is-selected');
+    if (c.muted) { classes.push('is-muted'); return `<div class="${classes.join(' ')}">${c.day}</div>`; }
+    return `<button type="button" class="${classes.join(' ')}" data-iso="${c.iso}">${c.day}</button>`;
+  }).join('');
+}
+
+function openDatePicker(inputEl, title) {
+  const current = inputEl.value;
+  const base = current ? parseISO(current) : new Date();
+  datePickerViewDate = new Date(base.getFullYear(), base.getMonth(), 1);
+  datePickerTargetInput = inputEl;
+  document.getElementById('datePickerTitle').textContent = title || 'Select Date';
+  renderDatePickerGrid(current);
+  document.getElementById('datePickerOverlay').hidden = false;
+}
+
+function initDatePicker() {
+  const overlay = document.getElementById('datePickerOverlay');
+  document.getElementById('btnCloseDatePicker').addEventListener('click', () => { overlay.hidden = true; });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+  document.getElementById('btnDatePickerPrev').addEventListener('click', () => {
+    datePickerViewDate = new Date(datePickerViewDate.getFullYear(), datePickerViewDate.getMonth() - 1, 1);
+    renderDatePickerGrid(datePickerTargetInput ? datePickerTargetInput.value : null);
+  });
+  document.getElementById('btnDatePickerNext').addEventListener('click', () => {
+    datePickerViewDate = new Date(datePickerViewDate.getFullYear(), datePickerViewDate.getMonth() + 1, 1);
+    renderDatePickerGrid(datePickerTargetInput ? datePickerTargetInput.value : null);
+  });
+  document.getElementById('btnDatePickerToday').addEventListener('click', () => {
+    datePickerViewDate = new Date();
+    renderDatePickerGrid(todayISO());
+  });
+  document.getElementById('datePickerGrid').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-iso]');
+    if (!btn || !datePickerTargetInput) return;
+    overlay.hidden = true;
+    datePickerTargetInput.value = btn.dataset.iso;
+    datePickerTargetInput.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
+  const titles = {
+    trainDate: 'Training Date', nutDate: 'Fuel Date', bioDate: 'Bio Date',
+    reviewDate: 'Week Ending', setupStartDate: 'Challenge Start', measureDate: 'Measurement Date',
+    foodDiaryDateInput: 'Food Diary Date',
+  };
+  document.querySelectorAll('.date-picker-trigger').forEach(input => {
+    input.addEventListener('click', () => openDatePicker(input, titles[input.id] || 'Select Date'));
+  });
+}
+
 function initTraining() {
   document.getElementById('trainDate').value = getActiveTrainingDate();
   localStorage.setItem('wft_active_train_date', document.getElementById('trainDate').value);
@@ -2855,22 +2995,22 @@ function renderPRBoard() {
   board.innerHTML = '';
   if (!rows.length) { empty.hidden = false; return; }
   empty.hidden = true;
-  const fmtBoth = (weightKg, reps) => `${round2(weightKg)}kg / ${round2(kgToLb(weightKg))}lb × ${reps}`;
+  const fmtCompact = (weightKg, reps) => `${round2(weightKg)}kg×${reps}`;
   rows.forEach(r => {
-    const curText = fmtBoth(r.current.weightKg, r.current.reps);
-    const prevText = r.previous ? fmtBoth(r.previous.weightKg, r.previous.reps) : '–';
+    const curText = fmtCompact(r.current.weightKg, r.current.reps);
+    const prevText = r.previous ? fmtCompact(r.previous.weightKg, r.previous.reps) : '–';
     const deltaPct = r.previous ? round2(((r.current.oneRM - r.previous.oneRM) / r.previous.oneRM) * 100) : null;
     const row = document.createElement('div');
     row.className = 'pr-board-row';
     row.innerHTML = `
       <div class="pr-board-name">${escapeHtml(r.name)}</div>
       <div class="pr-board-compare">
-        <div class="pr-board-col"><span class="pr-board-label">Previous</span><span class="pr-board-value">${prevText}</span></div>
-        <div class="pr-board-arrow">→</div>
-        <div class="pr-board-col"><span class="pr-board-label">Current</span><span class="pr-board-value pr-board-value--current">${curText}</span></div>
+        <span class="pr-board-value">${prevText}</span>
+        <span class="pr-board-arrow">→</span>
+        <span class="pr-board-value pr-board-value--current">${curText}</span>
       </div>
       ${deltaPct != null
-        ? `<div class="pr-board-delta ${deltaPct >= 0 ? 'is-up' : 'is-down'}">${deltaPct >= 0 ? '+' : ''}${deltaPct}% est. 1RM</div>`
+        ? `<div class="pr-board-delta ${deltaPct >= 0 ? 'is-up' : 'is-down'}">${deltaPct >= 0 ? '+' : ''}${deltaPct}%</div>`
         : `<div class="pr-board-delta is-up">New PR!</div>`}
     `;
     board.appendChild(row);
@@ -3370,7 +3510,7 @@ function renderFoodDiary(date) {
       <div class="meal-item-row">
         <div class="meal-item-info">
           <div class="meal-item-name">${escapeHtml(item.name)}</div>
-          <div class="meal-item-meta">${item.grams ? round0(item.grams) + 'g · ' : ''}${round0(item.calories)} kcal</div>
+          <div class="meal-item-meta">${item.qty != null ? formatServingQty(item.qty, item.unit) + ' · ' : (item.grams ? round0(item.grams) + 'g · ' : '')}${round0(item.calories)} kcal</div>
         </div>
         <select class="meal-item-move" data-meal="${mt}" data-idx="${idx}">
           ${MEAL_TYPES.map(m2 => `<option value="${m2}" ${m2 === mt ? 'selected' : ''}>${m2.charAt(0).toUpperCase() + m2.slice(1)}</option>`).join('')}
@@ -3494,6 +3634,36 @@ function initFoodDiary() {
 
 let pendingBarcodeCode = null;
 
+// g/oz/ml convert exactly for any food. cup/bowl/piece/stick/pack are rough,
+// general-purpose estimates (a "piece" of chicken vs. a "piece" of candy weigh
+// nothing alike) — flagged with a visible warning wherever they're picked.
+const SERVING_UNITS = {
+  g: { label: 'g', gramsPerUnit: 1, precise: true },
+  oz: { label: 'oz', gramsPerUnit: 28.3495, precise: true },
+  ml: { label: 'ml', gramsPerUnit: 1, precise: true },
+  cup: { label: 'cup', gramsPerUnit: 240, precise: false },
+  bowl: { label: 'bowl', gramsPerUnit: 350, precise: false },
+  piece: { label: 'piece', gramsPerUnit: 50, precise: false },
+  stick: { label: 'stick', gramsPerUnit: 20, precise: false },
+  pack: { label: 'pack', gramsPerUnit: 30, precise: false },
+};
+
+function servingUnitToGrams(qty, unit) {
+  const u = SERVING_UNITS[unit] || SERVING_UNITS.g;
+  return (qty || 0) * u.gramsPerUnit;
+}
+
+function isServingUnitPrecise(unit) {
+  return (SERVING_UNITS[unit] || SERVING_UNITS.g).precise;
+}
+
+function formatServingQty(qty, unit) {
+  if (qty == null) return '';
+  const u = unit || 'g';
+  const wordUnit = !['g', 'oz', 'ml'].includes(u);
+  return round0(qty) + (wordUnit ? ' ' + u : u);
+}
+
 function openAddFoodPanel() {
   document.getElementById('foodSearchInput').value = '';
   document.getElementById('foodSearchResults').innerHTML = '';
@@ -3502,6 +3672,8 @@ function openAddFoodPanel() {
   selectedFoodData = null;
   document.getElementById('customFoodName').value = '';
   document.getElementById('customFoodGrams').value = '100';
+  document.getElementById('customFoodUnit').value = 'g';
+  document.getElementById('customFoodUnitWarning').hidden = true;
   document.getElementById('customFoodCalories').value = '';
   document.getElementById('customFoodProtein').value = '';
   document.getElementById('customFoodCarbs').value = '';
@@ -3581,20 +3753,62 @@ async function searchUsdaFoods(query) {
   return data.foods || [];
 }
 
-function renderFoodSearchResults(foods) {
+// Nutritionix is optional (blank App ID/Key in config.js = silently skipped)
+// and scoped to *branded* results only — restaurant/fast-food items USDA and
+// Open Food Facts don't cover, since generic foods already overlap with USDA.
+async function searchNutritionixFoods(query) {
+  if (!NUTRITIONIX_APP_ID || !NUTRITIONIX_APP_KEY) return [];
+  try {
+    const res = await fetch(`https://trackapi.nutritionix.com/v2/search/instant?query=${encodeURIComponent(query)}&common=false&branded=true`, {
+      headers: { 'x-app-id': NUTRITIONIX_APP_ID, 'x-app-key': NUTRITIONIX_APP_KEY },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.branded || []).slice(0, 8);
+  } catch (e) { return []; }
+}
+
+async function fetchNutritionixNutrients(foodName) {
+  const res = await fetch('https://trackapi.nutritionix.com/v2/natural/nutrients', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-app-id': NUTRITIONIX_APP_ID, 'x-app-key': NUTRITIONIX_APP_KEY },
+    body: JSON.stringify({ query: foodName }),
+  });
+  if (res.status === 401 || res.status === 403) throw new Error('Nutritionix key invalid — check config.js.');
+  if (!res.ok) throw new Error('Nutritionix lookup failed');
+  const data = await res.json();
+  const f = (data.foods || [])[0];
+  if (!f) throw new Error('No nutrition data found for that item.');
+  return f;
+}
+
+function renderFoodSearchResults(usdaFoods, nixBranded) {
   const container = document.getElementById('foodSearchResults');
-  if (!foods.length) { container.innerHTML = ''; return; }
-  container.innerHTML = foods.map((f, i) => `
+  const usdaRows = (usdaFoods || []).map(f => ({
+    name: f.description,
+    meta: f.brandName || f.brandOwner || (f.dataType === 'Branded' ? 'Branded' : 'Generic'),
+    kcalLabel: round0(usdaNutrientValue(f, USDA_NUTRIENT_IDS.calories)) + ' kcal/100g',
+    onSelect: () => selectFoodProduct({ source: 'usda', food: f }),
+  }));
+  const nixRows = (nixBranded || []).map(f => ({
+    name: f.food_name,
+    meta: f.brand_name || 'Restaurant',
+    kcalLabel: round0(f.nf_calories || 0) + ' kcal/serving',
+    onSelect: () => selectFoodProduct({ source: 'nutritionix', foodName: f.food_name }),
+  }));
+  const rows = usdaRows.concat(nixRows);
+  if (!rows.length) { container.innerHTML = ''; return; }
+  container.innerHTML = rows.map((r, i) => `
     <button type="button" class="food-search-result-row" data-idx="${i}">
       <div>
-        <div class="food-result-name">${escapeHtml(f.description)}</div>
-        <div class="food-result-meta">${escapeHtml(f.brandName || f.brandOwner || (f.dataType === 'Branded' ? 'Branded' : 'Generic'))}</div>
+        <div class="food-result-name">${escapeHtml(r.name)}</div>
+        <div class="food-result-meta">${escapeHtml(r.meta)}</div>
       </div>
-      <span class="food-result-kcal">${round0(usdaNutrientValue(f, USDA_NUTRIENT_IDS.calories))} kcal/100g</span>
+      <span class="food-result-kcal">${r.kcalLabel}</span>
     </button>
   `).join('');
-  container.querySelectorAll('.food-search-result-row').forEach(btn => {
-    btn.addEventListener('click', () => selectFoodProduct({ source: 'usda', food: foods[parseInt(btn.dataset.idx, 10)] }));
+  container.querySelectorAll('.food-search-result-row').forEach((btn, i) => {
+    btn.addEventListener('click', rows[i].onSelect);
   });
 }
 
@@ -3616,7 +3830,7 @@ function offBrandsText(brands) {
 // barcode scanner (product already has full nutriments attached).
 async function selectFoodProduct(selection) {
   const status = document.getElementById('foodSearchStatus');
-  let name, per100g;
+  let name, per100g, defaultGrams = 100;
 
   if (selection.source === 'usda') {
     const f = selection.food;
@@ -3640,6 +3854,30 @@ async function selectFoodProduct(selection) {
       fiber: p.fiber || 0,
       sodium: p.sodium || 0,
     };
+  } else if (selection.source === 'nutritionix') {
+    status.textContent = 'Loading nutrition info…';
+    let f;
+    try {
+      f = await fetchNutritionixNutrients(selection.foodName);
+    } catch (e) {
+      status.textContent = e.message || 'Could not load nutrition info for that item — try another or add custom.';
+      return;
+    }
+    // Branded/restaurant items are reported per labeled serving, not per 100g —
+    // rescale to 100g so the existing grams-based scaling UI works unchanged,
+    // defaulting the grams input to that item's real serving weight.
+    const gramsPerServing = f.serving_weight_grams || 100;
+    const scale = 100 / gramsPerServing;
+    name = f.food_name;
+    per100g = {
+      calories: (f.nf_calories || 0) * scale,
+      protein: (f.nf_protein || 0) * scale,
+      carbs: (f.nf_total_carbohydrate || 0) * scale,
+      fat: (f.nf_total_fat || 0) * scale,
+      fiber: (f.nf_dietary_fiber || 0) * scale,
+      sodium: (f.nf_sodium || 0) * scale,
+    };
+    defaultGrams = round0(gramsPerServing);
   } else {
     let product = selection.product;
     if (!product.nutriments) {
@@ -3666,7 +3904,9 @@ async function selectFoodProduct(selection) {
   status.textContent = '';
   selectedFoodData = { name, per100g };
   document.getElementById('selectedFoodName').textContent = name;
-  document.getElementById('selectedFoodGrams').value = 100;
+  document.getElementById('selectedFoodGrams').value = defaultGrams;
+  document.getElementById('selectedFoodUnit').value = 'g';
+  document.getElementById('selectedFoodUnitWarning').hidden = true;
   updateSelectedFoodPreview();
   document.getElementById('selectedFoodCard').hidden = false;
   document.getElementById('selectedFoodCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -3674,7 +3914,10 @@ async function selectFoodProduct(selection) {
 
 function updateSelectedFoodPreview() {
   if (!selectedFoodData) return;
-  const grams = parseFloat(document.getElementById('selectedFoodGrams').value) || 0;
+  const qty = parseFloat(document.getElementById('selectedFoodGrams').value) || 0;
+  const unit = document.getElementById('selectedFoodUnit').value;
+  document.getElementById('selectedFoodUnitWarning').hidden = isServingUnitPrecise(unit);
+  const grams = servingUnitToGrams(qty, unit);
   const scale = grams / 100;
   const kcal = round0(selectedFoodData.per100g.calories * scale);
   const protein = round0(selectedFoodData.per100g.protein * scale);
@@ -3711,10 +3954,12 @@ function initAddFoodPanel() {
     }
     document.getElementById('foodSearchStatus').textContent = 'Searching…';
     foodSearchDebounceId = setTimeout(async () => {
+      const nixPromise = searchNutritionixFoods(q);
       try {
         const results = await searchUsdaFoods(q);
-        renderFoodSearchResults(results);
-        document.getElementById('foodSearchStatus').textContent = results.length ? '' : 'No matches — try "Add custom food" below.';
+        const nixResults = await nixPromise;
+        renderFoodSearchResults(results, nixResults);
+        document.getElementById('foodSearchStatus').textContent = (results.length || nixResults.length) ? '' : 'No matches — try "Add custom food" below.';
       } catch (e) {
         document.getElementById('foodSearchStatus').textContent = e.message || 'Search unavailable — check your connection.';
       }
@@ -3722,6 +3967,7 @@ function initAddFoodPanel() {
   });
 
   document.getElementById('selectedFoodGrams').addEventListener('input', updateSelectedFoodPreview);
+  document.getElementById('selectedFoodUnit').addEventListener('change', updateSelectedFoodPreview);
 
   const aiBtn = document.getElementById('btnEstimateAiNutrition');
   aiBtn.addEventListener('click', async () => {
@@ -3747,11 +3993,15 @@ function initAddFoodPanel() {
 
   document.getElementById('btnAddSelectedFood').addEventListener('click', () => {
     if (!selectedFoodData) return;
-    const grams = parseFloat(document.getElementById('selectedFoodGrams').value) || 0;
+    const qty = parseFloat(document.getElementById('selectedFoodGrams').value) || 0;
+    const unit = document.getElementById('selectedFoodUnit').value;
+    const grams = servingUnitToGrams(qty, unit);
     const scale = grams / 100;
     addFoodItemToDiary({
       name: selectedFoodData.name,
       grams,
+      qty,
+      unit,
       calories: round0(selectedFoodData.per100g.calories * scale),
       protein: round0(selectedFoodData.per100g.protein * scale),
       carbs: round0(selectedFoodData.per100g.carbs * scale),
@@ -3762,10 +4012,16 @@ function initAddFoodPanel() {
     });
   });
 
+  document.getElementById('customFoodUnit').addEventListener('change', e => {
+    document.getElementById('customFoodUnitWarning').hidden = isServingUnitPrecise(e.target.value);
+  });
+
   document.getElementById('btnAddCustomFood').addEventListener('click', () => {
     const name = document.getElementById('customFoodName').value.trim();
     if (!name) { alert('Enter a food name.'); return; }
-    const grams = parseFloat(document.getElementById('customFoodGrams').value) || null;
+    const qty = parseFloat(document.getElementById('customFoodGrams').value) || null;
+    const unit = document.getElementById('customFoodUnit').value;
+    const grams = qty != null ? servingUnitToGrams(qty, unit) : null;
     const calories = parseFloat(document.getElementById('customFoodCalories').value) || 0;
     const protein = parseFloat(document.getElementById('customFoodProtein').value) || 0;
     const carbs = parseFloat(document.getElementById('customFoodCarbs').value) || 0;
@@ -3778,7 +4034,7 @@ function initAddFoodPanel() {
     }
     pendingBarcodeCode = null;
     document.getElementById('customFoodTeachNote').hidden = true;
-    addFoodItemToDiary({ name, grams, calories, protein, carbs, fat, fiber: 0, sodium: 0, source: 'custom' });
+    addFoodItemToDiary({ name, grams, qty, unit, calories, protein, carbs, fat, fiber: 0, sodium: 0, source: 'custom' });
   });
 }
 
@@ -3903,6 +4159,33 @@ function initFuelWaterOrb() {
   refreshFuelWaterViews(document.getElementById('nutDate').value || todayISO());
 }
 
+async function shareDailyFuelStatus() {
+  const profile = getProfile();
+  const date = document.getElementById('nutDate').value || todayISO();
+  const entry = getLogs()[date] || {};
+  const calorieTarget = getEffectiveCalorieTarget(profile) || 0;
+  const caloriesNow = entry.calories ?? 0;
+  const proteinNow = entry.protein ?? 0;
+  const carbsNow = entry.carbs ?? 0;
+  const fatNow = entry.fat ?? 0;
+  const waterTarget = effectiveWaterTargetML(date);
+  const waterNow = entry.water ?? 0;
+  const text = `🔥 Daily Fuel Status — ${caloriesNow}/${calorieTarget} kcal logged with Winfinity Tracker!`;
+  const blob = await generateShareCardBlob({
+    emoji: '🔥',
+    title: 'Daily Fuel Status',
+    stats: [
+      { label: 'Calories', value: `${caloriesNow} / ${calorieTarget} kcal` },
+      { label: 'Protein', value: `${proteinNow}g` },
+      { label: 'Carbs', value: `${carbsNow}g` },
+      { label: 'Fat', value: `${fatNow}g` },
+      { label: 'Water', value: `${waterNow} / ${waterTarget} mL` },
+      { label: 'Date', value: fmtDate(parseISO(date)) },
+    ],
+  });
+  shareViaWebShare({ title: 'Winfinity Tracker — Daily Fuel', text }, blob);
+}
+
 function initNutrition() {
   document.getElementById('nutDate').value = todayISO();
   document.getElementById('nutDate').addEventListener('change', e => {
@@ -3913,6 +4196,7 @@ function initNutrition() {
   document.getElementById('btnGoToBioFromFuel').addEventListener('click', () => {
     document.querySelector('.tab-btn[data-target="bio"]').click();
   });
+  document.getElementById('btnShareFuelStatus').addEventListener('click', shareDailyFuelStatus);
 
   initFuelWaterOrb();
   loadNutritionForDate(todayISO());
@@ -3982,9 +4266,20 @@ function renderNutritionTargets() {
   const sodiumNow = entry.sodium ?? 0;
   const waterNow = entry.water ?? 0;
 
-  const caloriePct = Math.min(100, (caloriesNow / calorieTarget) * 100);
+  const carryoverDebt = getCalorieCarryoverDebt(date, profile);
+  const effectiveCalorieTarget = Math.max(1, calorieTarget - carryoverDebt);
+  const caloriePctRaw = (caloriesNow / effectiveCalorieTarget) * 100;
+  const caloriePct = Math.min(100, caloriePctRaw);
+  const calorieOverflowPct = Math.max(0, caloriePctRaw - 100);
+  const isOverCalories = caloriePctRaw > 100;
   renderRing(document.getElementById('fuelCalorieRing'), caloriePct, {
-    size: 120, stroke: 10, gradient: true, centerText: Math.round(caloriePct) + '%', label: 'Calories', sub: `${caloriesNow} / ${calorieTarget} kcal`,
+    size: 120, stroke: 10, gradient: true, overflowPct: calorieOverflowPct,
+    centerHtml: isOverCalories
+      ? `<span style="font-size:${Math.round(120 * 0.22)}px;font-weight:800;font-family:var(--font-mono);color:var(--critical);">${Math.round(caloriePctRaw)}%</span>`
+      : undefined,
+    centerText: Math.round(caloriePctRaw) + '%',
+    label: 'Calories',
+    sub: `${caloriesNow} / ${effectiveCalorieTarget} kcal${carryoverDebt > 0 ? ` (−${round0(carryoverDebt)} carried over)` : ''}`,
   });
 
   const proteinKcal = proteinNow * 4;
@@ -4274,7 +4569,10 @@ function initDrive() {
   }
 
   connectBtn.addEventListener('click', () => connectDrive());
-  syncBtn.addEventListener('click', () => saveToDrive(true));
+  syncBtn.addEventListener('click', () => {
+    saveToDrive(true);
+    if (localStorage.getItem('wft_lb_optin') === '1' && sbConfigured()) updateLeaderboard();
+  });
 
   const tryInit = () => {
     if (!window.google || !google.accounts || !google.accounts.oauth2) {
@@ -4901,7 +5199,10 @@ function initLeaderboard() {
     updateCodeNameHint();
   });
 
-  document.getElementById('btnLbUpdate').addEventListener('click', updateLeaderboard);
+  document.getElementById('btnLbUpdate').addEventListener('click', () => {
+    updateLeaderboard();
+    if (localStorage.getItem('wft_drive_connected') && driveConfigured()) saveToDrive(false);
+  });
 
   document.getElementById('btnLbChatSend').addEventListener('click', async () => {
     const input = document.getElementById('lbChatInput');
@@ -5271,6 +5572,7 @@ initMeasurements();
 initTraining();
 initCardioTracker();
 initMissionLog();
+initDatePicker();
 initWeightChartToggle();
 initNutrition();
 initFoodDiary();
@@ -5284,6 +5586,7 @@ initLeaderboard();
 loadSetupForm();
 loadCheckinForm();
 loadQuickLog();
+document.getElementById('sysVersion').textContent = APP_VERSION;
 renderDashboard();
 updateTabDots();
 initBetaLock();

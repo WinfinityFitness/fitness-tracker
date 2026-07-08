@@ -36,7 +36,7 @@
   <!-- ============ STATUS ============ -->
   <section class="tab-panel" id="tab-status" data-tab="status">
     <div class="hero-card">
-      <p class="sys-version">SYS_V.4.2</p>
+      <p class="sys-version" id="sysVersion"></p>
       <p class="hero-eyebrow">System check-in</p>
       <h2 class="hero-title"><span class="hero-title-shrink">Welcome back, </span><span class="accent" id="heroName">Operator</span><span class="hero-title-shrink">.</span></h2>
       <div class="chip-row">
@@ -75,7 +75,7 @@
       <div class="weather-widget" id="weatherWidget">
         <p class="datetime-label">
           <span>Weather</span>
-          <button type="button" class="datetime-tz-btn" id="btnWeatherLocation" aria-label="Choose location">📍</button>
+          <button type="button" class="datetime-tz-btn wx-location-btn" id="btnWeatherLocation" aria-label="Choose location"><svg viewBox="0 0 12 12" class="wx-location-dot"><circle cx="6" cy="6" r="5"></circle></svg></button>
         </p>
         <div class="weather-icon" id="weatherIcon">⛅</div>
         <div class="weather-temp" id="weatherTemp">--°</div>
@@ -220,7 +220,7 @@
 
     <label class="field">
       <span>Date</span>
-      <input type="date" id="trainDate">
+      <input type="date" id="trainDate" class="date-picker-trigger" readonly>
     </label>
 
     <fieldset class="field-group">
@@ -340,7 +340,7 @@
 
     <label class="field">
       <span>Date</span>
-      <input type="date" id="nutDate">
+      <input type="date" id="nutDate" class="date-picker-trigger" readonly>
     </label>
 
     <div class="water-orb-card">
@@ -376,7 +376,15 @@
     </div>
 
     <div class="hero-card fuel-status-card" id="fuelStatusCard">
-      <div class="chart-card-head"><p class="mod-tag" style="margin:0;">Current performance</p><span class="target-icon">◎</span></div>
+      <div class="chart-card-head">
+        <p class="mod-tag" style="margin:0;">Current performance</p>
+        <div class="fuel-status-head-right">
+          <button type="button" class="icon-btn glass-emboss" id="btnShareFuelStatus" aria-label="Share Daily Fuel Status">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
+          </button>
+          <span class="target-icon">◎</span>
+        </div>
+      </div>
       <h3 class="fuel-status-title">Daily Fuel Status</h3>
 
       <div class="fuel-cal-row">
@@ -469,24 +477,14 @@
 
     <label class="field">
       <span>Date</span>
-      <input type="date" id="bioDate">
+      <input type="date" id="bioDate" class="date-picker-trigger" readonly>
     </label>
 
     <fieldset class="field-group">
       <p class="mod-tag">Mod_bio_log_01</p>
-      <label class="field">
-        <span>Morning weight</span>
-        <div class="input-unit-wrap"><input type="number" step="0.01" id="bioWeight" placeholder="e.g. 79.5"><span class="input-unit" id="bioWeightUnitLabel">kg / lbs</span></div>
-      </label>
       <label class="field field--checkbox" id="bioMenstruatingField">
         <input type="checkbox" id="bioMenstruating">
         <span>Period</span>
-      </label>
-      <label class="field">
-        <span>Sleep quality</span>
-        <input type="range" id="bioSleep" min="1" max="5" step="1" value="3">
-        <output id="bioSleepOut">3</output>
-        <div class="slider-endpoints"><span>Restless</span><span>Optimal</span></div>
       </label>
       <label class="field">
         <span>Stress</span>
@@ -734,7 +732,7 @@
       <form id="reviewForm">
         <label class="field">
           <span>Week ending</span>
-          <input type="date" id="reviewDate" required>
+          <input type="date" id="reviewDate" class="date-picker-trigger" required readonly>
         </label>
         <label class="field">
           <span>Adjustments made to keep progress on track</span>
@@ -988,7 +986,7 @@
         <div class="field-row">
           <label class="field">
             <span>Challenge Start</span>
-            <input type="date" id="setupStartDate">
+            <input type="date" id="setupStartDate" class="date-picker-trigger" readonly>
           </label>
           <label class="field">
             <span>Duration (Days)</span>
@@ -1354,7 +1352,12 @@
     <div class="sheet-handle"></div>
     <div class="sheet-head">
       <h2>Personal Records</h2>
-      <button class="sheet-close" id="btnClosePRBoard">✕</button>
+      <div class="fuel-status-head-right">
+        <button type="button" class="icon-btn glass-emboss" id="btnSharePR" aria-label="Share Personal Records">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
+        </button>
+        <button class="sheet-close" id="btnClosePRBoard">✕</button>
+      </div>
     </div>
     <div class="pr-board" id="prBoard"></div>
     <p class="empty-note" id="prBoardEmpty">Log completed sets to start tracking personal records.</p>
@@ -1367,16 +1370,16 @@
     <div class="sheet-head">
       <h2>Dietary Algorithm</h2>
       <div class="food-diary-date-nav">
-        <button type="button" class="icon-btn" id="btnFoodDiaryPrevDay" aria-label="Previous day">‹</button>
-        <span class="food-diary-date-picker">📅<input type="date" id="foodDiaryDateInput" aria-label="Choose date"></span>
-        <button type="button" class="icon-btn" id="btnFoodDiaryNextDay" aria-label="Next day">›</button>
+        <button type="button" class="icon-btn glass-emboss" id="btnFoodDiaryPrevDay" aria-label="Previous day">‹</button>
+        <span class="food-diary-date-picker glass-emboss"><svg viewBox="0 0 24 24" class="cal-icon"><rect x="3.5" y="5" width="17" height="16" rx="2" stroke="var(--cyan)" stroke-width="1.6" fill="none"/><line x1="3.5" y1="9.5" x2="20.5" y2="9.5" stroke="var(--cyan)" stroke-width="1.6"/><line x1="7.5" y1="3" x2="7.5" y2="6.5" stroke="var(--cyan)" stroke-width="1.6" stroke-linecap="round"/><line x1="16.5" y1="3" x2="16.5" y2="6.5" stroke="var(--cyan)" stroke-width="1.6" stroke-linecap="round"/></svg><input type="date" id="foodDiaryDateInput" class="date-picker-trigger" aria-label="Choose date" readonly></span>
+        <button type="button" class="icon-btn glass-emboss" id="btnFoodDiaryNextDay" aria-label="Next day">›</button>
       </div>
       <button class="sheet-close" id="btnCloseFoodDiary">✕</button>
     </div>
 
     <div class="meal-section" data-meal="breakfast">
       <div class="meal-section-head">
-        <span class="meal-section-title">🌅 Breakfast</span>
+        <span class="meal-section-title"><svg viewBox="0 0 24 24" class="meal-icon"><g stroke="var(--cyan)" stroke-width="1.6" stroke-linecap="round" fill="none"><path d="M6 15a6 6 0 0 1 12 0"/><line x1="2" y1="15" x2="22" y2="15"/><line x1="12" y1="4" x2="12" y2="7"/><line x1="5.5" y1="7.5" x2="7.3" y2="9"/><line x1="18.5" y1="7.5" x2="16.7" y2="9"/></g></svg> Breakfast</span>
         <span class="meal-section-total" id="mealTotal_breakfast">0 kcal</span>
       </div>
       <div class="meal-items" id="mealItems_breakfast"></div>
@@ -1385,7 +1388,7 @@
 
     <div class="meal-section" data-meal="lunch">
       <div class="meal-section-head">
-        <span class="meal-section-title">☀️ Lunch</span>
+        <span class="meal-section-title"><svg viewBox="0 0 24 24" class="meal-icon"><circle cx="12" cy="12" r="4.5" stroke="var(--cyan)" stroke-width="1.6" fill="none"/><g stroke="var(--cyan)" stroke-width="1.6" stroke-linecap="round"><line x1="12" y1="2" x2="12" y2="4.3"/><line x1="12" y1="19.7" x2="12" y2="22"/><line x1="2" y1="12" x2="4.3" y2="12"/><line x1="19.7" y1="12" x2="22" y2="12"/><line x1="4.9" y1="4.9" x2="6.4" y2="6.4"/><line x1="17.6" y1="17.6" x2="19.1" y2="19.1"/><line x1="4.9" y1="19.1" x2="6.4" y2="17.6"/><line x1="17.6" y1="6.4" x2="19.1" y2="4.9"/></g></svg> Lunch</span>
         <span class="meal-section-total" id="mealTotal_lunch">0 kcal</span>
       </div>
       <div class="meal-items" id="mealItems_lunch"></div>
@@ -1394,7 +1397,7 @@
 
     <div class="meal-section" data-meal="dinner">
       <div class="meal-section-head">
-        <span class="meal-section-title">🌙 Dinner</span>
+        <span class="meal-section-title"><svg viewBox="0 0 24 24" class="meal-icon"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4 7 7 0 0 0 20 14.5z" stroke="var(--cyan)" stroke-width="1.6" fill="none" stroke-linejoin="round"/></svg> Dinner</span>
         <span class="meal-section-total" id="mealTotal_dinner">0 kcal</span>
       </div>
       <div class="meal-items" id="mealItems_dinner"></div>
@@ -1403,7 +1406,7 @@
 
     <div class="meal-section" data-meal="snacks">
       <div class="meal-section-head">
-        <span class="meal-section-title">🍎 Snacks</span>
+        <span class="meal-section-title"><svg viewBox="0 0 24 24" class="meal-icon"><path d="M12 9c-3.5 0-6 2.6-6 6.2C6 19 8.4 21.5 11 21.5c.7 0 1-.3 1.5-.3.5 0 .8.3 1.5.3 2.6 0 5-2.5 5-6.3 0-3.6-2.5-6.2-6-6.2z" stroke="var(--cyan)" stroke-width="1.5" fill="none" stroke-linejoin="round"/><path d="M12 9c0-1.8.9-3 2.2-3.6" stroke="var(--cyan)" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg> Snacks</span>
         <span class="meal-section-total" id="mealTotal_snacks">0 kcal</span>
       </div>
       <div class="meal-items" id="mealItems_snacks"></div>
@@ -1436,10 +1439,26 @@
     <div class="selected-food-card" id="selectedFoodCard" hidden>
       <p class="mod-tag">Confirm serving</p>
       <p class="selected-food-name" id="selectedFoodName"></p>
-      <label class="field">
-        <span>Quantity (g)</span>
-        <input type="number" id="selectedFoodGrams" value="100">
-      </label>
+      <div class="field-row">
+        <label class="field">
+          <span>Serving size</span>
+          <input type="number" id="selectedFoodGrams" value="100">
+        </label>
+        <label class="field">
+          <span>Unit</span>
+          <select id="selectedFoodUnit">
+            <option value="g">g</option>
+            <option value="oz">oz</option>
+            <option value="ml">ml</option>
+            <option value="cup">cup</option>
+            <option value="bowl">bowl</option>
+            <option value="piece">piece</option>
+            <option value="stick">stick</option>
+            <option value="pack">pack</option>
+          </select>
+        </label>
+      </div>
+      <p class="hint hint--warning" id="selectedFoodUnitWarning" hidden>⚠️ Approximate conversion — weigh in grams for exact accuracy.</p>
       <p class="selected-food-preview" id="selectedFoodPreview"></p>
       <button type="button" class="btn btn--primary" id="btnAddSelectedFood">Add to diary</button>
     </div>
@@ -1457,14 +1476,28 @@
       <p class="hint" id="aiEstimateStatus"></p>
       <div class="field-row">
         <label class="field">
-          <span>Serving size (g)</span>
+          <span>Serving size</span>
           <input type="number" id="customFoodGrams" placeholder="e.g. 250" value="100">
+        </label>
+        <label class="field">
+          <span>Unit</span>
+          <select id="customFoodUnit">
+            <option value="g">g</option>
+            <option value="oz">oz</option>
+            <option value="ml">ml</option>
+            <option value="cup">cup</option>
+            <option value="bowl">bowl</option>
+            <option value="piece">piece</option>
+            <option value="stick">stick</option>
+            <option value="pack">pack</option>
+          </select>
         </label>
         <label class="field">
           <span>Calories</span>
           <input type="number" id="customFoodCalories" placeholder="e.g. 350">
         </label>
       </div>
+      <p class="hint hint--warning" id="customFoodUnitWarning" hidden>⚠️ Approximate conversion — weigh in grams for exact accuracy.</p>
       <div class="field-row">
         <label class="field">
           <span>Protein (g)</span>
@@ -1508,7 +1541,7 @@
       <p class="field-group-heading">Measurement Log (CM, to nearest 0.1)</p>
       <label class="field">
         <span>Date</span>
-        <input type="date" id="measureDate">
+        <input type="date" id="measureDate" class="date-picker-trigger" readonly>
       </label>
       <label class="field">
         <span>Chest (on nipple)</span>
@@ -1591,6 +1624,26 @@
       <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
     </div>
     <div class="mission-log-grid" id="missionLogGrid"></div>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="datePickerOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2 id="datePickerTitle">Select Date</h2>
+      <button class="sheet-close" id="btnCloseDatePicker">✕</button>
+    </div>
+    <div class="mission-log-nav">
+      <button type="button" id="btnDatePickerPrev" aria-label="Previous month">‹</button>
+      <span id="datePickerMonthLabel">–</span>
+      <button type="button" id="btnDatePickerNext" aria-label="Next month">›</button>
+    </div>
+    <div class="mission-log-weekdays">
+      <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+    </div>
+    <div class="mission-log-grid" id="datePickerGrid"></div>
+    <button type="button" class="btn btn--sm" id="btnDatePickerToday" style="margin-top:12px;">Jump to today</button>
   </div>
 </div>
 

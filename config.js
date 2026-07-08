@@ -11,3 +11,10 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // Food Diary's search-as-you-type. Without it, search falls back to the shared
 // public DEMO_KEY, which is heavily rate-limited across every app that uses it.
 const USDA_API_KEY = 'bep5rhM1sI50XKr8XvsY7OHK908TU3Rds21hVgIa';
+
+// Free App ID + App Key from https://developer.nutritionix.com/signup — adds
+// restaurant/fast-food coverage (Jollibee, McDonald's, etc.) to the Dietary
+// Algorithm's food search, which USDA/Open Food Facts don't cover well. Leave
+// blank to skip Nutritionix entirely — search still works fine with USDA alone.
+const NUTRITIONIX_APP_ID = '';
+const NUTRITIONIX_APP_KEY = '';
