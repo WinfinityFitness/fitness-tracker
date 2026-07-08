@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.6';
+const APP_VERSION = 'WF_SYS_V.1.9';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -161,18 +161,32 @@ function getEffectiveCalorieTarget(profile) {
   return round0((range[0] + range[1]) / 2);
 }
 
-// One-day-back only (no compounding chain) — if yesterday went over target,
-// today's effective target shrinks by that overage, shown on the calorie ring.
-function getCalorieCarryoverDebt(date, profile) {
+// Signed running balance, day by day: eating under target banks a surplus
+// (adds to a later day's target), eating over target racks up a debt
+// (subtracts from it) — a debt from one day and a surplus from another net
+// against each other as they carry forward. Asymmetric weekly boundary: any
+// banked surplus is forfeited at the start of each week (Monday) — "use it
+// by Sunday or lose it" — but an unresolved debt is never forgiven, it keeps
+// carrying into the next week until cancelled out by under-eating.
+function getCalorieCarryover(date, profile) {
   if (!profile) return 0;
   const target = getEffectiveCalorieTarget(profile);
   if (!target) return 0;
-  const prev = parseISO(date);
-  prev.setDate(prev.getDate() - 1);
-  const prevIso = prev.getFullYear() + '-' + String(prev.getMonth() + 1).padStart(2, '0') + '-' + String(prev.getDate()).padStart(2, '0');
-  const prevEntry = getLogs()[prevIso];
-  if (!prevEntry || prevEntry.calories == null) return 0;
-  return Math.max(0, prevEntry.calories - target);
+  const logs = getLogs();
+  const loggedDates = Object.keys(logs).filter(iso => logs[iso].calories != null).sort();
+  if (!loggedDates.length) return 0;
+  const cutoff = parseISO(date);
+  const cursor = parseISO(loggedDates[0]);
+
+  let balance = 0;
+  while (cursor < cutoff) {
+    const iso = cursor.getFullYear() + '-' + String(cursor.getMonth() + 1).padStart(2, '0') + '-' + String(cursor.getDate()).padStart(2, '0');
+    const entry = logs[iso];
+    if (entry && entry.calories != null) balance += target - entry.calories;
+    cursor.setDate(cursor.getDate() + 1);
+    if (cursor.getDay() === 1 && balance > 0) balance = 0; // crossed into Monday — forfeit unused surplus
+  }
+  return balance;
 }
 function getEffectiveStepGoal(profile) {
   if (!profile) return 8000;
@@ -4266,8 +4280,8 @@ function renderNutritionTargets() {
   const sodiumNow = entry.sodium ?? 0;
   const waterNow = entry.water ?? 0;
 
-  const carryoverDebt = getCalorieCarryoverDebt(date, profile);
-  const effectiveCalorieTarget = Math.max(1, calorieTarget - carryoverDebt);
+  const carryover = getCalorieCarryover(date, profile);
+  const effectiveCalorieTarget = Math.max(1, calorieTarget + carryover);
   const caloriePctRaw = (caloriesNow / effectiveCalorieTarget) * 100;
   const caloriePct = Math.min(100, caloriePctRaw);
   const calorieOverflowPct = Math.max(0, caloriePctRaw - 100);
@@ -4279,7 +4293,7 @@ function renderNutritionTargets() {
       : undefined,
     centerText: Math.round(caloriePctRaw) + '%',
     label: 'Calories',
-    sub: `${caloriesNow} / ${effectiveCalorieTarget} kcal${carryoverDebt > 0 ? ` (−${round0(carryoverDebt)} carried over)` : ''}`,
+    sub: `${caloriesNow} / ${effectiveCalorieTarget} kcal${carryover !== 0 ? ` (${carryover > 0 ? '+' : '−'}${round0(Math.abs(carryover))} carried over)` : ''}`,
   });
 
   const proteinKcal = proteinNow * 4;
@@ -5615,6 +5629,7 @@ function checkUnreadMessagesBackground() {
 }
 setTimeout(checkUnreadMessagesBackground, 5000);
 setInterval(checkUnreadMessagesBackground, 60000);
+
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
