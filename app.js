@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.2';
+const APP_VERSION = 'WF_SYS_V.1.4';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -160,6 +160,7 @@ function getEffectiveCalorieTarget(profile) {
   const range = profile.goalMode === 'bulk' ? targets.bulking : targets.cutting;
   return round0((range[0] + range[1]) / 2);
 }
+
 // One-day-back only (no compounding chain) — if yesterday went over target,
 // today's effective target shrinks by that overage, shown on the calorie ring.
 function getCalorieCarryoverDebt(date, profile) {
@@ -173,7 +174,6 @@ function getCalorieCarryoverDebt(date, profile) {
   if (!prevEntry || prevEntry.calories == null) return 0;
   return Math.max(0, prevEntry.calories - target);
 }
-
 function getEffectiveStepGoal(profile) {
   if (!profile) return 8000;
   return profile.coachStepGoal || profile.stepGoal || 8000;
@@ -4273,9 +4273,9 @@ function renderNutritionTargets() {
   const calorieOverflowPct = Math.max(0, caloriePctRaw - 100);
   const isOverCalories = caloriePctRaw > 100;
   renderRing(document.getElementById('fuelCalorieRing'), caloriePct, {
-    size: 120, stroke: 10, gradient: true, overflowPct: calorieOverflowPct,
+    size: 100, stroke: 9, gradient: true, overflowPct: calorieOverflowPct,
     centerHtml: isOverCalories
-      ? `<span style="font-size:${Math.round(120 * 0.22)}px;font-weight:800;font-family:var(--font-mono);color:var(--critical);">${Math.round(caloriePctRaw)}%</span>`
+      ? `<span style="font-size:${Math.round(100 * 0.22)}px;font-weight:800;font-family:var(--font-mono);color:var(--critical);">${Math.round(caloriePctRaw)}%</span>`
       : undefined,
     centerText: Math.round(caloriePctRaw) + '%',
     label: 'Calories',
