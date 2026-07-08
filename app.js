@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.9';
+const APP_VERSION = 'WF_SYS_V.1.11';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -5567,6 +5567,7 @@ document.getElementById('btnGoToBioFromChart').addEventListener('click', () => {
   document.querySelector('.tab-btn[data-target="bio"]').click();
 });
 initSettingsOverlay();
+initAppUpdateButton();
 initDigitalId();
 initContact();
 initFooterShare();
@@ -5631,9 +5632,51 @@ setTimeout(checkUnreadMessagesBackground, 5000);
 setInterval(checkUnreadMessagesBackground, 60000);
 
 
+let swRegistration = null;
+let swReloadedOnce = false;
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.register('sw.js').then(reg => { swRegistration = reg; }).catch(() => {});
+  });
+  // Fires once the new worker actually takes control (after SKIP_WAITING) —
+  // this is the one-and-only reload the "Update Now" flow needs.
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (swReloadedOnce) return;
+    swReloadedOnce = true;
+    location.reload();
   });
 }
+
+async function checkAndApplyAppUpdate() {
+  const overlay = document.getElementById('appUpdateOverlay');
+  const statusEl = document.getElementById('appUpdateStatus');
+  overlay.hidden = false;
+  statusEl.textContent = 'Checking for updates…';
+
+  if (!swRegistration) {
+    statusEl.textContent = 'Update system unavailable — try closing and reopening the app.';
+    setTimeout(() => { overlay.hidden = true; }, 2200);
+    return;
+  }
+
+  try { await swRegistration.update(); } catch (e) { /* offline — fall through, may already have one waiting */ }
+  await new Promise(r => setTimeout(r, 600)); // give the browser a beat to finish installing if it just found one
+
+  if (swRegistration.waiting) {
+    statusEl.textContent = 'Updating…';
+    swRegistration.waiting.postMessage('SKIP_WAITING');
+    // Safety net in case controllerchange never fires for some reason.
+    setTimeout(() => { if (!swReloadedOnce) location.reload(); }, 4000);
+  } else {
+    statusEl.textContent = "You're already on the latest version.";
+    setTimeout(() => { overlay.hidden = true; }, 1800);
+  }
+}
+
+function initAppUpdateButton() {
+  document.getElementById('settingsAppVersion').textContent = APP_VERSION;
+  document.getElementById('btnCheckUpdate').addEventListener('click', checkAndApplyAppUpdate);
+}
+
 

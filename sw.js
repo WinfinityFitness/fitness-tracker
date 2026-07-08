@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fittracker-v108';
+const CACHE_NAME = 'fittracker-v110';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -16,8 +16,13 @@ const CORE_ASSETS = [
 ];
 
 self.addEventListener('install', event => {
+  // No unconditional skipWaiting() here — on an update (an existing version is
+  // already controlling the page), the new worker installs and then WAITS
+  // until the page explicitly asks it to activate (see the message listener
+  // below), so the in-app "Update Now" button controls exactly when the swap
+  // happens instead of it happening silently mid-session.
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(CORE_ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then(cache => cache.addAll(CORE_ASSETS))
   );
 });
 
@@ -27,6 +32,10 @@ self.addEventListener('activate', event => {
       keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
     )).then(() => self.clients.claim())
   );
+});
+
+self.addEventListener('message', event => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('fetch', event => {

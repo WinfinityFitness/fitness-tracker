@@ -267,7 +267,10 @@
 
     <button type="button" class="btn btn--finish" id="btnFinishWorkout">Finish</button>
 
-    <button type="button" class="btn btn--primary" id="btnOpenPRBoard">🏆 Personal Records</button>
+    <button type="button" class="btn btn--primary" id="btnOpenPRBoard">
+      <svg viewBox="0 0 24 24" width="16" height="16" class="diet-icon" fill="none" stroke="var(--cyan)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8v4a4 4 0 0 1-8 0V3z"/><path d="M8 4H5a2 2 0 0 0 0 4h1"/><path d="M16 4h3a2 2 0 0 1 0 4h-1"/><path d="M12 11v4"/><path d="M9 21h6"/><path d="M10 17h4l1 4H9l1-4z"/></svg>
+      Personal Records
+    </button>
 
     <h2 class="section-title">Outdoor activity tracker</h2>
     <div class="chart-card" id="cardioCard">
@@ -1152,7 +1155,18 @@
         <p class="hint" id="hydroSaveNote"></p>
       </div>
     </div>
+
+    <div class="sheet-section">
+      <p class="field-group-heading">App Update</p>
+      <p class="hint">Current version: <span id="settingsAppVersion">–</span></p>
+      <button type="button" class="btn btn--primary" id="btnCheckUpdate">Update Now</button>
+    </div>
   </div>
+</div>
+
+<div id="appUpdateOverlay" class="app-update-overlay" hidden>
+  <div class="app-update-spinner"></div>
+  <p id="appUpdateStatus">Checking for updates…</p>
 </div>
 
 <!-- ============ WORKOUT SUMMARY SHEET ============ -->

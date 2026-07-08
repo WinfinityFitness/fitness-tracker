@@ -1839,6 +1839,39 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .sheet-overlay--stacked { z-index: 160; }
 #datePickerOverlay { z-index: 170; }
 
+.app-update-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(5,10,14,0.94);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 20px;
+  text-align: center;
+}
+.app-update-overlay p {
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  text-shadow: 0 0 6px var(--cyan-glow);
+}
+.app-update-spinner {
+  width: 44px;
+  height: 44px;
+  border: 3px solid var(--border-soft);
+  border-top-color: var(--cyan);
+  border-radius: 50%;
+  filter: drop-shadow(0 0 6px var(--cyan-glow));
+  animation: app-update-spin 0.9s linear infinite;
+}
+@keyframes app-update-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .app-update-spinner { animation: none; }
+}
+
 /* ---------------- Food Diary ---------------- */
 .meal-section { margin-bottom: 18px; }
 .meal-section-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
