@@ -260,9 +260,9 @@
     <div class="new-protocol-box" id="newProtocolBox">
       <p class="mod-tag">+ New_protocol_sequence</p>
       <label class="field">
-        <input type="text" id="exerciseName" list="exerciseNameList" placeholder="Protocol Name (e.g., Deadlift)" autocomplete="off">
-        <datalist id="exerciseNameList"></datalist>
+        <input type="text" id="exerciseName" placeholder="Protocol Name (e.g., Deadlift)" autocomplete="off">
       </label>
+      <div id="exerciseSuggestResults" class="food-search-results" hidden></div>
       <button type="button" class="btn" id="btnAddExercise">Synchronize new exercise</button>
     </div>
 
@@ -1277,6 +1277,11 @@
     <div class="sheet-handle"></div>
     <div class="sheet-head">
       <h2>Food Diary</h2>
+      <div class="food-diary-date-nav">
+        <button type="button" class="icon-btn" id="btnFoodDiaryPrevDay" aria-label="Previous day">‹</button>
+        <span class="food-diary-date-picker">📅<input type="date" id="foodDiaryDateInput" aria-label="Choose date"></span>
+        <button type="button" class="icon-btn" id="btnFoodDiaryNextDay" aria-label="Next day">›</button>
+      </div>
       <button class="sheet-close" id="btnCloseFoodDiary">✕</button>
     </div>
 
@@ -1351,11 +1356,16 @@
     </div>
 
     <div class="field-group-heading" style="margin-top:16px;">Not finding it?</div>
+    <p class="hint hint--accent" id="customFoodTeachNote" hidden>📷 Barcode not in our database yet — fill this in and we'll remember it for the next scan (by anyone).</p>
     <fieldset class="field-group" id="customFoodForm">
       <label class="field">
         <span>Food name</span>
         <input type="text" id="customFoodName" placeholder="e.g. Lola's adobo">
       </label>
+      <div class="btn-row">
+        <button type="button" class="btn btn--sm" id="btnEstimateAiNutrition">✨ Estimate with AI</button>
+      </div>
+      <p class="hint" id="aiEstimateStatus"></p>
       <div class="field-row">
         <label class="field">
           <span>Serving size (g)</span>

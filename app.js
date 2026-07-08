@@ -1659,8 +1659,96 @@ function bestHistoricalOneRM(name, beforeDate) {
   return best;
 }
 
+let exerciseDb = [];
+let exerciseDbLoaded = false;
+let recentExerciseNames = [];
+let exerciseSuggestDebounceId = null;
+
+async function loadExerciseDb() {
+  if (exerciseDbLoaded) return;
+  try {
+    const res = await fetch('data/exercises.json');
+    exerciseDb = await res.json();
+  } catch (e) { exerciseDb = []; /* offline-friendly: suggestions from own history still work */ }
+  exerciseDbLoaded = true;
+}
+
 function initExerciseNameAutocomplete() {
   renderExerciseNameOptions();
+  loadExerciseDb();
+
+  const input = document.getElementById('exerciseName');
+  const results = document.getElementById('exerciseSuggestResults');
+
+  input.addEventListener('input', () => {
+    clearTimeout(exerciseSuggestDebounceId);
+    const q = input.value.trim();
+    if (!q) { results.hidden = true; results.innerHTML = ''; return; }
+    exerciseSuggestDebounceId = setTimeout(() => renderExerciseSuggestions(q), 150);
+  });
+  input.addEventListener('focus', () => {
+    if (input.value.trim()) renderExerciseSuggestions(input.value.trim());
+  });
+  document.addEventListener('click', e => {
+    if (!results.hidden && !results.contains(e.target) && e.target !== input) results.hidden = true;
+  });
+}
+
+function renderExerciseSuggestions(query) {
+  const results = document.getElementById('exerciseSuggestResults');
+  const q = query.toLowerCase();
+
+  const seen = new Set();
+  const matches = [];
+
+  // Own exercise history first — these are the ones actually relevant to this user.
+  recentExerciseNames.forEach(name => {
+    if (name.toLowerCase().includes(q) && !seen.has(name.toLowerCase())) {
+      seen.add(name.toLowerCase());
+      matches.push({ name, tag: 'Recent' });
+    }
+  });
+
+  // Then the exercise library, prefix matches ranked above substring matches.
+  const dbMatches = exerciseDb
+    .filter(ex => ex.name.toLowerCase().includes(q) && !seen.has(ex.name.toLowerCase()))
+    .sort((a, b) => {
+      const aStarts = a.name.toLowerCase().startsWith(q) ? 0 : 1;
+      const bStarts = b.name.toLowerCase().startsWith(q) ? 0 : 1;
+      return aStarts - bStarts || a.name.localeCompare(b.name);
+    });
+  dbMatches.forEach(ex => {
+    if (seen.has(ex.name.toLowerCase())) return;
+    seen.add(ex.name.toLowerCase());
+    matches.push(ex);
+  });
+
+  const top = matches.slice(0, 20);
+  if (!top.length) { results.hidden = true; results.innerHTML = ''; return; }
+
+  results.innerHTML = top.map((ex, i) => {
+    const muscles = (ex.primaryMuscles || []).slice(0, 2);
+    const tags = [];
+    if (ex.tag === 'Recent') tags.push('<span class="exercise-tag">Recent</span>');
+    muscles.forEach(m => tags.push(`<span class="exercise-tag exercise-tag--muscle">${escapeHtml(m)}</span>`));
+    if (ex.equipment) tags.push(`<span class="exercise-tag">${escapeHtml(ex.equipment)}</span>`);
+    return `
+      <button type="button" class="food-search-result-row" data-idx="${i}">
+        <div>
+          <div class="food-result-name">${escapeHtml(ex.name)}</div>
+          <div class="exercise-result-tags">${tags.join('')}</div>
+        </div>
+      </button>
+    `;
+  }).join('');
+  results.hidden = false;
+
+  results.querySelectorAll('.food-search-result-row').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('exerciseName').value = top[parseInt(btn.dataset.idx, 10)].name;
+      results.hidden = true;
+    });
+  });
 }
 
 function renderExerciseNameOptions() {
@@ -1674,9 +1762,7 @@ function renderExerciseNameOptions() {
       if (!existing || date > existing.lastDate) seen.set(key, { name: ex.name.trim(), lastDate: date });
     });
   });
-  const names = Array.from(seen.values()).sort((a, b) => b.lastDate.localeCompare(a.lastDate)).map(v => v.name);
-  const datalist = document.getElementById('exerciseNameList');
-  if (datalist) datalist.innerHTML = names.map(n => `<option value="${escapeHtml(n)}"></option>`).join('');
+  recentExerciseNames = Array.from(seen.values()).sort((a, b) => b.lastDate.localeCompare(a.lastDate)).map(v => v.name);
 }
 
 function getFinishedDates() {
@@ -2976,13 +3062,41 @@ function refreshFuelViewsForDate(date) {
   updateTabDots();
 }
 
+let editingMealItem = null; // { meal, idx } while a meal-item row is in edit mode
+
 function renderFoodDiary(date) {
   const meals = getMealsForDate(date);
   MEAL_TYPES.forEach(mt => {
     const container = document.getElementById(`mealItems_${mt}`);
     const totalEl = document.getElementById(`mealTotal_${mt}`);
     const items = meals[mt];
-    container.innerHTML = items.length ? items.map((item, idx) => `
+    container.innerHTML = items.length ? items.map((item, idx) => {
+      if (editingMealItem && editingMealItem.meal === mt && editingMealItem.idx === idx) {
+        return `
+      <div class="meal-item-row meal-item-row--edit">
+        <div class="meal-item-edit-form">
+          <div>
+            <span class="field-label">Food name</span>
+            <input type="text" class="meal-edit-name" value="${escapeHtml(item.name)}">
+          </div>
+          <div class="field-row">
+            <div><span class="field-label">Grams</span><input type="number" class="meal-edit-grams" value="${item.grams != null ? item.grams : ''}"></div>
+            <div><span class="field-label">Calories</span><input type="number" class="meal-edit-calories" value="${round0(item.calories)}"></div>
+          </div>
+          <div class="field-row">
+            <div><span class="field-label">Protein g</span><input type="number" class="meal-edit-protein" value="${round0(item.protein)}"></div>
+            <div><span class="field-label">Carbs g</span><input type="number" class="meal-edit-carbs" value="${round0(item.carbs)}"></div>
+            <div><span class="field-label">Fat g</span><input type="number" class="meal-edit-fat" value="${round0(item.fat)}"></div>
+          </div>
+          <div class="btn-row">
+            <button type="button" class="btn btn--primary btn--sm meal-item-save" data-meal="${mt}" data-idx="${idx}">Save</button>
+            <button type="button" class="btn btn--sm meal-item-cancel-edit">Cancel</button>
+          </div>
+        </div>
+      </div>
+        `;
+      }
+      return `
       <div class="meal-item-row">
         <div class="meal-item-info">
           <div class="meal-item-name">${escapeHtml(item.name)}</div>
@@ -2991,12 +3105,23 @@ function renderFoodDiary(date) {
         <select class="meal-item-move" data-meal="${mt}" data-idx="${idx}">
           ${MEAL_TYPES.map(m2 => `<option value="${m2}" ${m2 === mt ? 'selected' : ''}>${m2.charAt(0).toUpperCase() + m2.slice(1)}</option>`).join('')}
         </select>
+        <button type="button" class="meal-item-edit-btn" data-meal="${mt}" data-idx="${idx}" aria-label="Edit">✎</button>
         <button type="button" class="meal-item-remove" data-meal="${mt}" data-idx="${idx}" aria-label="Remove">✕</button>
       </div>
-    `).join('') : '<p class="empty-note">No items yet.</p>';
+    `;
+    }).join('') : '<p class="empty-note">No items yet.</p>';
     const mealTotalKcal = items.reduce((s, i) => s + (i.calories || 0), 0);
     totalEl.textContent = round0(mealTotalKcal) + ' kcal';
   });
+}
+
+function shiftFoodDiaryDate(deltaDays) {
+  const dateInput = document.getElementById('foodDiaryDateInput');
+  const current = dateInput.value || document.getElementById('nutDate').value || todayISO();
+  const d = parseISO(current);
+  d.setDate(d.getDate() + deltaDays);
+  dateInput.value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  dateInput.dispatchEvent(new Event('change'));
 }
 
 let currentAddFoodMeal = 'breakfast';
@@ -3005,12 +3130,28 @@ let foodSearchDebounceId = null;
 
 function initFoodDiary() {
   const overlay = document.getElementById('foodDiaryOverlay');
+  const dateInput = document.getElementById('foodDiaryDateInput');
+
   document.getElementById('btnOpenFoodDiary').addEventListener('click', () => {
-    renderFoodDiary(document.getElementById('nutDate').value);
+    const date = document.getElementById('nutDate').value;
+    dateInput.value = date;
+    editingMealItem = null;
+    renderFoodDiary(date);
     overlay.hidden = false;
   });
-  document.getElementById('btnCloseFoodDiary').addEventListener('click', () => { overlay.hidden = true; });
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+  document.getElementById('btnCloseFoodDiary').addEventListener('click', () => { overlay.hidden = true; editingMealItem = null; });
+  overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.hidden = true; editingMealItem = null; } });
+
+  dateInput.addEventListener('change', () => {
+    if (!dateInput.value) return;
+    const nutDateEl = document.getElementById('nutDate');
+    nutDateEl.value = dateInput.value;
+    nutDateEl.dispatchEvent(new Event('change'));
+    editingMealItem = null;
+    renderFoodDiary(dateInput.value);
+  });
+  document.getElementById('btnFoodDiaryPrevDay').addEventListener('click', () => shiftFoodDiaryDate(-1));
+  document.getElementById('btnFoodDiaryNextDay').addEventListener('click', () => shiftFoodDiaryDate(1));
 
   overlay.addEventListener('click', e => {
     const removeBtn = e.target.closest('.meal-item-remove');
@@ -3021,6 +3162,41 @@ function initFoodDiary() {
       saveMealsForDate(date, meals);
       renderFoodDiary(date);
       refreshFuelViewsForDate(date);
+      return;
+    }
+    const editBtn = e.target.closest('.meal-item-edit-btn');
+    if (editBtn) {
+      editingMealItem = { meal: editBtn.dataset.meal, idx: parseInt(editBtn.dataset.idx, 10) };
+      renderFoodDiary(document.getElementById('nutDate').value);
+      return;
+    }
+    const cancelEditBtn = e.target.closest('.meal-item-cancel-edit');
+    if (cancelEditBtn) {
+      editingMealItem = null;
+      renderFoodDiary(document.getElementById('nutDate').value);
+      return;
+    }
+    const saveBtn = e.target.closest('.meal-item-save');
+    if (saveBtn) {
+      const date = document.getElementById('nutDate').value;
+      const meals = getMealsForDate(date);
+      const mt = saveBtn.dataset.meal;
+      const idx = parseInt(saveBtn.dataset.idx, 10);
+      const form = saveBtn.closest('.meal-item-edit-form');
+      const item = meals[mt][idx];
+      const newName = form.querySelector('.meal-edit-name').value.trim();
+      item.name = newName || item.name;
+      const gramsVal = form.querySelector('.meal-edit-grams').value;
+      item.grams = gramsVal === '' ? null : (parseFloat(gramsVal) || 0);
+      item.calories = parseFloat(form.querySelector('.meal-edit-calories').value) || 0;
+      item.protein = parseFloat(form.querySelector('.meal-edit-protein').value) || 0;
+      item.carbs = parseFloat(form.querySelector('.meal-edit-carbs').value) || 0;
+      item.fat = parseFloat(form.querySelector('.meal-edit-fat').value) || 0;
+      editingMealItem = null;
+      saveMealsForDate(date, meals);
+      renderFoodDiary(date);
+      refreshFuelViewsForDate(date);
+      showRestToast('Saved changes.');
       return;
     }
     const addBtn = e.target.closest('.add-food-btn');
@@ -3046,6 +3222,8 @@ function initFoodDiary() {
   });
 }
 
+let pendingBarcodeCode = null;
+
 function openAddFoodPanel() {
   document.getElementById('foodSearchInput').value = '';
   document.getElementById('foodSearchResults').innerHTML = '';
@@ -3058,7 +3236,57 @@ function openAddFoodPanel() {
   document.getElementById('customFoodProtein').value = '';
   document.getElementById('customFoodCarbs').value = '';
   document.getElementById('customFoodFat').value = '';
+  document.getElementById('customFoodTeachNote').hidden = true;
+  document.getElementById('aiEstimateStatus').textContent = '';
+  pendingBarcodeCode = null;
   document.getElementById('addFoodOverlay').hidden = false;
+}
+
+async function estimateFoodNutritionWithAI(foodName) {
+  let res;
+  try {
+    res = await fetch(`${SUPABASE_URL}/functions/v1/estimate-food-nutrition`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ foodName }),
+    });
+  } catch (e) {
+    throw new Error('AI estimate unavailable — check your connection.');
+  }
+  let data;
+  try { data = await res.json(); } catch (e) { throw new Error('AI estimate unavailable — try again later.'); }
+  if (!res.ok) throw new Error(data.error || 'AI estimate failed');
+  return data;
+}
+
+// Shown when a scanned barcode isn't in our Supabase cache or on Open Food
+// Facts — lets the user fill it in once via the existing custom-food form,
+// then contributes it to barcode_products so future scans (by anyone) hit
+// the cache first. Mainly closes the PH-local/imported product gap in OFF.
+function offerBarcodeTeach(code) {
+  openAddFoodPanel();
+  pendingBarcodeCode = code;
+  document.getElementById('customFoodTeachNote').hidden = false;
+  document.getElementById('foodSearchStatus').textContent = '';
+  document.getElementById('customFoodName').focus();
+}
+
+async function contributeBarcodeProduct(code, name, per100g) {
+  if (!sbConfigured() || !code) return;
+  try {
+    await sb.rpc('contribute_barcode_product', {
+      p_code: code,
+      p_name: name,
+      p_brands: null,
+      p_calories: round0(per100g.calories),
+      p_protein: round0(per100g.protein),
+      p_carbs: round0(per100g.carbs),
+      p_fat: round0(per100g.fat),
+      p_fiber: 0,
+      p_sodium: 0,
+      p_contributed_by_name: (getProfile().name || 'Anonymous'),
+    });
+  } catch (e) { /* best-effort — app still works fully offline without this */ }
 }
 
 // Open Food Facts' search endpoints block cross-origin browser fetch (no
@@ -3113,8 +3341,9 @@ function offBrandsText(brands) {
   return Array.isArray(brands) ? brands.join(', ') : brands;
 }
 
-// Accepts { source: 'usda', food } from search results, or { source: 'off', product }
-// from the barcode scanner (product already has full nutriments attached).
+// Accepts { source: 'usda', food } from search results, { source: 'local', product }
+// from our own Supabase barcode cache, or { source: 'off', product } from the
+// barcode scanner (product already has full nutriments attached).
 async function selectFoodProduct(selection) {
   const status = document.getElementById('foodSearchStatus');
   let name, per100g;
@@ -3129,6 +3358,17 @@ async function selectFoodProduct(selection) {
       fat: usdaNutrientValue(f, USDA_NUTRIENT_IDS.fat),
       fiber: usdaNutrientValue(f, USDA_NUTRIENT_IDS.fiber),
       sodium: usdaNutrientValue(f, USDA_NUTRIENT_IDS.sodium), // USDA already reports sodium in mg
+    };
+  } else if (selection.source === 'local') {
+    const p = selection.product;
+    name = p.name;
+    per100g = {
+      calories: p.calories || 0,
+      protein: p.protein || 0,
+      carbs: p.carbs || 0,
+      fat: p.fat || 0,
+      fiber: p.fiber || 0,
+      sodium: p.sodium || 0,
     };
   } else {
     let product = selection.product;
@@ -3213,6 +3453,28 @@ function initAddFoodPanel() {
 
   document.getElementById('selectedFoodGrams').addEventListener('input', updateSelectedFoodPreview);
 
+  const aiBtn = document.getElementById('btnEstimateAiNutrition');
+  aiBtn.addEventListener('click', async () => {
+    const name = document.getElementById('customFoodName').value.trim();
+    const statusEl = document.getElementById('aiEstimateStatus');
+    if (!name) { statusEl.textContent = 'Enter a food name first.'; return; }
+    statusEl.textContent = 'Estimating with AI…';
+    aiBtn.disabled = true;
+    try {
+      const est = await estimateFoodNutritionWithAI(name);
+      document.getElementById('customFoodGrams').value = 100;
+      document.getElementById('customFoodCalories').value = round0(est.calories);
+      document.getElementById('customFoodProtein').value = round0(est.protein);
+      document.getElementById('customFoodCarbs').value = round0(est.carbs);
+      document.getElementById('customFoodFat').value = round0(est.fat);
+      statusEl.textContent = '⚠️ AI estimate for 100g — low accuracy, review before saving.';
+    } catch (e) {
+      statusEl.textContent = e.message || 'AI estimate unavailable — check your connection or add manually.';
+    } finally {
+      aiBtn.disabled = false;
+    }
+  });
+
   document.getElementById('btnAddSelectedFood').addEventListener('click', () => {
     if (!selectedFoodData) return;
     const grams = parseFloat(document.getElementById('selectedFoodGrams').value) || 0;
@@ -3234,17 +3496,19 @@ function initAddFoodPanel() {
     const name = document.getElementById('customFoodName').value.trim();
     if (!name) { alert('Enter a food name.'); return; }
     const grams = parseFloat(document.getElementById('customFoodGrams').value) || null;
-    addFoodItemToDiary({
-      name,
-      grams,
-      calories: parseFloat(document.getElementById('customFoodCalories').value) || 0,
-      protein: parseFloat(document.getElementById('customFoodProtein').value) || 0,
-      carbs: parseFloat(document.getElementById('customFoodCarbs').value) || 0,
-      fat: parseFloat(document.getElementById('customFoodFat').value) || 0,
-      fiber: 0,
-      sodium: 0,
-      source: 'custom',
-    });
+    const calories = parseFloat(document.getElementById('customFoodCalories').value) || 0;
+    const protein = parseFloat(document.getElementById('customFoodProtein').value) || 0;
+    const carbs = parseFloat(document.getElementById('customFoodCarbs').value) || 0;
+    const fat = parseFloat(document.getElementById('customFoodFat').value) || 0;
+    if (pendingBarcodeCode && grams) {
+      const scale = 100 / grams;
+      contributeBarcodeProduct(pendingBarcodeCode, name, {
+        calories: calories * scale, protein: protein * scale, carbs: carbs * scale, fat: fat * scale,
+      });
+    }
+    pendingBarcodeCode = null;
+    document.getElementById('customFoodTeachNote').hidden = true;
+    addFoodItemToDiary({ name, grams, calories, protein, carbs, fat, fiber: 0, sodium: 0, source: 'custom' });
   });
 }
 
@@ -3295,13 +3559,31 @@ function stopBarcodeScan() {
   if (barcodeStream) { barcodeStream.getTracks().forEach(t => t.stop()); barcodeStream = null; }
 }
 
+// Checks our own Supabase-backed cache first (fed by contributeBarcodeProduct
+// whenever a user teaches a barcode OFF doesn't have — mainly PH-local/imported
+// goods), then falls back to Open Food Facts, then offers the teach form.
+async function lookupLocalBarcodeProduct(code) {
+  if (!sbConfigured()) return null;
+  try {
+    const { data, error } = await sb.from('barcode_products').select('*').eq('code', code).maybeSingle();
+    if (error || !data) return null;
+    return data;
+  } catch (e) { return null; }
+}
+
 async function lookupBarcodeProduct(code) {
   document.getElementById('foodSearchStatus').textContent = 'Looking up barcode…';
+  const local = await lookupLocalBarcodeProduct(code);
+  if (local) {
+    selectFoodProduct({ source: 'local', product: local });
+    document.getElementById('foodSearchStatus').textContent = '';
+    return;
+  }
   try {
     const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name,brands,nutriments,code`);
     const data = await res.json();
     if (data.status !== 1 || !data.product || !data.product.nutriments) {
-      document.getElementById('foodSearchStatus').textContent = 'No product found for that barcode — try search or add custom.';
+      offerBarcodeTeach(code);
       return;
     }
     selectFoodProduct({ source: 'off', product: data.product });
@@ -4747,7 +5029,6 @@ function checkUnreadMessagesBackground() {
 }
 setTimeout(checkUnreadMessagesBackground, 5000);
 setInterval(checkUnreadMessagesBackground, 60000);
-
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

@@ -798,6 +798,7 @@ body {
 
 .save-note { font-family: var(--font-mono); font-size: 0.78rem; color: var(--good); min-height: 1.1em; text-align: center; }
 .hint { font-size: 0.8rem; color: var(--text-muted); margin: 8px 0 4px; line-height: 1.4; }
+.hint--accent { color: var(--cyan); background: var(--surface-2); border: 1px solid var(--cyan-dim); border-radius: 5px; padding: 8px 10px; }
 
 .computed-card {
   background: var(--surface-1);
@@ -1805,7 +1806,59 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   font-family: inherit;
 }
 .meal-item-remove { flex: none; background: none; border: none; color: var(--critical); font-size: 1rem; cursor: pointer; padding: 4px; }
+.meal-item-edit-btn { flex: none; background: none; border: none; color: var(--cyan); font-size: 0.95rem; cursor: pointer; padding: 4px; }
 .add-food-btn { width: 100%; }
+
+.meal-item-row--edit { align-items: stretch; }
+.meal-item-edit-form { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.meal-item-edit-form input[type="text"],
+.meal-item-edit-form input[type="number"] {
+  background: var(--surface-1);
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.8rem;
+  padding: 6px 8px;
+  min-width: 0;
+  width: 100%;
+}
+.meal-item-edit-form .field-row input { flex: 1; }
+.meal-item-edit-form .field-label { font-family: var(--font-mono); font-size: 0.62rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-bottom: 2px; }
+
+.food-diary-date-nav { display: flex; align-items: center; gap: 4px; }
+.food-diary-date-picker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: 5px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+}
+.food-diary-date-picker input[type="date"] {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 0;
+  width: 108px;
+  color-scheme: dark;
+}
+.icon-btn {
+  flex: none;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: 5px;
+  color: var(--text-primary);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 5px 9px;
+  cursor: pointer;
+}
+.icon-btn:hover { border-color: var(--cyan); color: var(--cyan); }
 
 .food-search-results { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; max-height: 260px; overflow-y: auto; }
 .food-search-result-row {
@@ -1819,11 +1872,26 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   border: 1px solid var(--border-soft);
   cursor: pointer;
   text-align: left;
+  color: var(--text-primary);
+  font-family: inherit;
 }
 .food-search-result-row:hover { border-color: var(--cyan); }
-.food-result-name { font-size: 0.85rem; font-weight: 700; }
+.food-result-name { font-size: 0.85rem; font-weight: 700; color: var(--text-primary); }
 .food-result-meta { font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-muted); }
 .food-result-kcal { flex: none; font-family: var(--font-mono); color: var(--cyan); font-size: 0.82rem; }
+.exercise-result-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
+.exercise-tag {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-soft);
+  color: var(--text-muted);
+}
+.exercise-tag--muscle { color: var(--cyan); border-color: var(--cyan-dim); }
 
 .selected-food-card {
   background: var(--surface-2);
