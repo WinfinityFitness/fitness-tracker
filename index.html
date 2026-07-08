@@ -116,6 +116,10 @@
         <output id="statusSleepOut">3</output>
         <div class="slider-endpoints"><span>Restless</span><span>Optimal</span></div>
       </label>
+      <label class="field">
+        <span>Daily steps</span>
+        <div class="input-unit-wrap"><input type="number" id="statusSteps" placeholder="e.g. 8000"><span class="input-unit">walk</span></div>
+      </label>
       <button type="button" class="btn btn--primary" id="btnSaveQuickLog">Save</button>
       <p class="save-note" id="quickLogSaveNote"></p>
     </div>
@@ -183,10 +187,11 @@
     </form>
 
     <h2 class="section-title">Body measurement scan</h2>
+    <p class="hint">Should ideally be filled once a week, every Sunday morning, fasted.</p>
     <div class="chart-card" style="position:relative;">
       <p class="mod-tag">MOD_BIOSCAN_10</p>
-      <button type="button" class="measure-entry-btn" id="btnOpenMeasureEntry">User Entry</button>
       <div class="measure-guide" id="measureGuide"></div>
+      <button type="button" class="measure-entry-btn" id="btnOpenMeasureEntry">User<br>Entry</button>
     </div>
   </section>
 
@@ -247,13 +252,7 @@
       </div>
     </div>
 
-    <div class="section-title-row">
-      <h2 class="section-title">Protocol execution queue</h2>
-      <div class="unit-switch">
-        <button type="button" class="unit-switch-btn" data-unit="kg" id="btnUnitKg">KG</button>
-        <button type="button" class="unit-switch-btn" data-unit="lb" id="btnUnitLb">LB</button>
-      </div>
-    </div>
+    <h2 class="section-title">Protocol execution queue</h2>
     <div class="exercise-cards" id="exerciseCards"></div>
     <p class="empty-note" id="exerciseEmptyNote">No exercises logged for this date yet.</p>
 
@@ -344,6 +343,38 @@
       <input type="date" id="nutDate">
     </label>
 
+    <div class="water-orb-card">
+      <div class="water-orb-card-head">
+        <span class="mod-tag" style="margin:0;">Mod_hydration_track</span>
+        <span class="water-orb-glass-tag">+250 mL / tap</span>
+      </div>
+      <div class="water-orb-row">
+        <button type="button" class="water-orb-arrow-btn" id="btnWaterOrbDown" aria-label="Remove a glass">▼</button>
+        <div class="water-orb">
+          <svg viewBox="0 0 100 100" class="water-orb-svg">
+            <defs>
+              <clipPath id="waterOrbClip"><circle cx="50" cy="50" r="46"></circle></clipPath>
+              <linearGradient id="waterOrbGrad" x1="0" y1="1" x2="0" y2="0">
+                <stop offset="0%" stop-color="#1f6fd6"></stop>
+                <stop offset="100%" stop-color="#2de2e6"></stop>
+              </linearGradient>
+            </defs>
+            <circle cx="50" cy="50" r="46" class="water-orb-track"></circle>
+            <g clip-path="url(#waterOrbClip)">
+              <rect id="fuelWaterOrbFill" class="water-orb-fill" x="0" y="100" width="100" height="0"></rect>
+            </g>
+            <circle cx="50" cy="50" r="46" class="water-orb-outline"></circle>
+          </svg>
+          <div class="water-orb-center">
+            <span class="water-orb-amount" id="fuelWaterOrbAmount">0</span>
+            <span class="water-orb-unit">mL</span>
+          </div>
+        </div>
+        <button type="button" class="water-orb-arrow-btn water-orb-arrow-btn--up" id="btnWaterOrbUp" aria-label="Add a glass">▲</button>
+      </div>
+      <p class="water-orb-target-label">Target: <span id="fuelWaterOrbTarget">3000</span> mL<span id="fuelWaterOrbAutoTag" class="water-orb-auto-tag" hidden> · auto</span></p>
+    </div>
+
     <div class="hero-card fuel-status-card" id="fuelStatusCard">
       <div class="chart-card-head"><p class="mod-tag" style="margin:0;">Current performance</p><span class="target-icon">◎</span></div>
       <h3 class="fuel-status-title">Daily Fuel Status</h3>
@@ -388,8 +419,7 @@
       </div>
     </div>
 
-    <button type="button" class="btn btn--primary" id="btnOpenFoodDiary">📔 Food Diary</button>
-    <button type="button" class="btn" id="btnOpenIntakeLog">Today Intake Log Entry</button>
+    <button type="button" class="btn btn--primary" id="btnOpenFoodDiary">📔 Dietary Algorithm</button>
 
     <h2 class="section-title">Averages (7-day)</h2>
     <div class="stat-grid stat-grid--3">
@@ -969,10 +999,24 @@
 
       <fieldset class="field-group">
         <p class="mod-tag">Mod_daily_04</p>
+        <label class="field field--checkbox">
+          <input type="checkbox" id="setupAutoWaterGoal">
+          <span>Auto-compute hydration target daily (weather + training + health)</span>
+        </label>
         <label class="field">
           <span>Hydration Goal (ML)</span>
           <div class="input-unit-wrap"><span class="input-icon">💧</span><input type="number" id="setupWaterGoal" value="3000" min="500" step="50"></div>
         </label>
+        <label class="field">
+          <span>Health status (adds extra hydration)</span>
+          <select id="setupHealthStatus">
+            <option value="">None</option>
+            <option value="pregnant">Pregnant (+300 mL)</option>
+            <option value="breastfeeding">Breastfeeding (+700 mL)</option>
+            <option value="illness">Illness — fever / diarrhea / vomiting (+500 mL)</option>
+          </select>
+        </label>
+        <p class="hint" id="setupAutoWaterHint">Base guidance: ~2.7L/day (women) or ~3.7L/day (men) total fluid, ~80% from drinking — plus extra for your logged training/cardio, today's weather (needs location access), and any health status above.</p>
         <label class="field">
           <span>Kinetic Output (Steps)</span>
           <div class="input-unit-wrap"><span class="input-icon">👣</span><input type="number" id="setupStepGoal" value="8000" min="1000" step="500"></div>
@@ -1060,6 +1104,51 @@
           <span>Bell</span>
           <button type="button" class="btn tone-preview-btn" data-tone="bell">▶</button>
         </label>
+      </div>
+    </div>
+
+    <div class="sheet-section">
+      <p class="field-group-heading">Hydration Reminders</p>
+      <p class="hint">Best-effort: a PWA can't wake up in the background at an exact time, so these fire while the app is open (checked every few minutes) using the schedule below, based on general hydration guidance.</p>
+      <div class="theme-toggle-row">
+        <span>Enable reminders</span>
+        <label class="switch">
+          <input type="checkbox" id="hydroRemindersEnabled">
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+        </label>
+      </div>
+      <div id="hydroReminderFields">
+        <div class="field-row">
+          <label class="field">
+            <span>Wake-up time</span>
+            <input type="time" id="hydroWakeTime" value="07:00">
+          </label>
+          <label class="field">
+            <span>Bedtime</span>
+            <input type="time" id="hydroBedTime" value="22:00">
+          </label>
+        </div>
+        <div class="field-row">
+          <label class="field">
+            <span>Breakfast</span>
+            <input type="time" id="hydroMeal0" value="07:00">
+          </label>
+          <label class="field">
+            <span>Lunch</span>
+            <input type="time" id="hydroMeal1" value="12:00">
+          </label>
+          <label class="field">
+            <span>Dinner</span>
+            <input type="time" id="hydroMeal2" value="19:00">
+          </label>
+        </div>
+        <label class="field field--checkbox">
+          <input type="checkbox" id="hydroHourlyEnabled" checked>
+          <span>Remind me hourly during waking hours</span>
+        </label>
+        <p class="hint">Also reminds you to sip water every ~12 min during a tracked run/walk/ride, and to rehydrate right after it ends.</p>
+        <button type="button" class="btn btn--sm" id="btnSaveHydroReminders">Save reminder schedule</button>
+        <p class="hint" id="hydroSaveNote"></p>
       </div>
     </div>
   </div>
@@ -1276,7 +1365,7 @@
   <div class="sheet">
     <div class="sheet-handle"></div>
     <div class="sheet-head">
-      <h2>Food Diary</h2>
+      <h2>Dietary Algorithm</h2>
       <div class="food-diary-date-nav">
         <button type="button" class="icon-btn" id="btnFoodDiaryPrevDay" aria-label="Previous day">‹</button>
         <span class="food-diary-date-picker">📅<input type="date" id="foodDiaryDateInput" aria-label="Choose date"></span>
@@ -1321,7 +1410,7 @@
       <button type="button" class="btn btn--sm add-food-btn" data-meal="snacks">+ Add food</button>
     </div>
 
-    <p class="hint">Food Diary totals feed your Daily Fuel Status automatically. The flat Today Intake Log Entry still works for quick manual totals on days you don't want to log individual foods.</p>
+    <p class="hint">Dietary Algorithm totals feed your Daily Fuel Status automatically.</p>
   </div>
 </div>
 
@@ -1404,53 +1493,6 @@
     </div>
     <p class="hint" id="barcodeScanStatus">Point your camera at a product barcode.</p>
     <video id="barcodeVideo" class="barcode-video" playsinline muted></video>
-  </div>
-</div>
-
-<div class="sheet-overlay" id="intakeLogOverlay" hidden>
-  <div class="sheet">
-    <div class="sheet-handle"></div>
-    <div class="sheet-head">
-      <h2>Today Intake Log Entry</h2>
-      <button class="sheet-close" id="btnCloseIntakeLog">✕</button>
-    </div>
-    <fieldset class="field-group">
-      <p class="mod-tag">Mod_input_01</p>
-      <label class="field">
-        <span>Calories consumed</span>
-        <div class="input-unit-wrap"><input type="number" id="nutCalories" placeholder="e.g. 2200"><span class="input-unit">kcal</span></div>
-      </label>
-      <label class="field">
-        <span>Protein (g)</span>
-        <div class="input-unit-wrap"><input type="number" id="nutProtein" placeholder="e.g. 140"><span class="input-unit">grams</span></div>
-      </label>
-      <label class="field">
-        <span>Carbs (g)</span>
-        <div class="input-unit-wrap"><input type="number" id="nutCarbs" placeholder="e.g. 220"><span class="input-unit">grams</span></div>
-      </label>
-      <label class="field">
-        <span>Fat (g)</span>
-        <div class="input-unit-wrap"><input type="number" id="nutFat" placeholder="e.g. 65"><span class="input-unit">grams</span></div>
-      </label>
-      <label class="field">
-        <span>Fiber (g)</span>
-        <div class="input-unit-wrap"><input type="number" id="nutFiber" placeholder="e.g. 28"><span class="input-unit">grams</span></div>
-      </label>
-      <label class="field">
-        <span>Sodium (mg)</span>
-        <div class="input-unit-wrap"><input type="number" id="nutSodium" placeholder="e.g. 1800"><span class="input-unit">mg</span></div>
-      </label>
-      <label class="field">
-        <span>Water (mL)</span>
-        <div class="input-unit-wrap"><input type="number" id="nutWater" min="0" step="50" placeholder="e.g. 3000"><span class="input-unit">mL</span></div>
-      </label>
-      <label class="field">
-        <span>Daily steps</span>
-        <div class="input-unit-wrap"><input type="number" id="nutSteps" placeholder="e.g. 8000"><span class="input-unit">walk</span></div>
-      </label>
-    </fieldset>
-    <button type="button" class="btn btn--primary" id="btnSaveNutrition">⟲ Sync fuel data</button>
-    <p class="save-note" id="nutSaveNote"></p>
   </div>
 </div>
 

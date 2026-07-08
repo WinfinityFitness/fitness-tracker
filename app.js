@@ -70,8 +70,6 @@ function getTrainUnit() {
   const profile = getProfile();
   return profile ? (profile.weightUnit || 'kg') : 'kg';
 }
-function setTrainUnit(u) { localStorage.setItem('wft_train_unit', u); }
-
 function todayISO() {
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -366,9 +364,11 @@ function initTabs() {
         checkTrainingIdle();
       }
       if (target === 'nutrition') {
-        loadNutritionForDate(document.getElementById('nutDate').value);
+        const nutDate = document.getElementById('nutDate').value;
+        loadNutritionForDate(nutDate);
         renderNutritionTargets();
         renderNutritionAverages();
+        refreshFuelWaterViews(nutDate);
       }
       if (target === 'bio') {
         loadBioForDate(document.getElementById('bioDate').value);
@@ -455,6 +455,8 @@ function initSettingsOverlay() {
   document.querySelectorAll('.tone-preview-btn').forEach(btn => {
     btn.addEventListener('click', () => playAlarmTone(btn.dataset.tone));
   });
+
+  initHydrationReminderSettings();
 }
 
 function initContact() {
@@ -562,13 +564,6 @@ function initPRBoardOverlay() {
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
 }
 
-function initIntakeLogOverlay() {
-  const overlay = document.getElementById('intakeLogOverlay');
-  document.getElementById('btnOpenIntakeLog').addEventListener('click', () => { overlay.hidden = false; });
-  document.getElementById('btnCloseIntakeLog').addEventListener('click', () => { overlay.hidden = true; });
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
-}
-
 function getSavedTimezone() {
   return localStorage.getItem('wft_timezone') || Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
@@ -640,6 +635,13 @@ async function fetchWeather(lat, lon) {
 function renderWeather(w) {
   document.getElementById('weatherIcon').textContent = weatherIconFor(w.code);
   document.getElementById('weatherTemp').textContent = Math.round(w.tempC) + '°C';
+  // Fresh weather feeds the auto-computed hydration target — refresh it if that's on.
+  const profile = getProfile();
+  const nutDateEl = document.getElementById('nutDate');
+  if (profile && profile.autoWaterGoal && nutDateEl) {
+    renderFuelWaterOrb(nutDateEl.value || todayISO());
+    renderNutritionTargets();
+  }
 }
 
 function getManualWeatherLocation() {
@@ -744,6 +746,88 @@ function initWeatherLocationPicker() {
 /* ---------------------------------------------------------------- */
 /* Bio: profile form                                                   */
 /* ---------------------------------------------------------------- */
+/* ---------------------------------------------------------------- */
+/* Auto-computed hydration target                                      */
+/* ---------------------------------------------------------------- */
+const AUTO_WATER_HINT_BASE_TEXT = "Base guidance: ~2.7L/day (women) or ~3.7L/day (men) total fluid, ~80% from drinking — plus extra for your logged training/cardio, today's weather (needs location access), and any health status above.";
+const HEALTH_STATUS_WATER_EXTRA_ML = { pregnant: 300, breastfeeding: 700, illness: 500 };
+
+// ~80% of total fluid need comes from drinking water (rest from food), per the
+// guidance the app targets: 2.7L/day total for women, 3.7L/day for men.
+function baseWaterTargetML(profile) {
+  const totalFluidNeedMl = (profile && profile.gender === 'female') ? 2700 : 3700;
+  return Math.round(totalFluidNeedMl * 0.8);
+}
+
+// Strength sets: ~3 min of work+rest per completed set at ~8 mL/min sweat rate.
+// Cardio: duration-based sweat rate that varies by activity intensity.
+function computeWaterActivityExtraML(date) {
+  const entry = getLogs()[date] || {};
+  let extraMl = 0;
+
+  const completedSets = (entry.exercises || []).reduce((sum, ex) =>
+    sum + (ex.sets || []).filter(s => s.completed).length, 0);
+  extraMl += completedSets * 3 * 8;
+
+  (entry.cardioSessions || []).forEach(s => {
+    const minutes = (s.durationSec || 0) / 60;
+    const rateMlPerMin = s.type === 'run' ? 12 : (s.type === 'walk' ? 6 : 9);
+    extraMl += minutes * rateMlPerMin;
+  });
+
+  return Math.round(extraMl);
+}
+
+function healthStatusExtraML(profile) {
+  return (profile && HEALTH_STATUS_WATER_EXTRA_ML[profile.healthStatus]) || 0;
+}
+
+function weatherExtraFromTempC(tempC) {
+  if (tempC == null) return 0;
+  if (tempC >= 32) return 750;
+  if (tempC >= 27) return 400;
+  if (tempC >= 21) return 150;
+  return 0;
+}
+
+// Reuses the same Open-Meteo cache the Status weather widget already
+// maintains (wft_weather_cache, refreshed by initWeatherWidget on load and
+// on manual location changes) rather than running a second geolocation/fetch
+// flow. Returns null if no fresh (<30 min) reading is cached yet.
+function getCachedWeatherTempC() {
+  try {
+    const cached = JSON.parse(localStorage.getItem('wft_weather_cache'));
+    if (cached && Date.now() - cached.time < 30 * 60 * 1000) return cached.tempC;
+  } catch (e) { /* ignore */ }
+  return null;
+}
+
+function computeAutoWaterTargetML(profile, date) {
+  const base = baseWaterTargetML(profile);
+  const activity = computeWaterActivityExtraML(date);
+  const health = healthStatusExtraML(profile);
+  const weather = (date === todayISO()) ? weatherExtraFromTempC(getCachedWeatherTempC()) : 0;
+  return Math.round((base + activity + health + weather) / 50) * 50;
+}
+
+function effectiveWaterTargetML(date) {
+  const profile = getProfile();
+  if (!profile) return 3000;
+  if (profile.autoWaterGoal) return computeAutoWaterTargetML(profile, date);
+  return profile.waterGoal || 3000;
+}
+
+function updateAutoWaterHint() {
+  const hintEl = document.getElementById('setupAutoWaterHint');
+  const draftProfile = {
+    gender: document.getElementById('setupGender').value,
+    healthStatus: document.getElementById('setupHealthStatus').value,
+    autoWaterGoal: true,
+  };
+  const est = computeAutoWaterTargetML(draftProfile, todayISO());
+  hintEl.textContent = `Estimated for today: ${est} mL (updates daily with your training + weather). ` + AUTO_WATER_HINT_BASE_TEXT;
+}
+
 function initSetupForm() {
   const form = document.getElementById('setupForm');
   const heightUnitSel = document.getElementById('setupHeightUnit');
@@ -758,6 +842,18 @@ function initSetupForm() {
 
   weightUnitSel.addEventListener('change', () => {
     document.getElementById('setupWeightUnitLabel').textContent = weightUnitSel.value.toUpperCase();
+  });
+
+  document.getElementById('setupAutoWaterGoal').addEventListener('change', e => {
+    document.getElementById('setupWaterGoal').disabled = e.target.checked;
+    if (e.target.checked) updateAutoWaterHint();
+    else document.getElementById('setupAutoWaterHint').textContent = AUTO_WATER_HINT_BASE_TEXT;
+  });
+  document.getElementById('setupHealthStatus').addEventListener('change', () => {
+    if (document.getElementById('setupAutoWaterGoal').checked) updateAutoWaterHint();
+  });
+  document.getElementById('setupGender').addEventListener('change', () => {
+    if (document.getElementById('setupAutoWaterGoal').checked) updateAutoWaterHint();
   });
 
   form.querySelectorAll('.proto-delete').forEach(btn => {
@@ -802,6 +898,8 @@ function initSetupForm() {
       startDate: document.getElementById('setupStartDate').value || null,
       programDays: parseInt(document.getElementById('setupProgramDays').value, 10) || 100,
       waterGoal: parseInt(document.getElementById('setupWaterGoal').value, 10) || 3000,
+      autoWaterGoal: document.getElementById('setupAutoWaterGoal').checked,
+      healthStatus: document.getElementById('setupHealthStatus').value,
       stepGoal: parseInt(document.getElementById('setupStepGoal').value, 10) || 8000,
       extraHabits,
     };
@@ -854,6 +952,10 @@ function loadSetupForm() {
   document.getElementById('setupStartDate').value = p.startDate || '';
   document.getElementById('setupProgramDays').value = p.programDays || 100;
   document.getElementById('setupWaterGoal').value = p.waterGoal || 3000;
+  document.getElementById('setupAutoWaterGoal').checked = !!p.autoWaterGoal;
+  document.getElementById('setupHealthStatus').value = p.healthStatus || '';
+  document.getElementById('setupWaterGoal').disabled = !!p.autoWaterGoal;
+  if (p.autoWaterGoal) updateAutoWaterHint(); else document.getElementById('setupAutoWaterHint').textContent = AUTO_WATER_HINT_BASE_TEXT;
   document.getElementById('setupStepGoal').value = p.stepGoal || 8000;
   (p.extraHabits || []).forEach((v, i) => {
     const el = document.querySelector(`.extraHabitInput[data-idx="${i}"]`);
@@ -1085,6 +1187,7 @@ function loadQuickLog() {
   document.getElementById('statusWeightUnitLabel').textContent = wu;
   document.getElementById('statusSleep').value = e.sleep ?? 3;
   document.getElementById('statusSleepOut').textContent = e.sleep ?? 3;
+  document.getElementById('statusSteps').value = e.steps ?? '';
 }
 
 function initQuickLog() {
@@ -1100,6 +1203,7 @@ function initQuickLog() {
     updateLogFields(date, {
       weightKg: isNaN(weightRaw) ? null : toKg(weightRaw, wu),
       sleep: parseInt(sleepInput.value, 10),
+      steps: parseIntOrNull(document.getElementById('statusSteps').value),
     });
     document.getElementById('quickLogSaveNote').textContent = 'Saved.';
     setTimeout(() => { document.getElementById('quickLogSaveNote').textContent = ''; }, 2000);
@@ -1805,6 +1909,7 @@ function renderExerciseCards() {
   newProtocolBox.hidden = false;
 
   currentExercises.forEach((ex, exIdx) => {
+    const exUnit = ex.unit || wu;
     const prevSets = findPreviousSets(ex.name, date);
     const card = document.createElement('div');
     card.className = 'ex-card';
@@ -1813,8 +1918,8 @@ function renderExerciseCards() {
       .map(m => `<option value="${m}"${m === restMins ? ' selected' : ''}>${m}m</option>`).join('');
 
     const rows = ex.sets.map((s, setIdx) => {
-      const prev = prevSets && prevSets[setIdx] ? `${prevSets[setIdx].reps} × ${round2(fromKg(prevSets[setIdx].weightKg, wu))}${wu}` : '–';
-      const weightDisplay = s.weightKg != null ? round2(fromKg(s.weightKg, wu)) : '';
+      const prev = prevSets && prevSets[setIdx] ? `${prevSets[setIdx].reps} × ${round2(fromKg(prevSets[setIdx].weightKg, exUnit))}${exUnit}` : '–';
+      const weightDisplay = s.weightKg != null ? round2(fromKg(s.weightKg, exUnit)) : '';
       return `<tr class="${s.completed ? 'is-complete' : ''}">
         <td>${setIdx + 1}</td>
         <td class="ex-set-prev">${prev}</td>
@@ -1834,6 +1939,10 @@ function renderExerciseCards() {
       <p class="mod-tag">MOD_P_${String(exIdx + 1).padStart(2, '0')}</p>
       <div class="ex-card-head">
         <div class="ex-card-title">${escapeHtml(ex.name)}</div>
+        <div class="ex-unit-toggle" data-ex="${exIdx}">
+          <button type="button" class="ex-unit-btn${exUnit === 'kg' ? ' is-active' : ''}" data-ex="${exIdx}" data-unit="kg">KG</button>
+          <button type="button" class="ex-unit-btn${exUnit === 'lb' ? ' is-active' : ''}" data-ex="${exIdx}" data-unit="lb">LB</button>
+        </div>
         <div class="ex-card-rest">
           ${isPR ? '<span class="pr-pill">🏆 PR</span>' : ''}
           <span class="ex-rest-timer ${timerInfo.state}" data-ex="${exIdx}">${timerInfo.text}</span>
@@ -1850,7 +1959,7 @@ function renderExerciseCards() {
       </div>
       <input type="text" class="ex-card-notes" data-ex="${exIdx}" placeholder="Add notes here…" value="${escapeHtml(ex.notes || '')}">
       <table class="ex-sets-table">
-        <thead><tr><th>Set</th><th>Previous</th><th>Reps</th><th>Load (${wu})</th><th></th><th></th></tr></thead>
+        <thead><tr><th>Set</th><th>Previous</th><th>Reps</th><th>Load (${exUnit})</th><th></th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       <button type="button" class="btn btn--sm ex-add-set" data-ex="${exIdx}">+ Append set block</button>
@@ -1999,6 +2108,7 @@ function startCardioTracking() {
   });
 
   cardioTickId = setInterval(updateCardioStats, 1000);
+  startCardioHydrationReminders();
 }
 
 let lastCardioSession = null;
@@ -2008,6 +2118,7 @@ function stopCardioTracking() {
   if (cardioTickId) clearInterval(cardioTickId);
   cardioWatchId = null;
   cardioTickId = null;
+  stopCardioHydrationReminders();
 
   const elapsedSec = Math.round((Date.now() - cardioStartTime) / 1000);
   const type = document.getElementById('cardioType').value;
@@ -2257,19 +2368,6 @@ function getActiveTrainingDate() {
   return (hasData && !isSessionFinished(stored)) ? stored : todayISO();
 }
 
-function initTrainUnitToggle() {
-  const btnKg = document.getElementById('btnUnitKg');
-  const btnLb = document.getElementById('btnUnitLb');
-  const sync = () => {
-    const u = getTrainUnit();
-    btnKg.classList.toggle('is-active', u === 'kg');
-    btnLb.classList.toggle('is-active', u === 'lb');
-  };
-  btnKg.addEventListener('click', () => { setTrainUnit('kg'); sync(); renderExerciseCards(); });
-  btnLb.addEventListener('click', () => { setTrainUnit('lb'); sync(); renderExerciseCards(); });
-  sync();
-}
-
 /* ---------------------------------------------------------------- */
 /* Training: temporal mission log (calendar of workout days)          */
 /* ---------------------------------------------------------------- */
@@ -2370,7 +2468,7 @@ function initTraining() {
     const date = document.getElementById('trainDate').value;
     const prevSets = findPreviousSets(name, date);
     const firstSet = prevSets && prevSets[0] ? { reps: prevSets[0].reps, weightKg: prevSets[0].weightKg, completed: false } : { reps: null, weightKg: null, completed: false };
-    currentExercises.push({ name, restSeconds: 180, notes: '', sets: [firstSet] });
+    currentExercises.push({ name, restSeconds: 180, notes: '', unit: getTrainUnit(), sets: [firstSet] });
     persistExercises();
     renderExerciseCards();
     renderExerciseNameOptions();
@@ -2427,6 +2525,15 @@ function initTraining() {
       const wasOpen = !menu.hidden;
       document.querySelectorAll('.ex-card-menu').forEach(m => { m.hidden = true; });
       menu.hidden = wasOpen;
+      return;
+    }
+
+    const unitBtn = e.target.closest('.ex-unit-btn');
+    if (unitBtn) {
+      const exIdx = parseInt(unitBtn.dataset.ex, 10);
+      currentExercises[exIdx].unit = unitBtn.dataset.unit;
+      persistExercises();
+      renderExerciseCards();
       return;
     }
 
@@ -2507,15 +2614,15 @@ function initTraining() {
   });
 
   cards.addEventListener('change', e => {
-    const wu = getTrainUnit();
     if (e.target.classList.contains('ex-set-reps')) {
       const exIdx = parseInt(e.target.dataset.ex, 10), setIdx = parseInt(e.target.dataset.set, 10);
       currentExercises[exIdx].sets[setIdx].reps = parseIntOrNull(e.target.value);
       persistExercises();
     } else if (e.target.classList.contains('ex-set-weight')) {
       const exIdx = parseInt(e.target.dataset.ex, 10), setIdx = parseInt(e.target.dataset.set, 10);
+      const exUnit = currentExercises[exIdx].unit || getTrainUnit();
       const val = parseFloat(e.target.value);
-      currentExercises[exIdx].sets[setIdx].weightKg = isNaN(val) ? null : toKg(val, wu);
+      currentExercises[exIdx].sets[setIdx].weightKg = isNaN(val) ? null : toKg(val, exUnit);
       persistExercises();
     } else if (e.target.classList.contains('ex-card-notes')) {
       const exIdx = parseInt(e.target.dataset.ex, 10);
@@ -2669,6 +2776,7 @@ function initSessionTemplates() {
     const templateExercises = currentExercises.map(ex => ({
       name: ex.name,
       restSeconds: ex.restSeconds,
+      unit: ex.unit || getTrainUnit(),
       sets: ex.sets.map(s => ({ reps: s.reps, weightKg: s.weightKg })),
     }));
     templates.push({ id: generateShareKey(), name, exercises: templateExercises });
@@ -2689,6 +2797,7 @@ function initSessionTemplates() {
       name: ex.name,
       restSeconds: ex.restSeconds || 180,
       notes: '',
+      unit: ex.unit || getTrainUnit(),
       sets: ex.sets.map(s => ({ reps: s.reps, weightKg: s.weightKg, completed: false })),
     }));
     persistExercises();
@@ -2938,6 +3047,167 @@ function fireSystemNotification(title, body) {
     const n = new Notification(title, { body });
     n.onclick = () => { n.close(); window.focus(); };
   } catch (e) { /* ignore */ }
+}
+
+/* ---------------------------------------------------------------- */
+/* Hydration reminders                                                 */
+/* Best-effort only (same caveat as checkMeasurementReminder): a PWA   */
+/* can't wake up in the background at an exact time, so a clock-based  */
+/* schedule is checked every few minutes while the app is open, plus   */
+/* real-time nudges tied to actual cardio start/stop events.           */
+/* ---------------------------------------------------------------- */
+function isHydrationRemindersEnabled() {
+  const profile = getProfile();
+  return !!(profile && profile.hydrationReminders && profile.hydrationReminders.enabled);
+}
+
+function timeStrToMin(t) {
+  const [h, m] = (t || '00:00').split(':').map(Number);
+  return h * 60 + m;
+}
+function minToTimeStr(min) {
+  min = ((min % 1440) + 1440) % 1440;
+  return String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0');
+}
+
+// Builds today's reminder slots from the hydration-schedule guidance:
+// wake-up, 30 min before each meal, hourly through waking hours (skipping
+// slots too close to another one), and a wind-down slot 2h before bed.
+function getHydrationSchedule(profile) {
+  const hr = (profile && profile.hydrationReminders) || {};
+  if (!hr.enabled) return [];
+  const wakeMin = timeStrToMin(hr.wakeTime || '07:00');
+  const bedMin = timeStrToMin(hr.bedTime || '22:00');
+  const meals = (hr.mealTimes && hr.mealTimes.length === 3) ? hr.mealTimes : ['07:00', '12:00', '19:00'];
+  const mealLabels = ['Breakfast', 'Lunch', 'Dinner'];
+
+  const slots = [{
+    id: 'wake', time: minToTimeStr(wakeMin),
+    message: 'Morning! Drink 1-2 glasses of water (~250-500 mL) to rehydrate after sleep.',
+  }];
+
+  meals.forEach((mt, i) => {
+    slots.push({
+      id: 'meal' + i, time: minToTimeStr(timeStrToMin(mt) - 30),
+      message: `Drink a glass of water (~250 mL) before ${mealLabels[i].toLowerCase()} to prep digestion.`,
+    });
+  });
+
+  if (hr.hourlyEnabled !== false) {
+    const cutoff = bedMin - 120;
+    for (let m = wakeMin + 60; m < cutoff; m += 60) {
+      const tooClose = slots.some(s => Math.abs(timeStrToMin(s.time) - m) < 20);
+      if (!tooClose) slots.push({ id: 'hourly' + m, time: minToTimeStr(m), message: 'Time for a cup of water (~250 mL).' });
+    }
+  }
+
+  slots.push({
+    id: 'bed', time: minToTimeStr(bedMin - 120),
+    message: "If you're thirsty, a small glass now — then taper off fluids before bed so you're not up at night.",
+  });
+
+  return slots;
+}
+
+function fireHydrationReminder(message) {
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  playBeep();
+  showAppReminder('💧 ' + message);
+  if (window.Notification && Notification.permission === 'default' && !notifyPermissionAsked) {
+    notifyPermissionAsked = true;
+    Notification.requestPermission().then(() => fireSystemNotification('💧 Hydration reminder', message)).catch(() => {});
+  } else {
+    fireSystemNotification('💧 Hydration reminder', message);
+  }
+}
+
+function checkHydrationReminders() {
+  const profile = getProfile();
+  if (!profile || !isHydrationRemindersEnabled()) return;
+  const schedule = getHydrationSchedule(profile);
+  if (!schedule.length) return;
+
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  const firedKey = 'wft_hydration_fired_' + todayISO();
+  let fired;
+  try { fired = JSON.parse(localStorage.getItem(firedKey)) || []; } catch (e) { fired = []; }
+
+  schedule.forEach(slot => {
+    const slotMin = timeStrToMin(slot.time);
+    if (nowMin >= slotMin && nowMin < slotMin + 10 && !fired.includes(slot.id)) {
+      fired.push(slot.id);
+      localStorage.setItem(firedKey, JSON.stringify(fired));
+      fireHydrationReminder(slot.message);
+    }
+  });
+}
+
+function cleanupOldHydrationFiredKeys() {
+  const todayKey = 'wft_hydration_fired_' + todayISO();
+  Object.keys(localStorage).forEach(k => {
+    if (k.startsWith('wft_hydration_fired_') && k !== todayKey) localStorage.removeItem(k);
+  });
+}
+
+let cardioHydrationIntervalId = null;
+
+function startCardioHydrationReminders() {
+  if (!isHydrationRemindersEnabled()) return;
+  fireHydrationReminder('Sip some water before you start (~6-12 oz / 175-350 mL).');
+  cardioHydrationIntervalId = setInterval(() => {
+    fireHydrationReminder('Sip 6-12 oz (~175-350 mL) of water — stay ahead of sweat loss.');
+  }, 12 * 60 * 1000);
+}
+
+function stopCardioHydrationReminders() {
+  if (cardioHydrationIntervalId) { clearInterval(cardioHydrationIntervalId); cardioHydrationIntervalId = null; }
+  if (!isHydrationRemindersEnabled()) return;
+  fireHydrationReminder('Rehydrate! Drink 16-24 oz (~500-700 mL) to replenish sweat loss.');
+}
+
+function loadHydroReminderSettings() {
+  const p = getProfile();
+  const hr = (p && p.hydrationReminders) || {};
+  document.getElementById('hydroRemindersEnabled').checked = !!hr.enabled;
+  document.getElementById('hydroWakeTime').value = hr.wakeTime || '07:00';
+  document.getElementById('hydroBedTime').value = hr.bedTime || '22:00';
+  const meals = (hr.mealTimes && hr.mealTimes.length === 3) ? hr.mealTimes : ['07:00', '12:00', '19:00'];
+  document.getElementById('hydroMeal0').value = meals[0];
+  document.getElementById('hydroMeal1').value = meals[1];
+  document.getElementById('hydroMeal2').value = meals[2];
+  document.getElementById('hydroHourlyEnabled').checked = hr.hourlyEnabled !== false;
+  document.getElementById('hydroReminderFields').style.display = hr.enabled ? '' : 'none';
+}
+
+function initHydrationReminderSettings() {
+  loadHydroReminderSettings();
+  const enabledToggle = document.getElementById('hydroRemindersEnabled');
+  enabledToggle.addEventListener('change', () => {
+    document.getElementById('hydroReminderFields').style.display = enabledToggle.checked ? '' : 'none';
+  });
+  document.getElementById('btnSaveHydroReminders').addEventListener('click', () => {
+    const profile = getProfile();
+    if (!profile) { document.getElementById('hydroSaveNote').textContent = 'Finish your Bio profile setup first.'; return; }
+    profile.hydrationReminders = {
+      enabled: document.getElementById('hydroRemindersEnabled').checked,
+      wakeTime: document.getElementById('hydroWakeTime').value || '07:00',
+      bedTime: document.getElementById('hydroBedTime').value || '22:00',
+      mealTimes: [
+        document.getElementById('hydroMeal0').value || '07:00',
+        document.getElementById('hydroMeal1').value || '12:00',
+        document.getElementById('hydroMeal2').value || '19:00',
+      ],
+      hourlyEnabled: document.getElementById('hydroHourlyEnabled').checked,
+    };
+    saveProfile(profile);
+    document.getElementById('hydroSaveNote').textContent = 'Reminder schedule saved.';
+    setTimeout(() => { document.getElementById('hydroSaveNote').textContent = ''; }, 2500);
+    if (profile.hydrationReminders.enabled && window.Notification && Notification.permission === 'default' && !notifyPermissionAsked) {
+      notifyPermissionAsked = true;
+      Notification.requestPermission().catch(() => {});
+    }
+    checkHydrationReminders();
+  });
 }
 
 function fireRestComplete(exName) {
@@ -3594,46 +3864,57 @@ async function lookupBarcodeProduct(code) {
 }
 
 function loadNutritionForDate(date) {
-  const logs = getLogs();
-  const e = logs[date] || {};
-  document.getElementById('nutCalories').value = e.calories ?? '';
-  document.getElementById('nutProtein').value = e.protein ?? '';
-  document.getElementById('nutCarbs').value = e.carbs ?? '';
-  document.getElementById('nutFat').value = e.fat ?? '';
-  document.getElementById('nutFiber').value = e.fiber ?? '';
-  document.getElementById('nutSodium').value = e.sodium ?? '';
-  document.getElementById('nutWater').value = e.water ?? '';
-  document.getElementById('nutSteps').value = e.steps ?? '';
   document.getElementById('fuelDateLabel').textContent = fmtDate(parseISO(date));
+}
+
+const WATER_GLASS_ML = 250;
+
+function renderFuelWaterOrb(date) {
+  const profile = getProfile();
+  const target = effectiveWaterTargetML(date);
+  const now = (getLogs()[date] || {}).water || 0;
+  const pct = Math.max(0, Math.min(100, (now / target) * 100));
+  document.getElementById('fuelWaterOrbFill').setAttribute('y', 100 - pct);
+  document.getElementById('fuelWaterOrbFill').setAttribute('height', pct);
+  document.getElementById('fuelWaterOrbAmount').textContent = now;
+  document.getElementById('fuelWaterOrbTarget').textContent = target;
+  document.getElementById('fuelWaterOrbAutoTag').hidden = !(profile && profile.autoWaterGoal);
+  document.getElementById('btnWaterOrbDown').disabled = now <= 0;
+}
+
+function adjustFuelWaterOrb(deltaMl) {
+  const date = document.getElementById('nutDate').value || todayISO();
+  const current = (getLogs()[date] || {}).water || 0;
+  const next = Math.max(0, current + deltaMl);
+  updateLogFields(date, { water: next });
+  renderFuelWaterOrb(date);
+  renderNutritionTargets();
+  renderNutritionAverages();
+  updateTabDots();
+}
+
+function refreshFuelWaterViews(date) {
+  renderFuelWaterOrb(date);
+}
+
+function initFuelWaterOrb() {
+  document.getElementById('btnWaterOrbUp').addEventListener('click', () => adjustFuelWaterOrb(WATER_GLASS_ML));
+  document.getElementById('btnWaterOrbDown').addEventListener('click', () => adjustFuelWaterOrb(-WATER_GLASS_ML));
+  refreshFuelWaterViews(document.getElementById('nutDate').value || todayISO());
 }
 
 function initNutrition() {
   document.getElementById('nutDate').value = todayISO();
-  document.getElementById('nutDate').addEventListener('change', e => { loadNutritionForDate(e.target.value); renderNutritionTargets(); });
+  document.getElementById('nutDate').addEventListener('change', e => {
+    loadNutritionForDate(e.target.value);
+    renderNutritionTargets();
+    refreshFuelWaterViews(e.target.value);
+  });
   document.getElementById('btnGoToBioFromFuel').addEventListener('click', () => {
     document.querySelector('.tab-btn[data-target="bio"]').click();
   });
 
-  document.getElementById('btnSaveNutrition').addEventListener('click', () => {
-    const date = document.getElementById('nutDate').value;
-    updateLogFields(date, {
-      calories: parseIntOrNull(document.getElementById('nutCalories').value),
-      protein: parseIntOrNull(document.getElementById('nutProtein').value),
-      carbs: parseIntOrNull(document.getElementById('nutCarbs').value),
-      fat: parseIntOrNull(document.getElementById('nutFat').value),
-      fiber: parseIntOrNull(document.getElementById('nutFiber').value),
-      sodium: parseIntOrNull(document.getElementById('nutSodium').value),
-      water: parseIntOrNull(document.getElementById('nutWater').value),
-      steps: parseIntOrNull(document.getElementById('nutSteps').value),
-    });
-    document.getElementById('nutSaveNote').textContent = 'Saved intake for ' + date;
-    setTimeout(() => { document.getElementById('nutSaveNote').textContent = ''; }, 2000);
-    renderNutritionAverages();
-    renderNutritionTargets();
-    renderWaterRetentionOrb();
-    updateTabDots();
-  });
-
+  initFuelWaterOrb();
   loadNutritionForDate(todayISO());
   renderNutritionTargets();
   renderNutritionAverages();
@@ -3689,9 +3970,9 @@ function renderNutritionTargets() {
   const carbTarget = Math.max(0, round0((calorieTarget - proteinTarget * 4 - fatTarget * 9) / 4));
   const fiberTarget = round0((calorieTarget / 1000) * 14);
   const sodiumTarget = 2300;
-  const waterTarget = profile.waterGoal || 3000;
 
   const date = document.getElementById('nutDate').value;
+  const waterTarget = effectiveWaterTargetML(date);
   const entry = getLogs()[date] || {};
   const caloriesNow = entry.calories ?? 0;
   const proteinNow = entry.protein ?? 0;
@@ -4977,7 +5258,6 @@ initFooterShare();
 initPrivacyPolicy();
 initTermsOfService();
 initPRBoardOverlay();
-initIntakeLogOverlay();
 initMeasureEntryOverlay();
 initEntityIdentityOverlay();
 initDateTimeWidget();
@@ -4989,7 +5269,6 @@ initCheckin();
 initQuickLog();
 initMeasurements();
 initTraining();
-initTrainUnitToggle();
 initCardioTracker();
 initMissionLog();
 initWeightChartToggle();
@@ -5019,7 +5298,11 @@ setTimeout(() => {
   setTimeout(() => { splash.hidden = true; }, 400);
   checkDataReminder();
   setTimeout(checkMeasurementReminder, 6000);
+  cleanupOldHydrationFiredKeys();
+  setTimeout(checkHydrationReminders, 8000);
 }, 2000);
+
+setInterval(checkHydrationReminders, 5 * 60 * 1000);
 
 // Background unread-message check so the Nexus tab dot can light up even while
 // the user is elsewhere — the Nexus tab's own polling only runs while it's active.
