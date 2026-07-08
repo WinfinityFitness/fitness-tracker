@@ -388,7 +388,8 @@
       </div>
     </div>
 
-    <button type="button" class="btn btn--primary" id="btnOpenIntakeLog">Today Intake Log Entry</button>
+    <button type="button" class="btn btn--primary" id="btnOpenFoodDiary">📔 Food Diary</button>
+    <button type="button" class="btn" id="btnOpenIntakeLog">Today Intake Log Entry</button>
 
     <h2 class="section-title">Averages (7-day)</h2>
     <div class="stat-grid stat-grid--3">
@@ -1268,6 +1269,131 @@
     </div>
     <div class="pr-board" id="prBoard"></div>
     <p class="empty-note" id="prBoardEmpty">Log completed sets to start tracking personal records.</p>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="foodDiaryOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Food Diary</h2>
+      <button class="sheet-close" id="btnCloseFoodDiary">✕</button>
+    </div>
+
+    <div class="meal-section" data-meal="breakfast">
+      <div class="meal-section-head">
+        <span class="meal-section-title">🌅 Breakfast</span>
+        <span class="meal-section-total" id="mealTotal_breakfast">0 kcal</span>
+      </div>
+      <div class="meal-items" id="mealItems_breakfast"></div>
+      <button type="button" class="btn btn--sm add-food-btn" data-meal="breakfast">+ Add food</button>
+    </div>
+
+    <div class="meal-section" data-meal="lunch">
+      <div class="meal-section-head">
+        <span class="meal-section-title">☀️ Lunch</span>
+        <span class="meal-section-total" id="mealTotal_lunch">0 kcal</span>
+      </div>
+      <div class="meal-items" id="mealItems_lunch"></div>
+      <button type="button" class="btn btn--sm add-food-btn" data-meal="lunch">+ Add food</button>
+    </div>
+
+    <div class="meal-section" data-meal="dinner">
+      <div class="meal-section-head">
+        <span class="meal-section-title">🌙 Dinner</span>
+        <span class="meal-section-total" id="mealTotal_dinner">0 kcal</span>
+      </div>
+      <div class="meal-items" id="mealItems_dinner"></div>
+      <button type="button" class="btn btn--sm add-food-btn" data-meal="dinner">+ Add food</button>
+    </div>
+
+    <div class="meal-section" data-meal="snacks">
+      <div class="meal-section-head">
+        <span class="meal-section-title">🍎 Snacks</span>
+        <span class="meal-section-total" id="mealTotal_snacks">0 kcal</span>
+      </div>
+      <div class="meal-items" id="mealItems_snacks"></div>
+      <button type="button" class="btn btn--sm add-food-btn" data-meal="snacks">+ Add food</button>
+    </div>
+
+    <p class="hint">Food Diary totals feed your Daily Fuel Status automatically. The flat Today Intake Log Entry still works for quick manual totals on days you don't want to log individual foods.</p>
+  </div>
+</div>
+
+<div class="sheet-overlay sheet-overlay--stacked" id="addFoodOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Add Food</h2>
+      <button class="sheet-close" id="btnCloseAddFood">✕</button>
+    </div>
+
+    <div class="btn-row">
+      <button type="button" class="btn btn--primary" id="btnScanBarcode">📷 Scan barcode</button>
+    </div>
+
+    <label class="field" style="margin-top:12px;">
+      <span>Search foods</span>
+      <input type="text" id="foodSearchInput" placeholder="e.g. chicken breast, banana, rice" autocomplete="off">
+    </label>
+    <p class="hint" id="foodSearchStatus"></p>
+    <div id="foodSearchResults" class="food-search-results"></div>
+
+    <div class="selected-food-card" id="selectedFoodCard" hidden>
+      <p class="mod-tag">Confirm serving</p>
+      <p class="selected-food-name" id="selectedFoodName"></p>
+      <label class="field">
+        <span>Quantity (g)</span>
+        <input type="number" id="selectedFoodGrams" value="100">
+      </label>
+      <p class="selected-food-preview" id="selectedFoodPreview"></p>
+      <button type="button" class="btn btn--primary" id="btnAddSelectedFood">Add to diary</button>
+    </div>
+
+    <div class="field-group-heading" style="margin-top:16px;">Not finding it?</div>
+    <fieldset class="field-group" id="customFoodForm">
+      <label class="field">
+        <span>Food name</span>
+        <input type="text" id="customFoodName" placeholder="e.g. Lola's adobo">
+      </label>
+      <div class="field-row">
+        <label class="field">
+          <span>Serving size (g)</span>
+          <input type="number" id="customFoodGrams" placeholder="e.g. 250" value="100">
+        </label>
+        <label class="field">
+          <span>Calories</span>
+          <input type="number" id="customFoodCalories" placeholder="e.g. 350">
+        </label>
+      </div>
+      <div class="field-row">
+        <label class="field">
+          <span>Protein (g)</span>
+          <input type="number" id="customFoodProtein" placeholder="0">
+        </label>
+        <label class="field">
+          <span>Carbs (g)</span>
+          <input type="number" id="customFoodCarbs" placeholder="0">
+        </label>
+        <label class="field">
+          <span>Fat (g)</span>
+          <input type="number" id="customFoodFat" placeholder="0">
+        </label>
+      </div>
+      <button type="button" class="btn btn--primary" id="btnAddCustomFood">Add to diary</button>
+    </fieldset>
+  </div>
+</div>
+
+<div class="sheet-overlay sheet-overlay--stacked" id="barcodeScanOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Scan Barcode</h2>
+      <button class="sheet-close" id="btnCloseBarcodeScan">✕</button>
+    </div>
+    <p class="hint" id="barcodeScanStatus">Point your camera at a product barcode.</p>
+    <video id="barcodeVideo" class="barcode-video" playsinline muted></video>
   </div>
 </div>
 

@@ -2921,6 +2921,396 @@ function playBeep() { playAlarmTone(getAlarmTone()); }
 /* ---------------------------------------------------------------- */
 /* Nutrition                                                            */
 /* ---------------------------------------------------------------- */
+/* ---------------------------------------------------------------- */
+/* Food Diary (meal-categorized food logging)                          */
+/* ---------------------------------------------------------------- */
+const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snacks'];
+const MEAL_LABELS = { breakfast: '🌅 Breakfast', lunch: '☀️ Lunch', dinner: '🌙 Dinner', snacks: '🍎 Snacks' };
+
+function getMealsForDate(date) {
+  const logs = getLogs();
+  const stored = logs[date] && logs[date].meals;
+  return {
+    breakfast: (stored && stored.breakfast) || [],
+    lunch: (stored && stored.lunch) || [],
+    dinner: (stored && stored.dinner) || [],
+    snacks: (stored && stored.snacks) || [],
+  };
+}
+
+function computeMealsNutritionTotals(meals) {
+  const totals = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sodium: 0 };
+  MEAL_TYPES.forEach(mt => {
+    (meals[mt] || []).forEach(item => {
+      totals.calories += item.calories || 0;
+      totals.protein += item.protein || 0;
+      totals.carbs += item.carbs || 0;
+      totals.fat += item.fat || 0;
+      totals.fiber += item.fiber || 0;
+      totals.sodium += item.sodium || 0;
+    });
+  });
+  return totals;
+}
+
+// Once the Food Diary is used for a date, it owns that date's flat nutrition
+// totals going forward (they're recomputed here) — the manual Today Intake
+// Log Entry fields still work standalone for dates that never touch this.
+function saveMealsForDate(date, meals) {
+  const totals = computeMealsNutritionTotals(meals);
+  updateLogFields(date, {
+    meals,
+    calories: round0(totals.calories),
+    protein: round0(totals.protein),
+    carbs: round0(totals.carbs),
+    fat: round0(totals.fat),
+    fiber: round0(totals.fiber),
+    sodium: round0(totals.sodium),
+  });
+}
+
+function refreshFuelViewsForDate(date) {
+  loadNutritionForDate(date);
+  renderNutritionTargets();
+  renderNutritionAverages();
+  updateTabDots();
+}
+
+function renderFoodDiary(date) {
+  const meals = getMealsForDate(date);
+  MEAL_TYPES.forEach(mt => {
+    const container = document.getElementById(`mealItems_${mt}`);
+    const totalEl = document.getElementById(`mealTotal_${mt}`);
+    const items = meals[mt];
+    container.innerHTML = items.length ? items.map((item, idx) => `
+      <div class="meal-item-row">
+        <div class="meal-item-info">
+          <div class="meal-item-name">${escapeHtml(item.name)}</div>
+          <div class="meal-item-meta">${item.grams ? round0(item.grams) + 'g · ' : ''}${round0(item.calories)} kcal</div>
+        </div>
+        <select class="meal-item-move" data-meal="${mt}" data-idx="${idx}">
+          ${MEAL_TYPES.map(m2 => `<option value="${m2}" ${m2 === mt ? 'selected' : ''}>${m2.charAt(0).toUpperCase() + m2.slice(1)}</option>`).join('')}
+        </select>
+        <button type="button" class="meal-item-remove" data-meal="${mt}" data-idx="${idx}" aria-label="Remove">✕</button>
+      </div>
+    `).join('') : '<p class="empty-note">No items yet.</p>';
+    const mealTotalKcal = items.reduce((s, i) => s + (i.calories || 0), 0);
+    totalEl.textContent = round0(mealTotalKcal) + ' kcal';
+  });
+}
+
+let currentAddFoodMeal = 'breakfast';
+let selectedFoodData = null;
+let foodSearchDebounceId = null;
+
+function initFoodDiary() {
+  const overlay = document.getElementById('foodDiaryOverlay');
+  document.getElementById('btnOpenFoodDiary').addEventListener('click', () => {
+    renderFoodDiary(document.getElementById('nutDate').value);
+    overlay.hidden = false;
+  });
+  document.getElementById('btnCloseFoodDiary').addEventListener('click', () => { overlay.hidden = true; });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+
+  overlay.addEventListener('click', e => {
+    const removeBtn = e.target.closest('.meal-item-remove');
+    if (removeBtn) {
+      const date = document.getElementById('nutDate').value;
+      const meals = getMealsForDate(date);
+      meals[removeBtn.dataset.meal].splice(parseInt(removeBtn.dataset.idx, 10), 1);
+      saveMealsForDate(date, meals);
+      renderFoodDiary(date);
+      refreshFuelViewsForDate(date);
+      return;
+    }
+    const addBtn = e.target.closest('.add-food-btn');
+    if (addBtn) {
+      currentAddFoodMeal = addBtn.dataset.meal;
+      openAddFoodPanel();
+    }
+  });
+
+  overlay.addEventListener('change', e => {
+    const moveSel = e.target.closest('.meal-item-move');
+    if (!moveSel || moveSel.value === moveSel.dataset.meal) return;
+    const date = document.getElementById('nutDate').value;
+    const meals = getMealsForDate(date);
+    const fromMeal = moveSel.dataset.meal;
+    const idx = parseInt(moveSel.dataset.idx, 10);
+    const item = meals[fromMeal][idx];
+    meals[fromMeal].splice(idx, 1);
+    meals[moveSel.value].push(item);
+    saveMealsForDate(date, meals);
+    renderFoodDiary(date);
+    refreshFuelViewsForDate(date);
+  });
+}
+
+function openAddFoodPanel() {
+  document.getElementById('foodSearchInput').value = '';
+  document.getElementById('foodSearchResults').innerHTML = '';
+  document.getElementById('foodSearchStatus').textContent = '';
+  document.getElementById('selectedFoodCard').hidden = true;
+  selectedFoodData = null;
+  document.getElementById('customFoodName').value = '';
+  document.getElementById('customFoodGrams').value = '100';
+  document.getElementById('customFoodCalories').value = '';
+  document.getElementById('customFoodProtein').value = '';
+  document.getElementById('customFoodCarbs').value = '';
+  document.getElementById('customFoodFat').value = '';
+  document.getElementById('addFoodOverlay').hidden = false;
+}
+
+// Open Food Facts' search endpoints block cross-origin browser fetch (no
+// CORS) — confirmed by direct testing, not just docs. Its single-product
+// barcode lookup DOES allow it, so that's used for the barcode scanner only.
+// Search-as-you-type instead uses USDA FoodData Central, which supports CORS
+// and returns full nutrition inline with search results (no second fetch).
+const USDA_NUTRIENT_IDS = { calories: 1008, protein: 1003, fat: 1004, carbs: 1005, fiber: 1079, sodium: 1093 };
+
+function usdaNutrientValue(food, nutrientId) {
+  const n = (food.foodNutrients || []).find(fn => fn.nutrientId === nutrientId);
+  return n ? (n.value || 0) : 0;
+}
+
+async function searchUsdaFoods(query) {
+  const key = (typeof USDA_API_KEY === 'string' && USDA_API_KEY) ? USDA_API_KEY : 'DEMO_KEY';
+  const url = `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(query)}&pageSize=15&api_key=${encodeURIComponent(key)}`;
+  const res = await fetch(url);
+  if (res.status === 429 || res.status === 403) throw new Error('Rate limited — get your own free key at api.data.gov/signup and add it to config.js.');
+  if (!res.ok) throw new Error('Search failed');
+  const data = await res.json();
+  return data.foods || [];
+}
+
+function renderFoodSearchResults(foods) {
+  const container = document.getElementById('foodSearchResults');
+  if (!foods.length) { container.innerHTML = ''; return; }
+  container.innerHTML = foods.map((f, i) => `
+    <button type="button" class="food-search-result-row" data-idx="${i}">
+      <div>
+        <div class="food-result-name">${escapeHtml(f.description)}</div>
+        <div class="food-result-meta">${escapeHtml(f.brandName || f.brandOwner || (f.dataType === 'Branded' ? 'Branded' : 'Generic'))}</div>
+      </div>
+      <span class="food-result-kcal">${round0(usdaNutrientValue(f, USDA_NUTRIENT_IDS.calories))} kcal/100g</span>
+    </button>
+  `).join('');
+  container.querySelectorAll('.food-search-result-row').forEach(btn => {
+    btn.addEventListener('click', () => selectFoodProduct({ source: 'usda', food: foods[parseInt(btn.dataset.idx, 10)] }));
+  });
+}
+
+async function fetchOffProductNutrition(code) {
+  const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name,product_name_en,brands,nutriments`);
+  if (!res.ok) throw new Error('Lookup failed');
+  const data = await res.json();
+  if (data.status !== 1 || !data.product) throw new Error('Product not found');
+  return data.product;
+}
+
+function offBrandsText(brands) {
+  if (!brands) return 'Generic';
+  return Array.isArray(brands) ? brands.join(', ') : brands;
+}
+
+// Accepts { source: 'usda', food } from search results, or { source: 'off', product }
+// from the barcode scanner (product already has full nutriments attached).
+async function selectFoodProduct(selection) {
+  const status = document.getElementById('foodSearchStatus');
+  let name, per100g;
+
+  if (selection.source === 'usda') {
+    const f = selection.food;
+    name = f.description;
+    per100g = {
+      calories: usdaNutrientValue(f, USDA_NUTRIENT_IDS.calories),
+      protein: usdaNutrientValue(f, USDA_NUTRIENT_IDS.protein),
+      carbs: usdaNutrientValue(f, USDA_NUTRIENT_IDS.carbs),
+      fat: usdaNutrientValue(f, USDA_NUTRIENT_IDS.fat),
+      fiber: usdaNutrientValue(f, USDA_NUTRIENT_IDS.fiber),
+      sodium: usdaNutrientValue(f, USDA_NUTRIENT_IDS.sodium), // USDA already reports sodium in mg
+    };
+  } else {
+    let product = selection.product;
+    if (!product.nutriments) {
+      status.textContent = 'Loading nutrition info…';
+      try {
+        product = await fetchOffProductNutrition(product.code);
+      } catch (e) {
+        status.textContent = 'Could not load nutrition info for that item — try another or add custom.';
+        return;
+      }
+    }
+    const n = product.nutriments || {};
+    name = product.product_name || product.product_name_en || 'Unknown item';
+    per100g = {
+      calories: n['energy-kcal_100g'] || 0,
+      protein: n['proteins_100g'] || 0,
+      carbs: n['carbohydrates_100g'] || 0,
+      fat: n['fat_100g'] || 0,
+      fiber: n['fiber_100g'] || 0,
+      sodium: (n['sodium_100g'] || 0) * 1000, // OFF gives grams — this app tracks sodium in mg
+    };
+  }
+
+  status.textContent = '';
+  selectedFoodData = { name, per100g };
+  document.getElementById('selectedFoodName').textContent = name;
+  document.getElementById('selectedFoodGrams').value = 100;
+  updateSelectedFoodPreview();
+  document.getElementById('selectedFoodCard').hidden = false;
+  document.getElementById('selectedFoodCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function updateSelectedFoodPreview() {
+  if (!selectedFoodData) return;
+  const grams = parseFloat(document.getElementById('selectedFoodGrams').value) || 0;
+  const scale = grams / 100;
+  const kcal = round0(selectedFoodData.per100g.calories * scale);
+  const protein = round0(selectedFoodData.per100g.protein * scale);
+  const carbs = round0(selectedFoodData.per100g.carbs * scale);
+  const fat = round0(selectedFoodData.per100g.fat * scale);
+  document.getElementById('selectedFoodPreview').textContent = `${kcal} kcal · ${protein}g protein · ${carbs}g carbs · ${fat}g fat`;
+}
+
+function addFoodItemToDiary(item) {
+  const date = document.getElementById('nutDate').value;
+  const meals = getMealsForDate(date);
+  meals[currentAddFoodMeal].push(item);
+  saveMealsForDate(date, meals);
+  document.getElementById('addFoodOverlay').hidden = true;
+  renderFoodDiary(date);
+  refreshFuelViewsForDate(date);
+  showRestToast(`Added "${item.name}" to ${currentAddFoodMeal}.`);
+}
+
+function initAddFoodPanel() {
+  const overlay = document.getElementById('addFoodOverlay');
+  document.getElementById('btnCloseAddFood').addEventListener('click', () => { overlay.hidden = true; });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+
+  const searchInput = document.getElementById('foodSearchInput');
+  searchInput.addEventListener('input', () => {
+    clearTimeout(foodSearchDebounceId);
+    const q = searchInput.value.trim();
+    document.getElementById('selectedFoodCard').hidden = true;
+    if (q.length < 2) {
+      document.getElementById('foodSearchResults').innerHTML = '';
+      document.getElementById('foodSearchStatus').textContent = '';
+      return;
+    }
+    document.getElementById('foodSearchStatus').textContent = 'Searching…';
+    foodSearchDebounceId = setTimeout(async () => {
+      try {
+        const results = await searchUsdaFoods(q);
+        renderFoodSearchResults(results);
+        document.getElementById('foodSearchStatus').textContent = results.length ? '' : 'No matches — try "Add custom food" below.';
+      } catch (e) {
+        document.getElementById('foodSearchStatus').textContent = e.message || 'Search unavailable — check your connection.';
+      }
+    }, 450);
+  });
+
+  document.getElementById('selectedFoodGrams').addEventListener('input', updateSelectedFoodPreview);
+
+  document.getElementById('btnAddSelectedFood').addEventListener('click', () => {
+    if (!selectedFoodData) return;
+    const grams = parseFloat(document.getElementById('selectedFoodGrams').value) || 0;
+    const scale = grams / 100;
+    addFoodItemToDiary({
+      name: selectedFoodData.name,
+      grams,
+      calories: round0(selectedFoodData.per100g.calories * scale),
+      protein: round0(selectedFoodData.per100g.protein * scale),
+      carbs: round0(selectedFoodData.per100g.carbs * scale),
+      fat: round0(selectedFoodData.per100g.fat * scale),
+      fiber: round0(selectedFoodData.per100g.fiber * scale),
+      sodium: round0(selectedFoodData.per100g.sodium * scale),
+      source: 'off',
+    });
+  });
+
+  document.getElementById('btnAddCustomFood').addEventListener('click', () => {
+    const name = document.getElementById('customFoodName').value.trim();
+    if (!name) { alert('Enter a food name.'); return; }
+    const grams = parseFloat(document.getElementById('customFoodGrams').value) || null;
+    addFoodItemToDiary({
+      name,
+      grams,
+      calories: parseFloat(document.getElementById('customFoodCalories').value) || 0,
+      protein: parseFloat(document.getElementById('customFoodProtein').value) || 0,
+      carbs: parseFloat(document.getElementById('customFoodCarbs').value) || 0,
+      fat: parseFloat(document.getElementById('customFoodFat').value) || 0,
+      fiber: 0,
+      sodium: 0,
+      source: 'custom',
+    });
+  });
+}
+
+let barcodeStream = null;
+let barcodeDetectInterval = null;
+
+function initBarcodeScanner() {
+  document.getElementById('btnScanBarcode').addEventListener('click', startBarcodeScan);
+  document.getElementById('btnCloseBarcodeScan').addEventListener('click', stopBarcodeScan);
+  document.getElementById('barcodeScanOverlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('barcodeScanOverlay')) stopBarcodeScan();
+  });
+}
+
+async function startBarcodeScan() {
+  if (!('BarcodeDetector' in window)) {
+    document.getElementById('foodSearchStatus').textContent = 'Barcode scanning needs Chrome/Edge on Android — not supported in this browser.';
+    return;
+  }
+  const overlay = document.getElementById('barcodeScanOverlay');
+  const video = document.getElementById('barcodeVideo');
+  const status = document.getElementById('barcodeScanStatus');
+  status.textContent = 'Point your camera at a product barcode.';
+  overlay.hidden = false;
+  try {
+    barcodeStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    video.srcObject = barcodeStream;
+    await video.play();
+    const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] });
+    barcodeDetectInterval = setInterval(async () => {
+      try {
+        const codes = await detector.detect(video);
+        if (codes.length) {
+          const code = codes[0].rawValue;
+          stopBarcodeScan();
+          await lookupBarcodeProduct(code);
+        }
+      } catch (e) { /* detection frame failed — try next tick */ }
+    }, 400);
+  } catch (e) {
+    status.textContent = 'Camera access denied or unavailable.';
+  }
+}
+
+function stopBarcodeScan() {
+  document.getElementById('barcodeScanOverlay').hidden = true;
+  if (barcodeDetectInterval) { clearInterval(barcodeDetectInterval); barcodeDetectInterval = null; }
+  if (barcodeStream) { barcodeStream.getTracks().forEach(t => t.stop()); barcodeStream = null; }
+}
+
+async function lookupBarcodeProduct(code) {
+  document.getElementById('foodSearchStatus').textContent = 'Looking up barcode…';
+  try {
+    const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name,brands,nutriments,code`);
+    const data = await res.json();
+    if (data.status !== 1 || !data.product || !data.product.nutriments) {
+      document.getElementById('foodSearchStatus').textContent = 'No product found for that barcode — try search or add custom.';
+      return;
+    }
+    selectFoodProduct({ source: 'off', product: data.product });
+    document.getElementById('foodSearchStatus').textContent = '';
+  } catch (e) {
+    document.getElementById('foodSearchStatus').textContent = 'Barcode lookup failed — check your connection.';
+  }
+}
+
 function loadNutritionForDate(date) {
   const logs = getLogs();
   const e = logs[date] || {};
@@ -4322,6 +4712,9 @@ initCardioTracker();
 initMissionLog();
 initWeightChartToggle();
 initNutrition();
+initFoodDiary();
+initAddFoodPanel();
+initBarcodeScanner();
 initBioLog();
 initReviewForm();
 initExport();
