@@ -877,10 +877,10 @@ button.mission-log-day:hover { border-color: var(--cyan); }
 .fuel-status-title { margin: 2px 0 4px; font-size: 1.05rem; font-weight: 800; }
 .fuel-cal-row {
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 16px;
   margin-bottom: 8px;
-  flex-wrap: wrap;
 }
 .fuel-cal-ring {
   display: flex;
@@ -889,7 +889,7 @@ button.mission-log-day:hover { border-color: var(--cyan); }
   text-align: center;
   flex: none;
 }
-.fuel-macro-pie-wrap { display: flex; align-items: center; gap: 12px; flex: 1 1 140px; min-width: 0; }
+.fuel-macro-pie-wrap { display: flex; align-items: center; justify-content: center; gap: 12px; }
 .fuel-macro-pie {
   width: 72px;
   height: 72px;
@@ -1900,6 +1900,8 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
     inset 0 -1px 2px rgba(0,0,0,0.35),
     0 1px 4px rgba(0,0,0,0.22);
 }
+.diet-algo-btn { color: var(--cyan); text-shadow: 0 0 6px var(--cyan-glow); width: 100%; }
+.diet-icon { flex: none; filter: drop-shadow(0 0 3px var(--cyan-glow)); }
 
 .food-diary-date-nav { display: flex; align-items: center; gap: 4px; }
 .food-diary-date-picker {

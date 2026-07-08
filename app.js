@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.4';
+const APP_VERSION = 'WF_SYS_V.1.6';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -4273,9 +4273,9 @@ function renderNutritionTargets() {
   const calorieOverflowPct = Math.max(0, caloriePctRaw - 100);
   const isOverCalories = caloriePctRaw > 100;
   renderRing(document.getElementById('fuelCalorieRing'), caloriePct, {
-    size: 100, stroke: 9, gradient: true, overflowPct: calorieOverflowPct,
+    size: 120, stroke: 10, gradient: true, overflowPct: calorieOverflowPct,
     centerHtml: isOverCalories
-      ? `<span style="font-size:${Math.round(100 * 0.22)}px;font-weight:800;font-family:var(--font-mono);color:var(--critical);">${Math.round(caloriePctRaw)}%</span>`
+      ? `<span style="font-size:${Math.round(120 * 0.22)}px;font-weight:800;font-family:var(--font-mono);color:var(--critical);">${Math.round(caloriePctRaw)}%</span>`
       : undefined,
     centerText: Math.round(caloriePctRaw) + '%',
     label: 'Calories',
