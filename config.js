@@ -10,4 +10,4 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // Free API key from https://api.data.gov/signup (instant, no cost) — powers the
 // Food Diary's search-as-you-type. Without it, search falls back to the shared
 // public DEMO_KEY, which is heavily rate-limited across every app that uses it.
-const USDA_API_KEY = 'DEMO_KEY';
+const USDA_API_KEY = 'bep5rhM1sI50XKr8XvsY7OHK908TU3Rds21hVgIa';
