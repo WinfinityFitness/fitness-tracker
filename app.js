@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.47';
+const APP_VERSION = 'WF_SYS_V.1.48';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -7562,65 +7562,82 @@ initThemeToggle();
 /* ---------------------------------------------------------------- */
 document.getElementById('headerToday').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
 
-// If any single init step below throws (e.g. a stray cached-asset mismatch
-// after an update), the whole app must not stay stuck behind the splash
-// screen forever — log it and keep going so the splash-hide timer below
-// still fires and as much of the app as possible still works.
-try {
-  migrateWaterUnitsIfNeeded();
-  initTabs();
-  initSwipeNavigation();
+// Each init step runs in its own try/catch: a bug in one feature (e.g. a
+// stray cached-asset mismatch after an update) must not silently cancel
+// every init step listed after it — that's what let a single early failure
+// take out unrelated late-registered features (like the chat refresh
+// button) with zero visible symptom. Failures are collected and, if any
+// happened, surfaced as a toast so they're actually reportable instead of
+// invisible in a console nobody's looking at.
+const initFailures = [];
+function safeInit(fn, label) {
+  try { fn(); } catch (err) {
+    console.error(`Init failed: ${label}`, err);
+    initFailures.push(label + ': ' + (err && err.message ? err.message : String(err)));
+  }
+}
+
+safeInit(migrateWaterUnitsIfNeeded, 'migrateWaterUnitsIfNeeded');
+safeInit(initTabs, 'initTabs');
+safeInit(initSwipeNavigation, 'initSwipeNavigation');
+safeInit(() => {
   document.getElementById('btnGoToBioFromChart').addEventListener('click', () => {
     document.querySelector('.tab-btn[data-target="bio"]').click();
   });
-  initSettingsOverlay();
-  initAppUpdateButton();
-  initDonationPrompt();
-  initLastStateRestore();
-  initDigitalId();
-  initContact();
-  initFooterShare();
-  initFooterTagline();
-  initPrivacyPolicy();
-  initTermsOfService();
-  initPRBoardOverlay();
-  initMeasureEntryOverlay();
-  initEntityIdentityOverlay();
-  initDateTimeWidget();
-  initTimezonePicker();
-  initWeatherWidget();
-  initWeatherLocationPicker();
-  initSetupForm();
-  initCheckin();
-  initQuickLog();
-  initMeasurements();
-  initTraining();
-  initCardioTracker();
-  initMissionLog();
-  initDatePicker();
-  initWeightChartToggle();
-  initNutrition();
-  initFoodDiary();
-  initAddFoodPanel();
-  initBarcodeScanner();
-  initBioLog();
-  initReviewForm();
-  initExport();
-  initDrive();
-  initLeaderboard();
-  initAnnouncementWidget();
-  loadSetupForm();
-  loadCheckinForm();
-  loadQuickLog();
-  document.getElementById('sysVersion').textContent = APP_VERSION;
-  renderDashboard();
-  updateTabDots();
-  initBetaLock();
+}, 'btnGoToBioFromChart');
+safeInit(initSettingsOverlay, 'initSettingsOverlay');
+safeInit(initAppUpdateButton, 'initAppUpdateButton');
+safeInit(initDonationPrompt, 'initDonationPrompt');
+safeInit(initLastStateRestore, 'initLastStateRestore');
+safeInit(initDigitalId, 'initDigitalId');
+safeInit(initContact, 'initContact');
+safeInit(initFooterShare, 'initFooterShare');
+safeInit(initFooterTagline, 'initFooterTagline');
+safeInit(initPrivacyPolicy, 'initPrivacyPolicy');
+safeInit(initTermsOfService, 'initTermsOfService');
+safeInit(initPRBoardOverlay, 'initPRBoardOverlay');
+safeInit(initMeasureEntryOverlay, 'initMeasureEntryOverlay');
+safeInit(initEntityIdentityOverlay, 'initEntityIdentityOverlay');
+safeInit(initDateTimeWidget, 'initDateTimeWidget');
+safeInit(initTimezonePicker, 'initTimezonePicker');
+safeInit(initWeatherWidget, 'initWeatherWidget');
+safeInit(initWeatherLocationPicker, 'initWeatherLocationPicker');
+safeInit(initSetupForm, 'initSetupForm');
+safeInit(initCheckin, 'initCheckin');
+safeInit(initQuickLog, 'initQuickLog');
+safeInit(initMeasurements, 'initMeasurements');
+safeInit(initTraining, 'initTraining');
+safeInit(initCardioTracker, 'initCardioTracker');
+safeInit(initMissionLog, 'initMissionLog');
+safeInit(initDatePicker, 'initDatePicker');
+safeInit(initWeightChartToggle, 'initWeightChartToggle');
+safeInit(initNutrition, 'initNutrition');
+safeInit(initFoodDiary, 'initFoodDiary');
+safeInit(initAddFoodPanel, 'initAddFoodPanel');
+safeInit(initBarcodeScanner, 'initBarcodeScanner');
+safeInit(initBioLog, 'initBioLog');
+safeInit(initReviewForm, 'initReviewForm');
+safeInit(initExport, 'initExport');
+safeInit(initDrive, 'initDrive');
+safeInit(initLeaderboard, 'initLeaderboard');
+safeInit(initAnnouncementWidget, 'initAnnouncementWidget');
+safeInit(loadSetupForm, 'loadSetupForm');
+safeInit(loadCheckinForm, 'loadCheckinForm');
+safeInit(loadQuickLog, 'loadQuickLog');
+safeInit(() => { document.getElementById('sysVersion').textContent = APP_VERSION; }, 'sysVersion');
+safeInit(renderDashboard, 'renderDashboard');
+safeInit(updateTabDots, 'updateTabDots');
+safeInit(initBetaLock, 'initBetaLock');
+safeInit(() => {
   if (document.getElementById('lockOverlay').hidden) {
     initOnboarding(() => initReviewGate(() => initConsentGate()));
   }
-} catch (err) {
-  console.error('App init error:', err);
+}, 'initOnboarding');
+
+if (initFailures.length) {
+  setTimeout(() => {
+    showRestToast(`${initFailures.length} feature(s) failed to load: ${initFailures[0]}${initFailures.length > 1 ? ` (+${initFailures.length - 1} more, see console)` : ''}`);
+  }, 2200);
 }
 
 setTimeout(() => {
