@@ -546,8 +546,8 @@
       <dl class="computed-list" id="computedList"></dl>
     </div>
 
-    <button type="button" class="btn entity-identity-btn" id="btnOpenEntityIdentity">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+    <button type="button" class="btn glass-emboss entity-identity-btn" id="btnOpenEntityIdentity">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3c0 5 10 5 10 10s-10 5-10 10"/><path d="M17 3c0 5-10 5-10 10s10 5 10 10"/><path d="M8 7h8M7.5 12h9M8 17h8"/></svg>
       Entity Identity
     </button>
   </section>
@@ -937,7 +937,7 @@
   </button>
   <button class="tab-btn" data-target="bio">
     <svg viewBox="0 0 24 24" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3c0 5 10 5 10 10s-10 5-10 10"/><path d="M17 3c0 5-10 5-10 10s10 5 10 10"/><path d="M8 7h8M7.5 12h9M8 17h8"/></svg>
-    <span>DNA</span>
+    <span>BIO</span>
     <span class="tab-dot" hidden></span>
   </button>
   <button class="tab-btn" data-target="leaderboard">
@@ -1239,6 +1239,7 @@
     <div class="sheet-section">
       <p class="field-group-heading">App Update</p>
       <p class="hint">Current version: <span id="settingsAppVersion">–</span></p>
+      <p class="update-available-note" id="updateAvailableNote" hidden>🆕 New update available — <span id="updateAvailableVersion"></span></p>
       <button type="button" class="btn btn--primary" id="btnCheckUpdate">Update Now</button>
     </div>
   </div>
@@ -1275,7 +1276,7 @@
     <div class="sheet-head">
       <h2>Welcome — Entity Setup</h2>
     </div>
-    <p class="hint" style="margin-top:0;">Before you begin, tell us a bit about yourself so we can calibrate your targets. You can always edit this later on the DNA page.</p>
+    <p class="hint" style="margin-top:0;">Before you begin, tell us a bit about yourself so we can calibrate your targets. You can always edit this later on the BIO page.</p>
     <div id="onboardingFormMount"></div>
   </div>
 </div>
@@ -1480,7 +1481,20 @@
     <div class="meal-section" data-meal="breakfast">
       <div class="meal-section-head">
         <span class="meal-section-title"><svg viewBox="0 0 24 24" class="meal-icon"><g stroke="var(--cyan)" stroke-width="1.6" stroke-linecap="round" fill="none"><path d="M6 15a6 6 0 0 1 12 0"/><line x1="2" y1="15" x2="22" y2="15"/><line x1="12" y1="4" x2="12" y2="7"/><line x1="5.5" y1="7.5" x2="7.3" y2="9"/><line x1="18.5" y1="7.5" x2="16.7" y2="9"/></g></svg> Breakfast</span>
-        <span class="meal-section-total" id="mealTotal_breakfast">0 kcal</span>
+        <div class="fuel-status-head-right">
+          <span class="meal-section-total" id="mealTotal_breakfast">0 kcal</span>
+          <div class="chat-room-menu-wrap meal-menu-wrap">
+            <button type="button" class="icon-btn glass-emboss meal-menu-btn" data-meal="breakfast" aria-label="Breakfast menu">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="var(--cyan)" stroke="none"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+            </button>
+            <div class="chat-room-menu meal-menu" data-meal="breakfast" hidden>
+              <button type="button" class="chat-room-menu-item meal-menu-share" data-meal="breakfast">Share</button>
+              <button type="button" class="chat-room-menu-item meal-menu-copy" data-meal="breakfast">Copy meal</button>
+              <button type="button" class="chat-room-menu-item meal-menu-paste" data-meal="breakfast">Paste meal</button>
+              <button type="button" class="chat-room-menu-item chat-room-menu-item--danger meal-menu-clear" data-meal="breakfast">Clear data</button>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="meal-items" id="mealItems_breakfast"></div>
       <button type="button" class="btn btn--sm add-food-btn" data-meal="breakfast">+ Add food</button>
@@ -1489,7 +1503,20 @@
     <div class="meal-section" data-meal="lunch">
       <div class="meal-section-head">
         <span class="meal-section-title"><svg viewBox="0 0 24 24" class="meal-icon"><circle cx="12" cy="12" r="4.5" stroke="var(--cyan)" stroke-width="1.6" fill="none"/><g stroke="var(--cyan)" stroke-width="1.6" stroke-linecap="round"><line x1="12" y1="2" x2="12" y2="4.3"/><line x1="12" y1="19.7" x2="12" y2="22"/><line x1="2" y1="12" x2="4.3" y2="12"/><line x1="19.7" y1="12" x2="22" y2="12"/><line x1="4.9" y1="4.9" x2="6.4" y2="6.4"/><line x1="17.6" y1="17.6" x2="19.1" y2="19.1"/><line x1="4.9" y1="19.1" x2="6.4" y2="17.6"/><line x1="17.6" y1="6.4" x2="19.1" y2="4.9"/></g></svg> Lunch</span>
-        <span class="meal-section-total" id="mealTotal_lunch">0 kcal</span>
+        <div class="fuel-status-head-right">
+          <span class="meal-section-total" id="mealTotal_lunch">0 kcal</span>
+          <div class="chat-room-menu-wrap meal-menu-wrap">
+            <button type="button" class="icon-btn glass-emboss meal-menu-btn" data-meal="lunch" aria-label="Lunch menu">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="var(--cyan)" stroke="none"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+            </button>
+            <div class="chat-room-menu meal-menu" data-meal="lunch" hidden>
+              <button type="button" class="chat-room-menu-item meal-menu-share" data-meal="lunch">Share</button>
+              <button type="button" class="chat-room-menu-item meal-menu-copy" data-meal="lunch">Copy meal</button>
+              <button type="button" class="chat-room-menu-item meal-menu-paste" data-meal="lunch">Paste meal</button>
+              <button type="button" class="chat-room-menu-item chat-room-menu-item--danger meal-menu-clear" data-meal="lunch">Clear data</button>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="meal-items" id="mealItems_lunch"></div>
       <button type="button" class="btn btn--sm add-food-btn" data-meal="lunch">+ Add food</button>
@@ -1498,7 +1525,20 @@
     <div class="meal-section" data-meal="dinner">
       <div class="meal-section-head">
         <span class="meal-section-title"><svg viewBox="0 0 24 24" class="meal-icon"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4 7 7 0 0 0 20 14.5z" stroke="var(--cyan)" stroke-width="1.6" fill="none" stroke-linejoin="round"/></svg> Dinner</span>
-        <span class="meal-section-total" id="mealTotal_dinner">0 kcal</span>
+        <div class="fuel-status-head-right">
+          <span class="meal-section-total" id="mealTotal_dinner">0 kcal</span>
+          <div class="chat-room-menu-wrap meal-menu-wrap">
+            <button type="button" class="icon-btn glass-emboss meal-menu-btn" data-meal="dinner" aria-label="Dinner menu">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="var(--cyan)" stroke="none"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+            </button>
+            <div class="chat-room-menu meal-menu" data-meal="dinner" hidden>
+              <button type="button" class="chat-room-menu-item meal-menu-share" data-meal="dinner">Share</button>
+              <button type="button" class="chat-room-menu-item meal-menu-copy" data-meal="dinner">Copy meal</button>
+              <button type="button" class="chat-room-menu-item meal-menu-paste" data-meal="dinner">Paste meal</button>
+              <button type="button" class="chat-room-menu-item chat-room-menu-item--danger meal-menu-clear" data-meal="dinner">Clear data</button>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="meal-items" id="mealItems_dinner"></div>
       <button type="button" class="btn btn--sm add-food-btn" data-meal="dinner">+ Add food</button>
@@ -1507,7 +1547,20 @@
     <div class="meal-section" data-meal="snacks">
       <div class="meal-section-head">
         <span class="meal-section-title"><svg viewBox="0 0 24 24" class="meal-icon"><path d="M12 9c-3.5 0-6 2.6-6 6.2C6 19 8.4 21.5 11 21.5c.7 0 1-.3 1.5-.3.5 0 .8.3 1.5.3 2.6 0 5-2.5 5-6.3 0-3.6-2.5-6.2-6-6.2z" stroke="var(--cyan)" stroke-width="1.5" fill="none" stroke-linejoin="round"/><path d="M12 9c0-1.8.9-3 2.2-3.6" stroke="var(--cyan)" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg> Snacks</span>
-        <span class="meal-section-total" id="mealTotal_snacks">0 kcal</span>
+        <div class="fuel-status-head-right">
+          <span class="meal-section-total" id="mealTotal_snacks">0 kcal</span>
+          <div class="chat-room-menu-wrap meal-menu-wrap">
+            <button type="button" class="icon-btn glass-emboss meal-menu-btn" data-meal="snacks" aria-label="Snacks menu">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="var(--cyan)" stroke="none"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+            </button>
+            <div class="chat-room-menu meal-menu" data-meal="snacks" hidden>
+              <button type="button" class="chat-room-menu-item meal-menu-share" data-meal="snacks">Share</button>
+              <button type="button" class="chat-room-menu-item meal-menu-copy" data-meal="snacks">Copy meal</button>
+              <button type="button" class="chat-room-menu-item meal-menu-paste" data-meal="snacks">Paste meal</button>
+              <button type="button" class="chat-room-menu-item chat-room-menu-item--danger meal-menu-clear" data-meal="snacks">Clear data</button>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="meal-items" id="mealItems_snacks"></div>
       <button type="button" class="btn btn--sm add-food-btn" data-meal="snacks">+ Add food</button>

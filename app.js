@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.27';
+const APP_VERSION = 'WF_SYS_V.1.32';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -243,6 +243,13 @@ function avgOfLastNDays(logsArr, field, n) {
   return vals.reduce((a, b) => a + b, 0) / vals.length;
 }
 
+function minOfLastNDays(logsArr, field, n) {
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - (n - 1)); cutoff.setHours(0,0,0,0);
+  const vals = logsArr.filter(l => parseISO(l.date) >= cutoff && l[field] != null).map(l => l[field]);
+  if (!vals.length) return null;
+  return Math.min(...vals);
+}
+
 function computeTrendSeries(logsArr) {
   const weightLogs = logsArr.filter(l => l.weightKg != null).sort((a, b) => a.date.localeCompare(b.date));
   return weightLogs.map((l) => {
@@ -479,6 +486,7 @@ function initTabs() {
       localStorage.setItem('wft_last_tab', target);
       document.querySelectorAll('.tab-panel').forEach(p => p.hidden = p.dataset.tab !== target);
       btns.forEach(b => b.classList.toggle('is-active', b === btn));
+      window.scrollTo(0, 0);
       if (target === 'status') { loadCheckinForm(); loadQuickLog(); renderDashboard(); }
       if (target === 'training') {
         loadTrainingForDate(document.getElementById('trainDate').value);
@@ -1621,7 +1629,7 @@ function renderDashboard() {
   });
 
   renderWeightChart(trendSeries, wu);
-  renderGoalProgress(profile, kgNow, wu);
+  renderGoalProgress(profile, kgNow, wu, logsArr);
   renderPulseSparkline();
   renderStepsCaloriesChart();
 }
@@ -1714,11 +1722,14 @@ function renderWeightChart(fullSeries, wu) {
     svg.appendChild(ap);
   }
 
+  const lowestIdx = displayVals.indexOf(Math.min(...displayVals));
   displayVals.forEach((v, i) => {
+    const isLowest = i === lowestIdx;
     const c = document.createElementNS(svgNS, 'circle');
     c.setAttribute('cx', xFor(i)); c.setAttribute('cy', yFor(v));
-    c.setAttribute('r', series.length > 40 ? 2 : 3.5);
-    c.setAttribute('fill', 'var(--series-1)');
+    c.setAttribute('r', (isLowest ? 1.4 : 1) * (series.length > 40 ? 2 : 3.5));
+    c.setAttribute('fill', isLowest ? 'var(--warning)' : 'var(--series-1)');
+    if (isLowest) c.style.filter = 'drop-shadow(0 0 4px var(--warning))';
     svg.appendChild(c);
   });
 
@@ -1786,7 +1797,7 @@ function initWeightChartToggle() {
 }
 
 /* ---- Goal progress bar ---- */
-function renderGoalProgress(profile, kgNow, wu) {
+function renderGoalProgress(profile, kgNow, wu, logsArr) {
   const card = document.getElementById('goalProgressCard');
   const emptyNote = document.getElementById('goalEmptyNote');
   card.querySelectorAll('.goal-track').forEach(el => el.remove());
@@ -1797,6 +1808,8 @@ function renderGoalProgress(profile, kgNow, wu) {
   }
   emptyNote.hidden = true;
 
+  const lowestKg7d = logsArr ? minOfLastNDays(logsArr, 'weightKg', 7) : null;
+
   const points = [
     { label: 'Start', kg: profile.startWeightKg },
     { label: 'Min goal', kg: profile.goalMinKg },
@@ -1805,6 +1818,7 @@ function renderGoalProgress(profile, kgNow, wu) {
   ].filter(p => p.kg != null);
 
   const allKg = points.map(p => p.kg).concat([kgNow]);
+  if (lowestKg7d != null) allKg.push(lowestKg7d);
   let min = Math.min(...allKg), max = Math.max(...allKg);
   if (min === max) { min -= 1; max += 1; }
   const range = max - min;
@@ -1828,6 +1842,14 @@ function renderGoalProgress(profile, kgNow, wu) {
     marker.textContent = `${p.label}: ${round2(fromKg(p.kg, wu))}${wu}`;
     track.appendChild(marker);
   });
+
+  if (lowestKg7d != null) {
+    const lowest = document.createElement('div');
+    lowest.className = 'goal-lowest';
+    lowest.style.left = pctFor(lowestKg7d) + '%';
+    lowest.textContent = `Lowest (7d): ${round2(fromKg(lowestKg7d, wu))}${wu}`;
+    track.appendChild(lowest);
+  }
 
   const now = document.createElement('div');
   now.className = 'goal-now';
@@ -2839,6 +2861,7 @@ function initTraining() {
 
     const removeSetBtn = e.target.closest('.ex-set-remove');
     if (removeSetBtn) {
+      if (!confirm('Delete this set? This cannot be undone.')) return;
       const exIdx = parseInt(removeSetBtn.dataset.ex, 10);
       const setIdx = parseInt(removeSetBtn.dataset.set, 10);
       currentExercises[exIdx].sets.splice(setIdx, 1);
@@ -3712,6 +3735,7 @@ function initFoodDiary() {
   overlay.addEventListener('click', e => {
     const removeBtn = e.target.closest('.meal-item-remove');
     if (removeBtn) {
+      if (!confirm('Delete this logged food item? This cannot be undone.')) return;
       const date = document.getElementById('nutDate').value;
       const meals = getMealsForDate(date);
       meals[removeBtn.dataset.meal].splice(parseInt(removeBtn.dataset.idx, 10), 1);
@@ -3759,6 +3783,41 @@ function initFoodDiary() {
     if (addBtn) {
       currentAddFoodMeal = addBtn.dataset.meal;
       openAddFoodPanel();
+      return;
+    }
+
+    const menuBtn = e.target.closest('.meal-menu-btn');
+    if (menuBtn) {
+      const mt = menuBtn.dataset.meal;
+      document.querySelectorAll('.meal-menu').forEach(m => { m.hidden = m.dataset.meal !== mt || !m.hidden; });
+      return;
+    }
+    const shareMealBtn = e.target.closest('.meal-menu-share');
+    if (shareMealBtn) {
+      document.querySelectorAll('.meal-menu').forEach(m => { m.hidden = true; });
+      shareSingleMeal(shareMealBtn.dataset.meal);
+      return;
+    }
+    const copyMealBtn = e.target.closest('.meal-menu-copy');
+    if (copyMealBtn) {
+      document.querySelectorAll('.meal-menu').forEach(m => { m.hidden = true; });
+      copyMealToClipboard(copyMealBtn.dataset.meal);
+      return;
+    }
+    const pasteMealBtn = e.target.closest('.meal-menu-paste');
+    if (pasteMealBtn) {
+      document.querySelectorAll('.meal-menu').forEach(m => { m.hidden = true; });
+      pasteMealFromClipboard(pasteMealBtn.dataset.meal);
+      return;
+    }
+    const clearMealBtn = e.target.closest('.meal-menu-clear');
+    if (clearMealBtn) {
+      document.querySelectorAll('.meal-menu').forEach(m => { m.hidden = true; });
+      clearMealData(clearMealBtn.dataset.meal);
+      return;
+    }
+    if (!e.target.closest('.meal-menu-wrap')) {
+      document.querySelectorAll('.meal-menu').forEach(m => { m.hidden = true; });
     }
   });
 
@@ -4730,6 +4789,62 @@ async function shareFoodDiary() {
   shareViaWebShare({ title: 'Winfinity Tracker — Dietary Log', text }, blob);
 }
 
+async function shareSingleMeal(mealType) {
+  const profile = getProfile();
+  const date = document.getElementById('foodDiaryDateInput').value || todayISO();
+  const meals = getMealsForDate(date);
+  const items = meals[mealType] || [];
+  if (!items.length) { showRestToast(`No items logged in ${FOOD_DIARY_MEAL_LABELS[mealType]} for this date.`); return; }
+  const kcal = items.reduce((s, i) => s + (i.calories || 0), 0);
+  const text = `🍽️ ${FOOD_DIARY_MEAL_LABELS[mealType]} — ${round0(kcal)} kcal logged with Winfinity Tracker!`;
+  const singleMeal = { breakfast: [], lunch: [], dinner: [], snacks: [] };
+  singleMeal[mealType] = items;
+  const blob = await generateFoodDiaryShareCard({
+    name: (profile && profile.name) || 'Operator',
+    digitalId: getOrCreatePublicId(),
+    date: fmtDate(parseISO(date)),
+    meals: singleMeal,
+  });
+  shareViaWebShare({ title: `Winfinity Tracker — ${FOOD_DIARY_MEAL_LABELS[mealType]}`, text }, blob);
+}
+
+function copyMealToClipboard(mealType) {
+  const date = document.getElementById('foodDiaryDateInput').value || todayISO();
+  const meals = getMealsForDate(date);
+  const items = meals[mealType] || [];
+  if (!items.length) { showRestToast(`No items in ${FOOD_DIARY_MEAL_LABELS[mealType]} to copy.`); return; }
+  localStorage.setItem('wft_meal_clipboard', JSON.stringify(items));
+  localStorage.setItem('wft_meal_clipboard_source', `${FOOD_DIARY_MEAL_LABELS[mealType]} (${fmtDate(parseISO(date))})`);
+  showRestToast(`Copied ${items.length} item${items.length > 1 ? 's' : ''} from ${FOOD_DIARY_MEAL_LABELS[mealType]}.`);
+}
+
+function pasteMealFromClipboard(mealType) {
+  let clipboard = [];
+  try { clipboard = JSON.parse(localStorage.getItem('wft_meal_clipboard')) || []; } catch (e) { clipboard = []; }
+  if (!clipboard.length) { showRestToast('Nothing copied yet — copy a meal first.'); return; }
+  const date = document.getElementById('foodDiaryDateInput').value || todayISO();
+  const meals = getMealsForDate(date);
+  meals[mealType] = (meals[mealType] || []).concat(JSON.parse(JSON.stringify(clipboard)));
+  saveMealsForDate(date, meals);
+  renderFoodDiary(date);
+  refreshFuelViewsForDate(date);
+  const source = localStorage.getItem('wft_meal_clipboard_source');
+  showRestToast(`Pasted ${clipboard.length} item${clipboard.length > 1 ? 's' : ''} into ${FOOD_DIARY_MEAL_LABELS[mealType]}${source ? ` from ${source}` : ''}.`);
+}
+
+function clearMealData(mealType) {
+  const date = document.getElementById('foodDiaryDateInput').value || todayISO();
+  const meals = getMealsForDate(date);
+  const items = meals[mealType] || [];
+  if (!items.length) { showRestToast(`${FOOD_DIARY_MEAL_LABELS[mealType]} is already empty.`); return; }
+  if (!confirm(`Clear all ${items.length} item${items.length > 1 ? 's' : ''} logged in ${FOOD_DIARY_MEAL_LABELS[mealType]} for this date? This cannot be undone.`)) return;
+  meals[mealType] = [];
+  saveMealsForDate(date, meals);
+  renderFoodDiary(date);
+  refreshFuelViewsForDate(date);
+  showRestToast(`Cleared ${FOOD_DIARY_MEAL_LABELS[mealType]}.`);
+}
+
 async function generateLeaderboardShareCard({ name, digitalId, dateTime, title, rows, formatValue }) {
   const width = 600;
   const headerH = 158;
@@ -4867,16 +4982,20 @@ function drawShareWeightChart(ctx, x, y, w, h, series, wu) {
     ctx.shadowBlur = 0;
   }
 
+  const lowestIdx = displayVals.indexOf(Math.min(...displayVals));
   displayVals.forEach((v, i) => {
+    const isLowest = i === lowestIdx;
     ctx.beginPath();
-    ctx.arc(xFor(i), yFor(v), series.length > 40 ? 2 : 3.5, 0, Math.PI * 2);
-    ctx.fillStyle = '#2de2e6';
+    ctx.arc(xFor(i), yFor(v), (isLowest ? 1.4 : 1) * (series.length > 40 ? 2 : 3.5), 0, Math.PI * 2);
+    ctx.fillStyle = isLowest ? '#dba52c' : '#2de2e6';
+    if (isLowest) { ctx.shadowColor = '#dba52c'; ctx.shadowBlur = 6; }
     ctx.fill();
+    ctx.shadowBlur = 0;
   });
   ctx.restore();
 }
 
-function drawShareGoalTrack(ctx, x, y, w, profile, kgNow, wu) {
+function drawShareGoalTrack(ctx, x, y, w, profile, kgNow, wu, lowestKg7d) {
   const points = [
     { label: 'Start', kg: profile.startWeightKg },
     { label: 'Min goal', kg: profile.goalMinKg },
@@ -4884,6 +5003,7 @@ function drawShareGoalTrack(ctx, x, y, w, profile, kgNow, wu) {
     { label: 'Dream', kg: profile.goalDreamKg },
   ].filter(p => p.kg != null);
   const allKg = points.map(p => p.kg).concat([kgNow]);
+  if (lowestKg7d != null) allKg.push(lowestKg7d);
   let min = Math.min(...allKg), max = Math.max(...allKg);
   if (min === max) { min -= 1; max += 1; }
   const range = max - min;
@@ -4920,18 +5040,24 @@ function drawShareGoalTrack(ctx, x, y, w, profile, kgNow, wu) {
   ctx.fillRect(fillX, trackY, Math.max(fillW, 2), trackH);
   ctx.restore();
 
+  if (lowestKg7d != null) {
+    const lowestX = x + pctFor(lowestKg7d) * w;
+    ctx.textAlign = 'center'; ctx.fillStyle = '#dba52c'; ctx.font = 'bold 13px monospace';
+    ctx.fillText(`Lowest (7d): ${round2(fromKg(lowestKg7d, wu))}${wu}`, Math.min(Math.max(lowestX, x + 55), x + w - 55), trackY + 34);
+  }
+
   const nowX = x + nowPct * w;
   ctx.textAlign = 'center'; ctx.fillStyle = '#2de2e6'; ctx.font = 'bold 13px monospace';
-  ctx.fillText(`Now: ${round2(fromKg(kgNow, wu))}${wu}`, Math.min(Math.max(nowX, x + 40), x + w - 40), trackY + 34);
+  ctx.fillText(`Now: ${round2(fromKg(kgNow, wu))}${wu}`, Math.min(Math.max(nowX, x + 40), x + w - 40), trackY + 52);
   ctx.restore();
 }
 
-async function generateWeightJourneyShareCard({ name, digitalId, date, series, wu, profile, kgNow }) {
+async function generateWeightJourneyShareCard({ name, digitalId, date, series, wu, profile, kgNow, lowestKg7d }) {
   const width = 600;
   const headerH = 116;
   const chartCardH = series.length ? 300 : 80;
   const gap = 16;
-  const goalCardH = 130;
+  const goalCardH = 148;
   const footerH = 46;
   const height = headerH + chartCardH + gap + goalCardH + footerH;
 
@@ -4985,7 +5111,7 @@ async function generateWeightJourneyShareCard({ name, digitalId, date, series, w
   ctx.fillText('Goal progress', 44, y + 30);
 
   if (profile && kgNow != null && profile.goalTargetKg != null) {
-    drawShareGoalTrack(ctx, 64, y + 44, width - 176, profile, kgNow, wu);
+    drawShareGoalTrack(ctx, 64, y + 44, width - 176, profile, kgNow, wu, lowestKg7d);
   } else {
     ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '13px sans-serif';
     ctx.fillText('Set your weights in Bio to see progress.', width / 2, y + goalCardH / 2 + 10);
@@ -5003,11 +5129,12 @@ async function shareWeightJourney() {
   const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
   const series = weightChartFullJourney ? computeTrendSeries(logsArr) : computeTrendSeries(logsArr).slice(-60);
   const kgNow = currentWeightKg(profile);
+  const lowestKg7d = minOfLastNDays(logsArr, 'weightKg', 7);
   const blob = await generateWeightJourneyShareCard({
     name: (profile && profile.name) || 'Operator',
     digitalId: getOrCreatePublicId(),
     date: fmtDate(new Date()),
-    series, wu, profile, kgNow,
+    series, wu, profile, kgNow, lowestKg7d,
   });
   shareViaWebShare({ title: 'Winfinity Tracker — Weight Journey', text: '📈 My weight journey & goal progress, tracked with Winfinity Tracker!' }, blob);
 }
@@ -5045,7 +5172,7 @@ function initCoachAssignment() {
     const profile = getProfile();
     const note = document.getElementById('coachAssignmentNote');
     if (!profile) {
-      alert('Set up your profile in DNA first, then assign coach targets here.');
+      alert('Set up your profile in BIO first, then assign coach targets here.');
       return;
     }
     profile.coachCalorieTarget = parseIntOrNull(document.getElementById('coachCalorieInput').value);
@@ -6423,13 +6550,14 @@ function initGroupChat() {
     if (!confirm('Leave this chat?')) return;
     const shareKey = localStorage.getItem('wft_lb_share_key');
     try {
-      await sb.rpc('leave_chat_room', { p_room_id: currentChatRoomId, p_share_key: shareKey });
+      const { error } = await sb.rpc('leave_chat_room', { p_room_id: currentChatRoomId, p_share_key: shareKey });
+      if (error) { showRestToast('Could not leave: ' + error.message); return; }
       currentChatRoomId = null;
       localStorage.removeItem('wft_chat_room');
       await refreshChatRooms();
       const messages = await fetchChatMessages();
       renderChatMessages(messages);
-    } catch (e) { /* best effort */ }
+    } catch (e) { showRestToast('Could not leave: ' + (e.message || 'check your connection')); }
   });
 
   document.getElementById('btnDeleteGroup').addEventListener('click', async () => {
@@ -6800,10 +6928,24 @@ setInterval(checkUnreadMessagesBackground, 60000);
 
 let swRegistration = null;
 let swReloadedOnce = false;
+let updateAvailable = false;
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').then(reg => { swRegistration = reg; }).catch(() => {});
+    // updateViaCache: 'none' stops the browser from ever serving sw.js (or
+    // anything it imports) from HTTP cache during an update check — without
+    // this, a stale cached copy of sw.js can make every check falsely
+    // report "already latest" until the HTTP cache entry happens to expire.
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+      swRegistration = reg;
+      if (reg.waiting && navigator.serviceWorker.controller) markUpdateAvailable();
+      // Background auto-check: silently looks for updates every 15 minutes
+      // while the app is open, and again shortly after boot. It only ever
+      // downloads/installs the new worker — it never applies it on its own,
+      // so nothing reloads or interrupts you until you tap Update Now.
+      setTimeout(() => checkForUpdate(), 5000);
+      setInterval(() => checkForUpdate(), 15 * 60 * 1000);
+    }).catch(() => {});
   });
   // Fires once the new worker actually takes control (after SKIP_WAITING) —
   // this is the one-and-only reload the "Update Now" flow needs.
@@ -6811,6 +6953,61 @@ if ('serviceWorker' in navigator) {
     if (swReloadedOnce) return;
     swReloadedOnce = true;
     location.reload();
+  });
+}
+
+async function fetchLatestVersionLabel() {
+  try {
+    const res = await fetch('app.js?_=' + Date.now(), { cache: 'no-store' });
+    const text = await res.text();
+    const m = text.match(/APP_VERSION\s*=\s*'([^']+)'/);
+    return m ? m[1] : null;
+  } catch (e) { return null; }
+}
+
+async function markUpdateAvailable() {
+  updateAvailable = true;
+  const note = document.getElementById('updateAvailableNote');
+  const versionEl = document.getElementById('updateAvailableVersion');
+  if (!note || !versionEl) return;
+  note.hidden = false;
+  versionEl.textContent = 'checking version…';
+  const label = await fetchLatestVersionLabel();
+  versionEl.textContent = label || 'ready to install';
+}
+
+function clearUpdateAvailable() {
+  updateAvailable = false;
+  const note = document.getElementById('updateAvailableNote');
+  if (note) note.hidden = true;
+}
+
+// Event-driven: waits for the actual 'installed' state instead of guessing
+// with a fixed delay, so it isn't a race against slow networks. Resolves
+// true if a new version ended up waiting to activate.
+function checkForUpdate() {
+  if (!swRegistration) return Promise.resolve(false);
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = found => {
+      if (settled) return;
+      settled = true;
+      swRegistration.removeEventListener('updatefound', onUpdateFound);
+      clearTimeout(fallbackTimer);
+      if (found) markUpdateAvailable();
+      resolve(found);
+    };
+    const onUpdateFound = () => {
+      const installing = swRegistration.installing;
+      if (!installing) return;
+      installing.addEventListener('statechange', () => {
+        if (installing.state === 'installed') finish(!!swRegistration.waiting);
+        else if (installing.state === 'redundant') finish(false);
+      });
+    };
+    swRegistration.addEventListener('updatefound', onUpdateFound);
+    const fallbackTimer = setTimeout(() => finish(!!swRegistration.waiting), 8000);
+    swRegistration.update().catch(() => finish(!!swRegistration.waiting));
   });
 }
 
@@ -6826,11 +7023,12 @@ async function checkAndApplyAppUpdate() {
     return;
   }
 
-  try { await swRegistration.update(); } catch (e) { /* offline — fall through, may already have one waiting */ }
-  await new Promise(r => setTimeout(r, 600)); // give the browser a beat to finish installing if it just found one
+  // Already found one in the background — apply immediately, no re-check needed.
+  const found = swRegistration.waiting ? true : await checkForUpdate();
 
-  if (swRegistration.waiting) {
+  if (found && swRegistration.waiting) {
     statusEl.textContent = 'Updating…';
+    clearUpdateAvailable();
     swRegistration.waiting.postMessage('SKIP_WAITING');
     // Safety net in case controllerchange never fires for some reason.
     setTimeout(() => { if (!swReloadedOnce) location.reload(); }, 4000);

@@ -591,7 +591,7 @@ body {
   height: 6px;
   background: var(--gridline);
   border-radius: 4px;
-  margin: 30px 6px 24px;
+  margin: 30px 6px 42px;
 }
 .goal-fill {
   position: absolute;
@@ -628,6 +628,16 @@ body {
   font-size: 0.68rem;
   font-weight: 700;
   color: var(--cyan);
+  white-space: nowrap;
+}
+.goal-lowest {
+  position: absolute;
+  bottom: -38px;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--warning);
   white-space: nowrap;
 }
 
@@ -1697,7 +1707,7 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .mission-log-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
 .settings-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
 .share-result-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 10px; color: var(--cyan); }
-.entity-identity-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
+.entity-identity-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; color: var(--cyan); text-shadow: 0 0 6px var(--cyan-glow); }
 
 /* ---------------- Alarm tone picker ---------------- */
 .tone-picker { display: flex; flex-direction: column; gap: 8px; }
@@ -1972,6 +1982,17 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   display: block;
 }
 
+.update-available-note {
+  color: var(--warning);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  background: rgba(219,165,44,0.1);
+  border: 1px solid rgba(219,165,44,0.35);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 8px 0;
+}
+.update-available-note[hidden] { display: none; }
 .app-update-overlay {
   position: fixed;
   inset: 0;
