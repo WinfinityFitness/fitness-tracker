@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.35';
+const APP_VERSION = 'WF_SYS_V.1.36';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -654,7 +654,30 @@ function generateShareCardBlob({ emoji, title, stats }) {
   });
 }
 
+// Browsers won't let a website silently write into the phone's protected
+// Photos/Gallery library — that would be a privacy hole any site could
+// abuse. Triggering a normal file download is the closest legitimate
+// equivalent: on Android it lands in Downloads, which the OS's MediaStore
+// auto-indexes into Gallery/Photos apps in most setups. On iOS/Safari it
+// saves to the Files app instead (Safari doesn't support silently saving
+// straight to Photos), so it isn't quite "automatic" there.
+function slugifyFilename(text) {
+  return (text || 'winfinity-share').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'winfinity-share';
+}
+
+function downloadImageBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
 async function shareViaWebShare(shareData, imageBlob) {
+  if (imageBlob) {
+    downloadImageBlob(imageBlob, `${slugifyFilename(shareData.title)}.png`);
+    showRestToast('Image saved to your device.');
+  }
   if (imageBlob && navigator.canShare) {
     const file = new File([imageBlob], 'winfinity-activity.png', { type: 'image/png' });
     if (navigator.canShare({ files: [file] })) {
@@ -675,6 +698,10 @@ async function shareViaWebShare(shareData, imageBlob) {
 }
 
 async function shareMultipleViaWebShare(shareData, namedBlobs) {
+  if (namedBlobs.length) {
+    namedBlobs.forEach(({ name, blob }) => downloadImageBlob(blob, name));
+    showRestToast(`${namedBlobs.length} image${namedBlobs.length > 1 ? 's' : ''} saved to your device.`);
+  }
   if (namedBlobs.length && navigator.canShare) {
     const files = namedBlobs.map(({ name, blob }) => new File([blob], name, { type: 'image/png' }));
     if (navigator.canShare({ files })) {
