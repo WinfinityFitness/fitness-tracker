@@ -1500,26 +1500,30 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   cursor: pointer;
 }
 .announcement-menu-item:hover { background: var(--surface-2); color: var(--cyan); }
-.announcement-text {
+.announcement-marquee-wrap {
+  overflow: hidden;
+  margin: 8px 0 0;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+}
+.announcement-marquee {
+  display: flex;
+  width: max-content;
+  animation: announcement-scroll 18s linear infinite;
+}
+.announcement-marquee-text {
+  white-space: nowrap;
+  padding-right: 56px;
   font-size: 0.85rem;
   color: var(--text-secondary);
-  margin: 6px 0 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
-.announcement-text.is-expanded { -webkit-line-clamp: unset; overflow: visible; }
-.announcement-expand-btn {
-  background: none;
-  border: none;
-  color: var(--cyan);
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  padding: 4px 0 0;
-  cursor: pointer;
+@keyframes announcement-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
 }
-.announcement-expand-btn[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .announcement-marquee { animation: none; }
+}
 .chat-invite-row {
   display: flex;
   flex-wrap: wrap;

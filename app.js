@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.44';
+const APP_VERSION = 'WF_SYS_V.1.47';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -663,47 +663,43 @@ function initContact() {
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
 }
 
-function generateShareCardBlob({ emoji, title, stats }) {
-  return new Promise(resolve => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 600; canvas.height = 600;
-    const ctx = canvas.getContext('2d');
+async function generateShareCardBlob({ emoji, title, stats }) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 600; canvas.height = 600;
+  const ctx = canvas.getContext('2d');
 
-    const bg = ctx.createLinearGradient(0, 0, 600, 600);
-    bg.addColorStop(0, '#171f24');
-    bg.addColorStop(1, '#0a0e12');
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, 600, 600);
-    ctx.strokeStyle = 'rgba(51,200,204,0.4)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(8, 8, 584, 584);
+  const bg = ctx.createLinearGradient(0, 0, 600, 600);
+  bg.addColorStop(0, '#171f24');
+  bg.addColorStop(1, '#0a0e12');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, 600, 600);
+  ctx.strokeStyle = 'rgba(51,200,204,0.4)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(8, 8, 584, 584);
 
-    ctx.textAlign = 'center';
-    ctx.font = '76px sans-serif';
-    ctx.fillText(emoji, 300, 140);
-    ctx.fillStyle = '#33c8cc';
-    ctx.font = 'bold 32px sans-serif';
-    ctx.fillText(title, 300, 205);
-    ctx.fillStyle = '#5a686e';
+  ctx.textAlign = 'center';
+  ctx.font = '76px sans-serif';
+  ctx.fillText(emoji, 300, 140);
+  ctx.fillStyle = '#33c8cc';
+  ctx.font = 'bold 32px sans-serif';
+  ctx.fillText(title, 300, 205);
+
+  ctx.textAlign = 'left';
+  let y = 310;
+  const colW = 260, startX = 55;
+  stats.forEach((s, i) => {
+    const x = startX + (i % 2) * colW;
+    if (i % 2 === 0 && i > 0) y += 110;
+    ctx.fillStyle = '#7e8e95';
     ctx.font = '15px monospace';
-    ctx.fillText('WINFINITY TRACKER', 300, 240);
-
-    ctx.textAlign = 'left';
-    let y = 310;
-    const colW = 260, startX = 55;
-    stats.forEach((s, i) => {
-      const x = startX + (i % 2) * colW;
-      if (i % 2 === 0 && i > 0) y += 110;
-      ctx.fillStyle = '#7e8e95';
-      ctx.font = '15px monospace';
-      ctx.fillText(s.label.toUpperCase(), x, y);
-      ctx.fillStyle = '#dde3e5';
-      ctx.font = 'bold 30px sans-serif';
-      ctx.fillText(s.value, x, y + 36);
-    });
-
-    canvas.toBlob(blob => resolve(blob), 'image/png');
+    ctx.fillText(s.label.toUpperCase(), x, y);
+    ctx.fillStyle = '#dde3e5';
+    ctx.font = 'bold 30px sans-serif';
+    ctx.fillText(s.value, x, y + 36);
   });
+
+  await drawShareWatermark(ctx, 600, 600);
+  return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
 }
 
 // Browsers won't let a website silently write into the phone's protected
@@ -789,6 +785,31 @@ function initFooterShare() {
       url: shareUrl,
     });
   });
+}
+
+const FOOTER_TAGLINES = [
+  "The only bad workout is the one that didn't happen.",
+  "Don't stop when you're tired. Stop when you're done.",
+  "Your body can stand almost anything. It's your mind that you have to convince.",
+  "Fitness is not about being better than someone else. It's about being better than you were yesterday.",
+  "Motivation is what gets you started. Habit is what keeps you going.",
+  "Success starts with self-discipline.",
+  "Push yourself because no one else is going to do it for you.",
+  "It does not matter how slowly you go as long as you do not stop.",
+  "Transformation is not five minutes from now; it's a present activity. In this moment, you can make a different choice, and it will lead to a different result.",
+  "Believe in yourself and all that you are. Know that there is something inside you that is greater than any obstacle.",
+];
+
+function initFooterTagline() {
+  const el = document.getElementById('footerTagline');
+  if (!el) return;
+  let lastIdx = -1;
+  setInterval(() => {
+    let idx;
+    do { idx = Math.floor(Math.random() * FOOTER_TAGLINES.length); } while (idx === lastIdx && FOOTER_TAGLINES.length > 1);
+    lastIdx = idx;
+    el.textContent = `"${FOOTER_TAGLINES[idx]}"`;
+  }, 15000);
 }
 
 function initPrivacyPolicy() {
@@ -1342,7 +1363,7 @@ function renderBodyFatWidget() {
   const cls = classifyBodyFat(pct, gender);
   document.getElementById('bodyFatEmptyNote').hidden = pct != null;
   renderRing(document.getElementById('bodyFatRing'), pct != null ? Math.min(100, Math.max(0, pct)) : 0, {
-    size: 120, stroke: 10,
+    size: 130, stroke: 9,
     centerText: pct != null ? round2(pct) + '%' : '–',
     label: 'Body Fat',
     sub: cls.label,
@@ -2650,9 +2671,6 @@ async function generateCardioShareCardWithMap(track, { emoji, title, stats }) {
   ctx.fillStyle = '#33c8cc';
   ctx.font = 'bold 24px sans-serif';
   ctx.fillText(title, 76, bannerTop + 50);
-  ctx.fillStyle = '#5a686e';
-  ctx.font = '12px monospace';
-  ctx.fillText('WINFINITY TRACKER', 76, bannerTop + 70);
 
   const cols = [30, 220, 410];
   const rowY = [bannerTop + 115, bannerTop + 175];
@@ -2667,6 +2685,7 @@ async function generateCardioShareCardWithMap(track, { emoji, title, stats }) {
     ctx.fillText(s.value, x, y + 28);
   });
 
+  await drawShareWatermark(ctx, 600, 600);
   return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
 }
 
@@ -4692,9 +4711,7 @@ async function generateFuelStatusShareCard({ name, digitalId, date, caloriesNow,
 
   // Footer.
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#5a686e';
-  ctx.font = '15px monospace';
-  ctx.fillText('WINFINITY TRACKER', 300, 725);
+  await drawShareWatermark(ctx, 600, 760);
 
   return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
 }
@@ -4840,8 +4857,7 @@ async function generateWorkoutSummaryShareCard({ name, digitalId, dateTime, summ
     y += rowH;
   });
 
-  ctx.textAlign = 'center'; ctx.fillStyle = '#5a686e'; ctx.font = '14px monospace';
-  ctx.fillText('WINFINITY TRACKER', width / 2, height - 18);
+  await drawShareWatermark(ctx, width, height);
 
   return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
 }
@@ -4969,8 +4985,7 @@ async function generateFoodDiaryShareCard({ name, digitalId, date, meals }) {
     y += mealGap;
   });
 
-  ctx.textAlign = 'center'; ctx.fillStyle = '#5a686e'; ctx.font = '14px monospace';
-  ctx.fillText('WINFINITY TRACKER', width / 2, height - 18);
+  await drawShareWatermark(ctx, width, height);
 
   return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
 }
@@ -5110,8 +5125,7 @@ async function generateLeaderboardShareCard({ name, digitalId, dateTime, title, 
     y += rowH;
   });
 
-  ctx.textAlign = 'center'; ctx.fillStyle = '#5a686e'; ctx.font = '14px monospace';
-  ctx.fillText('WINFINITY TRACKER', width / 2, height - 18);
+  await drawShareWatermark(ctx, width, height);
 
   return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
 }
@@ -5318,8 +5332,7 @@ async function generateWeightJourneyShareCard({ name, digitalId, date, series, w
     ctx.fillText('Set your weights in Bio to see progress.', width / 2, y + goalCardH / 2 + 10);
   }
 
-  ctx.textAlign = 'center'; ctx.fillStyle = '#5a686e'; ctx.font = '14px monospace';
-  ctx.fillText('WINFINITY TRACKER', width / 2, height - 18);
+  await drawShareWatermark(ctx, width, height);
 
   return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
 }
@@ -5364,9 +5377,47 @@ function drawShareCardHeader(ctx, width, { name, digitalId, date, title }) {
   ctx.fillText(title, 32, 106);
 }
 
-function drawShareCardFooter(ctx, width, height) {
-  ctx.textAlign = 'center'; ctx.fillStyle = '#5a686e'; ctx.font = '14px monospace';
-  ctx.fillText('WINFINITY TRACKER', width / 2, height - 18);
+// Cached across calls within the session so only the first share pays the
+// image-load cost — every card after that draws from the already-loaded img.
+let cachedShareLogoImage = null;
+function loadShareLogoImage() {
+  if (cachedShareLogoImage) return Promise.resolve(cachedShareLogoImage);
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => { cachedShareLogoImage = img; resolve(img); };
+    img.onerror = () => resolve(null);
+    img.src = 'icons/icon-192.png';
+  });
+}
+
+// Small brand mark in the lower-right corner of every share card: the app
+// icon + "WINFINITY", each sized to 70% of how they appear in the app's own
+// header (28px logo / 1.1rem≈17.6px text there).
+async function drawShareWatermark(ctx, width, height) {
+  const logoSize = Math.round(28 * 0.7);
+  const fontSize = Math.round(17.6 * 0.7);
+  const pad = 18;
+  const img = await loadShareLogoImage();
+  ctx.save();
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#33c8cc';
+  ctx.font = `800 ${fontSize}px "Courier New", monospace`;
+  const centerY = height - pad - logoSize / 2;
+  ctx.fillText('WINFINITY', width - pad, centerY);
+  if (img) {
+    const textW = ctx.measureText('WINFINITY').width;
+    const iconX = width - pad - textW - 8 - logoSize;
+    const iconY = height - pad - logoSize;
+    ctx.shadowColor = '#33c8cc';
+    ctx.shadowBlur = 4;
+    ctx.drawImage(img, iconX, iconY, logoSize, logoSize);
+  }
+  ctx.restore();
+}
+
+async function drawShareCardFooter(ctx, width, height) {
+  await drawShareWatermark(ctx, width, height);
 }
 
 function drawShareTable(ctx, x, y, w, columns, rows) {
@@ -5423,7 +5474,7 @@ async function generateHistoryLogShareCard({ name, digitalId, date, wu, rows }) 
     drawShareTable(ctx, 32, y, width - 64, columns, tableRows);
   }
 
-  drawShareCardFooter(ctx, width, height);
+  await drawShareCardFooter(ctx, width, height);
   return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
 }
 
@@ -5471,7 +5522,7 @@ async function generateMeasurementHistoryShareCard({ name, digitalId, date, rows
     ctx.fillText('Values in cm · left = most recent', 32, y + tableH + 16);
   }
 
-  drawShareCardFooter(ctx, width, height);
+  await drawShareCardFooter(ctx, width, height);
   return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
 }
 
@@ -5531,7 +5582,7 @@ async function generateOutdoorActivityShareCard({ name, digitalId, date, summary
     drawShareTable(ctx, 32, y, width - 64, columns, tableRows);
   }
 
-  drawShareCardFooter(ctx, width, height);
+  await drawShareCardFooter(ctx, width, height);
   return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
 }
 
@@ -5608,7 +5659,7 @@ async function generateRecentPerformanceShareCard({ name, digitalId, date, perfI
   ctx.fillStyle = '#8069d6'; ctx.fillRect(120, legendY - 9, 10, 10);
   ctx.fillStyle = '#dde3e5'; ctx.fillText('Calories', 136, legendY);
 
-  drawShareCardFooter(ctx, width, height);
+  await drawShareCardFooter(ctx, width, height);
   return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
 }
 
@@ -7003,19 +7054,22 @@ try {
   const savedAdmin = JSON.parse(localStorage.getItem('wft_admin_session'));
   if (savedAdmin && savedAdmin.digitalId && savedAdmin.password) adminSession = savedAdmin;
 } catch (e) { /* ignore malformed/missing saved session */ }
-let announcementExpanded = false;
 let currentAnnouncementText = '';
 
 function isAdminLoggedIn() { return !!adminSession.password; }
 
 function renderAnnouncement(message) {
   currentAnnouncementText = message || '';
-  const textEl = document.getElementById('announcementText');
-  const expandBtn = document.getElementById('btnAnnouncementExpand');
-  textEl.textContent = currentAnnouncementText || 'No announcements yet.';
-  textEl.classList.toggle('is-expanded', announcementExpanded);
-  expandBtn.hidden = currentAnnouncementText.length <= 120;
-  expandBtn.textContent = announcementExpanded ? 'Show less' : 'Show more';
+  const displayText = currentAnnouncementText || 'No announcements yet.';
+  const track = document.getElementById('announcementMarquee');
+  track.querySelectorAll('.announcement-marquee-text').forEach(span => { span.textContent = displayText; });
+  // Two identical copies laid out side by side, animated -50% and looped —
+  // speed is set from the measured text width so it always scrolls at a
+  // constant pace instead of a fixed duration that would race short
+  // messages and crawl through long ones.
+  const singleWidth = track.children[0] ? track.children[0].getBoundingClientRect().width : 0;
+  const pxPerSecond = 55;
+  track.style.animationDuration = Math.max(6, singleWidth / pxPerSecond) + 's';
 }
 
 async function loadAnnouncement() {
@@ -7042,11 +7096,6 @@ function initAnnouncementWidget() {
   menuBtn.addEventListener('click', () => { menu.hidden = !menu.hidden; });
   document.addEventListener('click', e => {
     if (!menu.hidden && !e.target.closest('.announcement-menu-wrap')) menu.hidden = true;
-  });
-
-  document.getElementById('btnAnnouncementExpand').addEventListener('click', () => {
-    announcementExpanded = !announcementExpanded;
-    renderAnnouncement(currentAnnouncementText);
   });
 
   document.getElementById('btnAdminLogin').addEventListener('click', () => {
@@ -7531,6 +7580,7 @@ try {
   initDigitalId();
   initContact();
   initFooterShare();
+  initFooterTagline();
   initPrivacyPolicy();
   initTermsOfService();
   initPRBoardOverlay();

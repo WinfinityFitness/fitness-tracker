@@ -741,8 +741,12 @@
           </div>
         </div>
       </div>
-      <p class="announcement-text" id="announcementText">No announcements yet.</p>
-      <button type="button" class="announcement-expand-btn" id="btnAnnouncementExpand" hidden>Show more</button>
+      <div class="announcement-marquee-wrap">
+        <div class="announcement-marquee" id="announcementMarquee">
+          <span class="announcement-marquee-text">No announcements yet.</span>
+          <span class="announcement-marquee-text" aria-hidden="true">No announcements yet.</span>
+        </div>
+      </div>
     </div>
 
     <div class="chart-card" id="chatCard">
@@ -849,7 +853,7 @@
       <div class="footer-brand">
         <img src="icons/icon-192.png" alt="" width="40" height="40">
         <div class="footer-brand-name">WINFINITYFITNESS</div>
-        <p class="footer-tagline">"There is no such thing as maintenance, it's either you keep moving forward, or eventually slip backwards"</p>
+        <p class="footer-tagline" id="footerTagline">"There is no such thing as maintenance, it's either you keep moving forward, or eventually slip backwards"</p>
       </div>
       <div class="footer-links">
         <div class="footer-col">
