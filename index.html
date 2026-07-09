@@ -385,6 +385,9 @@
           <button type="button" class="icon-btn glass-emboss" id="btnShareFuelStatus" aria-label="Share Daily Fuel Status">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
           </button>
+          <button type="button" class="icon-btn glass-emboss" id="btnResetCarryover" aria-label="Reset banked and overflow calorie carryover">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="var(--warning)" stroke="none"><circle cx="12" cy="12" r="5"/></svg>
+          </button>
           <span class="target-icon">◎</span>
         </div>
       </div>
@@ -783,8 +786,16 @@
     <div class="sheet-section">
       <p class="mod-tag">Mod_backup_14</p>
       <p class="field-group-heading">Backup</p>
+      <div class="section-title-row">
+        <p class="hint" style="margin:0;">Backup mode</p>
+        <div class="unit-switch" id="backupModeSwitch">
+          <button type="button" class="unit-switch-btn is-active" id="btnBackupModeManual" data-mode="manual">Manually</button>
+          <button type="button" class="unit-switch-btn" id="btnBackupModeAuto" data-mode="auto">Auto</button>
+        </div>
+      </div>
+      <p class="hint" id="backupModeHint">Manual — tap "Back Up Now" whenever you want to save a JSON backup.</p>
       <div class="btn-row">
-        <button class="btn" id="btnBackup">Save backup (JSON)</button>
+        <button class="btn" id="btnBackup">Back Up Now</button>
         <label class="btn btn--file">
           Restore backup
           <input type="file" id="fileRestore" accept="application/json" hidden>

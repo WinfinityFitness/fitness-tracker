@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.15';
+const APP_VERSION = 'WF_SYS_V.1.17';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -168,6 +168,11 @@ function getEffectiveCalorieTarget(profile) {
 // banked surplus is forfeited at the start of each week (Monday) — "use it
 // by Sunday or lose it" — but an unresolved debt is never forgiven, it keeps
 // carrying into the next week until cancelled out by under-eating.
+function getCarryoverResets() {
+  try { return JSON.parse(localStorage.getItem('wft_carryover_resets')) || {}; } catch (e) { return {}; }
+}
+function saveCarryoverResets(obj) { localStorage.setItem('wft_carryover_resets', JSON.stringify(obj)); }
+
 function getCalorieCarryover(date, profile) {
   if (!profile) return 0;
   const target = getEffectiveCalorieTarget(profile);
@@ -176,7 +181,14 @@ function getCalorieCarryover(date, profile) {
   const loggedDates = Object.keys(logs).filter(iso => logs[iso].calories != null).sort();
   if (!loggedDates.length) return 0;
   const cutoff = parseISO(date);
-  const cursor = parseISO(loggedDates[0]);
+
+  // A manual reset (see resetCalorieCarryover) zeroes the running balance as
+  // of a given day — everything logged before that day is ignored, everything
+  // from that day forward accumulates normally.
+  const resets = getCarryoverResets();
+  let startIso = loggedDates[0];
+  Object.keys(resets).forEach(rd => { if (rd <= date && rd > startIso) startIso = rd; });
+  const cursor = parseISO(startIso);
 
   // Unused calories bank forward as a bonus for tomorrow; overeating banks
   // forward as debt that shrinks tomorrow's allowance. Surplus banked
@@ -191,6 +203,23 @@ function getCalorieCarryover(date, profile) {
     if (cursor.getDay() === 1 && balance > 0) balance = 0; // crossed into Monday — forfeit unused surplus
   }
   return balance;
+}
+
+function resetCalorieCarryover() {
+  const profile = getProfile();
+  if (!profile) return;
+  const today = todayISO();
+  const before = getCalorieCarryover(today, profile);
+  if (Math.abs(before) < 1) { showRestToast('No banked or overflow calories to reset.'); return; }
+  const label = before > 0 ? `+${round0(before)} kcal banked` : `${round0(before)} kcal overflow`;
+  if (!confirm(`Reset ${label} to 0? This clears both banked and overflow calorie carryover going forward.`)) return;
+  const resets = getCarryoverResets();
+  resets[today] = { balanceBefore: before };
+  saveCarryoverResets(resets);
+  renderNutritionTargets();
+  const missionLogOverlay = document.getElementById('missionLogOverlay');
+  if (missionLogOverlay && !missionLogOverlay.hidden) renderMissionLogCalendar();
+  showRestToast(`Carryover reset: ${label} cleared for ${fmtDate(parseISO(today))}. Noted on the calendar.`);
 }
 function getEffectiveStepGoal(profile) {
   if (!profile) return 8000;
@@ -1277,6 +1306,7 @@ function initCheckin() {
     document.getElementById('checkinSaveNote').textContent = 'Check-in saved.';
     setTimeout(() => { document.getElementById('checkinSaveNote').textContent = ''; }, 2000);
     renderDashboard();
+    autoBackupIfEnabled();
   });
 }
 
@@ -1329,6 +1359,7 @@ function initQuickLog() {
     renderSleepBarChart();
     if (document.getElementById('bioDate').value === date) loadBioForDate(date);
     updateTabDots();
+    autoBackupIfEnabled();
   });
 }
 
@@ -1395,6 +1426,7 @@ function initMeasurements() {
       const overlay = document.getElementById('measureEntryOverlay');
       if (overlay && !overlay.hidden) overlay.hidden = true;
     }, 900);
+    autoBackupIfEnabled();
   });
 
   loadMeasurementsForDate(todayISO());
@@ -2519,6 +2551,7 @@ function renderMissionLogCalendar() {
   const showPeriod = profile && profile.gender === 'female';
   const workoutDays = getWorkoutDaysSet();
   const periodDays = showPeriod ? getPeriodDaysSet() : new Set();
+  const carryoverResets = getCarryoverResets();
   const todayIso = todayISO();
 
   document.getElementById('missionLogPeriodLegend').hidden = !showPeriod;
@@ -2534,7 +2567,7 @@ function renderMissionLogCalendar() {
   }
   for (let d = 1; d <= daysInMonth; d++) {
     const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    cells.push({ day: d, iso, isToday: iso === todayIso, isWorkout: workoutDays.has(iso), isPeriod: periodDays.has(iso) });
+    cells.push({ day: d, iso, isToday: iso === todayIso, isWorkout: workoutDays.has(iso), isPeriod: periodDays.has(iso), isReset: !!carryoverResets[iso] });
   }
   let nextDay = 1;
   while (cells.length % 7 !== 0) { cells.push({ day: nextDay++, muted: true }); }
@@ -2546,8 +2579,11 @@ function renderMissionLogCalendar() {
     if (c.isWorkout) classes.push('is-workout');
     if (c.isToday) classes.push('is-today');
     if (c.isPeriod) classes.push('is-period');
+    if (c.isReset) classes.push('is-reset');
     const dot = c.isPeriod ? '<span class="mission-log-period-dot"></span>' : '';
-    return `<div class="${classes.join(' ')}">${c.day}${dot}</div>`;
+    const resetDot = c.isReset ? '<span class="mission-log-reset-dot"></span>' : '';
+    const isoAttr = c.iso ? ` data-iso="${c.iso}"` : '';
+    return `<div class="${classes.join(' ')}"${isoAttr}>${c.day}${dot}${resetDot}</div>`;
   }).join('');
 }
 
@@ -2567,6 +2603,15 @@ function initMissionLog() {
   document.getElementById('btnMissionLogNext').addEventListener('click', () => {
     missionLogViewDate = new Date(missionLogViewDate.getFullYear(), missionLogViewDate.getMonth() + 1, 1);
     renderMissionLogCalendar();
+  });
+  document.getElementById('missionLogGrid').addEventListener('click', e => {
+    const cell = e.target.closest('.mission-log-day.is-reset');
+    if (!cell) return;
+    const iso = cell.dataset.iso;
+    const rec = getCarryoverResets()[iso];
+    if (!rec) return;
+    const label = rec.balanceBefore > 0 ? `+${round0(rec.balanceBefore)} kcal banked` : `${round0(rec.balanceBefore)} kcal overflow`;
+    showRestToast(`Carryover reset on ${fmtDate(parseISO(iso))}: ${label} cleared.`);
   });
 }
 
@@ -2848,6 +2893,7 @@ function initTraining() {
     renderExerciseCards();
     renderTrainingStats();
     autoSyncLeaderboardIfOptedIn();
+    autoBackupIfEnabled();
   });
 
   document.getElementById('btnCloseSummary').addEventListener('click', () => { document.getElementById('summaryOverlay').hidden = true; });
@@ -4025,6 +4071,7 @@ function addFoodItemToDiary(item) {
   renderFoodDiary(date);
   refreshFuelViewsForDate(date);
   showRestToast(`Added "${item.name}" to ${currentAddFoodMeal}.`);
+  autoBackupIfEnabled();
 }
 
 function initAddFoodPanel() {
@@ -4536,6 +4583,7 @@ function initNutrition() {
     document.querySelector('.tab-btn[data-target="bio"]').click();
   });
   document.getElementById('btnShareFuelStatus').addEventListener('click', shareDailyFuelStatus);
+  document.getElementById('btnResetCarryover').addEventListener('click', resetCalorieCarryover);
 
   initFuelWaterOrb();
   loadNutritionForDate(todayISO());
@@ -4848,6 +4896,24 @@ function downloadBackupJSON() {
   autoSyncDriveBackupToNexus();
 }
 
+function getBackupMode() {
+  return localStorage.getItem('wft_backup_mode') || 'manual';
+}
+function setBackupMode(mode) {
+  localStorage.setItem('wft_backup_mode', mode);
+}
+function autoBackupIfEnabled() {
+  if (getBackupMode() !== 'auto') return;
+  downloadBackupJSON();
+}
+let autoBackupTimerId = null;
+function startAutoBackupTimer() {
+  if (autoBackupTimerId) clearInterval(autoBackupTimerId);
+  autoBackupTimerId = setInterval(() => {
+    if (getBackupMode() === 'auto') downloadBackupJSON();
+  }, 30 * 60 * 1000);
+}
+
 function initExport() {
   document.getElementById('btnExportWeek').addEventListener('click', () => {
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 6); cutoff.setHours(0,0,0,0);
@@ -4859,6 +4925,22 @@ function initExport() {
   });
 
   document.getElementById('btnBackup').addEventListener('click', downloadBackupJSON);
+
+  const backupModeButtons = document.querySelectorAll('#backupModeSwitch .unit-switch-btn');
+  const backupModeHint = document.getElementById('backupModeHint');
+  const refreshBackupModeUI = () => {
+    const mode = getBackupMode();
+    backupModeButtons.forEach(btn => btn.classList.toggle('is-active', btn.dataset.mode === mode));
+    backupModeHint.textContent = mode === 'auto'
+      ? 'Auto — backs up automatically on every check-in, confirm, or save, plus every 30 minutes.'
+      : 'Manual — tap "Back Up Now" whenever you want to save a JSON backup.';
+  };
+  backupModeButtons.forEach(btn => btn.addEventListener('click', () => {
+    setBackupMode(btn.dataset.mode);
+    refreshBackupModeUI();
+  }));
+  refreshBackupModeUI();
+  startAutoBackupTimer();
 
   document.getElementById('fileRestore').addEventListener('change', async e => {
     const file = e.target.files[0];

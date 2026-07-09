@@ -1724,6 +1724,18 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   background: var(--critical);
   box-shadow: 0 0 4px var(--critical);
 }
+.mission-log-day.is-reset { position: relative; cursor: pointer; }
+.mission-log-reset-dot {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--warning);
+  box-shadow: 0 0 4px var(--warning);
+}
 
 /* ---------------- Footer (Nexus) ---------------- */
 .app-footer {
