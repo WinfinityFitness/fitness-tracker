@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.50';
+const APP_VERSION = 'WF_SYS_V.1.53';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -6991,6 +6991,18 @@ async function inviteUserToRoom(name, roomId) {
   } catch (e) { showRestToast('Could not send invite: ' + (e.message || 'check your connection')); }
 }
 
+async function copyChatUserDigitalId(name) {
+  if (!sbConfigured()) return;
+  try {
+    const { data: row, error } = await sb.from('leaderboard').select('public_id').eq('code_name', name).maybeSingle();
+    if (error) throw error;
+    if (!row || !row.public_id) { showRestToast(`"${name}" doesn't have a Digital ID synced yet.`); return; }
+    if (!navigator.clipboard) { showRestToast(`Digital ID: ${row.public_id}`); return; }
+    await navigator.clipboard.writeText(row.public_id);
+    showRestToast(`Copied ${name}'s Digital ID!`);
+  } catch (e) { showRestToast('Could not copy Digital ID: ' + (e.message || 'check your connection')); }
+}
+
 function initChatUserMenu() {
   document.getElementById('btnChatUserDm').addEventListener('click', () => {
     const name = chatUserMenuTarget;
@@ -7001,6 +7013,11 @@ function initChatUserMenu() {
     document.getElementById('chatUserMenuMain').hidden = true;
     renderChatUserMenuGroups();
     document.getElementById('chatUserMenuGroups').hidden = false;
+  });
+  document.getElementById('btnChatUserCopyId').addEventListener('click', () => {
+    const name = chatUserMenuTarget;
+    closeChatUserMenu();
+    copyChatUserDigitalId(name);
   });
   document.addEventListener('click', e => {
     const menu = document.getElementById('chatUserMenu');
@@ -7082,18 +7099,31 @@ let currentAnnouncementText = '';
 
 function isAdminLoggedIn() { return !!adminSession.password; }
 
-function renderAnnouncement(message) {
-  currentAnnouncementText = message || '';
-  const displayText = currentAnnouncementText || 'No announcements yet.';
-  const track = document.getElementById('announcementMarquee');
-  track.querySelectorAll('.announcement-marquee-text').forEach(span => { span.textContent = displayText; });
-  // Two identical copies laid out side by side, animated -50% and looped —
-  // speed is set from the measured text width so it always scrolls at a
-  // constant pace instead of a fixed duration that would race short
-  // messages and crawl through long ones.
+// Two identical copies laid out side by side, animated -50% and looped —
+// speed is set from the measured text width so it always scrolls at a
+// constant pace instead of a fixed duration that would race short messages
+// and crawl through long ones.
+function setMarqueeText(trackId, text) {
+  const track = document.getElementById(trackId);
+  if (!track) return;
+  track.querySelectorAll('.announcement-marquee-text').forEach(span => { span.textContent = text; });
   const singleWidth = track.children[0] ? track.children[0].getBoundingClientRect().width : 0;
   const pxPerSecond = 55;
   track.style.animationDuration = Math.max(6, singleWidth / pxPerSecond) + 's';
+}
+
+function renderAnnouncement(message) {
+  currentAnnouncementText = message || '';
+  setMarqueeText('announcementMarquee', currentAnnouncementText || 'No announcements yet.');
+
+  // Top-of-page strip (under the header, above every tab): only exists at
+  // all when there's a real announcement — no placeholder text, no empty
+  // strip taking up space when there's nothing to show.
+  const globalStrip = document.getElementById('globalAnnouncementStrip');
+  if (globalStrip) {
+    globalStrip.hidden = !currentAnnouncementText;
+    if (currentAnnouncementText) setMarqueeText('globalAnnouncementMarquee', currentAnnouncementText);
+  }
 }
 
 async function loadAnnouncement() {
@@ -7241,9 +7271,19 @@ function initLeaderboard() {
     const refreshBtn = document.getElementById('btnChatRefresh');
     refreshBtn.disabled = true;
     try {
+      // refreshChatRooms() always rebuilds chatRoomMeta and the invites
+      // popover from a fresh query — nothing is patched in place — so a
+      // room that got deleted (or an invite that got accepted/declined,
+      // here or on another device) since the last refresh is dropped
+      // automatically, and anything newly joined/created appears. This
+      // just makes that visible with a concrete summary instead of the
+      // button appearing to silently do nothing.
       await refreshChatRooms();
       const messages = await fetchChatMessages();
       renderChatMessages(messages);
+      const roomCount = Object.keys(chatRoomMeta).length;
+      const inviteCount = parseInt(document.getElementById('chatBellBadge').textContent, 10) || 0;
+      showRestToast(`Refreshed — ${roomCount} room${roomCount !== 1 ? 's' : ''}, ${inviteCount} pending invite${inviteCount !== 1 ? 's' : ''}.`);
     } catch (e) { showRestToast('Refresh failed: ' + (e.message || 'check your connection')); }
     refreshBtn.disabled = false;
   });

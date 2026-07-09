@@ -1506,6 +1506,15 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
   mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
 }
+.global-announcement-strip {
+  overflow: hidden;
+  padding: 7px 16px;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+}
+.global-announcement-strip[hidden] { display: none; }
 .announcement-marquee {
   display: flex;
   width: max-content;

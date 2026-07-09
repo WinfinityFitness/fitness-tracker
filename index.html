@@ -29,6 +29,13 @@
   <span class="app-header-sub" id="headerToday"></span>
 </header>
 
+<div class="global-announcement-strip" id="globalAnnouncementStrip" hidden>
+  <div class="announcement-marquee" id="globalAnnouncementMarquee">
+    <span class="announcement-marquee-text"></span>
+    <span class="announcement-marquee-text" aria-hidden="true"></span>
+  </div>
+</div>
+
 <div class="rest-toast" id="restToast" hidden></div>
 
 <main id="app">
@@ -835,6 +842,7 @@
         <p class="chat-user-menu-name" id="chatUserMenuName"></p>
         <button type="button" class="chat-room-menu-item" id="btnChatUserDm">Send Direct Message</button>
         <button type="button" class="chat-room-menu-item" id="btnChatUserInvite">Invite to Group Chat</button>
+        <button type="button" class="chat-room-menu-item" id="btnChatUserCopyId">Copy Digital ID</button>
       </div>
       <div id="chatUserMenuGroups" hidden></div>
     </div>
