@@ -847,7 +847,7 @@ button.mission-log-day:hover { border-color: var(--cyan); }
   line-height: 1.2;
   white-space: normal;
 }
-.quick-log-btn-icon { font-size: 1.3rem; line-height: 1; }
+.quick-log-icon { filter: drop-shadow(0 0 4px var(--cyan-glow)); }
 
 .save-note { font-family: var(--font-mono); font-size: 0.78rem; color: var(--good); min-height: 1.1em; text-align: center; }
 .hint { font-size: 0.8rem; color: var(--text-muted); margin: 8px 0 4px; line-height: 1.4; }
