@@ -273,6 +273,7 @@ body {
 }
 .section-title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 6px 0 -4px; }
 .section-title-row .section-title { margin: 0; }
+.section-title--neon { color: var(--cyan); text-shadow: 0 0 8px var(--cyan-glow); }
 .unit-switch { display: flex; border: 1px solid var(--border-soft); border-radius: 5px; overflow: hidden; flex: none; }
 .unit-switch-btn {
   background: var(--surface-2);
@@ -492,6 +493,17 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--card-radius);
   padding: 14px;
+}
+.chart-card--neon {
+  border-color: var(--cyan);
+  animation: quick-log-throb 2.4s ease-in-out infinite;
+}
+@keyframes quick-log-throb {
+  0%, 100% { box-shadow: 0 0 8px var(--cyan-glow), 0 0 2px var(--cyan); }
+  50% { box-shadow: 0 0 22px var(--cyan-glow), 0 0 6px var(--cyan); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chart-card--neon { animation: none; box-shadow: 0 0 10px var(--cyan-glow), 0 0 2px var(--cyan); }
 }
 .chart-card-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
 .chart-card-title { font-weight: 700; font-size: 0.95rem; }

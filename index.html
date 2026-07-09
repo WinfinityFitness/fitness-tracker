@@ -89,29 +89,8 @@
       </div>
     </div>
 
-    <div class="ring-row">
-      <div class="ring-card" id="ringHabitCard"></div>
-      <div class="ring-card" id="ringHydrationCard"></div>
-    </div>
-
-    <div class="stat-grid stat-grid--3">
-      <div class="stat-tile">
-        <div class="stat-tile-value" id="avgSteps">–</div>
-        <div class="stat-tile-label">Avg steps (7d)</div>
-      </div>
-      <div class="stat-tile">
-        <div class="stat-tile-value" id="currentBMI">–</div>
-        <div class="stat-tile-label">Current BMI</div>
-      </div>
-      <div class="stat-tile" id="adjustedBmiTile" hidden>
-        <div class="stat-tile-value" id="adjustedBMI">–</div>
-        <div class="stat-tile-label">Adjusted BMI (est.)</div>
-      </div>
-    </div>
-    <p class="hint" id="adjustedBmiHint" hidden>Adjusted BMI factors in your training intensity and step activity as a rough proxy for muscle mass vs. body fat — not a clinical measurement.</p>
-
-    <h2 class="section-title">Quick log</h2>
-    <div class="chart-card">
+    <h2 class="section-title section-title--neon">Quick log</h2>
+    <div class="chart-card chart-card--neon">
       <p class="mod-tag">MOD_QUICK_05</p>
       <div class="quick-log-btn-row">
         <button type="button" class="btn quick-log-btn" id="btnOpenStartDayLog">
@@ -144,6 +123,27 @@
         </button>
       </div>
     </div>
+
+    <div class="ring-row">
+      <div class="ring-card" id="ringHabitCard"></div>
+      <div class="ring-card" id="ringHydrationCard"></div>
+    </div>
+
+    <div class="stat-grid stat-grid--3">
+      <div class="stat-tile">
+        <div class="stat-tile-value" id="avgSteps">–</div>
+        <div class="stat-tile-label">Avg steps (7d)</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-tile-value" id="currentBMI">–</div>
+        <div class="stat-tile-label">Current BMI</div>
+      </div>
+      <div class="stat-tile" id="adjustedBmiTile" hidden>
+        <div class="stat-tile-value" id="adjustedBMI">–</div>
+        <div class="stat-tile-label">Adjusted BMI (est.)</div>
+      </div>
+    </div>
+    <p class="hint" id="adjustedBmiHint" hidden>Adjusted BMI factors in your training intensity and step activity as a rough proxy for muscle mass vs. body fat — not a clinical measurement.</p>
 
     <h2 class="section-title">Weight change (trend weight)</h2>
     <div class="stat-grid stat-grid--3">
@@ -2058,6 +2058,8 @@
       <span>Week ending</span>
       <input type="date" id="wlDate" class="date-picker-trigger" readonly>
     </label>
+    <label class="field field--checkbox"><input type="checkbox" id="wlProgressPhoto"><span>Take Progress Photo</span></label>
+    <label class="field field--checkbox"><input type="checkbox" id="wlMeasurement"><span>Measurement</span></label>
     <label class="field">
       <span>Adjustments made to keep progress on track</span>
       <textarea id="wlAdjustments" rows="2"></textarea>

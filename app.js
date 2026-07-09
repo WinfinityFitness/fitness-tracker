@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.57';
+const APP_VERSION = 'WF_SYS_V.1.58';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1629,6 +1629,8 @@ function openWeekendLog() {
   const date = todayISO();
   const r = getReviews()[date] || {};
   document.getElementById('wlDate').value = date;
+  document.getElementById('wlProgressPhoto').checked = !!r.progressPhoto;
+  document.getElementById('wlMeasurement').checked = !!r.measurementDone;
   document.getElementById('wlAdjustments').value = r.adjustments || '';
   document.getElementById('wlWins').value = r.wins || '';
   document.getElementById('wlImprovements').value = r.improvements || '';
@@ -1645,6 +1647,8 @@ function saveWeekendLog() {
   const focus = Array.from(document.querySelectorAll('.wlFocus')).filter(c => c.checked).map(c => c.value);
   reviews[date] = {
     date,
+    progressPhoto: document.getElementById('wlProgressPhoto').checked,
+    measurementDone: document.getElementById('wlMeasurement').checked,
     adjustments: document.getElementById('wlAdjustments').value,
     wins: document.getElementById('wlWins').value,
     improvements: document.getElementById('wlImprovements').value,
