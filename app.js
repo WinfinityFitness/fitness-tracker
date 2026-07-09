@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.36';
+const APP_VERSION = 'WF_SYS_V.1.38';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -235,6 +235,33 @@ function resetCalorieCarryover() {
   if (missionLogOverlay && !missionLogOverlay.hidden) renderMissionLogCalendar();
   showRestToast(`Carryover reset: ${label} cleared for ${fmtDate(parseISO(today))}. Noted on the calendar.`);
 }
+
+// Undoes the most recent cancel — since getCalorieCarryover always derives
+// the balance fresh from the logs plus whichever reset markers still exist,
+// simply removing the latest marker is enough to make the exact same math
+// "see" further back into history again. Nothing about the balance is
+// stored separately, so there's no way for this to drift out of sync no
+// matter how many times it's cancelled and returned.
+function returnCalorieOverflow() {
+  const resets = getCarryoverResets();
+  const resetDates = Object.keys(resets).sort();
+  if (!resetDates.length) { showRestToast('No cancelled overflow to return yet.'); return; }
+  const latestDate = resetDates[resetDates.length - 1];
+  const record = resets[latestDate];
+  const label = record.balanceBefore > 0 ? `+${round0(record.balanceBefore)} kcal banked` : `${round0(Math.abs(record.balanceBefore))} kcal overflow`;
+  if (!confirm(`Bring back the ${label} that was cancelled on ${fmtDate(parseISO(latestDate))}?`)) return;
+  delete resets[latestDate];
+  saveCarryoverResets(resets);
+  renderNutritionTargets();
+  const missionLogOverlay = document.getElementById('missionLogOverlay');
+  if (missionLogOverlay && !missionLogOverlay.hidden) renderMissionLogCalendar();
+  showRestToast(`Returned: ${label} is back in your carryover.`);
+}
+
+function hasCancelledOverflow() {
+  return Object.keys(getCarryoverResets()).length > 0;
+}
+
 function getEffectiveStepGoal(profile) {
   if (!profile) return 8000;
   return profile.coachStepGoal || profile.stepGoal || 8000;
@@ -697,24 +724,35 @@ async function shareViaWebShare(shareData, imageBlob) {
   }
 }
 
+// Returns 'shared' (share sheet opened and completed), 'cancelled' (user
+// dismissed the share sheet — not a failure), or 'unsupported' (no share
+// API path worked at all). Images are downloaded to the device in every
+// case, matching "save automatically when share is tapped" regardless of
+// what happens with the OS share sheet afterward.
 async function shareMultipleViaWebShare(shareData, namedBlobs) {
-  if (namedBlobs.length) {
-    namedBlobs.forEach(({ name, blob }) => downloadImageBlob(blob, name));
-    showRestToast(`${namedBlobs.length} image${namedBlobs.length > 1 ? 's' : ''} saved to your device.`);
-  }
+  // The share attempt goes first, as close as possible to the click that
+  // triggered it — a mobile browser's "this came from a real tap" grace
+  // period for navigator.share() is short, and generating several images
+  // before attempting it can already eat into that window on slower devices.
+  let result = 'unsupported';
   if (namedBlobs.length && navigator.canShare) {
     const files = namedBlobs.map(({ name, blob }) => new File([blob], name, { type: 'image/png' }));
     if (navigator.canShare({ files })) {
       try {
         await navigator.share({ title: shareData.title, text: shareData.text, files });
-        return true;
-      } catch (e) { if (e && e.name === 'AbortError') return false; }
+        result = 'shared';
+      } catch (e) { result = (e && e.name === 'AbortError') ? 'cancelled' : 'unsupported'; }
     }
   }
-  if (navigator.share) {
-    try { await navigator.share(shareData); return true; } catch (e) { return false; }
+  if (result === 'unsupported' && navigator.share) {
+    try { await navigator.share(shareData); result = 'shared'; }
+    catch (e) { result = (e && e.name === 'AbortError') ? 'cancelled' : 'unsupported'; }
   }
-  return false;
+  if (namedBlobs.length) {
+    namedBlobs.forEach(({ name, blob }) => downloadImageBlob(blob, name));
+    showRestToast(`${namedBlobs.length} image${namedBlobs.length > 1 ? 's' : ''} saved to your device.`);
+  }
+  return result;
 }
 
 function initFooterShare() {
@@ -5529,7 +5567,25 @@ function initNutrition() {
     document.querySelector('.tab-btn[data-target="bio"]').click();
   });
   document.getElementById('btnShareFuelStatus').addEventListener('click', shareDailyFuelStatus);
-  document.getElementById('btnResetCarryover').addEventListener('click', resetCalorieCarryover);
+  const carryoverMenuBtn = document.getElementById('btnCarryoverMenu');
+  const carryoverMenu = document.getElementById('carryoverMenu');
+  carryoverMenuBtn.addEventListener('click', () => {
+    if (carryoverMenu.hidden) document.getElementById('btnReturnOverflow').disabled = !hasCancelledOverflow();
+    carryoverMenu.hidden = !carryoverMenu.hidden;
+  });
+  document.addEventListener('click', e => {
+    if (!carryoverMenu.hidden && !e.target.closest('#carryoverMenu') && e.target !== carryoverMenuBtn && !carryoverMenuBtn.contains(e.target)) {
+      carryoverMenu.hidden = true;
+    }
+  });
+  document.getElementById('btnCancelOverflow').addEventListener('click', () => {
+    carryoverMenu.hidden = true;
+    resetCalorieCarryover();
+  });
+  document.getElementById('btnReturnOverflow').addEventListener('click', () => {
+    carryoverMenu.hidden = true;
+    returnCalorieOverflow();
+  });
 
   initFuelWaterOrb();
   loadNutritionForDate(todayISO());
@@ -5586,30 +5642,31 @@ async function buildAssessmentBlobs() {
   const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
   const logsArr = sortedLogsArray();
   const nowDate = fmtDate(new Date());
-  const blobs = [];
+  // Kicked off together (not one-by-one with sequential awaits) to keep the
+  // total wait as short as possible — a long delay here before the eventual
+  // navigator.share() call risks the browser no longer treating it as
+  // tied to the tap that started it, which some browsers silently reject.
+  const jobs = [];
 
   if (document.getElementById('assessChkHistory').checked) {
-    const blob = await generateHistoryLogShareCard({
+    jobs.push(generateHistoryLogShareCard({
       name, digitalId, date: nowDate, wu, rows: logsArr.slice(-7).reverse(),
-    });
-    blobs.push({ name: 'accomplishment-log.png', blob });
+    }).then(blob => ({ name: 'accomplishment-log.png', blob })));
   }
 
   if (document.getElementById('assessChkMeasurements').checked) {
-    const blob = await generateMeasurementHistoryShareCard({
+    jobs.push(generateMeasurementHistoryShareCard({
       name, digitalId, date: nowDate, rows: logsArr.filter(l => l.measurements).slice(-5).reverse(),
-    });
-    blobs.push({ name: 'measurement-history.png', blob });
+    }).then(blob => ({ name: 'measurement-history.png', blob })));
   }
 
   if (document.getElementById('assessChkWeight').checked) {
     const series = weightChartFullJourney ? computeTrendSeries(logsArr) : computeTrendSeries(logsArr).slice(-60);
     const kgNow = currentWeightKg(profile);
     const lowestKg7d = minOfLastNDays(logsArr, 'weightKg', 7);
-    const blob = await generateWeightJourneyShareCard({
+    jobs.push(generateWeightJourneyShareCard({
       name, digitalId, date: nowDate, series, wu, profile, kgNow, lowestKg7d,
-    });
-    blobs.push({ name: 'weight-journey.png', blob });
+    }).then(blob => ({ name: 'weight-journey.png', blob })));
   }
 
   if (document.getElementById('assessChkPerformance').checked) {
@@ -5631,26 +5688,24 @@ async function buildAssessmentBlobs() {
         calPct: entry && entry.calories != null ? (entry.calories / calorieTargetForChart) * 100 : 0,
       });
     }
-    const blob = await generateRecentPerformanceShareCard({ name, digitalId, date: nowDate, perfItems, days });
-    blobs.push({ name: 'recent-performance.png', blob });
+    jobs.push(generateRecentPerformanceShareCard({ name, digitalId, date: nowDate, perfItems, days })
+      .then(blob => ({ name: 'recent-performance.png', blob })));
   }
 
   if (document.getElementById('assessChkWorkout').checked) {
     const trainDate = getActiveTrainingDate();
     const exercisesForDate = (getLogs()[trainDate] && getLogs()[trainDate].exercises) || [];
     const summary = computeWorkoutSummaryFromExercises(exercisesForDate, trainDate);
-    const blob = await generateWorkoutSummaryShareCard({
+    jobs.push(generateWorkoutSummaryShareCard({
       name, digitalId, dateTime: fmtDate(parseISO(trainDate)), summary,
-    });
-    blobs.push({ name: 'workout-summary.png', blob });
+    }).then(blob => ({ name: 'workout-summary.png', blob })));
   }
 
   if (document.getElementById('assessChkOutdoor').checked) {
     const summary = computeOutdoorActivitySummary(logsArr);
-    const blob = await generateOutdoorActivityShareCard({
+    jobs.push(generateOutdoorActivityShareCard({
       name, digitalId, date: nowDate, summary, unit: distUnitForProfile(profile),
-    });
-    blobs.push({ name: 'outdoor-activity.png', blob });
+    }).then(blob => ({ name: 'outdoor-activity.png', blob })));
   }
 
   if (document.getElementById('assessChkFuel').checked) {
@@ -5666,13 +5721,12 @@ async function buildAssessmentBlobs() {
       { label: 'Carbs', kcal: carbsNow * 4, color: '#8069d6', pct: caloriesNow > 0 ? Math.round((carbsNow * 4 / caloriesNow) * 100) : 0 },
       { label: 'Fat', kcal: fatNow * 9, color: '#dba52c', pct: caloriesNow > 0 ? Math.round((fatNow * 9 / caloriesNow) * 100) : 0 },
     ];
-    const blob = await generateFuelStatusShareCard({
+    jobs.push(generateFuelStatusShareCard({
       name, digitalId, date: fmtDate(parseISO(date)), caloriesNow, calorieTarget, macros,
-    });
-    blobs.push({ name: 'daily-fuel-status.png', blob });
+    }).then(blob => ({ name: 'daily-fuel-status.png', blob })));
   }
 
-  return blobs;
+  return Promise.all(jobs);
 }
 
 function initRequestAssessment() {
@@ -5696,11 +5750,17 @@ function initRequestAssessment() {
         btn.disabled = false;
         return;
       }
-      const ok = await shareMultipleViaWebShare({
+      const result = await shareMultipleViaWebShare({
         title: 'Winfinity Tracker — Assessment',
         text: '📋 My fitness assessment, tracked with Winfinity Tracker!',
       }, blobs);
-      if (ok) { overlay.hidden = true; } else { note.textContent = 'Sharing isn\'t supported on this browser.'; }
+      if (result === 'shared') {
+        overlay.hidden = true;
+      } else if (result === 'cancelled') {
+        note.textContent = 'Share cancelled — images were still saved to your device.';
+      } else {
+        note.textContent = "Direct sharing isn't available on this browser — images were saved to your device instead.";
+      }
     } catch (e) {
       note.textContent = 'Could not prepare assessment: ' + (e.message || 'try again');
     }

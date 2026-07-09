@@ -395,9 +395,15 @@
           <button type="button" class="icon-btn glass-emboss" id="btnShareFuelStatus" aria-label="Share Daily Fuel Status">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
           </button>
-          <button type="button" class="icon-btn glass-emboss" id="btnResetCarryover" aria-label="Reset banked and overflow calorie carryover">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="var(--warning)" stroke="none"><circle cx="12" cy="12" r="5"/></svg>
-          </button>
+          <div class="chat-room-menu-wrap">
+            <button type="button" class="icon-btn glass-emboss" id="btnCarryoverMenu" aria-label="Calorie overflow options">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="var(--warning)" stroke="none"><circle cx="12" cy="12" r="5"/></svg>
+            </button>
+            <div class="chat-room-menu" id="carryoverMenu" hidden>
+              <button type="button" class="chat-room-menu-item" id="btnCancelOverflow">Cancel overflow</button>
+              <button type="button" class="chat-room-menu-item" id="btnReturnOverflow">Return overflow</button>
+            </div>
+          </div>
           <span class="target-icon">◎</span>
         </div>
       </div>
