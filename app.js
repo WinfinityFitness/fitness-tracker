@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.11';
+const APP_VERSION = 'WF_SYS_V.1.14';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -178,13 +178,15 @@ function getCalorieCarryover(date, profile) {
   const cutoff = parseISO(date);
   const cursor = parseISO(loggedDates[0]);
 
+  // Debt-only carryover: eating under target never banks a bonus for tomorrow
+  // (capped at 0 via Math.min), it only pays down existing debt. Eating over
+  // target adds the overflow as debt that shrinks tomorrow's allowance.
   let balance = 0;
   while (cursor < cutoff) {
     const iso = cursor.getFullYear() + '-' + String(cursor.getMonth() + 1).padStart(2, '0') + '-' + String(cursor.getDate()).padStart(2, '0');
     const entry = logs[iso];
-    if (entry && entry.calories != null) balance += target - entry.calories;
+    if (entry && entry.calories != null) balance = Math.min(0, balance + (target - entry.calories));
     cursor.setDate(cursor.getDate() + 1);
-    if (cursor.getDay() === 1 && balance > 0) balance = 0; // crossed into Monday — forfeit unused surplus
   }
   return balance;
 }
@@ -396,11 +398,54 @@ function initSwipeNavigation() {
   }, { passive: true });
 }
 
+// Curated top-level overlays worth restoring on reopen — each maps to the
+// same trigger button a user would tap to open it, so restoring re-runs the
+// real open logic (populating content) instead of just toggling `hidden` and
+// risking stale/empty content. Nested or action-specific overlays (Add Food,
+// barcode scan, date picker, the donation prompt, etc.) are deliberately left
+// out since their state can't be safely reconstructed from just an ID.
+const RESTORABLE_OVERLAYS = {
+  foodDiaryOverlay: 'btnOpenFoodDiary',
+  settingsOverlay: 'btnOpenSettings',
+  prBoardOverlay: 'btnOpenPRBoard',
+  missionLogOverlay: 'btnOpenMissionLog',
+};
+
+function initLastStateRestore() {
+  Object.entries(RESTORABLE_OVERLAYS).forEach(([overlayId, triggerId]) => {
+    const overlay = document.getElementById(overlayId);
+    const trigger = document.getElementById(triggerId);
+    if (!overlay || !trigger) return;
+    trigger.addEventListener('click', () => localStorage.setItem('wft_last_overlay', overlayId));
+    const clearIfCurrent = () => {
+      if (localStorage.getItem('wft_last_overlay') === overlayId) localStorage.removeItem('wft_last_overlay');
+    };
+    const closeBtn = overlay.querySelector('.sheet-close');
+    if (closeBtn) closeBtn.addEventListener('click', clearIfCurrent);
+    overlay.addEventListener('click', e => { if (e.target === overlay) clearIfCurrent(); });
+  });
+}
+
+function restoreLastState() {
+  const savedTab = localStorage.getItem('wft_last_tab');
+  if (savedTab) {
+    const btn = document.querySelector(`.tab-btn[data-target="${savedTab}"]`);
+    if (btn && !btn.classList.contains('is-active')) btn.click();
+  }
+  const savedOverlay = localStorage.getItem('wft_last_overlay');
+  const triggerId = savedOverlay && RESTORABLE_OVERLAYS[savedOverlay];
+  if (triggerId) {
+    const trigger = document.getElementById(triggerId);
+    if (trigger) setTimeout(() => trigger.click(), 150);
+  }
+}
+
 function initTabs() {
   const btns = document.querySelectorAll('.tab-btn[data-target]');
   btns.forEach(btn => {
     btn.addEventListener('click', () => {
       const target = btn.dataset.target;
+      localStorage.setItem('wft_last_tab', target);
       document.querySelectorAll('.tab-panel').forEach(p => p.hidden = p.dataset.tab !== target);
       btns.forEach(b => b.classList.toggle('is-active', b === btn));
       if (target === 'status') { loadCheckinForm(); loadQuickLog(); renderDashboard(); }
@@ -2812,15 +2857,15 @@ function initTraining() {
     const vol = round0(fromKg(lastWorkoutSummary.totalVolumeKg, wu));
     let text = `💪 Just finished a Winfinity Tracker session: ${lastWorkoutSummary.exercises.length} exercises, ${lastWorkoutSummary.totalSets} sets, ${vol} ${wu} total volume.`;
     if (prCount > 0) text += ` 🏆 ${prCount} new PR${prCount > 1 ? 's' : ''}!`;
-    const blob = await generateShareCardBlob({
-      emoji: prCount > 0 ? '🏆' : '💪',
-      title: 'Workout complete!',
-      stats: [
-        { label: 'Exercises', value: String(lastWorkoutSummary.exercises.length) },
-        { label: 'Sets', value: String(lastWorkoutSummary.totalSets) },
-        { label: `Volume (${wu})`, value: String(vol) },
-        { label: 'New PRs', value: String(prCount) },
-      ],
+    const profile = getProfile();
+    const trainDate = document.getElementById('trainDate').value || todayISO();
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const blob = await generateWorkoutSummaryShareCard({
+      name: (profile && profile.name) || 'Operator',
+      digitalId: getOrCreatePublicId(),
+      dateTime: `${fmtDate(parseISO(trainDate))} · ${timeStr}`,
+      summary: lastWorkoutSummary,
     });
     shareViaWebShare({ title: 'Winfinity Tracker — Workout Summary', text }, blob);
   });
@@ -3193,6 +3238,35 @@ function checkMeasurementReminder() {
   } else {
     fireSystemNotification('Winfinity Tracker', message);
   }
+}
+
+/* Best-effort only, same caveat as the other periodic reminders — fires the
+   first time the app is opened on a Saturday night (6pm-midnight local time),
+   once per Saturday, showing a donation prompt after the splash screen. */
+function isSaturdayNightNow() {
+  const now = new Date();
+  return now.getDay() === 6 && now.getHours() >= 18;
+}
+
+function checkDonationPrompt() {
+  if (!isSaturdayNightNow()) return;
+  const todayKey = todayISO();
+  if (localStorage.getItem('wft_donation_shown') === todayKey) return;
+  localStorage.setItem('wft_donation_shown', todayKey);
+  document.getElementById('donationPromptView').hidden = false;
+  document.getElementById('donationQrView').hidden = true;
+  document.getElementById('donationOverlay').hidden = false;
+}
+
+function initDonationPrompt() {
+  const overlay = document.getElementById('donationOverlay');
+  document.getElementById('btnDonationIgnore').addEventListener('click', () => { overlay.hidden = true; });
+  document.getElementById('btnDonationSure').addEventListener('click', () => {
+    document.getElementById('donationPromptView').hidden = true;
+    document.getElementById('donationQrView').hidden = false;
+  });
+  document.getElementById('btnDonationQrClose').addEventListener('click', () => { overlay.hidden = true; });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
 }
 
 function fireSystemNotification(title, body) {
@@ -4173,6 +4247,139 @@ function initFuelWaterOrb() {
   refreshFuelWaterViews(document.getElementById('nutDate').value || todayISO());
 }
 
+// Draws a ring/arc identical in spirit to renderRing() (gradient stroke,
+// rounded cap) directly onto a canvas 2D context, for the share-card export.
+function drawShareRing(ctx, cx, cy, r, stroke, pct, gradientColors) {
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineWidth = stroke;
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  const grad = ctx.createLinearGradient(cx - r, cy, cx + r, cy);
+  gradientColors.forEach((c, i) => grad.addColorStop(i / (gradientColors.length - 1), c));
+  ctx.strokeStyle = grad;
+  ctx.shadowColor = gradientColors[gradientColors.length - 1];
+  ctx.shadowBlur = 14;
+  const clamped = Math.max(0, Math.min(100, pct));
+  const start = -Math.PI / 2;
+  const end = start + (clamped / 100) * Math.PI * 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, start, end);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// Draws the multi-slice macro pie matching the in-app conic-gradient pie.
+function drawSharePie(ctx, cx, cy, r, slices) {
+  ctx.save();
+  const total = slices.reduce((s, m) => s + m.value, 0);
+  if (total <= 0) {
+    ctx.fillStyle = '#2a3238';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+  let angle = -Math.PI / 2;
+  slices.forEach(m => {
+    const slice = (m.value / total) * Math.PI * 2;
+    if (slice <= 0) return;
+    ctx.fillStyle = m.color;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, angle, angle + slice);
+    ctx.closePath();
+    ctx.fill();
+    angle += slice;
+  });
+  ctx.restore();
+}
+
+async function generateFuelStatusShareCard({ name, digitalId, date, caloriesNow, calorieTarget, macros }) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 600; canvas.height = 760;
+  const ctx = canvas.getContext('2d');
+
+  const bg = ctx.createLinearGradient(0, 0, 600, 760);
+  bg.addColorStop(0, '#171f24');
+  bg.addColorStop(1, '#0a0e12');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, 600, 760);
+  ctx.strokeStyle = 'rgba(51,200,204,0.4)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(8, 8, 584, 744);
+
+  // Header: name upper-left, Digital ID upper-right.
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#dde3e5';
+  ctx.font = 'bold 22px sans-serif';
+  ctx.fillText(name || 'Operator', 40, 58);
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#33c8cc';
+  ctx.font = 'bold 16px monospace';
+  ctx.fillText(digitalId || '', 560, 56);
+
+  // Date, centered.
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#7e8e95';
+  ctx.font = '15px monospace';
+  ctx.fillText(date, 300, 92);
+
+  // Title.
+  ctx.fillStyle = '#33c8cc';
+  ctx.font = 'bold 30px sans-serif';
+  ctx.fillText('Daily Fuel Status', 300, 138);
+
+  // Calorie ring.
+  const caloriePct = calorieTarget > 0 ? (caloriesNow / calorieTarget) * 100 : 0;
+  drawShareRing(ctx, 300, 300, 110, 20, caloriePct, ['#8b6bf2', '#3f8ff0', '#2de2e6']);
+  ctx.fillStyle = '#dde3e5';
+  ctx.font = 'bold 52px monospace';
+  ctx.fillText(Math.round(Math.min(100, caloriePct)) + '%', 300, 318);
+  ctx.fillStyle = '#7e8e95';
+  ctx.font = '14px monospace';
+  ctx.fillText('CALORIES', 300, 448);
+  ctx.fillStyle = '#dde3e5';
+  ctx.font = 'bold 22px sans-serif';
+  ctx.fillText(`${caloriesNow} / ${calorieTarget} kcal`, 300, 478);
+
+  // Macro pie (left) + legend (right of the pie), matching the in-app row.
+  const pieCx = 210, pieCy = 590, pieR = 58;
+  drawSharePie(ctx, pieCx, pieCy, pieR, macros.map(m => ({ value: m.kcal, color: m.color })));
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(pieCx, pieCy, pieR, 0, Math.PI * 2);
+  ctx.stroke();
+
+  const legendX = 300;
+  let legendY = pieCy - 34;
+  ctx.textAlign = 'left';
+  macros.forEach(m => {
+    ctx.fillStyle = m.color;
+    ctx.beginPath();
+    ctx.arc(legendX, legendY - 6, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#dde3e5';
+    ctx.font = '17px sans-serif';
+    ctx.fillText(`${m.label}  ${m.pct}% of intake`, legendX + 16, legendY);
+    legendY += 34;
+  });
+
+  // Footer.
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#5a686e';
+  ctx.font = '15px monospace';
+  ctx.fillText('WINFINITY TRACKER', 300, 725);
+
+  return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
+}
+
 async function shareDailyFuelStatus() {
   const profile = getProfile();
   const date = document.getElementById('nutDate').value || todayISO();
@@ -4182,22 +4389,138 @@ async function shareDailyFuelStatus() {
   const proteinNow = entry.protein ?? 0;
   const carbsNow = entry.carbs ?? 0;
   const fatNow = entry.fat ?? 0;
-  const waterTarget = effectiveWaterTargetML(date);
-  const waterNow = entry.water ?? 0;
+
+  const proteinKcal = proteinNow * 4;
+  const carbKcal = carbsNow * 4;
+  const fatKcal = fatNow * 9;
+  const macros = [
+    { label: 'Protein', kcal: proteinKcal, color: '#33c8cc', pct: caloriesNow > 0 ? Math.round((proteinKcal / caloriesNow) * 100) : 0 },
+    { label: 'Carbs', kcal: carbKcal, color: '#8069d6', pct: caloriesNow > 0 ? Math.round((carbKcal / caloriesNow) * 100) : 0 },
+    { label: 'Fat', kcal: fatKcal, color: '#dba52c', pct: caloriesNow > 0 ? Math.round((fatKcal / caloriesNow) * 100) : 0 },
+  ];
+
   const text = `🔥 Daily Fuel Status — ${caloriesNow}/${calorieTarget} kcal logged with Winfinity Tracker!`;
-  const blob = await generateShareCardBlob({
-    emoji: '🔥',
-    title: 'Daily Fuel Status',
-    stats: [
-      { label: 'Calories', value: `${caloriesNow} / ${calorieTarget} kcal` },
-      { label: 'Protein', value: `${proteinNow}g` },
-      { label: 'Carbs', value: `${carbsNow}g` },
-      { label: 'Fat', value: `${fatNow}g` },
-      { label: 'Water', value: `${waterNow} / ${waterTarget} mL` },
-      { label: 'Date', value: fmtDate(parseISO(date)) },
-    ],
+  const blob = await generateFuelStatusShareCard({
+    name: (profile && profile.name) || 'Operator',
+    digitalId: getOrCreatePublicId(),
+    date: fmtDate(parseISO(date)),
+    caloriesNow,
+    calorieTarget,
+    macros,
   });
   shareViaWebShare({ title: 'Winfinity Tracker — Daily Fuel', text }, blob);
+}
+
+function roundRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+async function generateWorkoutSummaryShareCard({ name, digitalId, dateTime, summary }) {
+  const wu = summary.wu;
+  const prCount = summary.exercises.filter(e => e.isPR).length;
+  const width = 600;
+  const rowH = 88;
+  const headerH = 158;
+  const statsH = 92 + 26;
+  const prBannerH = prCount > 0 ? 44 : 0;
+  const exercisesH = summary.exercises.length
+    ? summary.exercises.length * rowH
+    : 50;
+  const footerH = 46;
+  const height = headerH + statsH + prBannerH + exercisesH + footerH;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext('2d');
+
+  const bg = ctx.createLinearGradient(0, 0, width, height);
+  bg.addColorStop(0, '#171f24'); bg.addColorStop(1, '#0a0e12');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, width, height);
+  ctx.strokeStyle = 'rgba(51,200,204,0.4)'; ctx.lineWidth = 2;
+  ctx.strokeRect(8, 8, width - 16, height - 16);
+  ctx.textBaseline = 'alphabetic';
+
+  ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 20px sans-serif';
+  ctx.fillText(name || 'Operator', 32, 46);
+  ctx.textAlign = 'right'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 15px monospace';
+  ctx.fillText(digitalId || '', width - 32, 44);
+
+  ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px monospace';
+  ctx.fillText(dateTime, width / 2, 74);
+
+  ctx.textAlign = 'left'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 26px sans-serif';
+  ctx.fillText('WORKOUT SUMMARY', 32, 116);
+
+  let y = headerH;
+
+  const tileGap = 14;
+  const tileW = (width - 64 - tileGap * 2) / 3;
+  const tiles = [
+    { value: String(summary.exercises.length), label: 'EXERCISES' },
+    { value: String(summary.totalSets), label: 'SETS' },
+    { value: String(round0(fromKg(summary.totalVolumeKg, wu))), label: `VOLUME (${wu.toUpperCase()})` },
+  ];
+  tiles.forEach((t, i) => {
+    const x = 32 + i * (tileW + tileGap);
+    ctx.strokeStyle = 'rgba(51,200,204,0.35)'; ctx.lineWidth = 1;
+    roundRectPath(ctx, x, y, tileW, 92, 10);
+    ctx.stroke();
+    ctx.textAlign = 'center'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 32px sans-serif';
+    ctx.fillText(t.value, x + tileW / 2, y + 48);
+    ctx.fillStyle = '#7e8e95'; ctx.font = '11px monospace';
+    ctx.fillText(t.label, x + tileW / 2, y + 74);
+  });
+  y += 92 + 26;
+
+  if (prCount > 0) {
+    ctx.textAlign = 'center'; ctx.fillStyle = '#dba52c'; ctx.font = 'bold 18px monospace';
+    ctx.fillText(`🏆 ${prCount} new personal record${prCount > 1 ? 's' : ''}!`, width / 2, y + 10);
+    y += prBannerH;
+  }
+
+  if (!summary.exercises.length) {
+    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '15px sans-serif';
+    ctx.fillText('No exercises logged for this date.', width / 2, y + 28);
+    y += exercisesH;
+  }
+  summary.exercises.forEach(ex => {
+    const rh = rowH - 14;
+    ctx.fillStyle = 'rgba(255,255,255,0.03)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1;
+    roundRectPath(ctx, 32, y, width - 64, rh, 10);
+    ctx.fill(); ctx.stroke();
+
+    ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 20px sans-serif';
+    ctx.fillText(ex.name, 52, y + 32);
+    ctx.fillStyle = '#8a9aa0'; ctx.font = '15px monospace';
+    ctx.fillText(`${ex.completedSets} sets · ${round0(fromKg(ex.volumeKg, wu))} ${wu} volume`, 52, y + 56);
+
+    if (ex.isPR) {
+      const badgeText = '🏆 PR';
+      ctx.font = 'bold 15px sans-serif';
+      const textW = ctx.measureText(badgeText).width;
+      const badgeW = textW + 26;
+      const badgeX = width - 52 - badgeW;
+      const badgeY = y + rh / 2 - 16;
+      ctx.strokeStyle = '#dba52c'; ctx.lineWidth = 1.5;
+      roundRectPath(ctx, badgeX, badgeY, badgeW, 32, 8);
+      ctx.stroke();
+      ctx.textAlign = 'center'; ctx.fillStyle = '#dba52c'; ctx.font = 'bold 15px sans-serif';
+      ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + 21);
+    }
+    y += rowH;
+  });
+
+  ctx.textAlign = 'center'; ctx.fillStyle = '#5a686e'; ctx.font = '14px monospace';
+  ctx.fillText('WINFINITY TRACKER', width / 2, height - 18);
+
+  return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
 }
 
 function initNutrition() {
@@ -5568,6 +5891,8 @@ document.getElementById('btnGoToBioFromChart').addEventListener('click', () => {
 });
 initSettingsOverlay();
 initAppUpdateButton();
+initDonationPrompt();
+initLastStateRestore();
 initDigitalId();
 initContact();
 initFooterShare();
@@ -5618,6 +5943,8 @@ setTimeout(() => {
   setTimeout(checkMeasurementReminder, 6000);
   cleanupOldHydrationFiredKeys();
   setTimeout(checkHydrationReminders, 8000);
+  setTimeout(checkDonationPrompt, 500);
+  restoreLastState();
 }, 2000);
 
 setInterval(checkHydrationReminders, 5 * 60 * 1000);

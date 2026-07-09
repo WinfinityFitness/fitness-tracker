@@ -1664,6 +1664,24 @@
   </div>
 </div>
 
+<div class="donation-overlay" id="donationOverlay" hidden>
+  <div class="donation-card">
+    <div class="donation-prompt-view" id="donationPromptView">
+      <img class="donation-logo" src="icons/icon-512.png" alt="Winfinity">
+      <p class="donation-message">Make a donation to keep the app improving</p>
+      <div class="donation-btn-row">
+        <button type="button" class="btn donation-btn-ignore" id="btnDonationIgnore">IGNORE</button>
+        <button type="button" class="btn btn--primary donation-btn-sure" id="btnDonationSure">SURE</button>
+      </div>
+    </div>
+    <div class="donation-qr-view" id="donationQrView" hidden>
+      <button class="sheet-close donation-qr-close" id="btnDonationQrClose">✕</button>
+      <img class="donation-qr-img" src="icons/gcash-donate-qr.png" alt="GCash QR code for donation">
+      <p class="hint">Scan with the GCash app to send a donation. Thank you for supporting Winfinity!</p>
+    </div>
+  </div>
+</div>
+
 <div class="sheet-overlay" id="timezoneOverlay" hidden>
   <div class="sheet">
     <div class="sheet-handle"></div>

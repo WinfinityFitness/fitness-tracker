@@ -1839,6 +1839,54 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .sheet-overlay--stacked { z-index: 160; }
 #datePickerOverlay { z-index: 170; }
 
+.donation-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 180;
+  background: rgba(0,0,0,0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.donation-overlay[hidden] { display: none; }
+.donation-card {
+  background: var(--surface-1);
+  border: 1px solid var(--cyan-dim);
+  border-radius: var(--card-radius);
+  box-shadow: 0 0 24px var(--cyan-glow);
+  padding: 24px 20px;
+  max-width: 340px;
+  width: 100%;
+  text-align: center;
+  position: relative;
+}
+.donation-logo {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 14px;
+  filter: drop-shadow(0 0 8px var(--cyan-glow));
+}
+.donation-message {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 20px;
+  line-height: 1.4;
+}
+.donation-btn-row { display: flex; gap: 10px; }
+.donation-btn-row .btn { flex: 1; }
+.donation-btn-ignore { color: var(--text-muted); }
+.donation-qr-view { position: relative; }
+.donation-qr-close { position: absolute; top: -12px; right: -8px; }
+.donation-qr-img {
+  width: 100%;
+  max-width: 260px;
+  border-radius: 8px;
+  margin: 8px auto 12px;
+  display: block;
+}
+
 .app-update-overlay {
   position: fixed;
   inset: 0;
