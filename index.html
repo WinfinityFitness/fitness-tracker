@@ -144,7 +144,12 @@
     <div class="perf-grid" id="perfGrid"></div>
 
     <div class="chart-card">
-      <div class="chart-card-head"><span class="chart-card-title">Steps vs Calories (7D)</span></div>
+      <div class="chart-card-head">
+        <span class="chart-card-title">Steps vs Calories (7D)</span>
+        <button type="button" class="icon-btn glass-emboss" id="btnShareRecentPerformance" aria-label="Share recent performance">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
+        </button>
+      </div>
       <p class="hint" style="margin-top:-2px;">Each bar shows % of your daily goal reached — taller bars mean better follow-through, and a big gap between the two means one habit is lagging behind the other.</p>
       <div class="dual-bar-chart" id="stepsCaloriesChart"></div>
       <div class="bar-chart-labels" id="stepsCaloriesLabels"></div>
@@ -461,6 +466,10 @@
 
     <h2 class="section-title">Coach assignment</h2>
     <p class="hint">Contact Coach Win for assessment to get a new assignment next week.</p>
+    <button type="button" class="btn glass-emboss entity-identity-btn" id="btnRequestAssessment">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      REQUEST ASSESSMENT
+    </button>
     <fieldset class="field-group">
       <p class="mod-tag">Mod_coach_07</p>
       <p class="field-group-heading">Assigned Targets (Optional Override)</p>
@@ -476,6 +485,21 @@
         <span>Workouts per week assignment</span>
         <input type="number" id="coachWorkoutsInput" min="0" max="14" placeholder="e.g. 4">
       </label>
+
+      <p class="field-group-heading">Refeed</p>
+      <label class="field">
+        <span>+Calories</span>
+        <input type="number" id="coachRefeedCalories" placeholder="e.g. 300">
+      </label>
+      <label class="field">
+        <span>Start date</span>
+        <input type="date" id="coachRefeedStart" class="date-picker-trigger" readonly>
+      </label>
+      <label class="field">
+        <span>End date</span>
+        <input type="date" id="coachRefeedEnd" class="date-picker-trigger" readonly>
+      </label>
+
       <button type="button" class="btn btn--primary" id="btnSaveCoachAssignment">Save assignment</button>
       <p class="save-note" id="coachAssignmentNote"></p>
     </fieldset>
@@ -1851,6 +1875,28 @@
     </label>
     <button type="button" class="btn btn--primary" id="btnAdminPostSubmit" style="width:100%;margin-top:10px;">Post</button>
     <p class="save-note" id="adminPostNote"></p>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="assessmentShareOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Request Assessment</h2>
+      <button class="sheet-close" id="btnCloseAssessmentShare">✕</button>
+    </div>
+    <p class="hint">Choose what to include, then share it with your coach.</p>
+    <div class="assessment-checklist">
+      <label class="field field--checkbox"><input type="checkbox" id="assessChkHistory" checked><span>Accomplishment Log History</span></label>
+      <label class="field field--checkbox"><input type="checkbox" id="assessChkMeasurements" checked><span>Measurement History</span></label>
+      <label class="field field--checkbox"><input type="checkbox" id="assessChkWeight" checked><span>Entity Weight Journey</span></label>
+      <label class="field field--checkbox"><input type="checkbox" id="assessChkPerformance" checked><span>Recent Performance (7-day avg)</span></label>
+      <label class="field field--checkbox"><input type="checkbox" id="assessChkWorkout" checked><span>Workout Summary</span></label>
+      <label class="field field--checkbox"><input type="checkbox" id="assessChkOutdoor" checked><span>Outdoor Activity Summary</span></label>
+      <label class="field field--checkbox"><input type="checkbox" id="assessChkFuel" checked><span>Daily Fuel Status</span></label>
+    </div>
+    <button type="button" class="btn btn--primary" id="btnAssessmentShareSubmit" style="width:100%;margin-top:10px;">Share</button>
+    <p class="save-note" id="assessmentShareNote"></p>
   </div>
 </div>
 

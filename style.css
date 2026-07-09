@@ -762,6 +762,7 @@ button.mission-log-day:hover { border-color: var(--cyan); }
 }
 .field--checkbox input { width: 18px; height: 18px; flex: none; accent-color: var(--cyan); }
 .field--checkbox span { font-weight: 500; color: var(--text-primary); }
+.assessment-checklist { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
 
 .field-row { display: flex; gap: 10px; }
 .field-row .field { flex: 1; }

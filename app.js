@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.32';
+const APP_VERSION = 'WF_SYS_V.1.35';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -149,16 +149,30 @@ function computeTargets(profile, currentKg) {
   };
 }
 
+// A refeed window (set alongside the coach assignment) adds a flat +kcal
+// bonus to the calorie target on every day from start through end, inclusive.
+function getRefeedBonusForDate(profile, date) {
+  if (!profile || !profile.refeedCalories || !profile.refeedStart || !profile.refeedEnd) return 0;
+  if (date >= profile.refeedStart && date <= profile.refeedEnd) return profile.refeedCalories;
+  return 0;
+}
+
 /* A coach-assigned value (set on the Fuel page) overrides the computed default
-   wherever a single-number target is needed, until the coach updates it again. */
-function getEffectiveCalorieTarget(profile) {
+   wherever a single-number target is needed, until the coach updates it again.
+   date (optional, defaults to today) only affects whether an active refeed
+   window's +kcal bonus applies — it doesn't change which base target is used. */
+function getEffectiveCalorieTarget(profile, date) {
   if (!profile) return null;
-  if (profile.coachCalorieTarget) return profile.coachCalorieTarget;
-  const kg = currentWeightKg(profile);
-  const targets = kg ? computeTargets(profile, kg) : null;
-  if (!targets) return null;
-  const range = profile.goalMode === 'bulk' ? targets.bulking : targets.cutting;
-  return round0((range[0] + range[1]) / 2);
+  let base;
+  if (profile.coachCalorieTarget) base = profile.coachCalorieTarget;
+  else {
+    const kg = currentWeightKg(profile);
+    const targets = kg ? computeTargets(profile, kg) : null;
+    if (!targets) return null;
+    const range = profile.goalMode === 'bulk' ? targets.bulking : targets.cutting;
+    base = round0((range[0] + range[1]) / 2);
+  }
+  return base + getRefeedBonusForDate(profile, date || todayISO());
 }
 
 // Signed running balance, day by day: eating under target banks a surplus
@@ -658,6 +672,22 @@ async function shareViaWebShare(shareData, imageBlob) {
       showRestToast('Copied — paste it anywhere to share!');
     } catch (e) { /* ignore */ }
   }
+}
+
+async function shareMultipleViaWebShare(shareData, namedBlobs) {
+  if (namedBlobs.length && navigator.canShare) {
+    const files = namedBlobs.map(({ name, blob }) => new File([blob], name, { type: 'image/png' }));
+    if (navigator.canShare({ files })) {
+      try {
+        await navigator.share({ title: shareData.title, text: shareData.text, files });
+        return true;
+      } catch (e) { if (e && e.name === 'AbortError') return false; }
+    }
+  }
+  if (navigator.share) {
+    try { await navigator.share(shareData); return true; } catch (e) { return false; }
+  }
+  return false;
 }
 
 function initFooterShare() {
@@ -1767,6 +1797,10 @@ function renderWeightChart(fullSeries, wu) {
     tooltip.style.left = `${left}px`;
     tooltip.style.top = '4px';
   }
+  function hideTooltip() {
+    crosshair.setAttribute('visibility', 'hidden');
+    tooltip.style.display = 'none';
+  }
   function pointerToIndex(evt) {
     const rect = svg.getBoundingClientRect();
     const relX = ((evt.clientX - rect.left) / rect.width) * W;
@@ -1777,9 +1811,24 @@ function renderWeightChart(fullSeries, wu) {
     });
     return closest;
   }
-  svg.addEventListener('pointermove', evt => showAt(pointerToIndex(evt)));
-  svg.addEventListener('pointerleave', () => { crosshair.setAttribute('visibility', 'hidden'); tooltip.style.display = 'none'; });
-  showAt(series.length - 1);
+  // Press-and-hold (works for both touch and mouse) instead of hover-only —
+  // details for any point stay hidden until pressed, and disappear on
+  // release. Disabled in the full-journey view (see weightChartFullJourney
+  // below) since that series can be long enough to make per-point touch
+  // targets impractical.
+  if (!weightChartFullJourney) {
+    let pressed = false;
+    svg.addEventListener('pointerdown', evt => {
+      pressed = true;
+      svg.setPointerCapture(evt.pointerId);
+      showAt(pointerToIndex(evt));
+    });
+    svg.addEventListener('pointermove', evt => { if (pressed) showAt(pointerToIndex(evt)); });
+    const release = () => { pressed = false; hideTooltip(); };
+    svg.addEventListener('pointerup', release);
+    svg.addEventListener('pointercancel', release);
+    svg.addEventListener('pointerleave', () => { if (!pressed) hideTooltip(); });
+  }
 
   legend.innerHTML = `<span><span class="legend-swatch" style="background:var(--series-1)"></span>Actual weight</span>
     <span><span class="legend-dash"></span>Trend (7-day avg)</span>
@@ -1794,6 +1843,7 @@ function initWeightChartToggle() {
     }
   });
   document.getElementById('btnShareWeightJourney').addEventListener('click', shareWeightJourney);
+  document.getElementById('btnShareRecentPerformance').addEventListener('click', shareRecentPerformance);
 }
 
 /* ---- Goal progress bar ---- */
@@ -2716,6 +2766,7 @@ function initDatePicker() {
     trainDate: 'Training Date', nutDate: 'Fuel Date', bioDate: 'Bio Date',
     reviewDate: 'Week Ending', setupStartDate: 'Challenge Start', measureDate: 'Measurement Date',
     foodDiaryDateInput: 'Food Diary Date',
+    coachRefeedStart: 'Refeed Start', coachRefeedEnd: 'Refeed End',
   };
   document.querySelectorAll('.date-picker-trigger').forEach(input => {
     input.addEventListener('click', () => openDatePicker(input, titles[input.id] || 'Select Date'));
@@ -3150,10 +3201,14 @@ function renderPRBoard() {
 
 /* ---- Finish workout summary + PR detection ---- */
 function computeWorkoutSummary(date) {
+  return computeWorkoutSummaryFromExercises(currentExercises, date);
+}
+
+function computeWorkoutSummaryFromExercises(exercisesList, date) {
   const profile = getProfile();
   const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
   let totalVolumeKg = 0, totalSets = 0;
-  const exercises = currentExercises.map(ex => {
+  const exercises = (exercisesList || []).map(ex => {
     const completed = ex.sets.filter(s => s.completed && s.weightKg != null && s.reps != null);
     const volumeKg = completed.reduce((sum, s) => sum + s.weightKg * s.reps, 0);
     totalVolumeKg += volumeKg;
@@ -4502,7 +4557,7 @@ async function shareDailyFuelStatus() {
   const profile = getProfile();
   const date = document.getElementById('nutDate').value || todayISO();
   const entry = getLogs()[date] || {};
-  const calorieTarget = getEffectiveCalorieTarget(profile) || 0;
+  const calorieTarget = getEffectiveCalorieTarget(profile, date) || 0;
   const caloriesNow = entry.calories ?? 0;
   const proteinNow = entry.protein ?? 0;
   const carbsNow = entry.carbs ?? 0;
@@ -5139,6 +5194,303 @@ async function shareWeightJourney() {
   shareViaWebShare({ title: 'Winfinity Tracker — Weight Journey', text: '📈 My weight journey & goal progress, tracked with Winfinity Tracker!' }, blob);
 }
 
+function shareCardShell(width, height) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  const bg = ctx.createLinearGradient(0, 0, width, height);
+  bg.addColorStop(0, '#171f24'); bg.addColorStop(1, '#0a0e12');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, width, height);
+  ctx.strokeStyle = 'rgba(51,200,204,0.4)'; ctx.lineWidth = 2;
+  ctx.strokeRect(8, 8, width - 16, height - 16);
+  return { canvas, ctx };
+}
+
+function drawShareCardHeader(ctx, width, { name, digitalId, date, title }) {
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 20px sans-serif';
+  ctx.fillText(name || 'Operator', 32, 46);
+  ctx.textAlign = 'right'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 15px monospace';
+  ctx.fillText(digitalId || '', width - 32, 44);
+  ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px monospace';
+  ctx.fillText(date, width / 2, 74);
+  ctx.textAlign = 'left'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 22px sans-serif';
+  ctx.fillText(title, 32, 106);
+}
+
+function drawShareCardFooter(ctx, width, height) {
+  ctx.textAlign = 'center'; ctx.fillStyle = '#5a686e'; ctx.font = '14px monospace';
+  ctx.fillText('WINFINITY TRACKER', width / 2, height - 18);
+}
+
+function drawShareTable(ctx, x, y, w, columns, rows) {
+  const headerH = 22;
+  const rowH = 22;
+  ctx.textBaseline = 'alphabetic';
+  ctx.font = 'bold 10px monospace'; ctx.fillStyle = '#33c8cc'; ctx.textAlign = 'left';
+  let cx = x;
+  columns.forEach(col => { ctx.fillText(col.label, cx + 4, y + 15); cx += col.width; });
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(x, y + headerH); ctx.lineTo(x + w, y + headerH); ctx.stroke();
+  ctx.font = '10px monospace';
+  rows.forEach((row, ri) => {
+    const ry = y + headerH + ri * rowH;
+    if (ri % 2 === 1) { ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fillRect(x, ry, w, rowH); }
+    ctx.fillStyle = '#dde3e5';
+    let ccx = x;
+    row.forEach((cell, ci) => {
+      ctx.fillText(String(cell), ccx + 4, ry + 15);
+      ccx += columns[ci].width;
+    });
+  });
+  return headerH + Math.max(1, rows.length) * rowH;
+}
+
+async function generateHistoryLogShareCard({ name, digitalId, date, wu, rows }) {
+  const width = 600;
+  const headerH = 116;
+  const columns = [
+    { label: 'DATE', width: 78 }, { label: 'WT', width: 66 }, { label: 'STEPS', width: 76 },
+    { label: 'CAL', width: 66 }, { label: 'PROT', width: 66 }, { label: 'SLEEP', width: 64 }, { label: 'EX', width: 56 },
+  ];
+  const tableRows = rows.map(l => [
+    l.date.slice(5),
+    l.weightKg != null ? round2(fromKg(l.weightKg, wu)) : '–',
+    l.steps ?? '–',
+    l.calories ?? '–',
+    l.protein ?? '–',
+    l.sleep ?? '–',
+    (l.exercises && l.exercises.length) ? l.exercises.length : '–',
+  ]);
+  const tableH = 22 + Math.max(1, tableRows.length) * 22;
+  const footerH = 46;
+  const height = headerH + 20 + tableH + 24 + footerH;
+
+  const { canvas, ctx } = shareCardShell(width, height);
+  drawShareCardHeader(ctx, width, { name, digitalId, date, title: 'ACCOMPLISHMENT LOG' });
+
+  const y = headerH + 20;
+  if (!tableRows.length) {
+    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px sans-serif';
+    ctx.fillText('No logs yet.', width / 2, y + 20);
+  } else {
+    drawShareTable(ctx, 32, y, width - 64, columns, tableRows);
+  }
+
+  drawShareCardFooter(ctx, width, height);
+  return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
+}
+
+async function generateMeasurementHistoryShareCard({ name, digitalId, date, rows }) {
+  const width = 600;
+  const headerH = 116;
+  const columns = [
+    { label: 'DATE', width: 68 }, { label: 'CHEST', width: 60 }, { label: 'SHLD', width: 56 },
+    { label: 'L-BI', width: 52 }, { label: 'R-BI', width: 52 }, { label: 'STOM', width: 56 },
+    { label: 'HIPS', width: 56 }, { label: 'L-TH', width: 52 }, { label: 'R-TH', width: 52 },
+  ];
+  const tableRows = rows.map(l => {
+    const m = l.measurements || {};
+    const c = v => v ?? '–';
+    return [l.date.slice(5), c(m.chest), c(m.shoulder), c(m.lBicep), c(m.rBicep), c(m.stomach), c(m.hips), c(m.lThigh), c(m.rThigh)];
+  });
+  const tableH = 22 + Math.max(1, tableRows.length) * 22;
+  const footerH = 46;
+  const height = headerH + 20 + tableH + 24 + footerH;
+
+  const { canvas, ctx } = shareCardShell(width, height);
+  drawShareCardHeader(ctx, width, { name, digitalId, date, title: 'MEASUREMENT HISTORY' });
+
+  const y = headerH + 20;
+  if (!tableRows.length) {
+    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px sans-serif';
+    ctx.fillText('No measurements logged yet.', width / 2, y + 20);
+  } else {
+    drawShareTable(ctx, 32, y, width - 64, columns, tableRows);
+    ctx.textAlign = 'left'; ctx.fillStyle = '#5a686e'; ctx.font = '10px monospace';
+    ctx.fillText('Values in cm.', 32, y + tableH + 16);
+  }
+
+  drawShareCardFooter(ctx, width, height);
+  return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
+}
+
+function computeOutdoorActivitySummary(logsArr) {
+  const sessions = [];
+  logsArr.forEach(l => (l.cardioSessions || []).forEach(s => sessions.push({ date: l.date, ...s })));
+  sessions.sort((a, b) => b.date.localeCompare(a.date));
+  const totalDistanceKm = sessions.reduce((s, x) => s + (x.distanceKm || 0), 0);
+  const totalDurationSec = sessions.reduce((s, x) => s + (x.durationSec || 0), 0);
+  return { sessions, totalDistanceKm, totalDurationSec, count: sessions.length };
+}
+
+async function generateOutdoorActivityShareCard({ name, digitalId, date, summary, unit }) {
+  const width = 600;
+  const headerH = 116;
+  const recent = summary.sessions.slice(0, 7);
+  const columns = [
+    { label: 'DATE', width: 90 }, { label: 'TYPE', width: 90 },
+    { label: 'DIST', width: 120 }, { label: 'DURATION', width: 130 },
+  ];
+  const tableRows = recent.map(s => {
+    const dist = unit === 'mi' ? kmToMi(s.distanceKm) : s.distanceKm;
+    return [s.date.slice(5), s.type, dist.toFixed(2) + ' ' + unit, formatCardioDuration(s.durationSec)];
+  });
+  const tableH = tableRows.length ? 22 + tableRows.length * 22 : 30;
+  const footerH = 46;
+  const height = headerH + 92 + 26 + 20 + tableH + 24 + footerH;
+
+  const { canvas, ctx } = shareCardShell(width, height);
+  drawShareCardHeader(ctx, width, { name, digitalId, date, title: 'OUTDOOR ACTIVITY SUMMARY' });
+
+  let y = headerH;
+  const tileGap = 14;
+  const tileW = (width - 64 - tileGap * 2) / 3;
+  const totalDist = unit === 'mi' ? kmToMi(summary.totalDistanceKm) : summary.totalDistanceKm;
+  const tiles = [
+    { value: String(summary.count), label: 'SESSIONS' },
+    { value: totalDist.toFixed(1), label: `DISTANCE (${unit.toUpperCase()})` },
+    { value: formatCardioDuration(summary.totalDurationSec), label: 'DURATION' },
+  ];
+  tiles.forEach((t, i) => {
+    const x = 32 + i * (tileW + tileGap);
+    ctx.strokeStyle = 'rgba(51,200,204,0.35)'; ctx.lineWidth = 1;
+    roundRectPath(ctx, x, y, tileW, 92, 10);
+    ctx.stroke();
+    ctx.textAlign = 'center'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 26px sans-serif';
+    ctx.fillText(t.value, x + tileW / 2, y + 50);
+    ctx.fillStyle = '#7e8e95'; ctx.font = '11px monospace';
+    ctx.fillText(t.label, x + tileW / 2, y + 74);
+  });
+  y += 92 + 26 + 20;
+
+  if (!tableRows.length) {
+    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px sans-serif';
+    ctx.fillText('No outdoor activity logged yet.', width / 2, y + 15);
+  } else {
+    drawShareTable(ctx, 32, y, width - 64, columns, tableRows);
+  }
+
+  drawShareCardFooter(ctx, width, height);
+  return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
+}
+
+async function generateRecentPerformanceShareCard({ name, digitalId, date, perfItems, days }) {
+  const width = 600;
+  const height = 560;
+  const { canvas, ctx } = shareCardShell(width, height);
+  drawShareCardHeader(ctx, width, { name, digitalId, date, title: 'RECENT PERFORMANCE (7D AVG)' });
+
+  const STATUS_COLORS = { good: '#34bd7c', warning: '#dba52c', serious: '#e6824b', critical: '#e6516a', muted: '#5a686e' };
+
+  const tileRowH = 84;
+  const tileGap = 12;
+  const tileW = (width - 64 - tileGap) / 2;
+  const tilesTop = 116;
+  perfItems.forEach((p, i) => {
+    const col = i % 2, row = Math.floor(i / 2);
+    const x = 32 + col * (tileW + tileGap);
+    const ty = tilesTop + row * (tileRowH + tileGap);
+    roundRectPath(ctx, x, ty, tileW, tileRowH, 10);
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 14px sans-serif';
+    ctx.fillText(p.label, x + 14, ty + 24);
+
+    const dotColor = STATUS_COLORS[p.status] || STATUS_COLORS.muted;
+    ctx.fillStyle = dotColor; ctx.beginPath(); ctx.arc(x + tileW - 66, ty + 20, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.textAlign = 'right'; ctx.fillStyle = dotColor; ctx.font = 'bold 13px monospace';
+    ctx.fillText(p.statusLabel, x + tileW - 14, ty + 24);
+
+    const barCount = p.sparkline.length;
+    const barGap = 4;
+    const barAreaW = tileW - 28;
+    const barW = (barAreaW - barGap * (barCount - 1)) / barCount;
+    const barBaseY = ty + tileRowH - 12;
+    const barMaxH = 34;
+    p.sparkline.forEach((v, bi) => {
+      const h = v != null ? Math.max(4, (v / 5) * barMaxH) : 3;
+      const bx = x + 14 + bi * (barW + barGap);
+      const isToday = bi === barCount - 1;
+      ctx.fillStyle = isToday ? dotColor : 'rgba(255,255,255,0.15)';
+      ctx.fillRect(bx, barBaseY - h, barW, h);
+    });
+  });
+
+  const chartTop = tilesTop + tileRowH * 2 + tileGap + 24;
+  ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 15px sans-serif';
+  ctx.fillText('Steps vs Calories (7D)', 32, chartTop);
+
+  const plotY = chartTop + 16;
+  const chartX = 32, chartW = width - 64, chartPlotH = 110;
+  const dayW = chartW / days.length;
+  const barPairW = Math.min(20, dayW * 0.28);
+  days.forEach((d, i) => {
+    const cx = chartX + i * dayW + dayW / 2;
+    const baseY = plotY + chartPlotH;
+    const stepsH = Math.max(2, (Math.min(100, (d.stepsPct / 130) * 100) / 100) * chartPlotH);
+    const calH = Math.max(2, (Math.min(100, (d.calPct / 130) * 100) / 100) * chartPlotH);
+    ctx.fillStyle = '#2de2e6';
+    ctx.fillRect(cx - barPairW - 2, baseY - stepsH, barPairW, stepsH);
+    ctx.fillStyle = '#8069d6';
+    ctx.fillRect(cx + 2, baseY - calH, barPairW, calH);
+    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '10px monospace';
+    ctx.fillText(d.weekday, cx, baseY + 16);
+  });
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(chartX, plotY + chartPlotH); ctx.lineTo(chartX + chartW, plotY + chartPlotH); ctx.stroke();
+
+  const legendY = plotY + chartPlotH + 36;
+  ctx.textAlign = 'left'; ctx.font = '11px sans-serif';
+  ctx.fillStyle = '#2de2e6'; ctx.fillRect(32, legendY - 9, 10, 10);
+  ctx.fillStyle = '#dde3e5'; ctx.fillText('Steps', 48, legendY);
+  ctx.fillStyle = '#8069d6'; ctx.fillRect(120, legendY - 9, 10, 10);
+  ctx.fillStyle = '#dde3e5'; ctx.fillText('Calories', 136, legendY);
+
+  drawShareCardFooter(ctx, width, height);
+  return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
+}
+
+async function shareRecentPerformance() {
+  const profile = getProfile();
+  const logsArr = sortedLogsArray();
+  const perfDefs = [
+    ['Sleep quality', 'sleep'], ['Stress', 'stress'], ['Fatigue', 'fatigue'], ['Hunger', 'hunger'],
+  ];
+  const perfItems = perfDefs.map(([label, field]) => {
+    const val = avgOfLastNDays(logsArr, field, 7);
+    return {
+      label, field,
+      status: statusForLevel(field, val),
+      statusLabel: labelForLevel(field, val),
+      sparkline: last7DailyValues(field),
+    };
+  });
+
+  const stepGoal = getEffectiveStepGoal(profile);
+  const calorieTarget = getEffectiveCalorieTarget(profile) || 2000;
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const entry = logsArr.find(l => l.date === iso);
+    days.push({
+      weekday: d.toLocaleDateString(undefined, { weekday: 'narrow' }),
+      stepsPct: entry && entry.steps != null ? (entry.steps / stepGoal) * 100 : 0,
+      calPct: entry && entry.calories != null ? (entry.calories / calorieTarget) * 100 : 0,
+    });
+  }
+
+  const blob = await generateRecentPerformanceShareCard({
+    name: (profile && profile.name) || 'Operator',
+    digitalId: getOrCreatePublicId(),
+    date: fmtDate(new Date()),
+    perfItems, days,
+  });
+  shareViaWebShare({ title: 'Winfinity Tracker — Recent Performance', text: '📊 My 7-day performance, tracked with Winfinity Tracker!' }, blob);
+}
+
 function initNutrition() {
   document.getElementById('nutDate').value = todayISO();
   document.getElementById('nutDate').addEventListener('change', e => {
@@ -5157,6 +5509,7 @@ function initNutrition() {
   renderNutritionTargets();
   renderNutritionAverages();
   initCoachAssignment();
+  initRequestAssessment();
 }
 
 function loadCoachAssignment() {
@@ -5164,6 +5517,9 @@ function loadCoachAssignment() {
   document.getElementById('coachCalorieInput').value = (profile && profile.coachCalorieTarget) || '';
   document.getElementById('coachStepsInput').value = (profile && profile.coachStepGoal) || '';
   document.getElementById('coachWorkoutsInput').value = (profile && profile.coachWorkoutsPerWeek) || '';
+  document.getElementById('coachRefeedCalories').value = (profile && profile.refeedCalories) || '';
+  document.getElementById('coachRefeedStart').value = (profile && profile.refeedStart) || '';
+  document.getElementById('coachRefeedEnd').value = (profile && profile.refeedEnd) || '';
 }
 
 function initCoachAssignment() {
@@ -5175,15 +5531,153 @@ function initCoachAssignment() {
       alert('Set up your profile in BIO first, then assign coach targets here.');
       return;
     }
+    const refeedStart = document.getElementById('coachRefeedStart').value || null;
+    const refeedEnd = document.getElementById('coachRefeedEnd').value || null;
+    if (refeedStart && refeedEnd && refeedStart > refeedEnd) {
+      note.textContent = 'Refeed start date must be on or before the end date.';
+      return;
+    }
     profile.coachCalorieTarget = parseIntOrNull(document.getElementById('coachCalorieInput').value);
     profile.coachStepGoal = parseIntOrNull(document.getElementById('coachStepsInput').value);
     profile.coachWorkoutsPerWeek = parseIntOrNull(document.getElementById('coachWorkoutsInput').value);
+    profile.refeedCalories = parseIntOrNull(document.getElementById('coachRefeedCalories').value);
+    profile.refeedStart = refeedStart;
+    profile.refeedEnd = refeedEnd;
     saveProfile(profile);
     note.textContent = 'Assignment saved.';
     setTimeout(() => { note.textContent = ''; }, 2500);
     renderNutritionTargets();
     renderDashboard();
     renderTrainingStats();
+  });
+}
+
+async function buildAssessmentBlobs() {
+  const profile = getProfile();
+  const name = (profile && profile.name) || 'Operator';
+  const digitalId = getOrCreatePublicId();
+  const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
+  const logsArr = sortedLogsArray();
+  const nowDate = fmtDate(new Date());
+  const blobs = [];
+
+  if (document.getElementById('assessChkHistory').checked) {
+    const blob = await generateHistoryLogShareCard({
+      name, digitalId, date: nowDate, wu, rows: logsArr.slice(-7).reverse(),
+    });
+    blobs.push({ name: 'accomplishment-log.png', blob });
+  }
+
+  if (document.getElementById('assessChkMeasurements').checked) {
+    const blob = await generateMeasurementHistoryShareCard({
+      name, digitalId, date: nowDate, rows: logsArr.filter(l => l.measurements).slice(-5).reverse(),
+    });
+    blobs.push({ name: 'measurement-history.png', blob });
+  }
+
+  if (document.getElementById('assessChkWeight').checked) {
+    const series = weightChartFullJourney ? computeTrendSeries(logsArr) : computeTrendSeries(logsArr).slice(-60);
+    const kgNow = currentWeightKg(profile);
+    const lowestKg7d = minOfLastNDays(logsArr, 'weightKg', 7);
+    const blob = await generateWeightJourneyShareCard({
+      name, digitalId, date: nowDate, series, wu, profile, kgNow, lowestKg7d,
+    });
+    blobs.push({ name: 'weight-journey.png', blob });
+  }
+
+  if (document.getElementById('assessChkPerformance').checked) {
+    const perfDefs = [['Sleep quality', 'sleep'], ['Stress', 'stress'], ['Fatigue', 'fatigue'], ['Hunger', 'hunger']];
+    const perfItems = perfDefs.map(([label, field]) => {
+      const val = avgOfLastNDays(logsArr, field, 7);
+      return { label, field, status: statusForLevel(field, val), statusLabel: labelForLevel(field, val), sparkline: last7DailyValues(field) };
+    });
+    const stepGoal = getEffectiveStepGoal(profile);
+    const calorieTargetForChart = getEffectiveCalorieTarget(profile) || 2000;
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      const entry = logsArr.find(l => l.date === iso);
+      days.push({
+        weekday: d.toLocaleDateString(undefined, { weekday: 'narrow' }),
+        stepsPct: entry && entry.steps != null ? (entry.steps / stepGoal) * 100 : 0,
+        calPct: entry && entry.calories != null ? (entry.calories / calorieTargetForChart) * 100 : 0,
+      });
+    }
+    const blob = await generateRecentPerformanceShareCard({ name, digitalId, date: nowDate, perfItems, days });
+    blobs.push({ name: 'recent-performance.png', blob });
+  }
+
+  if (document.getElementById('assessChkWorkout').checked) {
+    const trainDate = getActiveTrainingDate();
+    const exercisesForDate = (getLogs()[trainDate] && getLogs()[trainDate].exercises) || [];
+    const summary = computeWorkoutSummaryFromExercises(exercisesForDate, trainDate);
+    const blob = await generateWorkoutSummaryShareCard({
+      name, digitalId, dateTime: fmtDate(parseISO(trainDate)), summary,
+    });
+    blobs.push({ name: 'workout-summary.png', blob });
+  }
+
+  if (document.getElementById('assessChkOutdoor').checked) {
+    const summary = computeOutdoorActivitySummary(logsArr);
+    const blob = await generateOutdoorActivityShareCard({
+      name, digitalId, date: nowDate, summary, unit: distUnitForProfile(profile),
+    });
+    blobs.push({ name: 'outdoor-activity.png', blob });
+  }
+
+  if (document.getElementById('assessChkFuel').checked) {
+    const date = todayISO();
+    const entry = getLogs()[date] || {};
+    const calorieTarget = getEffectiveCalorieTarget(profile, date) || 0;
+    const caloriesNow = entry.calories ?? 0;
+    const proteinNow = entry.protein ?? 0;
+    const carbsNow = entry.carbs ?? 0;
+    const fatNow = entry.fat ?? 0;
+    const macros = [
+      { label: 'Protein', kcal: proteinNow * 4, color: '#33c8cc', pct: caloriesNow > 0 ? Math.round((proteinNow * 4 / caloriesNow) * 100) : 0 },
+      { label: 'Carbs', kcal: carbsNow * 4, color: '#8069d6', pct: caloriesNow > 0 ? Math.round((carbsNow * 4 / caloriesNow) * 100) : 0 },
+      { label: 'Fat', kcal: fatNow * 9, color: '#dba52c', pct: caloriesNow > 0 ? Math.round((fatNow * 9 / caloriesNow) * 100) : 0 },
+    ];
+    const blob = await generateFuelStatusShareCard({
+      name, digitalId, date: fmtDate(parseISO(date)), caloriesNow, calorieTarget, macros,
+    });
+    blobs.push({ name: 'daily-fuel-status.png', blob });
+  }
+
+  return blobs;
+}
+
+function initRequestAssessment() {
+  const overlay = document.getElementById('assessmentShareOverlay');
+  document.getElementById('btnRequestAssessment').addEventListener('click', () => {
+    document.getElementById('assessmentShareNote').textContent = '';
+    overlay.hidden = false;
+  });
+  document.getElementById('btnCloseAssessmentShare').addEventListener('click', () => { overlay.hidden = true; });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+
+  document.getElementById('btnAssessmentShareSubmit').addEventListener('click', async () => {
+    const note = document.getElementById('assessmentShareNote');
+    const btn = document.getElementById('btnAssessmentShareSubmit');
+    btn.disabled = true;
+    note.textContent = 'Preparing…';
+    try {
+      const blobs = await buildAssessmentBlobs();
+      if (!blobs.length) {
+        note.textContent = 'Check at least one item to share.';
+        btn.disabled = false;
+        return;
+      }
+      const ok = await shareMultipleViaWebShare({
+        title: 'Winfinity Tracker — Assessment',
+        text: '📋 My fitness assessment, tracked with Winfinity Tracker!',
+      }, blobs);
+      if (ok) { overlay.hidden = true; } else { note.textContent = 'Sharing isn\'t supported on this browser.'; }
+    } catch (e) {
+      note.textContent = 'Could not prepare assessment: ' + (e.message || 'try again');
+    }
+    btn.disabled = false;
   });
 }
 
@@ -5202,14 +5696,14 @@ function renderNutritionTargets() {
   emptyBox.hidden = true;
   statRows.forEach(el => el.style.display = '');
 
-  const calorieTarget = getEffectiveCalorieTarget(profile);
+  const date = document.getElementById('nutDate').value;
+  const calorieTarget = getEffectiveCalorieTarget(profile, date);
   const proteinTarget = round0((targets.protein[0] + targets.protein[1]) / 2);
   const fatTarget = round0((calorieTarget * 0.3) / 9);
   const carbTarget = Math.max(0, round0((calorieTarget - proteinTarget * 4 - fatTarget * 9) / 4));
   const fiberTarget = round0((calorieTarget / 1000) * 14);
   const sodiumTarget = 2300;
 
-  const date = document.getElementById('nutDate').value;
   const waterTarget = effectiveWaterTargetML(date);
   const entry = getLogs()[date] || {};
   const caloriesNow = entry.calories ?? 0;
