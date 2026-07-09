@@ -163,7 +163,12 @@
     <div class="chart-card">
       <div class="chart-card-head">
         <span class="chart-card-title">ENTITY WEIGHT JOURNEY</span>
-        <span class="chart-card-sub" id="chartRange"></span>
+        <div class="fuel-status-head-right">
+          <span class="chart-card-sub" id="chartRange"></span>
+          <button type="button" class="icon-btn glass-emboss" id="btnShareWeightJourney" aria-label="Share weight journey and goal progress">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
+          </button>
+        </div>
       </div>
       <div id="weightChart" class="weight-chart"></div>
       <div class="chart-legend" id="chartLegend"></div>
@@ -681,9 +686,18 @@
           <div class="chat-room-menu" id="chatRoomMenu" hidden>
             <button type="button" class="chat-room-menu-item" id="btnNewGroup">+ New group</button>
             <button type="button" class="chat-room-menu-item" id="btnInviteGroup" hidden>Invite people</button>
+            <button type="button" class="chat-room-menu-item" id="btnRoomMembers" hidden>Members</button>
             <button type="button" class="chat-room-menu-item" id="btnLeaveGroup" hidden>Leave</button>
             <button type="button" class="chat-room-menu-item chat-room-menu-item--danger" id="btnDeleteGroup" hidden>Delete group</button>
           </div>
+        </div>
+      </div>
+
+      <div class="chat-new-group" id="roomMembersPanel" hidden>
+        <p class="field-group-heading" style="margin:0 0 8px;">Members</p>
+        <div id="roomMembersList"></div>
+        <div class="btn-row">
+          <button type="button" class="btn" id="btnCloseRoomMembers">Close</button>
         </div>
       </div>
 
@@ -724,6 +738,15 @@
         <input type="text" id="lbChatInput" maxlength="280" placeholder="Transmit message…">
         <button type="button" class="btn btn--primary btn--sm" id="btnLbChatSend">➤</button>
       </div>
+    </div>
+
+    <div class="chat-user-menu" id="chatUserMenu" hidden>
+      <div id="chatUserMenuMain">
+        <p class="chat-user-menu-name" id="chatUserMenuName"></p>
+        <button type="button" class="chat-room-menu-item" id="btnChatUserDm">Send Direct Message</button>
+        <button type="button" class="chat-room-menu-item" id="btnChatUserInvite">Invite to Group Chat</button>
+      </div>
+      <div id="chatUserMenuGroups" hidden></div>
     </div>
 
     <footer class="app-footer">

@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.24';
+const APP_VERSION = 'WF_SYS_V.1.26';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1782,6 +1782,7 @@ function initWeightChartToggle() {
       renderDashboard();
     }
   });
+  document.getElementById('btnShareWeightJourney').addEventListener('click', shareWeightJourney);
 }
 
 /* ---- Goal progress bar ---- */
@@ -4817,6 +4818,200 @@ async function shareLeaderboardCard(containerId, title) {
   shareViaWebShare({ title: `Winfinity Tracker — ${title}`, text }, blob);
 }
 
+function drawShareWeightChart(ctx, x, y, w, h, series, wu) {
+  const padL = 34, padR = 8, padT = 6, padB = 18;
+  const plotW = w - padL - padR, plotH = h - padT - padB;
+  const displayVals = series.map(p => fromKg(p.actualKg, wu));
+  const trendVals = series.map(p => fromKg(p.trendKg, wu));
+  const allVals = displayVals.concat(trendVals);
+  let min = Math.min(...allVals), max = Math.max(...allVals);
+  if (min === max) { min -= 1; max += 1; }
+  const rangePad = (max - min) * 0.1;
+  min -= rangePad; max += rangePad;
+
+  const xFor = i => x + padL + (series.length === 1 ? plotW / 2 : (i / (series.length - 1)) * plotW);
+  const yFor = v => y + padT + plotH - ((v - min) / (max - min)) * plotH;
+
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  const gridCount = 4;
+  for (let g = 0; g <= gridCount; g++) {
+    const v = min + (g / gridCount) * (max - min);
+    const gy = yFor(v);
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x + padL, gy); ctx.lineTo(x + w - padR, gy); ctx.stroke();
+    ctx.textAlign = 'left'; ctx.fillStyle = '#7e8e95'; ctx.font = '9px monospace';
+    ctx.fillText(String(round2(v)), x, gy + 3);
+  }
+
+  [0, Math.floor((series.length - 1) / 2), series.length - 1].forEach(i => {
+    ctx.textAlign = i === 0 ? 'left' : i === series.length - 1 ? 'right' : 'center';
+    ctx.fillStyle = '#7e8e95'; ctx.font = '9px monospace';
+    ctx.fillText(fmtDate(series[i].dateObj), xFor(i), y + h - 4);
+  });
+
+  if (series.length > 1) {
+    ctx.beginPath();
+    trendVals.forEach((v, i) => { const px = xFor(i), py = yFor(v); if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); });
+    ctx.strokeStyle = '#8069d6'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  if (series.length > 1) {
+    ctx.beginPath();
+    displayVals.forEach((v, i) => { const px = xFor(i), py = yFor(v); if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); });
+    ctx.strokeStyle = '#2de2e6'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.shadowColor = '#2de2e6'; ctx.shadowBlur = 6;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  displayVals.forEach((v, i) => {
+    ctx.beginPath();
+    ctx.arc(xFor(i), yFor(v), series.length > 40 ? 2 : 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#2de2e6';
+    ctx.fill();
+  });
+  ctx.restore();
+}
+
+function drawShareGoalTrack(ctx, x, y, w, profile, kgNow, wu) {
+  const points = [
+    { label: 'Start', kg: profile.startWeightKg },
+    { label: 'Min goal', kg: profile.goalMinKg },
+    { label: 'Target', kg: profile.goalTargetKg },
+    { label: 'Dream', kg: profile.goalDreamKg },
+  ].filter(p => p.kg != null);
+  const allKg = points.map(p => p.kg).concat([kgNow]);
+  let min = Math.min(...allKg), max = Math.max(...allKg);
+  if (min === max) { min -= 1; max += 1; }
+  const range = max - min;
+  const pctFor = kg => (kg - min) / range;
+
+  const trackY = y + 26;
+  const trackH = 6;
+  const startPct = points.length ? pctFor(points[0].kg) : 0;
+  const nowPct = pctFor(kgNow);
+
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+
+  points.forEach(p => {
+    const px = x + pctFor(p.kg) * w;
+    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '11px monospace';
+    ctx.fillText(`${p.label}: ${round2(fromKg(p.kg, wu))}${wu}`, Math.min(Math.max(px, x + 40), x + w - 40), trackY - 12);
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(px, trackY + trackH + 2); ctx.lineTo(px, trackY + trackH + 10); ctx.stroke();
+  });
+
+  roundRectPath(ctx, x, trackY, w, trackH, trackH / 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.1)';
+  ctx.fill();
+
+  const fillX = x + Math.min(startPct, nowPct) * w;
+  const fillW = Math.abs(nowPct - startPct) * w;
+  const grad = ctx.createLinearGradient(fillX, 0, fillX + fillW, 0);
+  grad.addColorStop(0, '#8b6bf2'); grad.addColorStop(0.55, '#3f8ff0'); grad.addColorStop(1, '#2de2e6');
+  ctx.save();
+  roundRectPath(ctx, fillX, trackY, Math.max(fillW, 2), trackH, trackH / 2);
+  ctx.clip();
+  ctx.fillStyle = grad;
+  ctx.fillRect(fillX, trackY, Math.max(fillW, 2), trackH);
+  ctx.restore();
+
+  const nowX = x + nowPct * w;
+  ctx.textAlign = 'center'; ctx.fillStyle = '#2de2e6'; ctx.font = 'bold 13px monospace';
+  ctx.fillText(`Now: ${round2(fromKg(kgNow, wu))}${wu}`, Math.min(Math.max(nowX, x + 40), x + w - 40), trackY + 34);
+  ctx.restore();
+}
+
+async function generateWeightJourneyShareCard({ name, digitalId, date, series, wu, profile, kgNow }) {
+  const width = 600;
+  const headerH = 116;
+  const chartCardH = series.length ? 300 : 80;
+  const gap = 16;
+  const goalCardH = 130;
+  const footerH = 46;
+  const height = headerH + chartCardH + gap + goalCardH + footerH;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext('2d');
+
+  const bg = ctx.createLinearGradient(0, 0, width, height);
+  bg.addColorStop(0, '#171f24'); bg.addColorStop(1, '#0a0e12');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, width, height);
+  ctx.strokeStyle = 'rgba(51,200,204,0.4)'; ctx.lineWidth = 2;
+  ctx.strokeRect(8, 8, width - 16, height - 16);
+  ctx.textBaseline = 'alphabetic';
+
+  ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 20px sans-serif';
+  ctx.fillText(name || 'Operator', 32, 46);
+  ctx.textAlign = 'right'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 15px monospace';
+  ctx.fillText(digitalId || '', width - 32, 44);
+
+  ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px monospace';
+  ctx.fillText(date, width / 2, 74);
+
+  ctx.textAlign = 'left'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 22px sans-serif';
+  ctx.fillText('ENTITY WEIGHT JOURNEY', 32, 106);
+
+  let y = headerH;
+
+  // Weight journey card
+  roundRectPath(ctx, 24, y, width - 48, chartCardH, 12);
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.textAlign = 'right'; ctx.fillStyle = '#7e8e95'; ctx.font = '12px monospace';
+  ctx.fillText(`${series.length} entries`, width - 44, y + 26);
+
+  if (series.length) {
+    drawShareWeightChart(ctx, 44, y + 36, width - 88, 190, series, wu);
+    ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = '11px sans-serif';
+    ctx.fillText('— Actual weight', 44, y + chartCardH - 14);
+    ctx.fillStyle = '#7e8e95';
+    ctx.fillText('- - Trend (7-day avg)', 190, y + chartCardH - 14);
+  } else {
+    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px sans-serif';
+    ctx.fillText('No weight entries logged yet.', width / 2, y + chartCardH / 2 + 5);
+  }
+  y += chartCardH + gap;
+
+  // Goal progress card
+  roundRectPath(ctx, 24, y, width - 48, goalCardH, 12);
+  ctx.stroke();
+  ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 16px sans-serif';
+  ctx.fillText('Goal progress', 44, y + 30);
+
+  if (profile && kgNow != null && profile.goalTargetKg != null) {
+    drawShareGoalTrack(ctx, 64, y + 44, width - 176, profile, kgNow, wu);
+  } else {
+    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '13px sans-serif';
+    ctx.fillText('Set your weights in Bio to see progress.', width / 2, y + goalCardH / 2 + 10);
+  }
+
+  ctx.textAlign = 'center'; ctx.fillStyle = '#5a686e'; ctx.font = '14px monospace';
+  ctx.fillText('WINFINITY TRACKER', width / 2, height - 18);
+
+  return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
+}
+
+async function shareWeightJourney() {
+  const profile = getProfile();
+  const logsArr = sortedLogsArray();
+  const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
+  const series = weightChartFullJourney ? computeTrendSeries(logsArr) : computeTrendSeries(logsArr).slice(-60);
+  const kgNow = currentWeightKg(profile);
+  const blob = await generateWeightJourneyShareCard({
+    name: (profile && profile.name) || 'Operator',
+    digitalId: getOrCreatePublicId(),
+    date: fmtDate(new Date()),
+    series, wu, profile, kgNow,
+  });
+  shareViaWebShare({ title: 'Winfinity Tracker — Weight Journey', text: '📈 My weight journey & goal progress, tracked with Winfinity Tracker!' }, blob);
+}
+
 function initNutrition() {
   document.getElementById('nutDate').value = todayISO();
   document.getElementById('nutDate').addEventListener('change', e => {
@@ -5614,7 +5809,7 @@ try { chatLastRead = JSON.parse(localStorage.getItem('wft_chat_last_read')) || {
 
 async function refreshChatRooms() {
   const shareKey = localStorage.getItem('wft_lb_share_key');
-  if (!shareKey || !sbConfigured()) { renderChatRoomOptions([]); renderInvitesPopover([]); return; }
+  if (!shareKey || !sbConfigured()) { chatRoomMeta = {}; renderChatRoomOptions(); renderInvitesPopover([]); return; }
   try { await sb.rpc('cleanup_stale_solo_rooms'); } catch (e) { /* best effort, opportunistic */ }
   const { data, error } = await sb.from('chat_room_members')
     .select('status, room_id, chat_rooms(id, name, is_dm, created_by_key)')
@@ -5640,11 +5835,27 @@ async function refreshChatRooms() {
       name: r.chat_rooms.is_dm ? (otherNameByRoom[r.chat_rooms.id] || r.chat_rooms.name) : r.chat_rooms.name,
       isDm: r.chat_rooms.is_dm,
       createdByKey: r.chat_rooms.created_by_key,
+      joinedByMe: true,
     };
   });
 
+  // Admin gets every group (never DMs) added to the room list even if they
+  // never joined, so they can freely enter any group chat. Membership-only
+  // actions (Leave/Invite/Members) stay gated on actually being a member —
+  // see updateRoomActionButtons — this just makes the room selectable.
+  if (isAdminLoggedIn()) {
+    try {
+      const { data: allGroups } = await sb.from('chat_rooms').select('id, name, created_by_key').eq('is_dm', false);
+      (allGroups || []).forEach(g => {
+        if (!chatRoomMeta[g.id]) {
+          chatRoomMeta[g.id] = { name: g.name, isDm: false, createdByKey: g.created_by_key, joinedByMe: false };
+        }
+      });
+    } catch (e) { /* best effort */ }
+  }
+
   try { await checkUnreadMessages(dmRoomIds); } catch (e) { /* best effort — room list still renders without unread flags */ }
-  renderChatRoomOptions(joined);
+  renderChatRoomOptions();
   renderInvitesPopover(rows.filter(r => r.status === 'invited' && r.chat_rooms));
 }
 
@@ -5721,28 +5932,27 @@ function markRoomRead(roomId) {
 function updateRoomActionButtons(roomId) {
   const meta = roomId ? chatRoomMeta[roomId] : null;
   const shareKey = localStorage.getItem('wft_lb_share_key');
-  document.getElementById('btnLeaveGroup').hidden = !roomId;
+  document.getElementById('btnLeaveGroup').hidden = !(meta && meta.joinedByMe);
   document.getElementById('btnDeleteGroup').hidden = !(meta && !meta.isDm && meta.createdByKey === shareKey);
   document.getElementById('btnInviteGroup').hidden = !(meta && !meta.isDm);
+  document.getElementById('btnRoomMembers').hidden = !(meta && !meta.isDm);
 }
 
-function renderChatRoomOptions(joinedRows) {
+function renderChatRoomOptions() {
   const select = document.getElementById('chatRoomSelect');
   const prevValue = select.value;
   select.innerHTML = '<option value="">🌐 Public Chat</option>';
-  joinedRows
-    .slice()
-    .sort((a, b) => chatRoomMeta[a.chat_rooms.id].name.localeCompare(chatRoomMeta[b.chat_rooms.id].name))
-    .forEach(r => {
-      const meta = chatRoomMeta[r.chat_rooms.id];
+  Object.entries(chatRoomMeta)
+    .sort((a, b) => a[1].name.localeCompare(b[1].name))
+    .forEach(([id, meta]) => {
       const opt = document.createElement('option');
-      opt.value = r.chat_rooms.id;
-      const icon = meta.isDm ? '💬' : '👥';
+      opt.value = id;
+      const icon = meta.isDm ? '💬' : (meta.joinedByMe ? '👥' : '🛡️');
       const label = meta.isDm ? `DM: ${meta.name}` : meta.name;
       opt.textContent = `${icon} ${label}${meta.unread ? ' 🔴' : ''}`;
       select.appendChild(opt);
     });
-  const stillJoined = currentChatRoomId && joinedRows.some(r => r.chat_rooms.id === currentChatRoomId);
+  const stillJoined = currentChatRoomId && !!chatRoomMeta[currentChatRoomId];
   select.value = stillJoined ? currentChatRoomId : '';
   if (select.value !== prevValue && !stillJoined) {
     currentChatRoomId = null;
@@ -5809,7 +6019,7 @@ function renderChatMessages(messages) {
     list.appendChild(row);
   });
   list.querySelectorAll('[data-dm-name]').forEach(el => {
-    el.addEventListener('click', () => startDM(el.dataset.dmName));
+    el.addEventListener('click', e => openChatUserMenu(el.dataset.dmName, e.clientX, e.clientY));
   });
   list.scrollTop = list.scrollHeight;
 }
@@ -5834,6 +6044,113 @@ async function startDM(otherName) {
     const messages = await fetchChatMessages();
     renderChatMessages(messages);
   } catch (e) { showRestToast('Could not start DM: ' + (e.message || 'check your connection')); }
+}
+
+/* ---- Tapping a name in chat: DM or invite to a group I created ---- */
+let chatUserMenuTarget = null;
+
+function closeChatUserMenu() {
+  document.getElementById('chatUserMenu').hidden = true;
+  document.getElementById('chatUserMenuGroups').hidden = true;
+  document.getElementById('chatUserMenuMain').hidden = false;
+}
+
+function openChatUserMenu(name, x, y) {
+  chatUserMenuTarget = name;
+  const menu = document.getElementById('chatUserMenu');
+  document.getElementById('chatUserMenuName').textContent = name;
+  document.getElementById('chatUserMenuGroups').hidden = true;
+  document.getElementById('chatUserMenuMain').hidden = false;
+  menu.hidden = false;
+  const menuWidth = 220;
+  menu.style.left = Math.max(8, Math.min(x, window.innerWidth - menuWidth - 12)) + 'px';
+  menu.style.top = Math.max(8, Math.min(y, window.innerHeight - 160)) + 'px';
+}
+
+function renderChatUserMenuGroups() {
+  const shareKey = localStorage.getItem('wft_lb_share_key');
+  const myGroups = Object.entries(chatRoomMeta).filter(([id, m]) => !m.isDm && m.createdByKey === shareKey);
+  const container = document.getElementById('chatUserMenuGroups');
+  container.innerHTML = myGroups.length
+    ? myGroups.map(([id, m]) => `<button type="button" class="chat-room-menu-item" data-invite-room="${id}">${escapeHtml(m.name)}</button>`).join('')
+    : '<p class="empty-note">You haven\'t created a group yet.</p>';
+  container.querySelectorAll('[data-invite-room]').forEach(btn => {
+    btn.addEventListener('click', () => inviteUserToRoom(chatUserMenuTarget, btn.dataset.inviteRoom));
+  });
+}
+
+async function inviteUserToRoom(name, roomId) {
+  closeChatUserMenu();
+  if (!sbConfigured()) return;
+  try {
+    const { data: row, error: lookupErr } = await sb.from('leaderboard').select('public_id').eq('code_name', name).maybeSingle();
+    if (lookupErr) throw lookupErr;
+    if (!row || !row.public_id) { showRestToast(`Couldn't find a Digital ID for "${name}".`); return; }
+    const shareKey = getOrCreateShareKey();
+    const roomName = chatRoomMeta[roomId] ? chatRoomMeta[roomId].name : 'the group';
+    const { error } = await sb.rpc('invite_to_chat_room', {
+      p_room_id: roomId, p_inviter_key: shareKey, p_invitee_ids: [row.public_id],
+    });
+    if (error) throw error;
+    showRestToast(`Invited ${name} to "${roomName}".`);
+  } catch (e) { showRestToast('Could not send invite: ' + (e.message || 'check your connection')); }
+}
+
+function initChatUserMenu() {
+  document.getElementById('btnChatUserDm').addEventListener('click', () => {
+    const name = chatUserMenuTarget;
+    closeChatUserMenu();
+    startDM(name);
+  });
+  document.getElementById('btnChatUserInvite').addEventListener('click', () => {
+    document.getElementById('chatUserMenuMain').hidden = true;
+    renderChatUserMenuGroups();
+    document.getElementById('chatUserMenuGroups').hidden = false;
+  });
+  document.addEventListener('click', e => {
+    const menu = document.getElementById('chatUserMenu');
+    if (!menu.hidden && !menu.contains(e.target) && !e.target.closest('[data-dm-name]')) closeChatUserMenu();
+  });
+}
+
+/* ---- Group members panel (creator can kick) ---- */
+async function renderRoomMembers() {
+  const list = document.getElementById('roomMembersList');
+  if (!currentChatRoomId || !sbConfigured()) { list.innerHTML = ''; return; }
+  const shareKey = localStorage.getItem('wft_lb_share_key');
+  const meta = chatRoomMeta[currentChatRoomId];
+  const isCreator = !!(meta && meta.createdByKey === shareKey);
+  list.innerHTML = '<p class="empty-note">Loading…</p>';
+  try {
+    const { data, error } = await sb.from('chat_room_members')
+      .select('share_key, code_name')
+      .eq('room_id', currentChatRoomId)
+      .eq('status', 'joined');
+    if (error) throw error;
+    const members = data || [];
+    list.innerHTML = members.length
+      ? members.map(m => `
+        <div class="chat-invite-row">
+          <span>${escapeHtml(m.code_name)}${m.share_key === shareKey ? ' (you)' : ''}</span>
+          ${isCreator && m.share_key !== shareKey ? `<button type="button" class="btn" data-kick-key="${m.share_key}">Kick</button>` : ''}
+        </div>
+      `).join('')
+      : '<p class="empty-note">No members yet.</p>';
+    list.querySelectorAll('[data-kick-key]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Remove this member from the group?')) return;
+        btn.disabled = true;
+        try {
+          const { error: kickErr } = await sb.rpc('kick_chat_room_member', {
+            p_room_id: currentChatRoomId, p_requester_key: shareKey, p_target_share_key: btn.dataset.kickKey,
+          });
+          if (kickErr) throw kickErr;
+          showRestToast('Member removed.');
+          renderRoomMembers();
+        } catch (e) { showRestToast('Could not remove member: ' + (e.message || '')); btn.disabled = false; }
+      });
+    });
+  } catch (e) { list.innerHTML = '<p class="empty-note">Could not load members.</p>'; }
 }
 
 async function updateLeaderboard() {
@@ -5917,6 +6234,7 @@ function initAnnouncementWidget() {
     adminSession = { digitalId: null, password: null };
     menu.hidden = true;
     refreshAnnouncementMenuState();
+    refreshChatRooms();
     showRestToast('Logged out of admin.');
   });
   document.getElementById('btnAdminPost').addEventListener('click', () => {
@@ -5944,6 +6262,7 @@ function initAnnouncementWidget() {
         adminSession = { digitalId: id, password: pw };
         loginOverlay.hidden = true;
         refreshAnnouncementMenuState();
+        refreshChatRooms();
         showRestToast('Admin unlocked.');
       } else {
         noteEl.textContent = 'Incorrect Digital ID or password.';
@@ -6099,6 +6418,15 @@ function initGroupChat() {
     pendingInviteToGroupIds = [];
     renderInviteToGroupChips();
   });
+
+  const membersPanel = document.getElementById('roomMembersPanel');
+  document.getElementById('btnRoomMembers').addEventListener('click', () => {
+    membersPanel.hidden = !membersPanel.hidden;
+    if (!membersPanel.hidden) renderRoomMembers();
+  });
+  document.getElementById('btnCloseRoomMembers').addEventListener('click', () => { membersPanel.hidden = true; });
+
+  initChatUserMenu();
 
   const addInviteeToGroup = () => {
     const input = document.getElementById('inviteGroupInput');

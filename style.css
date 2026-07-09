@@ -1587,6 +1587,28 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .chat-new-group[hidden] { display: none; }
 .chat-new-group .input-unit-wrap { display: flex; gap: 6px; }
 .chat-new-group .input-unit-wrap input { flex: 1; }
+.chat-user-menu {
+  position: fixed;
+  z-index: 200;
+  width: 220px;
+  max-width: 80vw;
+  max-height: 300px;
+  overflow-y: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 6px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+.chat-user-menu[hidden] { display: none; }
+.chat-user-menu-name {
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin: 2px 4px 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-soft);
+}
 .new-group-invite-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 .invite-chip {
   display: flex;
