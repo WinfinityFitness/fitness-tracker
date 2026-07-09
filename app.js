@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.55';
+const APP_VERSION = 'WF_SYS_V.1.56';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -553,7 +553,7 @@ function initTabs() {
       document.querySelectorAll('.tab-panel').forEach(p => p.hidden = p.dataset.tab !== target);
       btns.forEach(b => b.classList.toggle('is-active', b === btn));
       window.scrollTo(0, 0);
-      if (target === 'status') { loadCheckinForm(); loadQuickLog(); renderDashboard(); }
+      if (target === 'status') { loadCheckinForm(); renderDashboard(); }
       if (target === 'training') {
         loadTrainingForDate(document.getElementById('trainDate').value);
         renderTrainingStats();
@@ -1394,7 +1394,7 @@ function initBioLog() {
     if (profile) renderComputedTargets(profile);
     renderSleepBarChart();
     renderWaterRetentionOrb();
-    if (date === todayISO()) { loadQuickLog(); renderDashboard(); }
+    if (date === todayISO()) { renderDashboard(); }
     updateTabDots();
   });
 
@@ -1531,41 +1531,163 @@ function loadCheckinForm() {
 }
 
 /* ---------------------------------------------------------------- */
-/* Status: quick log (morning weight + sleep quality)                  */
+/* Status: quick log (Start Day / End Day / Weekend floating logs)     */
 /* ---------------------------------------------------------------- */
-function loadQuickLog() {
+function openStartDayLog() {
   const profile = getProfile();
   const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
   const e = getLogs()[todayISO()] || {};
-  document.getElementById('statusWeight').value = e.weightKg != null ? round2(fromKg(e.weightKg, wu)) : '';
-  document.getElementById('statusWeightUnitLabel').textContent = wu;
-  document.getElementById('statusSleep').value = e.sleep ?? 3;
-  document.getElementById('statusSleepOut').textContent = e.sleep ?? 3;
-  document.getElementById('statusSteps').value = e.steps ?? '';
+  document.getElementById('sdlWeight').value = e.weightKg != null ? round2(fromKg(e.weightKg, wu)) : '';
+  document.getElementById('sdlWeightUnitLabel').textContent = wu;
+  document.getElementById('sdlSleep').value = e.sleep ?? 3;
+  document.getElementById('sdlSleepOut').textContent = e.sleep ?? 3;
+  document.getElementById('sdlWater250').checked = false;
+  document.getElementById('sdlSaveNote').textContent = '';
+  document.getElementById('btnShareFromStartDayLog').hidden = true;
+  document.getElementById('startDayLogOverlay').hidden = false;
 }
 
-function initQuickLog() {
-  const sleepInput = document.getElementById('statusSleep');
-  const sleepOut = document.getElementById('statusSleepOut');
-  sleepInput.addEventListener('input', () => { sleepOut.textContent = sleepInput.value; });
+function saveStartDayLog() {
+  const profile = getProfile();
+  const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
+  const date = todayISO();
+  const weightRaw = parseFloat(document.getElementById('sdlWeight').value);
+  const partial = {
+    weightKg: isNaN(weightRaw) ? null : toKg(weightRaw, wu),
+    sleep: parseInt(document.getElementById('sdlSleep').value, 10),
+  };
+  if (document.getElementById('sdlWater250').checked) {
+    const current = getLogs()[date] || {};
+    partial.water = (current.water || 0) + WATER_GLASS_ML;
+  }
+  updateLogFields(date, partial);
+  document.getElementById('sdlWater250').checked = false;
+  document.getElementById('sdlSaveNote').textContent = 'Saved.';
+  document.getElementById('btnShareFromStartDayLog').hidden = false;
+  renderDashboard();
+  if (profile) renderComputedTargets(profile);
+  renderSleepBarChart();
+  refreshFuelWaterViews(date);
+  renderNutritionTargets();
+  renderNutritionAverages();
+  if (document.getElementById('bioDate').value === date) loadBioForDate(date);
+  updateTabDots();
+}
 
-  document.getElementById('btnSaveQuickLog').addEventListener('click', () => {
-    const profile = getProfile();
-    const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
-    const date = todayISO();
-    const weightRaw = parseFloat(document.getElementById('statusWeight').value);
-    updateLogFields(date, {
-      weightKg: isNaN(weightRaw) ? null : toKg(weightRaw, wu),
-      sleep: parseInt(sleepInput.value, 10),
-      steps: parseIntOrNull(document.getElementById('statusSteps').value),
-    });
-    document.getElementById('quickLogSaveNote').textContent = 'Saved.';
-    setTimeout(() => { document.getElementById('quickLogSaveNote').textContent = ''; }, 2000);
-    renderDashboard();
-    if (profile) renderComputedTargets(profile);
-    renderSleepBarChart();
-    if (document.getElementById('bioDate').value === date) loadBioForDate(date);
-    updateTabDots();
+function openEndDayLog() {
+  const profile = getProfile();
+  const date = todayISO();
+  const e = getLogs()[date] || {};
+  document.getElementById('edlSteps').value = e.steps ?? '';
+  document.getElementById('edlWorkoutDone').checked = !!e.workoutDone;
+  document.getElementById('edlFatigue').value = e.fatigue ?? 3;
+  document.getElementById('edlFatigueOut').textContent = e.fatigue ?? 3;
+  document.getElementById('edlStress').value = e.stress ?? 3;
+  document.getElementById('edlStressOut').textContent = e.stress ?? 3;
+  document.getElementById('edlHunger').value = e.hunger ?? 3;
+  document.getElementById('edlHungerOut').textContent = e.hunger ?? 3;
+
+  const calorieTarget = profile ? getEffectiveCalorieTarget(profile, date) : null;
+  const effectiveCalorieTarget = calorieTarget != null
+    ? Math.max(1, calorieTarget + getCalorieCarryover(date, profile))
+    : null;
+  document.getElementById('edlCaloriesNow').textContent = e.calories ?? 0;
+  document.getElementById('edlCaloriesTarget').textContent = effectiveCalorieTarget != null ? effectiveCalorieTarget : '–';
+
+  const kg = profile ? currentWeightKg(profile) : null;
+  const targets = (profile && kg) ? computeTargets(profile, kg) : null;
+  const proteinTarget = targets ? round0((targets.protein[0] + targets.protein[1]) / 2) : null;
+  document.getElementById('edlProteinNow').textContent = e.protein ?? 0;
+  document.getElementById('edlProteinTarget').textContent = proteinTarget != null ? proteinTarget : '–';
+
+  document.getElementById('edlSaveNote').textContent = '';
+  document.getElementById('btnShareFromEndDayLog').hidden = true;
+  document.getElementById('endDayLogOverlay').hidden = false;
+}
+
+function saveEndDayLog() {
+  const profile = getProfile();
+  const date = todayISO();
+  updateLogFields(date, {
+    steps: parseIntOrNull(document.getElementById('edlSteps').value),
+    workoutDone: document.getElementById('edlWorkoutDone').checked,
+    fatigue: parseInt(document.getElementById('edlFatigue').value, 10),
+    stress: parseInt(document.getElementById('edlStress').value, 10),
+    hunger: parseInt(document.getElementById('edlHunger').value, 10),
+  });
+  document.getElementById('edlSaveNote').textContent = 'Saved.';
+  document.getElementById('btnShareFromEndDayLog').hidden = false;
+  renderDashboard();
+  if (profile) renderComputedTargets(profile);
+  renderSleepBarChart();
+  renderWaterRetentionOrb();
+  if (document.getElementById('bioDate').value === date) loadBioForDate(date);
+  updateTabDots();
+}
+
+function openWeekendLog() {
+  const date = todayISO();
+  const r = getReviews()[date] || {};
+  document.getElementById('wlDate').value = date;
+  document.getElementById('wlAdjustments').value = r.adjustments || '';
+  document.getElementById('wlWins').value = r.wins || '';
+  document.getElementById('wlImprovements').value = r.improvements || '';
+  document.querySelectorAll('.wlFocus').forEach(c => { c.checked = (r.focus || []).includes(c.value); });
+  document.getElementById('wlOther').value = r.other || '';
+  document.getElementById('wlSaveNote').textContent = '';
+  document.getElementById('btnShareFromWeekendLog').hidden = true;
+  document.getElementById('weekendLogOverlay').hidden = false;
+}
+
+function saveWeekendLog() {
+  const date = document.getElementById('wlDate').value || todayISO();
+  const reviews = getReviews();
+  const focus = Array.from(document.querySelectorAll('.wlFocus')).filter(c => c.checked).map(c => c.value);
+  reviews[date] = {
+    date,
+    adjustments: document.getElementById('wlAdjustments').value,
+    wins: document.getElementById('wlWins').value,
+    improvements: document.getElementById('wlImprovements').value,
+    focus,
+    other: document.getElementById('wlOther').value,
+  };
+  saveReviews(reviews);
+  document.getElementById('wlSaveNote').textContent = 'Saved review for week ending ' + date;
+  document.getElementById('btnShareFromWeekendLog').hidden = false;
+  renderDashboard();
+  updateTabDots();
+}
+
+function initQuickLogLaunchers() {
+  document.getElementById('btnOpenStartDayLog').addEventListener('click', openStartDayLog);
+  document.getElementById('btnCloseStartDayLog').addEventListener('click', () => { document.getElementById('startDayLogOverlay').hidden = true; });
+  document.getElementById('startDayLogOverlay').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.hidden = true; });
+  document.getElementById('sdlSleep').addEventListener('input', e => { document.getElementById('sdlSleepOut').textContent = e.target.value; });
+  document.getElementById('btnSaveStartDayLog').addEventListener('click', saveStartDayLog);
+  document.getElementById('btnShareFromStartDayLog').addEventListener('click', () => {
+    document.getElementById('startDayLogOverlay').hidden = true;
+    openAssessmentOverlay();
+  });
+
+  document.getElementById('btnOpenEndDayLog').addEventListener('click', openEndDayLog);
+  document.getElementById('btnCloseEndDayLog').addEventListener('click', () => { document.getElementById('endDayLogOverlay').hidden = true; });
+  document.getElementById('endDayLogOverlay').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.hidden = true; });
+  ['edlFatigue', 'edlStress', 'edlHunger'].forEach(id => {
+    document.getElementById(id).addEventListener('input', e => { document.getElementById(id + 'Out').textContent = e.target.value; });
+  });
+  document.getElementById('btnSaveEndDayLog').addEventListener('click', saveEndDayLog);
+  document.getElementById('btnShareFromEndDayLog').addEventListener('click', () => {
+    document.getElementById('endDayLogOverlay').hidden = true;
+    openAssessmentOverlay();
+  });
+
+  document.getElementById('btnOpenWeekendLog').addEventListener('click', openWeekendLog);
+  document.getElementById('btnCloseWeekendLog').addEventListener('click', () => { document.getElementById('weekendLogOverlay').hidden = true; });
+  document.getElementById('weekendLogOverlay').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.hidden = true; });
+  document.getElementById('btnSaveWeekendLog').addEventListener('click', saveWeekendLog);
+  document.getElementById('btnShareFromWeekendLog').addEventListener('click', () => {
+    document.getElementById('weekendLogOverlay').hidden = true;
+    openAssessmentOverlay();
   });
 }
 
@@ -5875,12 +5997,14 @@ async function buildAssessmentBlobs() {
   return Promise.all(jobs);
 }
 
+function openAssessmentOverlay() {
+  document.getElementById('assessmentShareNote').textContent = '';
+  document.getElementById('assessmentShareOverlay').hidden = false;
+}
+
 function initRequestAssessment() {
   const overlay = document.getElementById('assessmentShareOverlay');
-  document.getElementById('btnRequestAssessment').addEventListener('click', () => {
-    document.getElementById('assessmentShareNote').textContent = '';
-    overlay.hidden = false;
-  });
+  document.getElementById('btnRequestAssessment').addEventListener('click', openAssessmentOverlay);
   document.getElementById('btnCloseAssessmentShare').addEventListener('click', () => { overlay.hidden = true; });
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
 
@@ -7675,7 +7799,7 @@ safeInit(initWeatherWidget, 'initWeatherWidget');
 safeInit(initWeatherLocationPicker, 'initWeatherLocationPicker');
 safeInit(initSetupForm, 'initSetupForm');
 safeInit(initCheckin, 'initCheckin');
-safeInit(initQuickLog, 'initQuickLog');
+safeInit(initQuickLogLaunchers, 'initQuickLogLaunchers');
 safeInit(initMeasurements, 'initMeasurements');
 safeInit(initTraining, 'initTraining');
 safeInit(initCardioTracker, 'initCardioTracker');
@@ -7694,7 +7818,6 @@ safeInit(initLeaderboard, 'initLeaderboard');
 safeInit(initAnnouncementWidget, 'initAnnouncementWidget');
 safeInit(loadSetupForm, 'loadSetupForm');
 safeInit(loadCheckinForm, 'loadCheckinForm');
-safeInit(loadQuickLog, 'loadQuickLog');
 safeInit(() => { document.getElementById('sysVersion').textContent = APP_VERSION; }, 'sysVersion');
 safeInit(renderDashboard, 'renderDashboard');
 safeInit(updateTabDots, 'updateTabDots');

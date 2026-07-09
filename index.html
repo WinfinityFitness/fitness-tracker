@@ -113,22 +113,20 @@
     <h2 class="section-title">Quick log</h2>
     <div class="chart-card">
       <p class="mod-tag">MOD_QUICK_05</p>
-      <label class="field">
-        <span>Morning weight</span>
-        <div class="input-unit-wrap"><input type="number" step="0.01" id="statusWeight" placeholder="e.g. 79.5"><span class="input-unit" id="statusWeightUnitLabel">kg / lbs</span></div>
-      </label>
-      <label class="field">
-        <span>Sleep quality</span>
-        <input type="range" id="statusSleep" min="1" max="5" step="1" value="3">
-        <output id="statusSleepOut">3</output>
-        <div class="slider-endpoints"><span>Restless</span><span>Optimal</span></div>
-      </label>
-      <label class="field">
-        <span>Daily steps</span>
-        <div class="input-unit-wrap"><input type="number" id="statusSteps" placeholder="e.g. 8000"><span class="input-unit">walk</span></div>
-      </label>
-      <button type="button" class="btn btn--primary" id="btnSaveQuickLog">Save</button>
-      <p class="save-note" id="quickLogSaveNote"></p>
+      <div class="quick-log-btn-row">
+        <button type="button" class="btn quick-log-btn" id="btnOpenStartDayLog">
+          <span class="quick-log-btn-icon">🌅</span>
+          <span>Start Day Log</span>
+        </button>
+        <button type="button" class="btn quick-log-btn" id="btnOpenEndDayLog">
+          <span class="quick-log-btn-icon">🌙</span>
+          <span>End Day Log</span>
+        </button>
+        <button type="button" class="btn quick-log-btn" id="btnOpenWeekendLog">
+          <span class="quick-log-btn-icon">🗓️</span>
+          <span>Weekend Log</span>
+        </button>
+      </div>
     </div>
 
     <h2 class="section-title">Weight change (trend weight)</h2>
@@ -1968,6 +1966,110 @@
     </div>
     <button type="button" class="btn btn--primary" id="btnAssessmentShareSubmit" style="width:100%;margin-top:10px;">Share</button>
     <p class="save-note" id="assessmentShareNote"></p>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="startDayLogOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Start Day Log</h2>
+      <button class="sheet-close" id="btnCloseStartDayLog">✕</button>
+    </div>
+    <label class="field">
+      <span>Morning weight</span>
+      <div class="input-unit-wrap"><input type="number" step="0.01" id="sdlWeight" placeholder="e.g. 79.5"><span class="input-unit" id="sdlWeightUnitLabel">kg / lbs</span></div>
+    </label>
+    <label class="field">
+      <span>Sleep quality</span>
+      <input type="range" id="sdlSleep" min="1" max="5" step="1" value="3">
+      <output id="sdlSleepOut">3</output>
+      <div class="slider-endpoints"><span>Restless</span><span>Optimal</span></div>
+    </label>
+    <label class="field field--checkbox"><input type="checkbox" id="sdlWater250"><span>Log 250 mL water</span></label>
+    <button type="button" class="btn btn--primary" id="btnSaveStartDayLog" style="width:100%;margin-top:10px;">Confirm &amp; Save</button>
+    <p class="save-note" id="sdlSaveNote"></p>
+    <button type="button" class="btn share-result-btn" id="btnShareFromStartDayLog" hidden>Share</button>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="endDayLogOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>End Day Log</h2>
+      <button class="sheet-close" id="btnCloseEndDayLog">✕</button>
+    </div>
+    <label class="field">
+      <span>Daily steps</span>
+      <div class="input-unit-wrap"><input type="number" id="edlSteps" placeholder="e.g. 8000"><span class="input-unit">walk</span></div>
+    </label>
+    <div class="gradient-stat-row-head"><span>Calories</span><span><strong id="edlCaloriesNow">0</strong> <span>/ <span id="edlCaloriesTarget">–</span> kcal</span></span></div>
+    <div class="gradient-stat-row-head" style="margin-top:6px;"><span>Protein</span><span><strong id="edlProteinNow">0</strong> <span>/ <span id="edlProteinTarget">–</span> g</span></span></div>
+    <label class="field field--checkbox" style="margin-top:12px;"><input type="checkbox" id="edlWorkoutDone"><span>Day workout done</span></label>
+    <label class="field">
+      <span>Fatigue</span>
+      <input type="range" id="edlFatigue" min="1" max="5" step="1" value="3">
+      <output id="edlFatigueOut">3</output>
+      <div class="slider-endpoints"><span>Energized</span><span>Exhausted</span></div>
+    </label>
+    <label class="field">
+      <span>Stress</span>
+      <input type="range" id="edlStress" min="1" max="5" step="1" value="3">
+      <output id="edlStressOut">3</output>
+      <div class="slider-endpoints"><span>Zen</span><span>Critical</span></div>
+    </label>
+    <label class="field">
+      <span>Hunger</span>
+      <input type="range" id="edlHunger" min="1" max="5" step="1" value="3">
+      <output id="edlHungerOut">3</output>
+      <div class="slider-endpoints"><span>Satiated</span><span>Famine</span></div>
+    </label>
+    <button type="button" class="btn btn--primary" id="btnSaveEndDayLog" style="width:100%;margin-top:10px;">Confirm &amp; Save</button>
+    <p class="save-note" id="edlSaveNote"></p>
+    <button type="button" class="btn share-result-btn" id="btnShareFromEndDayLog" hidden>Share</button>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="weekendLogOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Weekend Log — Weekly Review</h2>
+      <button class="sheet-close" id="btnCloseWeekendLog">✕</button>
+    </div>
+    <label class="field">
+      <span>Week ending</span>
+      <input type="date" id="wlDate" class="date-picker-trigger" readonly>
+    </label>
+    <label class="field">
+      <span>Adjustments made to keep progress on track</span>
+      <textarea id="wlAdjustments" rows="2"></textarea>
+    </label>
+    <label class="field">
+      <span>Wins this week</span>
+      <textarea id="wlWins" rows="2"></textarea>
+    </label>
+    <label class="field">
+      <span>Improvements this week</span>
+      <textarea id="wlImprovements" rows="2"></textarea>
+    </label>
+    <fieldset class="field-group">
+      <p class="field-group-heading" style="font-size:0.8rem;">Focus for Next Week (pick 1-2)</p>
+      <label class="field field--checkbox"><input type="checkbox" class="wlFocus" value="consistency"><span>Be more consistent with logging</span></label>
+      <label class="field field--checkbox"><input type="checkbox" class="wlFocus" value="accuracy"><span>Be more accurate measuring food</span></label>
+      <label class="field field--checkbox"><input type="checkbox" class="wlFocus" value="calorieTarget"><span>Do better hitting calorie target</span></label>
+      <label class="field field--checkbox"><input type="checkbox" class="wlFocus" value="stepTarget"><span>Hit step target</span></label>
+      <label class="field field--checkbox"><input type="checkbox" class="wlFocus" value="workoutTarget"><span>Hit workout target</span></label>
+      <label class="field field--checkbox"><input type="checkbox" class="wlFocus" value="other"><span>Other (detail below)</span></label>
+    </fieldset>
+    <label class="field">
+      <span>Other changes for next week</span>
+      <textarea id="wlOther" rows="2"></textarea>
+    </label>
+    <button type="button" class="btn btn--primary" id="btnSaveWeekendLog" style="width:100%;margin-top:10px;">Confirm &amp; Save</button>
+    <p class="save-note" id="wlSaveNote"></p>
+    <button type="button" class="btn share-result-btn" id="btnShareFromWeekendLog" hidden>Share</button>
   </div>
 </div>
 

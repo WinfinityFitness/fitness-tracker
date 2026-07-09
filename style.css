@@ -836,6 +836,19 @@ button.mission-log-day:hover { border-color: var(--cyan); }
 .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
 .btn-row .btn { flex: 1; min-width: 140px; }
 
+.quick-log-btn-row { display: flex; gap: 8px; }
+.quick-log-btn {
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+  padding: 14px 4px 12px;
+  font-size: 0.66rem;
+  line-height: 1.2;
+  white-space: normal;
+}
+.quick-log-btn-icon { font-size: 1.3rem; line-height: 1; }
+
 .save-note { font-family: var(--font-mono); font-size: 0.78rem; color: var(--good); min-height: 1.1em; text-align: center; }
 .hint { font-size: 0.8rem; color: var(--text-muted); margin: 8px 0 4px; line-height: 1.4; }
 .hint--accent { color: var(--cyan); background: var(--surface-2); border: 1px solid var(--cyan-dim); border-radius: 5px; padding: 8px 10px; }
