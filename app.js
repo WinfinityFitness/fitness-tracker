@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.49';
+const APP_VERSION = 'WF_SYS_V.1.50';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -6858,11 +6858,17 @@ function renderInvitesPopover(invitedRows) {
       // actually changed — a plain update() reports "success" with zero
       // error even if the filter matched nothing, which would otherwise
       // look exactly like a stuck/unresponsive button.
+      const roomId = btn.dataset.acceptRoom;
       const { data, error } = await sb.from('chat_room_members')
-        .update({ status: 'joined' }).eq('room_id', btn.dataset.acceptRoom).eq('share_key', shareKey).select();
+        .update({ status: 'joined' }).eq('room_id', roomId).eq('share_key', shareKey).select();
       if (error) { showRestToast('Could not accept invite: ' + error.message); btn.disabled = false; return; }
       if (!data || !data.length) {
-        showRestToast('Could not accept — no matching invite found (share_key: ' + (shareKey ? shareKey.slice(0, 8) : 'none') + '…). Try Refresh first.');
+        // Diagnostic: is there a row for this room at all (any share_key/status)?
+        const { data: anyRows } = await sb.from('chat_room_members').select('share_key, status').eq('room_id', roomId);
+        const detail = (anyRows && anyRows.length)
+          ? `room has ${anyRows.length} member row(s), none for this share_key`
+          : 'room has zero member rows';
+        showRestToast(`Accept failed — room ${roomId.slice(0, 8)}…, key ${(shareKey || 'none').slice(0, 8)}…: ${detail}.`);
         btn.disabled = false;
         return;
       }
