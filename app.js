@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.53';
+const APP_VERSION = 'WF_SYS_V.1.54';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -6811,7 +6811,6 @@ function updateRoomActionButtons(roomId) {
 
 function renderChatRoomOptions() {
   const select = document.getElementById('chatRoomSelect');
-  const prevValue = select.value;
   select.innerHTML = '<option value="">🌐 Public Chat</option>';
   Object.entries(chatRoomMeta)
     .sort((a, b) => a[1].name.localeCompare(b[1].name))
@@ -6825,7 +6824,15 @@ function renderChatRoomOptions() {
     });
   const stillJoined = currentChatRoomId && !!chatRoomMeta[currentChatRoomId];
   select.value = stillJoined ? currentChatRoomId : '';
-  if (select.value !== prevValue && !stillJoined) {
+  // Always resync the underlying JS variable to whatever the dropdown can
+  // actually show — not just when the dropdown's *visible* value changes.
+  // If a brand-new room wasn't found in this refresh (the exact bug this
+  // was catching), the <select> falls back to the already-selected "Public
+  // Chat" option, so its value never visibly changes even though
+  // currentChatRoomId is still pointing at a room nothing can render —
+  // silently redirecting every later message fetch to that dead room
+  // while the UI still reads "Public Chat".
+  if (!stillJoined) {
     currentChatRoomId = null;
     localStorage.removeItem('wft_chat_room');
   }
