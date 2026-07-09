@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.18';
+const APP_VERSION = 'WF_SYS_V.1.21';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -3137,7 +3137,15 @@ function computeWorkoutSummary(date) {
     const bestOneRM = completed.reduce((max, s) => Math.max(max, estOneRM(s.weightKg, s.reps)), 0);
     const historicalBest = bestHistoricalOneRM(ex.name, date);
     const isPR = completed.length > 0 && historicalBest > 0 && bestOneRM > historicalBest + 0.01;
-    return { name: ex.name, completedSets: completed.length, volumeKg, isPR };
+    const topSet = completed.reduce((best, s) => (!best || s.weightKg > best.weightKg) ? s : best, null);
+    return {
+      name: ex.name,
+      completedSets: completed.length,
+      volumeKg,
+      isPR,
+      topWeightKg: topSet ? topSet.weightKg : null,
+      topReps: topSet ? topSet.reps : null,
+    };
   });
   return { exercises, totalVolumeKg, totalSets, wu };
 }
@@ -3698,6 +3706,7 @@ function initFoodDiary() {
   });
   document.getElementById('btnFoodDiaryPrevDay').addEventListener('click', () => shiftFoodDiaryDate(-1));
   document.getElementById('btnFoodDiaryNextDay').addEventListener('click', () => shiftFoodDiaryDate(1));
+  document.getElementById('btnShareFoodDiary').addEventListener('click', shareFoodDiary);
 
   overlay.addEventListener('click', e => {
     const removeBtn = e.target.closest('.meal-item-remove');
@@ -4474,7 +4483,7 @@ async function generateWorkoutSummaryShareCard({ name, digitalId, dateTime, summ
   const wu = summary.wu;
   const prCount = summary.exercises.filter(e => e.isPR).length;
   const width = 600;
-  const rowH = 88;
+  const rowH = 106;
   const headerH = 158;
   const statsH = 92 + 26;
   const prBannerH = prCount > 0 ? 44 : 0;
@@ -4546,9 +4555,13 @@ async function generateWorkoutSummaryShareCard({ name, digitalId, dateTime, summ
     ctx.fill(); ctx.stroke();
 
     ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 20px sans-serif';
-    ctx.fillText(ex.name, 52, y + 32);
+    ctx.fillText(ex.name, 52, y + 28);
     ctx.fillStyle = '#8a9aa0'; ctx.font = '15px monospace';
-    ctx.fillText(`${ex.completedSets} sets · ${round0(fromKg(ex.volumeKg, wu))} ${wu} volume`, 52, y + 56);
+    ctx.fillText(`${ex.completedSets} sets · ${round0(fromKg(ex.volumeKg, wu))} ${wu} volume`, 52, y + 50);
+    if (ex.topWeightKg != null) {
+      ctx.fillStyle = '#7e8e95'; ctx.font = '14px monospace';
+      ctx.fillText(`Top set: ${round0(fromKg(ex.topWeightKg, wu))} ${wu} × ${ex.topReps} reps`, 52, y + 72);
+    }
 
     if (ex.isPR) {
       const badgeText = '🏆 PR';
@@ -4570,6 +4583,189 @@ async function generateWorkoutSummaryShareCard({ name, digitalId, dateTime, summ
   ctx.fillText('WINFINITY TRACKER', width / 2, height - 18);
 
   return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
+}
+
+const FOOD_DIARY_MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snacks: 'Snacks' };
+const FOOD_DIARY_MEAL_EMOJI = { breakfast: '🌅', lunch: '🍱', dinner: '🌙', snacks: '🍪' };
+
+async function generateFoodDiaryShareCard({ name, digitalId, date, meals }) {
+  const activeMeals = MEAL_TYPES.filter(mt => meals[mt] && meals[mt].length);
+  const width = 600;
+  const headerH = 116;
+  const mealHeaderH = 40;
+  const itemRowH = 64;
+  const mealGap = 18;
+  const footerH = 46;
+
+  let contentH = activeMeals.length ? 0 : 60;
+  activeMeals.forEach(mt => { contentH += mealHeaderH + meals[mt].length * itemRowH + mealGap; });
+  const height = headerH + contentH + footerH;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext('2d');
+
+  const bg = ctx.createLinearGradient(0, 0, width, height);
+  bg.addColorStop(0, '#171f24'); bg.addColorStop(1, '#0a0e12');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, width, height);
+  ctx.strokeStyle = 'rgba(51,200,204,0.4)'; ctx.lineWidth = 2;
+  ctx.strokeRect(8, 8, width - 16, height - 16);
+  ctx.textBaseline = 'alphabetic';
+
+  ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 20px sans-serif';
+  ctx.fillText(name || 'Operator', 32, 46);
+  ctx.textAlign = 'right'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 15px monospace';
+  ctx.fillText(digitalId || '', width - 32, 44);
+
+  ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px monospace';
+  ctx.fillText(date, width / 2, 74);
+
+  ctx.textAlign = 'left'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 24px sans-serif';
+  ctx.fillText('DIETARY LOG', 32, 106);
+
+  let y = headerH;
+
+  if (!activeMeals.length) {
+    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '15px sans-serif';
+    ctx.fillText('No food logged for this date.', width / 2, y + 30);
+    y += contentH;
+  }
+
+  activeMeals.forEach(mt => {
+    const items = meals[mt];
+    const mealKcal = items.reduce((s, i) => s + (i.calories || 0), 0);
+
+    ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 19px sans-serif';
+    ctx.fillText(`${FOOD_DIARY_MEAL_EMOJI[mt]} ${FOOD_DIARY_MEAL_LABELS[mt]}`, 32, y + 22);
+    ctx.textAlign = 'right'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 17px monospace';
+    ctx.fillText(`${round0(mealKcal)} kcal`, width - 32, y + 22);
+    y += mealHeaderH;
+
+    items.forEach(item => {
+      const rh = itemRowH - 12;
+      ctx.fillStyle = 'rgba(255,255,255,0.03)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1;
+      roundRectPath(ctx, 32, y, width - 64, rh, 8);
+      ctx.fill(); ctx.stroke();
+
+      ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 17px sans-serif';
+      ctx.fillText(item.name, 48, y + 24);
+      const qtyStr = item.qty != null ? formatServingQty(item.qty, item.unit) : (item.grams ? round0(item.grams) + 'g' : '');
+      const metaStr = `${qtyStr ? qtyStr + ' · ' : ''}${round0(item.calories)} kcal · P${round0(item.protein)}g C${round0(item.carbs)}g F${round0(item.fat)}g`;
+      ctx.fillStyle = '#8a9aa0'; ctx.font = '13px monospace';
+      ctx.fillText(metaStr, 48, y + 44);
+      y += itemRowH;
+    });
+    y += mealGap;
+  });
+
+  ctx.textAlign = 'center'; ctx.fillStyle = '#5a686e'; ctx.font = '14px monospace';
+  ctx.fillText('WINFINITY TRACKER', width / 2, height - 18);
+
+  return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
+}
+
+async function shareFoodDiary() {
+  const profile = getProfile();
+  const date = document.getElementById('foodDiaryDateInput').value || todayISO();
+  const meals = getMealsForDate(date);
+  const totals = computeMealsNutritionTotals(meals);
+  const text = `🍽️ Dietary log — ${round0(totals.calories)} kcal logged with Winfinity Tracker!`;
+  const blob = await generateFoodDiaryShareCard({
+    name: (profile && profile.name) || 'Operator',
+    digitalId: getOrCreatePublicId(),
+    date: fmtDate(parseISO(date)),
+    meals,
+  });
+  shareViaWebShare({ title: 'Winfinity Tracker — Dietary Log', text }, blob);
+}
+
+async function generateLeaderboardShareCard({ name, digitalId, dateTime, title, rows, formatValue }) {
+  const width = 600;
+  const headerH = 158;
+  const rowH = 52;
+  const footerH = 46;
+  const listRows = rows.slice(0, 10);
+  const contentH = listRows.length ? listRows.length * rowH : 60;
+  const height = headerH + contentH + footerH;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext('2d');
+
+  const bg = ctx.createLinearGradient(0, 0, width, height);
+  bg.addColorStop(0, '#171f24'); bg.addColorStop(1, '#0a0e12');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, width, height);
+  ctx.strokeStyle = 'rgba(51,200,204,0.4)'; ctx.lineWidth = 2;
+  ctx.strokeRect(8, 8, width - 16, height - 16);
+  ctx.textBaseline = 'alphabetic';
+
+  ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 20px sans-serif';
+  ctx.fillText(name || 'Operator', 32, 46);
+  ctx.textAlign = 'right'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 15px monospace';
+  ctx.fillText(digitalId || '', width - 32, 44);
+
+  ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px monospace';
+  ctx.fillText(dateTime, width / 2, 74);
+
+  ctx.textAlign = 'left'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 24px sans-serif';
+  ctx.fillText(title.toUpperCase(), 32, 116);
+
+  let y = headerH;
+
+  if (!listRows.length) {
+    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '15px sans-serif';
+    ctx.fillText('No data yet.', width / 2, y + 30);
+    y += contentH;
+  }
+
+  listRows.forEach((r, i) => {
+    const rh = rowH - 10;
+    ctx.fillStyle = i === 0 ? 'rgba(219,165,44,0.08)' : 'rgba(255,255,255,0.03)';
+    ctx.strokeStyle = i === 0 ? 'rgba(219,165,44,0.4)' : 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 1;
+    roundRectPath(ctx, 32, y, width - 64, rh, 8);
+    ctx.fill(); ctx.stroke();
+
+    const midY = y + rh / 2 + 5;
+    ctx.textAlign = 'left'; ctx.fillStyle = i === 0 ? '#dba52c' : '#7e8e95'; ctx.font = 'bold 14px monospace';
+    ctx.fillText(String(i + 1).padStart(2, '0'), 48, midY);
+
+    ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 16px sans-serif';
+    ctx.fillText(r.code_name, 88, midY);
+    if (r.public_id) {
+      const nameW = ctx.measureText(r.code_name).width;
+      ctx.fillStyle = '#7e8e95'; ctx.font = '11px monospace';
+      ctx.fillText(r.public_id, 88 + nameW + 8, midY);
+    }
+
+    ctx.textAlign = 'right'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 16px monospace';
+    ctx.fillText(formatValue(r), width - 48, midY);
+    y += rowH;
+  });
+
+  ctx.textAlign = 'center'; ctx.fillStyle = '#5a686e'; ctx.font = '14px monospace';
+  ctx.fillText('WINFINITY TRACKER', width / 2, height - 18);
+
+  return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
+}
+
+async function shareLeaderboardCard(containerId, title) {
+  const cached = rankListDataCache[containerId];
+  if (!cached || !cached.rows.length) { showRestToast('No ranking data to share yet.'); return; }
+  const profile = getProfile();
+  const now = new Date();
+  const dateTime = `${fmtDate(now)} · ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  const text = `🏆 ${title} — top ${Math.min(10, cached.rows.length)} on the Winfinity Nexus!`;
+  const blob = await generateLeaderboardShareCard({
+    name: (profile && profile.name) || 'Operator',
+    digitalId: getOrCreatePublicId(),
+    dateTime,
+    title,
+    rows: cached.rows,
+    formatValue: cached.opts.formatValue,
+  });
+  shareViaWebShare({ title: `Winfinity Tracker — ${title}`, text }, blob);
 }
 
 function initNutrition() {
@@ -5211,7 +5407,7 @@ async function autoSyncDriveBackupToNexus() {
 
 async function pullLeaderboard() {
   const { data, error } = await sb.from('leaderboard')
-    .select('code_name, weight, weight_unit, weight_progress, weight_progress_pct, steps, volume_lifted, volume_unit, furthest_run_km, fastest_run_pace_sec, updated_at')
+    .select('code_name, public_id, weight, weight_unit, weight_progress, weight_progress_pct, steps, volume_lifted, volume_unit, furthest_run_km, fastest_run_pace_sec, updated_at')
     .order('updated_at', { ascending: false });
   if (error) throw error;
   return data || [];
@@ -5249,9 +5445,12 @@ function dedupeRankRows(rows, isBetter) {
   return Array.from(bestByName.values());
 }
 
+const rankListDataCache = {};
+
 function renderRankList(containerId, rows, opts) {
   const container = document.getElementById(containerId);
   const expandBtn = document.querySelector(`.rank-expand-btn[data-target="${containerId}"]`);
+  rankListDataCache[containerId] = { rows, opts };
   container.innerHTML = '';
   if (!rows.length) {
     container.innerHTML = '<p class="empty-note">No data yet.</p>';
@@ -5265,7 +5464,7 @@ function renderRankList(containerId, rows, opts) {
     const row = document.createElement('div');
     row.className = 'rank-row' + (i === 0 ? ' is-top' : '');
     row.innerHTML = `<span class="rank-num">${String(i + 1).padStart(2, '0')}</span>
-      <span class="rank-name">${escapeHtml(r.code_name)}</span>
+      <span class="rank-name">${escapeHtml(r.code_name)}${r.public_id ? `<span class="rank-digital-id">${escapeHtml(r.public_id)}</span>` : ''}</span>
       <span class="rank-value">${opts.formatValue(r)}</span>`;
     container.appendChild(row);
   });
@@ -5608,6 +5807,10 @@ function initLeaderboard() {
   const optInEl = document.getElementById('lbOptIn');
   optInEl.checked = localStorage.getItem('wft_lb_optin') === '1';
   updateCodeNameHint();
+
+  document.querySelectorAll('.rank-share-btn').forEach(btn => {
+    btn.addEventListener('click', () => shareLeaderboardCard(btn.dataset.target, btn.dataset.title));
+  });
 
   optInEl.addEventListener('change', () => {
     if (optInEl.checked) {

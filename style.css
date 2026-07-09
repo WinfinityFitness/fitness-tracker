@@ -1360,6 +1360,7 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .rank-row.is-top { border-left-color: var(--cyan); background: rgba(45,226,230,0.08); }
 .rank-num { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); width: 20px; }
 .rank-name { flex: 1; font-weight: 700; font-size: 0.85rem; letter-spacing: 0.02em; }
+.rank-digital-id { font-weight: 400; font-size: 0.68rem; font-family: var(--font-mono); color: var(--text-muted); letter-spacing: normal; margin-left: 4px; }
 .rank-value { font-family: var(--font-mono); font-weight: 700; color: var(--cyan); font-size: 0.85rem; }
 
 /* ---------------- Public chat (Nexus) ---------------- */
