@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.48';
+const APP_VERSION = 'WF_SYS_V.1.49';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -6854,8 +6854,19 @@ function renderInvitesPopover(invitedRows) {
     btn.addEventListener('click', async () => {
       btn.disabled = true;
       const shareKey = localStorage.getItem('wft_lb_share_key');
-      const { error } = await sb.from('chat_room_members').update({ status: 'joined' }).eq('room_id', btn.dataset.acceptRoom).eq('share_key', shareKey);
+      // .select() after the update so we get back the rows that were
+      // actually changed — a plain update() reports "success" with zero
+      // error even if the filter matched nothing, which would otherwise
+      // look exactly like a stuck/unresponsive button.
+      const { data, error } = await sb.from('chat_room_members')
+        .update({ status: 'joined' }).eq('room_id', btn.dataset.acceptRoom).eq('share_key', shareKey).select();
       if (error) { showRestToast('Could not accept invite: ' + error.message); btn.disabled = false; return; }
+      if (!data || !data.length) {
+        showRestToast('Could not accept — no matching invite found (share_key: ' + (shareKey ? shareKey.slice(0, 8) : 'none') + '…). Try Refresh first.');
+        btn.disabled = false;
+        return;
+      }
+      showRestToast('Joined the group!');
       refreshChatRooms();
     });
   });
@@ -6863,8 +6874,15 @@ function renderInvitesPopover(invitedRows) {
     btn.addEventListener('click', async () => {
       btn.disabled = true;
       const shareKey = localStorage.getItem('wft_lb_share_key');
-      const { error } = await sb.from('chat_room_members').delete().eq('room_id', btn.dataset.declineRoom).eq('share_key', shareKey);
+      const { data, error } = await sb.from('chat_room_members')
+        .delete().eq('room_id', btn.dataset.declineRoom).eq('share_key', shareKey).select();
       if (error) { showRestToast('Could not decline invite: ' + error.message); btn.disabled = false; return; }
+      if (!data || !data.length) {
+        showRestToast('Could not decline — no matching invite found. Try Refresh first.');
+        btn.disabled = false;
+        return;
+      }
+      showRestToast('Invite declined.');
       refreshChatRooms();
     });
   });
