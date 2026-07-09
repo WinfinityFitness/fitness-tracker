@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.26';
+const APP_VERSION = 'WF_SYS_V.1.27';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -5811,14 +5811,31 @@ async function refreshChatRooms() {
   const shareKey = localStorage.getItem('wft_lb_share_key');
   if (!shareKey || !sbConfigured()) { chatRoomMeta = {}; renderChatRoomOptions(); renderInvitesPopover([]); return; }
   try { await sb.rpc('cleanup_stale_solo_rooms'); } catch (e) { /* best effort, opportunistic */ }
-  const { data, error } = await sb.from('chat_room_members')
-    .select('status, room_id, chat_rooms(id, name, is_dm, created_by_key)')
-    .eq('share_key', shareKey);
-  if (error) return;
-  const rows = data || [];
-  const joined = rows.filter(r => r.status === 'joined' && r.chat_rooms);
 
-  const dmRoomIds = joined.filter(r => r.chat_rooms.is_dm).map(r => r.chat_rooms.id);
+  // Two plain queries instead of one embedded (chat_room_members -> chat_rooms)
+  // select: the embedded/nested form can silently resolve a row's chat_rooms
+  // to null (dropped with no error) right after a room is created, which was
+  // making brand-new groups vanish from the room list. Plain .in() filtering
+  // has no such failure mode.
+  const { data: memberRows, error: memberErr } = await sb.from('chat_room_members')
+    .select('status, room_id')
+    .eq('share_key', shareKey);
+  if (memberErr) { showRestToast('Could not load chat rooms: ' + memberErr.message); return; }
+  const rows = memberRows || [];
+  const roomIds = [...new Set(rows.map(r => r.room_id))];
+
+  let roomsById = {};
+  if (roomIds.length) {
+    const { data: roomRows, error: roomErr } = await sb.from('chat_rooms')
+      .select('id, name, is_dm, created_by_key')
+      .in('id', roomIds);
+    if (roomErr) { showRestToast('Could not load chat rooms: ' + roomErr.message); return; }
+    (roomRows || []).forEach(r => { roomsById[r.id] = r; });
+  }
+
+  const joined = rows.filter(r => r.status === 'joined' && roomsById[r.room_id]);
+
+  const dmRoomIds = joined.filter(r => roomsById[r.room_id].is_dm).map(r => r.room_id);
   const otherNameByRoom = {};
   if (dmRoomIds.length) {
     const { data: members } = await sb.from('chat_room_members')
@@ -5831,10 +5848,11 @@ async function refreshChatRooms() {
 
   chatRoomMeta = {};
   joined.forEach(r => {
-    chatRoomMeta[r.chat_rooms.id] = {
-      name: r.chat_rooms.is_dm ? (otherNameByRoom[r.chat_rooms.id] || r.chat_rooms.name) : r.chat_rooms.name,
-      isDm: r.chat_rooms.is_dm,
-      createdByKey: r.chat_rooms.created_by_key,
+    const room = roomsById[r.room_id];
+    chatRoomMeta[r.room_id] = {
+      name: room.is_dm ? (otherNameByRoom[r.room_id] || room.name) : room.name,
+      isDm: room.is_dm,
+      createdByKey: room.created_by_key,
       joinedByMe: true,
     };
   });
@@ -5856,7 +5874,10 @@ async function refreshChatRooms() {
 
   try { await checkUnreadMessages(dmRoomIds); } catch (e) { /* best effort — room list still renders without unread flags */ }
   renderChatRoomOptions();
-  renderInvitesPopover(rows.filter(r => r.status === 'invited' && r.chat_rooms));
+  const invited = rows
+    .filter(r => r.status === 'invited' && roomsById[r.room_id])
+    .map(r => ({ roomId: r.room_id, roomName: roomsById[r.room_id].name }));
+  renderInvitesPopover(invited);
 }
 
 function isNexusTabActive() {
@@ -5973,9 +5994,9 @@ function renderInvitesPopover(invitedRows) {
   popover.innerHTML = invitedRows.length
     ? invitedRows.map(r => `
       <div class="chat-invite-row">
-        <span>🔔 Invited to "${escapeHtml(r.chat_rooms.name)}"</span>
-        <button type="button" class="btn btn--primary" data-accept-room="${r.chat_rooms.id}">Accept</button>
-        <button type="button" class="btn" data-decline-room="${r.chat_rooms.id}">Decline</button>
+        <span>🔔 Invited to "${escapeHtml(r.roomName)}"</span>
+        <button type="button" class="btn btn--primary" data-accept-room="${r.roomId}">Accept</button>
+        <button type="button" class="btn" data-decline-room="${r.roomId}">Decline</button>
       </div>
     `).join('')
     : '<p class="empty-note">No pending invites.</p>';
@@ -6173,10 +6194,16 @@ async function updateLeaderboard() {
 /* Nexus announcement (single admin, verified entirely server-side —    */
 /* the credentials never ship in this file or config.js)               */
 /* ---------------------------------------------------------------- */
-// In-memory only — cleared on reload/close. The client never persists or
-// hardcodes the admin password; every write is re-verified server-side by
-// the verify_admin_login / set_announcement Supabase RPCs.
+// Kept in localStorage on this device only, so the admin stays logged in
+// across reloads/updates until they explicitly log out — never shipped in
+// app.js/index.html/config.js, so it's still invisible to anyone just
+// viewing page source. Every write is still re-verified server-side by the
+// verify_admin_login / set_announcement Supabase RPCs regardless.
 let adminSession = { digitalId: null, password: null };
+try {
+  const savedAdmin = JSON.parse(localStorage.getItem('wft_admin_session'));
+  if (savedAdmin && savedAdmin.digitalId && savedAdmin.password) adminSession = savedAdmin;
+} catch (e) { /* ignore malformed/missing saved session */ }
 let announcementExpanded = false;
 let currentAnnouncementText = '';
 
@@ -6198,7 +6225,7 @@ async function loadAnnouncement() {
     const { data, error } = await sb.from('announcements').select('message').eq('id', 1).maybeSingle();
     if (error) throw error;
     renderAnnouncement(data && data.message);
-  } catch (e) { /* best effort */ }
+  } catch (e) { showRestToast('Could not load announcement: ' + (e.message || 'check your connection')); }
 }
 
 function refreshAnnouncementMenuState() {
@@ -6232,6 +6259,7 @@ function initAnnouncementWidget() {
   });
   document.getElementById('btnAdminLogout').addEventListener('click', () => {
     adminSession = { digitalId: null, password: null };
+    localStorage.removeItem('wft_admin_session');
     menu.hidden = true;
     refreshAnnouncementMenuState();
     refreshChatRooms();
@@ -6260,6 +6288,7 @@ function initAnnouncementWidget() {
       if (error) throw error;
       if (data === true) {
         adminSession = { digitalId: id, password: pw };
+        localStorage.setItem('wft_admin_session', JSON.stringify(adminSession));
         loginOverlay.hidden = true;
         refreshAnnouncementMenuState();
         refreshChatRooms();
@@ -6334,6 +6363,17 @@ function initLeaderboard() {
   });
   document.getElementById('lbChatInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') document.getElementById('btnLbChatSend').click();
+  });
+
+  document.getElementById('btnChatRefresh').addEventListener('click', async () => {
+    const refreshBtn = document.getElementById('btnChatRefresh');
+    refreshBtn.disabled = true;
+    try {
+      await refreshChatRooms();
+      const messages = await fetchChatMessages();
+      renderChatMessages(messages);
+    } catch (e) { showRestToast('Refresh failed: ' + (e.message || 'check your connection')); }
+    refreshBtn.disabled = false;
   });
 
   document.getElementById('btnChatExpand').addEventListener('click', () => {
