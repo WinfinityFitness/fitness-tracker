@@ -29,7 +29,7 @@ create or replace function verify_admin_login(p_digital_id text, p_password text
 language sql
 security definer
 as $$
-  select p_digital_id = 'WF-B932GB' and p_password = '082801';
+  select p_digital_id = 'WF-B932GB' and p_password = 'admin082801';
 $$;
 
 grant execute on function verify_admin_login(text, text) to anon;
@@ -39,7 +39,7 @@ language plpgsql
 security definer
 as $$
 begin
-  if not (p_digital_id = 'WF-B932GB' and p_password = '082801') then
+  if not (p_digital_id = 'WF-B932GB' and p_password = 'admin082801') then
     raise exception 'Not authorized';
   end if;
   update announcements set message = p_message, updated_at = now() where id = 1;
