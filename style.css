@@ -818,9 +818,7 @@ button.mission-log-day:hover { border-color: var(--cyan); }
   text-align: center;
 }
 .btn--primary {
-  background: linear-gradient(155deg, rgba(255,255,255,0.08), rgba(255,255,255,0.015) 55%, rgba(0,0,0,0.06));
-  backdrop-filter: blur(7px);
-  -webkit-backdrop-filter: blur(7px);
+  background: linear-gradient(155deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02) 55%, rgba(0,0,0,0.08)), var(--surface-2);
   border: 1px solid rgba(255,255,255,0.13);
   box-shadow:
     inset 0 1px 1px rgba(255,255,255,0.14),
@@ -842,6 +840,8 @@ button.mission-log-day:hover { border-color: var(--cyan); }
 .hint { font-size: 0.8rem; color: var(--text-muted); margin: 8px 0 4px; line-height: 1.4; }
 .hint--accent { color: var(--cyan); background: var(--surface-2); border: 1px solid var(--cyan-dim); border-radius: 5px; padding: 8px 10px; }
 .hint--warning { color: var(--warning); background: var(--surface-2); border: 1px solid var(--warning); border-radius: 5px; padding: 6px 10px; }
+.hint--sm { font-size: 0.68rem; margin: 3px 0 0; line-height: 1.35; }
+.skinfold-grid { display: flex; flex-direction: column; gap: 12px; margin: 10px 0; }
 
 .computed-card {
   background: var(--surface-1);
@@ -985,9 +985,7 @@ thead th { color: var(--text-muted); font-weight: 600; border-bottom: 1px solid 
 tbody tr:nth-child(even) { background: rgba(255,255,255,0.02); }
 
 .btn--finish {
-  background: linear-gradient(155deg, rgba(255,255,255,0.08), rgba(255,255,255,0.015) 55%, rgba(0,0,0,0.06));
-  backdrop-filter: blur(7px);
-  -webkit-backdrop-filter: blur(7px);
+  background: linear-gradient(155deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02) 55%, rgba(0,0,0,0.08)), var(--surface-2);
   border: 1px solid rgba(255,255,255,0.13);
   box-shadow:
     inset 0 1px 1px rgba(255,255,255,0.14),
@@ -2062,9 +2060,7 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .meal-item-edit-btn { flex: none; background: none; border: none; color: var(--cyan); font-size: 0.95rem; cursor: pointer; padding: 4px; }
 .add-food-btn {
   width: 100%;
-  background: linear-gradient(155deg, rgba(255,255,255,0.08), rgba(255,255,255,0.015) 55%, rgba(0,0,0,0.06));
-  backdrop-filter: blur(7px);
-  -webkit-backdrop-filter: blur(7px);
+  background: linear-gradient(155deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02) 55%, rgba(0,0,0,0.08)), var(--surface-2);
   border: 1px solid rgba(255,255,255,0.13);
   box-shadow:
     inset 0 1px 1px rgba(255,255,255,0.14),
@@ -2091,11 +2087,13 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .meal-item-edit-form .field-label { font-family: var(--font-mono); font-size: 0.62rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-bottom: 2px; }
 
 /* Frosted-glass / embossed-thin surface — used where neon line icons need a
-   subtle, translucent seat rather than a flat solid block. */
+   subtle, translucent seat rather than a flat solid block. No backdrop-filter
+   (was blur(7px)): dozens of these render at once across the app, and live
+   backdrop blur at that scale caused real input lag and paint glitches on
+   mid-range mobile hardware — a solid-ish gradient reads the same without
+   the per-frame compositing cost. */
 .glass-emboss {
-  background: linear-gradient(155deg, rgba(255,255,255,0.08), rgba(255,255,255,0.015) 55%, rgba(0,0,0,0.06));
-  backdrop-filter: blur(7px);
-  -webkit-backdrop-filter: blur(7px);
+  background: linear-gradient(155deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02) 55%, rgba(0,0,0,0.08)), var(--surface-2);
   border: 1px solid rgba(255,255,255,0.13);
   box-shadow:
     inset 0 1px 1px rgba(255,255,255,0.14),

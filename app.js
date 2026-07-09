@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.39';
+const APP_VERSION = 'WF_SYS_V.1.44';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -132,6 +132,31 @@ function computeAdjustedBMI(profile, baseBMI, logsArr) {
   const adjustedBMI = Math.max(15, baseBMI + adjustment);
   return { adjustedBMI, activityIndex };
 }
+
+const SKINFOLD_SITES = ['chest', 'abdomen', 'thigh', 'triceps', 'suprailiac', 'subscapular', 'midaxillary'];
+
+// Jackson-Pollock 7-site skinfold method (Siri equation for body fat % from
+// body density). Same seven sites for both sexes; only the density formula
+// coefficients differ by gender.
+function computeBodyFatJP7(skinfolds, age, gender) {
+  const sum = SKINFOLD_SITES.reduce((s, key) => s + (skinfolds[key] || 0), 0);
+  if (sum <= 0 || !age) return null;
+  const density = gender === 'female'
+    ? 1.097 - 0.00046971 * sum + 0.00000056 * sum * sum - 0.00012828 * age
+    : 1.112 - 0.00043499 * sum + 0.00000055 * sum * sum - 0.00028826 * age;
+  return (495 / density) - 450;
+}
+
+function classifyBodyFat(pct, gender) {
+  if (pct == null) return { label: '–', status: 'muted' };
+  const bounds = gender === 'female' ? [14, 21, 25, 32] : [6, 14, 18, 25];
+  const labels = ['Essential/Athletic', 'Fitness', 'Average', 'Above average', 'Obese range'];
+  const statuses = ['good', 'good', 'warning', 'serious', 'critical'];
+  const idx = bounds.findIndex(b => pct < b);
+  const i = idx === -1 ? labels.length - 1 : idx;
+  return { label: labels[i], status: statuses[i] };
+}
+
 function computeBMR(kg, cm, age, gender) {
   if (!kg || !cm || !age) return null;
   const base = 10 * kg + 6.25 * cm - 5 * age;
@@ -1112,6 +1137,7 @@ function initSetupForm() {
   });
   document.getElementById('setupGender').addEventListener('change', () => {
     if (document.getElementById('setupAutoWaterGoal').checked) updateAutoWaterHint();
+    updateHealthStatusOptions();
   });
 
   form.querySelectorAll('.proto-delete').forEach(btn => {
@@ -1179,6 +1205,15 @@ function initSetupForm() {
   });
 }
 
+function updateHealthStatusOptions() {
+  const isFemale = document.getElementById('setupGender').value === 'female';
+  const select = document.getElementById('setupHealthStatus');
+  select.querySelectorAll('option[value="pregnant"], option[value="breastfeeding"]').forEach(opt => {
+    opt.hidden = !isFemale;
+  });
+  if (!isFemale && (select.value === 'pregnant' || select.value === 'breastfeeding')) select.value = '';
+}
+
 function loadSetupForm() {
   const p = getProfile();
   if (!p) { renderExtraHabitFields({ extraHabits: [] }); return; }
@@ -1212,6 +1247,7 @@ function loadSetupForm() {
   document.getElementById('setupWaterGoal').value = p.waterGoal || 3000;
   document.getElementById('setupAutoWaterGoal').checked = !!p.autoWaterGoal;
   document.getElementById('setupHealthStatus').value = p.healthStatus || '';
+  updateHealthStatusOptions();
   document.getElementById('setupWaterGoal').disabled = !!p.autoWaterGoal;
   if (p.autoWaterGoal) updateAutoWaterHint(); else document.getElementById('setupAutoWaterHint').textContent = AUTO_WATER_HINT_BASE_TEXT;
   document.getElementById('setupStepGoal').value = p.stepGoal || 8000;
@@ -1277,6 +1313,40 @@ function loadBioForDate(date) {
   document.getElementById('bioHunger').value = e.hunger ?? 3;
   document.getElementById('bioHungerOut').textContent = e.hunger ?? 3;
   document.getElementById('bioMenstruatingField').hidden = !profile || profile.gender !== 'female';
+
+  const skinfolds = e.skinfolds || {};
+  SKINFOLD_SITES.forEach(key => {
+    const input = document.getElementById('skin' + key.charAt(0).toUpperCase() + key.slice(1));
+    if (input) input.value = skinfolds[key] ?? '';
+  });
+  renderBodyFatWidget();
+}
+
+function readSkinfoldInputs() {
+  const skinfolds = {};
+  SKINFOLD_SITES.forEach(key => {
+    const input = document.getElementById('skin' + key.charAt(0).toUpperCase() + key.slice(1));
+    const v = input ? parseFloat(input.value) : NaN;
+    skinfolds[key] = isNaN(v) ? 0 : v;
+  });
+  return skinfolds;
+}
+
+function renderBodyFatWidget() {
+  const profile = getProfile();
+  const skinfolds = readSkinfoldInputs();
+  const sum = SKINFOLD_SITES.reduce((s, key) => s + skinfolds[key], 0);
+  const age = profile ? profile.age : null;
+  const gender = profile ? profile.gender : 'male';
+  const pct = (sum > 0 && age) ? computeBodyFatJP7(skinfolds, age, gender) : null;
+  const cls = classifyBodyFat(pct, gender);
+  document.getElementById('bodyFatEmptyNote').hidden = pct != null;
+  renderRing(document.getElementById('bodyFatRing'), pct != null ? Math.min(100, Math.max(0, pct)) : 0, {
+    size: 120, stroke: 10,
+    centerText: pct != null ? round2(pct) + '%' : '–',
+    label: 'Body Fat',
+    sub: cls.label,
+  });
 }
 
 function initBioLog() {
@@ -1305,6 +1375,20 @@ function initBioLog() {
     renderWaterRetentionOrb();
     if (date === todayISO()) { loadQuickLog(); renderDashboard(); }
     updateTabDots();
+  });
+
+  SKINFOLD_SITES.forEach(key => {
+    const input = document.getElementById('skin' + key.charAt(0).toUpperCase() + key.slice(1));
+    if (input) input.addEventListener('input', renderBodyFatWidget);
+  });
+  document.getElementById('btnSaveSkinfolds').addEventListener('click', () => {
+    const date = document.getElementById('bioDate').value;
+    const skinfolds = readSkinfoldInputs();
+    const profile = getProfile();
+    const bodyFatPct = computeBodyFatJP7(skinfolds, profile ? profile.age : null, profile ? profile.gender : 'male');
+    updateLogFields(date, { skinfolds, bodyFatPct: bodyFatPct != null ? round2(bodyFatPct) : null });
+    document.getElementById('skinfoldSaveNote').textContent = 'Saved skinfold measurements for ' + date;
+    setTimeout(() => { document.getElementById('skinfoldSaveNote').textContent = ''; }, 2500);
   });
 
   loadBioForDate(todayISO());
@@ -1409,7 +1493,6 @@ function initCheckin() {
     document.getElementById('checkinSaveNote').textContent = 'Check-in saved.';
     setTimeout(() => { document.getElementById('checkinSaveNote').textContent = ''; }, 2000);
     renderDashboard();
-    autoBackupIfEnabled();
   });
 }
 
@@ -1462,7 +1545,6 @@ function initQuickLog() {
     renderSleepBarChart();
     if (document.getElementById('bioDate').value === date) loadBioForDate(date);
     updateTabDots();
-    autoBackupIfEnabled();
   });
 }
 
@@ -1529,7 +1611,6 @@ function initMeasurements() {
       const overlay = document.getElementById('measureEntryOverlay');
       if (overlay && !overlay.hidden) overlay.hidden = true;
     }, 900);
-    autoBackupIfEnabled();
   });
 
   loadMeasurementsForDate(todayISO());
@@ -3035,7 +3116,6 @@ function initTraining() {
     renderExerciseCards();
     renderTrainingStats();
     autoSyncLeaderboardIfOptedIn();
-    autoBackupIfEnabled();
   });
 
   document.getElementById('btnCloseSummary').addEventListener('click', () => { document.getElementById('summaryOverlay').hidden = true; });
@@ -4262,7 +4342,6 @@ function addFoodItemToDiary(item) {
   renderFoodDiary(date);
   refreshFuelViewsForDate(date);
   showRestToast(`Added "${item.name}" to ${currentAddFoodMeal}.`);
-  autoBackupIfEnabled();
 }
 
 function initAddFoodPanel() {
@@ -5351,16 +5430,30 @@ async function generateHistoryLogShareCard({ name, digitalId, date, wu, rows }) 
 async function generateMeasurementHistoryShareCard({ name, digitalId, date, rows }) {
   const width = 600;
   const headerH = 116;
-  const columns = [
-    { label: 'DATE', width: 68 }, { label: 'CHEST', width: 60 }, { label: 'SHLD', width: 56 },
-    { label: 'L-BI', width: 52 }, { label: 'R-BI', width: 52 }, { label: 'STOM', width: 56 },
-    { label: 'HIPS', width: 56 }, { label: 'L-TH', width: 52 }, { label: 'R-TH', width: 52 },
+  // Transposed: one row per measurement, one column per logged date (most
+  // recent first, matching the incoming row order) — makes it easy to read
+  // straight across and compare recent vs. previous for the same spot,
+  // instead of having to scan down a column across separate date-rows.
+  const measureDefs = [
+    { key: 'chest', label: 'Chest' },
+    { key: 'shoulder', label: 'Shoulder' },
+    { key: 'lBicep', label: 'L. Bicep' },
+    { key: 'rBicep', label: 'R. Bicep' },
+    { key: 'abdSupra', label: 'Abd. Supra' },
+    { key: 'stomach', label: 'Stomach' },
+    { key: 'abdInfra', label: 'Abd. Infra' },
+    { key: 'hips', label: 'Hips' },
+    { key: 'lThigh', label: 'L. Thigh' },
+    { key: 'rThigh', label: 'R. Thigh' },
+    { key: 'lCalf', label: 'L. Calf' },
+    { key: 'rCalf', label: 'R. Calf' },
   ];
-  const tableRows = rows.map(l => {
-    const m = l.measurements || {};
-    const c = v => v ?? '–';
-    return [l.date.slice(5), c(m.chest), c(m.shoulder), c(m.lBicep), c(m.rBicep), c(m.stomach), c(m.hips), c(m.lThigh), c(m.rThigh)];
-  });
+  const labelColW = 92;
+  const dateColW = rows.length ? Math.min(90, (width - 64 - labelColW) / rows.length) : 90;
+  const columns = [{ label: 'MEASURE', width: labelColW }, ...rows.map(l => ({ label: l.date.slice(5), width: dateColW }))];
+  const tableRows = measureDefs
+    .map(def => [def.label, ...rows.map(l => (l.measurements || {})[def.key] ?? '–')])
+    .filter(row => row.slice(1).some(v => v !== '–'));
   const tableH = 22 + Math.max(1, tableRows.length) * 22;
   const footerH = 46;
   const height = headerH + 20 + tableH + 24 + footerH;
@@ -5369,13 +5462,13 @@ async function generateMeasurementHistoryShareCard({ name, digitalId, date, rows
   drawShareCardHeader(ctx, width, { name, digitalId, date, title: 'MEASUREMENT HISTORY' });
 
   const y = headerH + 20;
-  if (!tableRows.length) {
+  if (!rows.length || !tableRows.length) {
     ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px sans-serif';
     ctx.fillText('No measurements logged yet.', width / 2, y + 20);
   } else {
     drawShareTable(ctx, 32, y, width - 64, columns, tableRows);
     ctx.textAlign = 'left'; ctx.fillStyle = '#5a686e'; ctx.font = '10px monospace';
-    ctx.fillText('Values in cm.', 32, y + tableH + 16);
+    ctx.fillText('Values in cm · left = most recent', 32, y + tableH + 16);
   }
 
   drawShareCardFooter(ctx, width, height);
@@ -6052,10 +6145,6 @@ function getBackupMode() {
 function setBackupMode(mode) {
   localStorage.setItem('wft_backup_mode', mode);
 }
-function autoBackupIfEnabled() {
-  if (getBackupMode() !== 'auto') return;
-  downloadBackupJSON();
-}
 let autoBackupTimerId = null;
 function startAutoBackupTimer() {
   if (autoBackupTimerId) clearInterval(autoBackupTimerId);
@@ -6082,7 +6171,7 @@ function initExport() {
     const mode = getBackupMode();
     backupModeButtons.forEach(btn => btn.classList.toggle('is-active', btn.dataset.mode === mode));
     backupModeHint.textContent = mode === 'auto'
-      ? 'Auto — backs up automatically on every check-in, confirm, or save, plus every 30 minutes.'
+      ? 'Auto — backs up automatically every 30 minutes while the app is open.'
       : 'Manual — tap "Back Up Now" whenever you want to save a JSON backup.';
   };
   backupModeButtons.forEach(btn => btn.addEventListener('click', () => {

@@ -577,6 +577,53 @@
       <p class="hint">Illustrative estimate only — from today's carbs + sodium intake (glycogen-bound water) plus your stress/fatigue/sleep average, scaled against your Watson-formula total body water. Not a medical measurement.</p>
     </div>
 
+    <div class="chart-card">
+      <p class="mod-tag">Mod_bodyfat_05</p>
+      <div class="chart-card-head"><span class="chart-card-title">Body Fat Percentage</span></div>
+      <p class="hint">Jackson-Pollock 7-Site skinfold method. Pinch each site with skinfold calipers and enter the reading in millimeters (mm) — both men and women are measured at the same seven locations.</p>
+      <div class="ring-card ring-card--flush" id="bodyFatRing"></div>
+      <div class="skinfold-grid">
+        <label class="field">
+          <span>Chest (mm)</span>
+          <input type="number" id="skinChest" step="0.1" min="0" placeholder="e.g. 8">
+          <p class="hint hint--sm">Diagonal pinch, halfway between the armpit crease and the nipple.</p>
+        </label>
+        <label class="field">
+          <span>Abdomen (mm)</span>
+          <input type="number" id="skinAbdomen" step="0.1" min="0" placeholder="e.g. 14">
+          <p class="hint hint--sm">Vertical pinch, about 1 inch (2.5 cm) to the right of the belly button.</p>
+        </label>
+        <label class="field">
+          <span>Thigh (mm)</span>
+          <input type="number" id="skinThigh" step="0.1" min="0" placeholder="e.g. 12">
+          <p class="hint hint--sm">Vertical pinch, halfway down the front of the thigh (between kneecap and hip).</p>
+        </label>
+        <label class="field">
+          <span>Triceps (mm)</span>
+          <input type="number" id="skinTriceps" step="0.1" min="0" placeholder="e.g. 10">
+          <p class="hint hint--sm">Vertical pinch at the back of the arm, halfway between the shoulder joint (acromion process) and the elbow.</p>
+        </label>
+        <label class="field">
+          <span>Suprailiac (mm)</span>
+          <input type="number" id="skinSuprailiac" step="0.1" min="0" placeholder="e.g. 9">
+          <p class="hint hint--sm">Diagonal pinch just above the top of the hip bone (iliac crest), on the side of the body.</p>
+        </label>
+        <label class="field">
+          <span>Subscapular (mm)</span>
+          <input type="number" id="skinSubscapular" step="0.1" min="0" placeholder="e.g. 11">
+          <p class="hint hint--sm">Diagonal pinch about 1 inch (2 cm) directly below the bottom tip of the shoulder blade.</p>
+        </label>
+        <label class="field">
+          <span>Midaxillary (mm)</span>
+          <input type="number" id="skinMidaxillary" step="0.1" min="0" placeholder="e.g. 8">
+          <p class="hint hint--sm">Pinch directly on the side of the torso, level with the bottom of the breastbone (xiphoid process).</p>
+        </label>
+      </div>
+      <p class="hint" id="bodyFatEmptyNote">Set your age and gender in Entity Identity, then enter all 7 sites to compute your body fat %.</p>
+      <button type="button" class="btn btn--primary" id="btnSaveSkinfolds">Save skinfold measurements</button>
+      <p class="save-note" id="skinfoldSaveNote"></p>
+    </div>
+
     <div class="computed-card">
       <h3>Computed targets</h3>
       <dl class="computed-list" id="computedList"></dl>
