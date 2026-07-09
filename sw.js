@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fittracker-v153';
+const CACHE_NAME = 'fittracker-v154';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -52,6 +52,15 @@ self.addEventListener('message', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
+  // Only same-origin app assets go through the cache-first strategy below.
+  // Cross-origin GETs (Supabase REST reads, Google APIs, etc.) must always
+  // hit the network — supabase-js issues SELECT queries as GET requests with
+  // a deterministic URL (same select+filter = same URL every time), so
+  // cache-first here was silently serving a stale snapshot of chat_room_members
+  // / chat_rooms forever after the first fetch: Accept/Decline, Refresh, and
+  // Sync to Nexus all appeared to "do nothing" because the app was reading a
+  // frozen cached response instead of the real current DB state.
+  if (new URL(event.request.url).origin !== self.location.origin) return;
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
