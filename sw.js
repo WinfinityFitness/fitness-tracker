@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fittracker-v116';
+const CACHE_NAME = 'fittracker-v117';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -21,8 +21,20 @@ self.addEventListener('install', event => {
   // until the page explicitly asks it to activate (see the message listener
   // below), so the in-app "Update Now" button controls exactly when the swap
   // happens instead of it happening silently mid-session.
+  //
+  // Every asset is fetched with { cache: 'reload' } to bypass the browser's
+  // HTTP cache entirely. Plain cache.addAll() lets the browser serve some
+  // CORE_ASSETS from its own (possibly stale) HTTP cache while others come
+  // fresh from the network, so the precached bundle can end up as a mix of
+  // old and new files (e.g. new app.js referencing an element that doesn't
+  // exist in the still-old cached index.html) — that mismatch is what caused
+  // the app to hang on the splash screen after an update.
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(CORE_ASSETS))
+    caches.open(CACHE_NAME).then(cache =>
+      Promise.all(CORE_ASSETS.map(url =>
+        fetch(url, { cache: 'reload' }).then(response => cache.put(url, response))
+      ))
+    )
   );
 });
 

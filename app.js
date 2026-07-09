@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.17';
+const APP_VERSION = 'WF_SYS_V.1.18';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -5967,55 +5967,63 @@ initThemeToggle();
 /* ---------------------------------------------------------------- */
 document.getElementById('headerToday').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
 
-migrateWaterUnitsIfNeeded();
-initTabs();
-initSwipeNavigation();
-document.getElementById('btnGoToBioFromChart').addEventListener('click', () => {
-  document.querySelector('.tab-btn[data-target="bio"]').click();
-});
-initSettingsOverlay();
-initAppUpdateButton();
-initDonationPrompt();
-initLastStateRestore();
-initDigitalId();
-initContact();
-initFooterShare();
-initPrivacyPolicy();
-initTermsOfService();
-initPRBoardOverlay();
-initMeasureEntryOverlay();
-initEntityIdentityOverlay();
-initDateTimeWidget();
-initTimezonePicker();
-initWeatherWidget();
-initWeatherLocationPicker();
-initSetupForm();
-initCheckin();
-initQuickLog();
-initMeasurements();
-initTraining();
-initCardioTracker();
-initMissionLog();
-initDatePicker();
-initWeightChartToggle();
-initNutrition();
-initFoodDiary();
-initAddFoodPanel();
-initBarcodeScanner();
-initBioLog();
-initReviewForm();
-initExport();
-initDrive();
-initLeaderboard();
-loadSetupForm();
-loadCheckinForm();
-loadQuickLog();
-document.getElementById('sysVersion').textContent = APP_VERSION;
-renderDashboard();
-updateTabDots();
-initBetaLock();
-if (document.getElementById('lockOverlay').hidden) {
-  initOnboarding(() => initReviewGate(() => initConsentGate()));
+// If any single init step below throws (e.g. a stray cached-asset mismatch
+// after an update), the whole app must not stay stuck behind the splash
+// screen forever — log it and keep going so the splash-hide timer below
+// still fires and as much of the app as possible still works.
+try {
+  migrateWaterUnitsIfNeeded();
+  initTabs();
+  initSwipeNavigation();
+  document.getElementById('btnGoToBioFromChart').addEventListener('click', () => {
+    document.querySelector('.tab-btn[data-target="bio"]').click();
+  });
+  initSettingsOverlay();
+  initAppUpdateButton();
+  initDonationPrompt();
+  initLastStateRestore();
+  initDigitalId();
+  initContact();
+  initFooterShare();
+  initPrivacyPolicy();
+  initTermsOfService();
+  initPRBoardOverlay();
+  initMeasureEntryOverlay();
+  initEntityIdentityOverlay();
+  initDateTimeWidget();
+  initTimezonePicker();
+  initWeatherWidget();
+  initWeatherLocationPicker();
+  initSetupForm();
+  initCheckin();
+  initQuickLog();
+  initMeasurements();
+  initTraining();
+  initCardioTracker();
+  initMissionLog();
+  initDatePicker();
+  initWeightChartToggle();
+  initNutrition();
+  initFoodDiary();
+  initAddFoodPanel();
+  initBarcodeScanner();
+  initBioLog();
+  initReviewForm();
+  initExport();
+  initDrive();
+  initLeaderboard();
+  loadSetupForm();
+  loadCheckinForm();
+  loadQuickLog();
+  document.getElementById('sysVersion').textContent = APP_VERSION;
+  renderDashboard();
+  updateTabDots();
+  initBetaLock();
+  if (document.getElementById('lockOverlay').hidden) {
+    initOnboarding(() => initReviewGate(() => initConsentGate()));
+  }
+} catch (err) {
+  console.error('App init error:', err);
 }
 
 setTimeout(() => {
