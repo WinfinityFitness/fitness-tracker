@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.21';
+const APP_VERSION = 'WF_SYS_V.1.24';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -3169,7 +3169,7 @@ function renderWorkoutSummary(summary) {
     html += `<div class="summary-ex-row">
       <div>
         <div class="summary-ex-name">${escapeHtml(ex.name)}</div>
-        <div class="summary-ex-meta">${ex.completedSets} sets · ${round0(fromKg(ex.volumeKg, wu))} ${wu} volume</div>
+        <div class="summary-ex-meta">${ex.completedSets} sets · ${round0(fromKg(ex.volumeKg, wu))} ${wu} volume${ex.topWeightKg != null ? ` · Top: ${round0(fromKg(ex.topWeightKg, wu))} ${wu} × ${ex.topReps} reps` : ''}</div>
       </div>
       ${ex.isPR ? '<span class="pr-pill">🏆 PR</span>' : ''}
     </div>`;
@@ -4586,7 +4586,55 @@ async function generateWorkoutSummaryShareCard({ name, digitalId, dateTime, summ
 }
 
 const FOOD_DIARY_MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snacks: 'Snacks' };
-const FOOD_DIARY_MEAL_EMOJI = { breakfast: '🌅', lunch: '🍱', dinner: '🌙', snacks: '🍪' };
+
+// Redraws the same glyphs used by the in-app meal-section headers (see the
+// inline SVGs in index.html) so the share card's icons match exactly instead
+// of substituting emoji.
+function drawMealIcon(ctx, mealType, cx, cy, size) {
+  const s = size / 24;
+  ctx.save();
+  ctx.translate(cx - size / 2, cy - size / 2);
+  ctx.scale(s, s);
+  ctx.strokeStyle = '#33c8cc';
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  if (mealType === 'breakfast') {
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(12, 15, 6, 0, Math.PI, true);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(2, 15); ctx.lineTo(22, 15);
+    ctx.moveTo(12, 4); ctx.lineTo(12, 7);
+    ctx.moveTo(5.5, 7.5); ctx.lineTo(7.3, 9);
+    ctx.moveTo(18.5, 7.5); ctx.lineTo(16.7, 9);
+    ctx.stroke();
+  } else if (mealType === 'lunch') {
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(12, 12, 4.5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(12, 2); ctx.lineTo(12, 4.3);
+    ctx.moveTo(12, 19.7); ctx.lineTo(12, 22);
+    ctx.moveTo(2, 12); ctx.lineTo(4.3, 12);
+    ctx.moveTo(19.7, 12); ctx.lineTo(22, 12);
+    ctx.moveTo(4.9, 4.9); ctx.lineTo(6.4, 6.4);
+    ctx.moveTo(17.6, 17.6); ctx.lineTo(19.1, 19.1);
+    ctx.moveTo(4.9, 19.1); ctx.lineTo(6.4, 17.6);
+    ctx.moveTo(17.6, 6.4); ctx.lineTo(19.1, 4.9);
+    ctx.stroke();
+  } else if (mealType === 'dinner') {
+    ctx.lineWidth = 1.6;
+    ctx.stroke(new Path2D('M20 14.5A8.5 8.5 0 1 1 9.5 4 7 7 0 0 0 20 14.5z'));
+  } else if (mealType === 'snacks') {
+    ctx.lineWidth = 1.5;
+    ctx.stroke(new Path2D('M12 9c-3.5 0-6 2.6-6 6.2C6 19 8.4 21.5 11 21.5c.7 0 1-.3 1.5-.3.5 0 .8.3 1.5.3 2.6 0 5-2.5 5-6.3 0-3.6-2.5-6.2-6-6.2z'));
+    ctx.stroke(new Path2D('M12 9c0-1.8.9-3 2.2-3.6'));
+  }
+  ctx.restore();
+}
 
 async function generateFoodDiaryShareCard({ name, digitalId, date, meals }) {
   const activeMeals = MEAL_TYPES.filter(mt => meals[mt] && meals[mt].length);
@@ -4635,8 +4683,9 @@ async function generateFoodDiaryShareCard({ name, digitalId, date, meals }) {
     const items = meals[mt];
     const mealKcal = items.reduce((s, i) => s + (i.calories || 0), 0);
 
+    drawMealIcon(ctx, mt, 42, y + 16, 22);
     ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 19px sans-serif';
-    ctx.fillText(`${FOOD_DIARY_MEAL_EMOJI[mt]} ${FOOD_DIARY_MEAL_LABELS[mt]}`, 32, y + 22);
+    ctx.fillText(FOOD_DIARY_MEAL_LABELS[mt], 60, y + 22);
     ctx.textAlign = 'right'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 17px monospace';
     ctx.fillText(`${round0(mealKcal)} kcal`, width - 32, y + 22);
     y += mealHeaderH;
@@ -5803,6 +5852,132 @@ async function updateLeaderboard() {
   }
 }
 
+/* ---------------------------------------------------------------- */
+/* Nexus announcement (single admin, verified entirely server-side —    */
+/* the credentials never ship in this file or config.js)               */
+/* ---------------------------------------------------------------- */
+// In-memory only — cleared on reload/close. The client never persists or
+// hardcodes the admin password; every write is re-verified server-side by
+// the verify_admin_login / set_announcement Supabase RPCs.
+let adminSession = { digitalId: null, password: null };
+let announcementExpanded = false;
+let currentAnnouncementText = '';
+
+function isAdminLoggedIn() { return !!adminSession.password; }
+
+function renderAnnouncement(message) {
+  currentAnnouncementText = message || '';
+  const textEl = document.getElementById('announcementText');
+  const expandBtn = document.getElementById('btnAnnouncementExpand');
+  textEl.textContent = currentAnnouncementText || 'No announcements yet.';
+  textEl.classList.toggle('is-expanded', announcementExpanded);
+  expandBtn.hidden = currentAnnouncementText.length <= 120;
+  expandBtn.textContent = announcementExpanded ? 'Show less' : 'Show more';
+}
+
+async function loadAnnouncement() {
+  if (!sbConfigured()) return;
+  try {
+    const { data, error } = await sb.from('announcements').select('message').eq('id', 1).maybeSingle();
+    if (error) throw error;
+    renderAnnouncement(data && data.message);
+  } catch (e) { /* best effort */ }
+}
+
+function refreshAnnouncementMenuState() {
+  const loggedIn = isAdminLoggedIn();
+  document.getElementById('btnAdminLogin').hidden = loggedIn;
+  document.getElementById('btnAdminPost').hidden = !loggedIn;
+  document.getElementById('btnAdminLogout').hidden = !loggedIn;
+}
+
+function initAnnouncementWidget() {
+  const menuBtn = document.getElementById('btnAnnouncementMenu');
+  const menu = document.getElementById('announcementMenu');
+  refreshAnnouncementMenuState();
+
+  menuBtn.addEventListener('click', () => { menu.hidden = !menu.hidden; });
+  document.addEventListener('click', e => {
+    if (!menu.hidden && !e.target.closest('.announcement-menu-wrap')) menu.hidden = true;
+  });
+
+  document.getElementById('btnAnnouncementExpand').addEventListener('click', () => {
+    announcementExpanded = !announcementExpanded;
+    renderAnnouncement(currentAnnouncementText);
+  });
+
+  document.getElementById('btnAdminLogin').addEventListener('click', () => {
+    menu.hidden = true;
+    document.getElementById('adminLoginNote').textContent = '';
+    document.getElementById('adminLoginId').value = '';
+    document.getElementById('adminLoginPassword').value = '';
+    document.getElementById('adminLoginOverlay').hidden = false;
+  });
+  document.getElementById('btnAdminLogout').addEventListener('click', () => {
+    adminSession = { digitalId: null, password: null };
+    menu.hidden = true;
+    refreshAnnouncementMenuState();
+    showRestToast('Logged out of admin.');
+  });
+  document.getElementById('btnAdminPost').addEventListener('click', () => {
+    menu.hidden = true;
+    document.getElementById('adminPostText').value = currentAnnouncementText;
+    document.getElementById('adminPostNote').textContent = '';
+    document.getElementById('adminPostOverlay').hidden = false;
+  });
+
+  const loginOverlay = document.getElementById('adminLoginOverlay');
+  document.getElementById('btnCloseAdminLogin').addEventListener('click', () => { loginOverlay.hidden = true; });
+  loginOverlay.addEventListener('click', e => { if (e.target === loginOverlay) loginOverlay.hidden = true; });
+
+  document.getElementById('btnAdminLoginSubmit').addEventListener('click', async () => {
+    const id = document.getElementById('adminLoginId').value.trim();
+    const pw = document.getElementById('adminLoginPassword').value;
+    const noteEl = document.getElementById('adminLoginNote');
+    if (!id || !pw) { noteEl.textContent = 'Enter both Digital ID and password.'; return; }
+    if (!sbConfigured()) { noteEl.textContent = 'Not available offline.'; return; }
+    noteEl.textContent = 'Checking…';
+    try {
+      const { data, error } = await sb.rpc('verify_admin_login', { p_digital_id: id, p_password: pw });
+      if (error) throw error;
+      if (data === true) {
+        adminSession = { digitalId: id, password: pw };
+        loginOverlay.hidden = true;
+        refreshAnnouncementMenuState();
+        showRestToast('Admin unlocked.');
+      } else {
+        noteEl.textContent = 'Incorrect Digital ID or password.';
+      }
+    } catch (e) {
+      noteEl.textContent = 'Login failed — try again.';
+    }
+  });
+
+  const postOverlay = document.getElementById('adminPostOverlay');
+  document.getElementById('btnCloseAdminPost').addEventListener('click', () => { postOverlay.hidden = true; });
+  postOverlay.addEventListener('click', e => { if (e.target === postOverlay) postOverlay.hidden = true; });
+
+  document.getElementById('btnAdminPostSubmit').addEventListener('click', async () => {
+    const noteEl = document.getElementById('adminPostNote');
+    if (!isAdminLoggedIn()) { noteEl.textContent = 'Not logged in.'; return; }
+    const message = document.getElementById('adminPostText').value.trim();
+    noteEl.textContent = 'Posting…';
+    try {
+      const { error } = await sb.rpc('set_announcement', {
+        p_digital_id: adminSession.digitalId, p_password: adminSession.password, p_message: message,
+      });
+      if (error) throw error;
+      renderAnnouncement(message);
+      postOverlay.hidden = true;
+      showRestToast('Announcement posted.');
+    } catch (e) {
+      noteEl.textContent = 'Failed to post — try again.';
+    }
+  });
+
+  loadAnnouncement();
+}
+
 function initLeaderboard() {
   const optInEl = document.getElementById('lbOptIn');
   optInEl.checked = localStorage.getItem('wft_lb_optin') === '1';
@@ -6215,6 +6390,7 @@ try {
   initExport();
   initDrive();
   initLeaderboard();
+  initAnnouncementWidget();
   loadSetupForm();
   loadCheckinForm();
   loadQuickLog();

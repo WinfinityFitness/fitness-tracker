@@ -1461,6 +1461,56 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   gap: 6px;
 }
 .chat-invites-popover[hidden] { display: none; }
+
+/* ---------------- Nexus announcement ---------------- */
+.announcement-menu-wrap { position: relative; }
+.announcement-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  width: 180px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 4px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.announcement-menu[hidden] { display: none; }
+.announcement-menu-item {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  text-align: left;
+  font-size: 0.8rem;
+  padding: 8px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.announcement-menu-item:hover { background: var(--surface-2); color: var(--cyan); }
+.announcement-text {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 6px 0 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.announcement-text.is-expanded { -webkit-line-clamp: unset; overflow: visible; }
+.announcement-expand-btn {
+  background: none;
+  border: none;
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  padding: 4px 0 0;
+  cursor: pointer;
+}
+.announcement-expand-btn[hidden] { display: none; }
 .chat-invite-row {
   display: flex;
   flex-wrap: wrap;

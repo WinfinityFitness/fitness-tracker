@@ -639,6 +639,24 @@
       <div class="rank-list" id="lbFastestRunRanking"></div>
     </div>
 
+    <div class="chart-card announcement-card" id="announcementCard">
+      <div class="chart-card-head">
+        <p class="mod-tag" style="margin:0;">Nexus Announcement</p>
+        <div class="announcement-menu-wrap">
+          <button type="button" class="icon-btn glass-emboss" id="btnAnnouncementMenu" aria-label="Announcement menu">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="var(--cyan)" stroke="none"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+          </button>
+          <div class="announcement-menu" id="announcementMenu" hidden>
+            <button type="button" class="announcement-menu-item" id="btnAdminLogin">Admin Log In</button>
+            <button type="button" class="announcement-menu-item" id="btnAdminPost" hidden>Post Announcement</button>
+            <button type="button" class="announcement-menu-item" id="btnAdminLogout" hidden>Log Out</button>
+          </div>
+        </div>
+      </div>
+      <p class="announcement-text" id="announcementText">No announcements yet.</p>
+      <button type="button" class="announcement-expand-btn" id="btnAnnouncementExpand" hidden>Show more</button>
+    </div>
+
     <div class="chart-card" id="chatCard">
       <div class="chart-card-head">
         <p class="mod-tag" style="margin:0;">Comms channel // uplink stable</p>
@@ -1718,6 +1736,42 @@
       <img class="donation-qr-img" src="icons/gcash-donate-qr.png" alt="GCash QR code for donation">
       <p class="hint">Scan with the GCash app to send a donation. Thank you for supporting Winfinity!</p>
     </div>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="adminLoginOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Admin Log In</h2>
+      <button class="sheet-close" id="btnCloseAdminLogin">✕</button>
+    </div>
+    <label class="field">
+      <span>Digital ID</span>
+      <input type="text" id="adminLoginId" placeholder="WF-XXXXXX" autocomplete="off" autocapitalize="characters">
+    </label>
+    <label class="field">
+      <span>Password</span>
+      <input type="password" id="adminLoginPassword" autocomplete="off">
+    </label>
+    <button type="button" class="btn btn--primary" id="btnAdminLoginSubmit" style="width:100%;margin-top:10px;">Log In</button>
+    <p class="save-note" id="adminLoginNote"></p>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="adminPostOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Post Announcement</h2>
+      <button class="sheet-close" id="btnCloseAdminPost">✕</button>
+    </div>
+    <label class="field">
+      <span>Announcement message</span>
+      <textarea id="adminPostText" rows="4" maxlength="500"></textarea>
+    </label>
+    <button type="button" class="btn btn--primary" id="btnAdminPostSubmit" style="width:100%;margin-top:10px;">Post</button>
+    <p class="save-note" id="adminPostNote"></p>
   </div>
 </div>
 
