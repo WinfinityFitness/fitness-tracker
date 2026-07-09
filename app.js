@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.38';
+const APP_VERSION = 'WF_SYS_V.1.39';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1984,6 +1984,8 @@ function loadTrainingForDate(date) {
   const logs = getLogs();
   currentExercises = (logs[date] && logs[date].exercises) ? JSON.parse(JSON.stringify(logs[date].exercises)) : [];
   renderExerciseCards();
+  const label = document.getElementById('trainDateLabel');
+  if (label) label.textContent = fmtDate(parseISO(date));
 }
 
 function persistExercises() {
