@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.14';
+const APP_VERSION = 'WF_SYS_V.1.15';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -178,15 +178,17 @@ function getCalorieCarryover(date, profile) {
   const cutoff = parseISO(date);
   const cursor = parseISO(loggedDates[0]);
 
-  // Debt-only carryover: eating under target never banks a bonus for tomorrow
-  // (capped at 0 via Math.min), it only pays down existing debt. Eating over
-  // target adds the overflow as debt that shrinks tomorrow's allowance.
+  // Unused calories bank forward as a bonus for tomorrow; overeating banks
+  // forward as debt that shrinks tomorrow's allowance. Surplus banked
+  // (positive balance) is forfeited at each weekly reset (Monday); debt is
+  // never forgiven and persists until offset by future undereating.
   let balance = 0;
   while (cursor < cutoff) {
     const iso = cursor.getFullYear() + '-' + String(cursor.getMonth() + 1).padStart(2, '0') + '-' + String(cursor.getDate()).padStart(2, '0');
     const entry = logs[iso];
-    if (entry && entry.calories != null) balance = Math.min(0, balance + (target - entry.calories));
+    if (entry && entry.calories != null) balance += target - entry.calories;
     cursor.setDate(cursor.getDate() + 1);
+    if (cursor.getDay() === 1 && balance > 0) balance = 0; // crossed into Monday — forfeit unused surplus
   }
   return balance;
 }
