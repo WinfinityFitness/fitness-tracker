@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.58';
+const APP_VERSION = 'WF_SYS_V.1.60';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -145,6 +145,23 @@ function computeBodyFatJP7(skinfolds, age, gender) {
     ? 1.097 - 0.00046971 * sum + 0.00000056 * sum * sum - 0.00012828 * age
     : 1.112 - 0.00043499 * sum + 0.00000055 * sum * sum - 0.00028826 * age;
   return (495 / density) - 450;
+}
+
+function hasLoggedSkinfolds(entry) {
+  return !!(entry && entry.skinfolds && SKINFOLD_SITES.some(k => (entry.skinfolds[k] || 0) > 0));
+}
+
+// Most recent entry on or before `onOrBeforeDate` that actually has skinfold
+// data — lets the Body Fat widget keep showing your last known reading
+// instead of dropping to "–" on days you didn't re-measure.
+function findLastBodyFatEntry(onOrBeforeDate) {
+  const logsArr = sortedLogsArray();
+  let found = null;
+  for (const l of logsArr) {
+    if (l.date > onOrBeforeDate) break;
+    if (hasLoggedSkinfolds(l)) found = l;
+  }
+  return found;
 }
 
 function classifyBodyFat(pct, gender) {
@@ -587,6 +604,7 @@ function initTabs() {
       if (target === 'menu') {
         renderHistory();
         renderMeasureHistory();
+        renderBodyFatHistory();
       }
       updateTabDots();
     });
@@ -1355,18 +1373,29 @@ function readSkinfoldInputs() {
 
 function renderBodyFatWidget() {
   const profile = getProfile();
+  const date = document.getElementById('bioDate').value || todayISO();
   const skinfolds = readSkinfoldInputs();
   const sum = SKINFOLD_SITES.reduce((s, key) => s + skinfolds[key], 0);
   const age = profile ? profile.age : null;
   const gender = profile ? profile.gender : 'male';
-  const pct = (sum > 0 && age) ? computeBodyFatJP7(skinfolds, age, gender) : null;
+
+  let pct = (sum > 0 && age) ? computeBodyFatJP7(skinfolds, age, gender) : null;
+  let carriedFromDate = null;
+  if (pct == null) {
+    const last = findLastBodyFatEntry(date);
+    if (last) {
+      pct = last.bodyFatPct ?? computeBodyFatJP7(last.skinfolds, age, gender);
+      if (pct != null) carriedFromDate = last.date;
+    }
+  }
+
   const cls = classifyBodyFat(pct, gender);
   document.getElementById('bodyFatEmptyNote').hidden = pct != null;
   renderRing(document.getElementById('bodyFatRing'), pct != null ? Math.min(100, Math.max(0, pct)) : 0, {
     size: 130, stroke: 9,
     centerText: pct != null ? round2(pct) + '%' : '–',
     label: 'Body Fat',
-    sub: cls.label,
+    sub: carriedFromDate ? `${cls.label} · last logged ${fmtDate(parseISO(carriedFromDate))}` : cls.label,
   });
 }
 
@@ -1410,6 +1439,8 @@ function initBioLog() {
     updateLogFields(date, { skinfolds, bodyFatPct: bodyFatPct != null ? round2(bodyFatPct) : null });
     document.getElementById('skinfoldSaveNote').textContent = 'Saved skinfold measurements for ' + date;
     setTimeout(() => { document.getElementById('skinfoldSaveNote').textContent = ''; }, 2500);
+    renderBodyFatWidget();
+    renderBodyFatHistory();
   });
 
   loadBioForDate(todayISO());
@@ -4334,7 +4365,7 @@ async function fetchNutritionixNutrients(foodName) {
   return f;
 }
 
-function renderFoodSearchResults(usdaFoods, nixBranded) {
+function renderFoodSearchResults(usdaFoods, nixBranded, query) {
   const container = document.getElementById('foodSearchResults');
   const usdaRows = (usdaFoods || []).map(f => ({
     name: f.description,
@@ -4349,9 +4380,21 @@ function renderFoodSearchResults(usdaFoods, nixBranded) {
     onSelect: () => selectFoodProduct({ source: 'nutritionix', foodName: f.food_name }),
   }));
   const rows = usdaRows.concat(nixRows);
-  if (!rows.length) { container.innerHTML = ''; return; }
-  container.innerHTML = rows.map((r, i) => `
-    <button type="button" class="food-search-result-row" data-idx="${i}">
+  // The AI row is always appended (not just when the database search comes up
+  // empty) — visually distinct (--ai modifier) so it never reads as a real
+  // matched product, but always reachable in one tap instead of requiring a
+  // detour through the separate "Add custom food" section below.
+  const aiRow = query ? [{
+    name: `✨ Estimate "${query}" with AI`,
+    meta: 'Not an exact match — AI estimates per-100g nutrition, review before saving',
+    kcalLabel: '',
+    isAi: true,
+    onSelect: () => selectFoodProduct({ source: 'ai', foodName: query }),
+  }] : [];
+  const allRows = rows.concat(aiRow);
+  if (!allRows.length) { container.innerHTML = ''; return; }
+  container.innerHTML = allRows.map((r, i) => `
+    <button type="button" class="food-search-result-row${r.isAi ? ' food-search-result-row--ai' : ''}" data-idx="${i}">
       <div>
         <div class="food-result-name">${escapeHtml(r.name)}</div>
         <div class="food-result-meta">${escapeHtml(r.meta)}</div>
@@ -4360,7 +4403,7 @@ function renderFoodSearchResults(usdaFoods, nixBranded) {
     </button>
   `).join('');
   container.querySelectorAll('.food-search-result-row').forEach((btn, i) => {
-    btn.addEventListener('click', rows[i].onSelect);
+    btn.addEventListener('click', allRows[i].onSelect);
   });
 }
 
@@ -4430,6 +4473,24 @@ async function selectFoodProduct(selection) {
       sodium: (f.nf_sodium || 0) * scale,
     };
     defaultGrams = round0(gramsPerServing);
+  } else if (selection.source === 'ai') {
+    status.textContent = 'Estimating with AI…';
+    let est;
+    try {
+      est = await estimateFoodNutritionWithAI(selection.foodName);
+    } catch (e) {
+      status.textContent = e.message || 'AI estimate unavailable — try again or add custom.';
+      return;
+    }
+    name = selection.foodName;
+    per100g = {
+      calories: est.calories || 0,
+      protein: est.protein || 0,
+      carbs: est.carbs || 0,
+      fat: est.fat || 0,
+      fiber: est.fiber || 0,
+      sodium: est.sodium || 0,
+    };
   } else {
     let product = selection.product;
     if (!product.nutriments) {
@@ -4459,6 +4520,7 @@ async function selectFoodProduct(selection) {
   document.getElementById('selectedFoodGrams').value = defaultGrams;
   document.getElementById('selectedFoodUnit').value = 'g';
   document.getElementById('selectedFoodUnitWarning').hidden = true;
+  document.getElementById('selectedFoodAiWarning').hidden = selection.source !== 'ai';
   updateSelectedFoodPreview();
   document.getElementById('selectedFoodCard').hidden = false;
   document.getElementById('selectedFoodCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -4510,9 +4572,12 @@ function initAddFoodPanel() {
       try {
         const results = await searchUsdaFoods(q);
         const nixResults = await nixPromise;
-        renderFoodSearchResults(results, nixResults);
-        document.getElementById('foodSearchStatus').textContent = (results.length || nixResults.length) ? '' : 'No matches — try "Add custom food" below.';
+        renderFoodSearchResults(results, nixResults, q);
+        document.getElementById('foodSearchStatus').textContent = '';
       } catch (e) {
+        // Even if USDA/Nutritionix search itself fails (rate limit, offline),
+        // the AI fallback row still works — it's a separate request.
+        renderFoodSearchResults([], [], q);
         document.getElementById('foodSearchStatus').textContent = e.message || 'Search unavailable — check your connection.';
       }
     }, 450);
@@ -6233,6 +6298,34 @@ function renderMeasureHistory() {
   });
 }
 
+function renderBodyFatHistory() {
+  const logsArr = sortedLogsArray().slice().reverse().filter(hasLoggedSkinfolds);
+  const body = document.getElementById('bodyFatHistoryBody');
+  const emptyNote = document.getElementById('bodyFatHistoryEmptyNote');
+  body.innerHTML = '';
+  if (!logsArr.length) { emptyNote.hidden = false; return; }
+  emptyNote.hidden = true;
+  const profile = getProfile();
+  const age = profile ? profile.age : null;
+  const gender = profile ? profile.gender : 'male';
+  logsArr.forEach(l => {
+    const sf = l.skinfolds || {};
+    const c = v => v ?? '–';
+    const pct = l.bodyFatPct ?? computeBodyFatJP7(sf, age, gender);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${l.date}</td>
+      <td>${c(sf.chest)}</td>
+      <td>${c(sf.abdomen)}</td>
+      <td>${c(sf.thigh)}</td>
+      <td>${c(sf.triceps)}</td>
+      <td>${c(sf.suprailiac)}</td>
+      <td>${c(sf.subscapular)}</td>
+      <td>${c(sf.midaxillary)}</td>
+      <td>${pct != null ? round2(pct) + '%' : '–'}</td>`;
+    body.appendChild(tr);
+  });
+}
+
 /* ---------------------------------------------------------------- */
 /* CSV export + share                                                  */
 /* ---------------------------------------------------------------- */
@@ -6375,6 +6468,7 @@ function initExport() {
       renderDashboard();
       renderHistory();
       renderMeasureHistory();
+      renderBodyFatHistory();
     } catch (err) {
       alert('Could not read that backup file.');
     }

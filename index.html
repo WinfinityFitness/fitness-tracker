@@ -1024,6 +1024,23 @@
       </div>
       <p class="empty-note" id="measureHistoryEmptyNote">No measurements logged yet.</p>
     </div>
+
+    <div class="sheet-section">
+      <p class="mod-tag">Mod_bfhistory_18</p>
+      <p class="field-group-heading">Body Fat Percentage Log History</p>
+      <div class="table-wrap">
+        <table id="bodyFatHistoryTable">
+          <thead>
+            <tr>
+              <th>Date</th><th>Chest</th><th>Abdomen</th><th>Thigh</th><th>Triceps</th>
+              <th>Suprailiac</th><th>Subscapular</th><th>Midaxillary</th><th>Body Fat %</th>
+            </tr>
+          </thead>
+          <tbody id="bodyFatHistoryBody"></tbody>
+        </table>
+      </div>
+      <p class="empty-note" id="bodyFatHistoryEmptyNote">No skinfold measurements logged yet.</p>
+    </div>
   </section>
 
 </main>
@@ -1721,6 +1738,7 @@
         </label>
       </div>
       <p class="hint hint--warning" id="selectedFoodUnitWarning" hidden>⚠️ Approximate conversion — weigh in grams for exact accuracy.</p>
+      <p class="hint hint--warning" id="selectedFoodAiWarning" hidden>✨ AI estimate — review before saving, may not be accurate.</p>
       <p class="selected-food-preview" id="selectedFoodPreview"></p>
       <button type="button" class="btn btn--primary" id="btnAddSelectedFood">Add to diary</button>
     </div>

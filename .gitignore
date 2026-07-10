@@ -1,0 +1,3 @@
+# Local-only Android TWA build project (Gradle caches, signing keystore,
+# compiled APKs) — not part of the deployed web app, stays local.
+android-twa/

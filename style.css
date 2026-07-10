@@ -2232,6 +2232,13 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   font-family: inherit;
 }
 .food-search-result-row:hover { border-color: var(--cyan); }
+.food-search-result-row--ai {
+  background: var(--surface-1);
+  border-style: dashed;
+  border-color: var(--violet);
+}
+.food-search-result-row--ai:hover { border-color: var(--violet); }
+.food-search-result-row--ai .food-result-name { color: var(--violet); }
 .food-result-name { font-size: 0.85rem; font-weight: 700; color: var(--text-primary); }
 .food-result-meta { font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-muted); }
 .food-result-kcal { flex: none; font-family: var(--font-mono); color: var(--cyan); font-size: 0.82rem; }
