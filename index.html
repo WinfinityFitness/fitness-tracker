@@ -919,6 +919,40 @@
     </button>
 
     <div class="sheet-section">
+      <p class="mod-tag">Mod_review_daily_11</p>
+      <p class="field-group-heading">Daily Review</p>
+      <form id="dailyReviewForm">
+        <label class="field">
+          <span>Date</span>
+          <input type="date" id="dailyReviewDate" class="date-picker-trigger" required readonly>
+        </label>
+        <label class="field">
+          <span>What is your struggles today?</span>
+          <textarea id="dailyReviewStruggle" rows="2"></textarea>
+        </label>
+        <label class="field">
+          <span>How do you think you can fix that struggle?</span>
+          <textarea id="dailyReviewFix" rows="2"></textarea>
+        </label>
+        <fieldset class="field-group">
+          <p class="field-group-heading" style="font-size:0.8rem;">Did you fill in complete?</p>
+          <label class="field field--checkbox"><input type="checkbox" id="drCheckWeight" disabled><span>Morning Weight</span></label>
+          <label class="field field--checkbox"><input type="checkbox" id="drCheckSleep" disabled><span>Sleep Quality</span></label>
+          <label class="field field--checkbox"><input type="checkbox" id="drCheckSteps" disabled><span>Day Steps</span></label>
+          <label class="field field--checkbox"><input type="checkbox" id="drCheckLevels" disabled><span>Stress/Fatigue/Hunger levels</span></label>
+          <label class="field field--checkbox"><input type="checkbox" id="drCheckWater" disabled><span>Water intake</span></label>
+          <label class="field field--checkbox"><input type="checkbox" id="drCheckTraining" disabled><span>Training</span></label>
+          <label class="field field--checkbox"><input type="checkbox" id="drCheckCalories" disabled><span>Calories</span></label>
+          <label class="field field--checkbox"><input type="checkbox" id="drCheckProtein" disabled><span>Protein</span></label>
+          <label class="field field--checkbox"><input type="checkbox" id="drCheckCardio" disabled><span>Cardio (optional)</span></label>
+        </fieldset>
+        <p class="hint hint--sm">The checklist above fills in automatically from what you've already logged that day — it's not something you check by hand.</p>
+        <button type="submit" class="btn btn--primary">Save daily review</button>
+        <p class="save-note" id="dailyReviewSaveNote"></p>
+      </form>
+    </div>
+
+    <div class="sheet-section">
       <p class="mod-tag">Mod_review_12</p>
       <p class="field-group-heading">Weekly Review</p>
       <form id="reviewForm">
@@ -956,7 +990,7 @@
       </form>
     </div>
 
-    <div class="sheet-section">
+    <div class="sheet-section sheet-section--compact">
       <p class="mod-tag">Mod_export_13</p>
       <p class="field-group-heading">Export &amp; Email</p>
       <div class="btn-row">
@@ -966,7 +1000,7 @@
       <p class="hint">Tap Export, then choose your email app from the share sheet to send the CSV as an attachment. If sharing isn't supported, the file downloads and you can attach it manually.</p>
     </div>
 
-    <div class="sheet-section">
+    <div class="sheet-section sheet-section--compact">
       <p class="mod-tag">Mod_backup_14</p>
       <p class="field-group-heading">Backup</p>
       <div class="section-title-row">
@@ -987,7 +1021,7 @@
       <p class="hint">Your data lives only on this device. Save a backup occasionally in case you clear browser data or switch phones.</p>
     </div>
 
-    <div class="sheet-section">
+    <div class="sheet-section sheet-section--compact">
       <p class="mod-tag">Mod_gdrive_15</p>
       <p class="field-group-heading">Google Drive Backup</p>
       <p class="hint" id="driveStatus">Not connected.</p>

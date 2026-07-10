@@ -926,11 +926,17 @@ button.mission-log-day:hover { border-color: var(--cyan); }
 .hint--accent { color: var(--cyan); background: var(--surface-2); border: 1px solid var(--cyan-dim); border-radius: 5px; padding: 8px 10px; }
 .hint--warning { color: var(--warning); background: var(--surface-2); border: 1px solid var(--warning); border-radius: 5px; padding: 6px 10px; }
 .hint--sm { font-size: 0.68rem; margin: 3px 0 0; line-height: 1.35; }
-.skinfold-grid { display: flex; flex-direction: column; gap: 12px; margin: 10px 0; }
-.caliper-entry-toggle { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; }
+.skinfold-grid { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
+.skinfold-grid .field { margin-bottom: 0; gap: 2px; }
+.skinfold-grid .field > span { font-size: 0.78rem; }
+.skinfold-grid .field input[type="number"] { padding: 7px 8px; font-size: 0.9rem; }
+.skinfold-grid .hint--sm { margin: 0; }
+.caliper-entry-toggle { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; padding: 8px 12px; font-size: 0.82rem; }
 .caliper-entry-chevron { transition: transform 0.2s ease; flex: none; }
 .caliper-entry-toggle[aria-expanded="true"] .caliper-entry-chevron { transform: rotate(180deg); }
-.caliper-entry-panel { margin-top: 12px; }
+.caliper-entry-panel { margin-top: 8px; }
+.caliper-entry-panel > .hint { margin: 0 0 6px; font-size: 0.74rem; }
+.caliper-entry-panel .btn--primary { padding: 9px 14px; font-size: 0.84rem; }
 
 .computed-card {
   background: var(--surface-1);
@@ -2529,6 +2535,12 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   backdrop-filter: none;
 }
 .sheet-section { margin-bottom: 22px; }
+.sheet-section--compact { margin-bottom: 14px; }
+.sheet-section--compact .field-group-heading { margin: 0 0 6px; font-size: 0.86rem; }
+.sheet-section--compact .hint { font-size: 0.72rem; margin: 5px 0 3px; line-height: 1.35; }
+.sheet-section--compact .btn-row { gap: 8px; margin: 6px 0; }
+.sheet-section--compact .btn-row .btn { padding: 9px 12px; font-size: 0.8rem; min-width: 110px; }
+.sheet-section--compact .section-title-row { margin: 4px 0 -2px; }
 
 /* ---------------- Custom background upload (Settings) ---------------- */
 .bg-upload-row { display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
@@ -2557,9 +2569,16 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
    variables per theme, so it works unchanged across every skin/mode. */
 :root { --widget-fill-pct: 100%; }
 .chart-card, .stat-tile, .ring-card, .computed-card {
+  /* Fallback for browsers that don't parse color-mix() (older iOS Safari) —
+     without this, an unsupported color-mix() declaration is dropped entirely
+     and the box falls back to the initial "transparent" background instead
+     of just ignoring the slider. Cascade: the later, valid declaration wins
+     wherever color-mix() IS supported; elsewhere this plain color remains. */
+  background: var(--surface-1);
   background: color-mix(in srgb, var(--surface-1) var(--widget-fill-pct), transparent);
 }
 .hero-card {
+  background: linear-gradient(160deg, var(--surface-2), var(--surface-1));
   background: linear-gradient(160deg,
     color-mix(in srgb, var(--surface-2) var(--widget-fill-pct), transparent),
     color-mix(in srgb, var(--surface-1) var(--widget-fill-pct), transparent));

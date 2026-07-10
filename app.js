@@ -2,12 +2,12 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.84';
+const APP_VERSION = 'WF_SYS_V.1.87';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
 /* ---------------------------------------------------------------- */
-const KEYS = { profile: 'wft_profile', logs: 'wft_logs', reviews: 'wft_reviews' };
+const KEYS = { profile: 'wft_profile', logs: 'wft_logs', reviews: 'wft_reviews', dailyReviews: 'wft_daily_reviews' };
 
 function getProfile() {
   try { return JSON.parse(localStorage.getItem(KEYS.profile)) || null; }
@@ -55,6 +55,12 @@ function getReviews() {
   catch { return {}; }
 }
 function saveReviews(r) { localStorage.setItem(KEYS.reviews, JSON.stringify(r)); }
+
+function getDailyReviews() {
+  try { return JSON.parse(localStorage.getItem(KEYS.dailyReviews)) || {}; }
+  catch { return {}; }
+}
+function saveDailyReviews(r) { localStorage.setItem(KEYS.dailyReviews, JSON.stringify(r)); }
 
 /* ---------------------------------------------------------------- */
 /* Unit conversions (canonical storage: kg, cm)                      */
@@ -673,6 +679,7 @@ function initTabs() {
         renderHistory();
         renderMeasureHistory();
         renderBodyFatHistory();
+        renderDailyReviewChecklist(document.getElementById('dailyReviewDate').value || todayISO());
       }
       updateTabDots();
     });
@@ -1570,7 +1577,7 @@ function renderWaterRetentionOrb() {
 
   if (!tbwLiters) {
     renderRing(container, 0, {
-      size: 108, stroke: 8, magenta: true, modTag: 'MOD_WATER_04',
+      size: 108, stroke: 8, magenta: true,
       centerText: '–', label: 'Edema extrapolation', sub: 'Complete Bio profile to estimate',
     });
     return;
@@ -1599,7 +1606,7 @@ function renderWaterRetentionOrb() {
   const gaugePct = Math.min(100, (totalG / 3500) * 100);
 
   renderRing(container, gaugePct, {
-    size: 108, stroke: 8, magenta: true, modTag: 'MOD_WATER_04',
+    size: 108, stroke: 8, magenta: true,
     centerText: round0(totalG) + 'g', label: 'Edema extrapolation', sub: `Estimate for ${fmtDate(parseISO(date))}`,
   });
 }
@@ -6439,6 +6446,69 @@ function renderNutritionAverages() {
 }
 
 /* ---------------------------------------------------------------- */
+/* Daily review                                                         */
+/* ---------------------------------------------------------------- */
+function computeDailyReviewChecklist(date) {
+  const entry = getLogs()[date] || {};
+  return {
+    weight: entry.weightKg != null,
+    sleep: entry.sleep != null,
+    steps: entry.steps != null,
+    levels: entry.stress != null && entry.fatigue != null && entry.hunger != null,
+    water: !!entry.water,
+    training: !!(entry.exercises && entry.exercises.length > 0),
+    calories: entry.calories != null,
+    protein: entry.protein != null,
+    cardio: !!(entry.cardioSessions && entry.cardioSessions.length > 0),
+  };
+}
+
+function renderDailyReviewChecklist(date) {
+  const c = computeDailyReviewChecklist(date);
+  document.getElementById('drCheckWeight').checked = c.weight;
+  document.getElementById('drCheckSleep').checked = c.sleep;
+  document.getElementById('drCheckSteps').checked = c.steps;
+  document.getElementById('drCheckLevels').checked = c.levels;
+  document.getElementById('drCheckWater').checked = c.water;
+  document.getElementById('drCheckTraining').checked = c.training;
+  document.getElementById('drCheckCalories').checked = c.calories;
+  document.getElementById('drCheckProtein').checked = c.protein;
+  document.getElementById('drCheckCardio').checked = c.cardio;
+}
+
+function loadDailyReviewForDate(date) {
+  const reviews = getDailyReviews();
+  const r = reviews[date] || {};
+  document.getElementById('dailyReviewStruggle').value = r.struggle || '';
+  document.getElementById('dailyReviewFix').value = r.fix || '';
+  renderDailyReviewChecklist(date);
+}
+
+function initDailyReviewForm() {
+  const form = document.getElementById('dailyReviewForm');
+  const dateInput = document.getElementById('dailyReviewDate');
+  dateInput.value = todayISO();
+
+  dateInput.addEventListener('change', () => loadDailyReviewForDate(dateInput.value));
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const date = dateInput.value;
+    const reviews = getDailyReviews();
+    reviews[date] = {
+      date,
+      struggle: document.getElementById('dailyReviewStruggle').value,
+      fix: document.getElementById('dailyReviewFix').value,
+    };
+    saveDailyReviews(reviews);
+    document.getElementById('dailyReviewSaveNote').textContent = 'Saved daily review for ' + date;
+    setTimeout(() => { document.getElementById('dailyReviewSaveNote').textContent = ''; }, 2000);
+  });
+
+  loadDailyReviewForDate(todayISO());
+}
+
+/* ---------------------------------------------------------------- */
 /* Weekly review                                                        */
 /* ---------------------------------------------------------------- */
 function initReviewForm() {
@@ -8420,6 +8490,7 @@ safeInit(initAddFoodPanel, 'initAddFoodPanel');
 safeInit(initManualIntake, 'initManualIntake');
 safeInit(initBarcodeScanner, 'initBarcodeScanner');
 safeInit(initBioLog, 'initBioLog');
+safeInit(initDailyReviewForm, 'initDailyReviewForm');
 safeInit(initReviewForm, 'initReviewForm');
 safeInit(initExport, 'initExport');
 safeInit(initDrive, 'initDrive');
