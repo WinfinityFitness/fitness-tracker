@@ -1954,6 +1954,18 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   background: var(--critical);
   box-shadow: 0 0 4px var(--critical);
 }
+.mission-log-day.is-has-data { position: relative; }
+.mission-log-data-dot {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 4px var(--cyan-glow);
+}
 .mission-log-day.is-reset { position: relative; cursor: pointer; }
 .mission-log-reset-dot {
   position: absolute;

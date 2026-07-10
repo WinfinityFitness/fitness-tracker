@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.95';
+const APP_VERSION = 'WF_SYS_V.1.97';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -3053,6 +3053,7 @@ function initCardioTracker() {
   styleBtn.addEventListener('click', () => {
     setCardioMapStyle(getCardioMapStyle() === 'satellite' ? 'road' : 'satellite');
   });
+  initClickToRevealHint('btnToggleActivityHistory', 'activityHistoryPanel');
   renderCardioHistory();
 }
 
@@ -3087,6 +3088,21 @@ function getPeriodDaysSet() {
   });
   return set;
 }
+
+// Generic "which days have data" set builder for the shared date-picker's
+// highlight dots — each calendar marks the days relevant to whatever
+// widget/tab opened it, not just workout days.
+function getLogDaysSet(predicate) {
+  const logs = getLogs();
+  const set = new Set();
+  Object.keys(logs).forEach(date => { if (predicate(logs[date])) set.add(date); });
+  return set;
+}
+function getNutritionDaysSet() { return getLogDaysSet(l => l.calories != null); }
+function getBioDaysSet() {
+  return getLogDaysSet(l => (l.stress != null && l.fatigue != null && l.hunger != null) || hasLoggedSkinfolds(l));
+}
+function getMeasurementDaysSet() { return getLogDaysSet(l => !!l.measurements); }
 
 function renderMissionLogCalendar() {
   const year = missionLogViewDate.getFullYear();
@@ -3170,6 +3186,9 @@ function initMissionLog() {
 /* ---------------------------------------------------------------- */
 let datePickerViewDate = new Date();
 let datePickerTargetInput = null;
+// Optional Set of ISO dates to mark with a dot (e.g. days that already have
+// saved Daily Review data) — set per-picker-open, cleared when not relevant.
+let datePickerHighlightDates = null;
 
 function renderDatePickerGrid(selectedIso) {
   const year = datePickerViewDate.getFullYear();
@@ -3187,7 +3206,10 @@ function renderDatePickerGrid(selectedIso) {
   for (let i = 0; i < firstWeekday; i++) cells.push({ day: daysInPrevMonth - firstWeekday + 1 + i, muted: true });
   for (let d = 1; d <= daysInMonth; d++) {
     const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    cells.push({ day: d, iso, isToday: iso === todayIso, isSelected: iso === selectedIso });
+    cells.push({
+      day: d, iso, isToday: iso === todayIso, isSelected: iso === selectedIso,
+      hasData: !!(datePickerHighlightDates && datePickerHighlightDates.has(iso)),
+    });
   }
   let nextDay = 1;
   while (cells.length % 7 !== 0) cells.push({ day: nextDay++, muted: true });
@@ -3197,16 +3219,19 @@ function renderDatePickerGrid(selectedIso) {
     const classes = ['mission-log-day'];
     if (c.isToday) classes.push('is-today');
     if (c.isSelected) classes.push('is-selected');
+    if (c.hasData) classes.push('is-has-data');
     if (c.muted) { classes.push('is-muted'); return `<div class="${classes.join(' ')}">${c.day}</div>`; }
-    return `<button type="button" class="${classes.join(' ')}" data-iso="${c.iso}">${c.day}</button>`;
+    const dot = c.hasData ? '<span class="mission-log-data-dot"></span>' : '';
+    return `<button type="button" class="${classes.join(' ')}" data-iso="${c.iso}">${c.day}${dot}</button>`;
   }).join('');
 }
 
-function openDatePicker(inputEl, title) {
+function openDatePicker(inputEl, title, highlightDates) {
   const current = inputEl.value;
   const base = current ? parseISO(current) : new Date();
   datePickerViewDate = new Date(base.getFullYear(), base.getMonth(), 1);
   datePickerTargetInput = inputEl;
+  datePickerHighlightDates = highlightDates || null;
   document.getElementById('datePickerTitle').textContent = title || 'Select Date';
   renderDatePickerGrid(current);
   document.getElementById('datePickerOverlay').hidden = false;
@@ -3241,9 +3266,29 @@ function initDatePicker() {
     reviewDate: 'Week Ending', setupStartDate: 'Challenge Start', measureDate: 'Measurement Date',
     foodDiaryDateInput: 'Food Diary Date',
     coachRefeedStart: 'Refeed Start', coachRefeedEnd: 'Refeed End',
+    dailyReviewDate: 'Daily Review Date',
+  };
+  // Each entry marks, on that input's calendar, the days that already have
+  // data relevant to it — training days on trainDate, nutrition days on
+  // nutDate, etc. Inputs with no "has logs" concept (challenge start date,
+  // refeed range picks) are simply omitted, leaving their calendar plain.
+  const DATE_PICKER_HIGHLIGHT_SETS = {
+    trainDate: getWorkoutDaysSet,
+    nutDate: getNutritionDaysSet,
+    foodDiaryDateInput: getNutritionDaysSet,
+    bioDate: getBioDaysSet,
+    measureDate: getMeasurementDaysSet,
+    reviewDate: () => new Set(Object.keys(getReviews())),
+    dailyReviewDate: () => {
+      const reviews = getDailyReviews();
+      return new Set(Object.keys(reviews).filter(d => reviews[d] && (reviews[d].struggle || reviews[d].fix)));
+    },
   };
   document.querySelectorAll('.date-picker-trigger').forEach(input => {
-    input.addEventListener('click', () => openDatePicker(input, titles[input.id] || 'Select Date'));
+    input.addEventListener('click', () => {
+      const getHighlight = DATE_PICKER_HIGHLIGHT_SETS[input.id];
+      openDatePicker(input, titles[input.id] || 'Select Date', getHighlight ? getHighlight() : null);
+    });
   });
 }
 

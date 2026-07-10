@@ -361,9 +361,14 @@
       </button>
     </div>
 
-    <h2 class="section-title">Activity history</h2>
-    <div class="cardio-history" id="cardioHistory"></div>
-    <p class="empty-note" id="cardioHistoryEmpty">No outdoor activities logged yet.</p>
+    <button type="button" class="btn caliper-entry-toggle" id="btnToggleActivityHistory" aria-expanded="false">
+      <span>Activity History</span>
+      <svg viewBox="0 0 24 24" width="16" height="16" class="caliper-entry-chevron" id="activityHistoryChevron" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+    <div class="caliper-entry-panel" id="activityHistoryPanel" hidden>
+      <div class="cardio-history" id="cardioHistory"></div>
+      <p class="empty-note" id="cardioHistoryEmpty">No outdoor activities logged yet.</p>
+    </div>
   </section>
 
   <!-- ============ NUTRITION / FUEL ============ -->
