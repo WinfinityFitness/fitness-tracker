@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fittracker-v166';
+const CACHE_NAME = 'fittracker-v170';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -13,6 +13,8 @@ const CORE_ASSETS = [
   './icons/bg-pattern.svg',
   './icons/bg-pattern-light.svg',
   './data/exercises.json',
+  './fonts/archivo-narrow.woff2',
+  './fonts/montserrat-heavy.woff2',
 ];
 
 self.addEventListener('install', event => {

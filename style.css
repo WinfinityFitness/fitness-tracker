@@ -33,6 +33,10 @@
   --card-radius: 5px;
   --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Roboto Mono", monospace;
   --font-display: system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* No-op for the default skin (equals --font-display) — only a skin like
+     Shinobi Core below gives headline-styled elements a distinct typeface
+     from body/label text. */
+  --font-headline: var(--font-display);
 }
 
 /* "Bright Core" light theme — same variable names, so every component
@@ -2294,4 +2298,170 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-head h2 { font-family: var(--font-mono); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.06em; margin: 0; color: var(--cyan); }
 .sheet-close { background: none; border: none; color: var(--text-muted); font-size: 1.3rem; cursor: pointer; padding: 4px 8px; }
+
+/* ================================================================== */
+/* SKIN: Shinobi Core — brutalist / manga-panel reskin.                */
+/* Self-hosted fonts (offline-first, matches this app's existing        */
+/* zero-external-request policy for the light theme) — see fonts/.      */
+/* ================================================================== */
+@font-face {
+  font-family: 'Archivo Narrow';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('fonts/archivo-narrow.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Shinobi Montserrat';
+  font-style: normal;
+  font-weight: 800 900;
+  font-display: swap;
+  src: url('fonts/montserrat-heavy.woff2') format('woff2');
+}
+
+/* Dark (default when this skin is selected, i.e. no data-theme="light"). */
+:root[data-skin="shinobi-core"] {
+  --bg: #1b110a;
+  --bg-elevated: #281d15;
+  --surface-1: #241912;
+  --surface-2: #281d15;
+  --border: #a58c7b;
+  --border-soft: #564334;
+  --text-primary: #f3dfd1;
+  --text-secondary: #ddc1ae;
+  --text-muted: #a58c7b;
+  --gridline: rgba(165, 140, 123, 0.25);
+  --baseline: #a58c7b;
+
+  --cyan: #ffb77f;
+  --cyan-dim: #914c00;
+  --cyan-glow: rgba(255, 138, 0, 0.42);
+  --violet: #c4c5db;
+  --magenta: #ffb4ab;
+
+  --series-1: #ffb77f;
+  --series-2: #c4c5db;
+  --gradient-bar: linear-gradient(90deg, #c4c5db 0%, #ffb77f 100%);
+  --gradient-glow: rgba(255, 138, 0, 0.36);
+
+  --good: #8bb26a;
+  --warning: #e8b339;
+  --serious: #d1652f;
+  --critical: #ffb4ab;
+
+  --surface-translucent: rgba(27, 17, 10, 0.9);
+  --nav-translucent: rgba(21, 12, 6, 0.92);
+
+  --card-radius: 0;
+  --font-mono: 'Archivo Narrow', ui-monospace, monospace;
+  --font-display: 'Archivo Narrow', system-ui, sans-serif;
+  --font-headline: 'Shinobi Montserrat', system-ui, sans-serif;
+}
+
+/* Light — the same "manga page" logic as the brand brief's ink-on-paper
+   panels: warm paper surfaces, black ink text/borders, orange as the one
+   spot color. Not given explicit tokens in the brand brief (only one,
+   dark, palette was supplied) — derived to fit the same design language. */
+:root[data-skin="shinobi-core"][data-theme="light"] {
+  --bg: #f5ede3;
+  --bg-elevated: #fffaf3;
+  --surface-1: #fffaf3;
+  --surface-2: #ede1d1;
+  --border: #1b110a;
+  --border-soft: #d8c9b3;
+  --text-primary: #1b110a;
+  --text-secondary: #4a3a2c;
+  --text-muted: #7c6b58;
+  --gridline: rgba(27, 17, 10, 0.1);
+  --baseline: #cbb89e;
+
+  --cyan: #d9720a;
+  --cyan-dim: #a85400;
+  --cyan-glow: rgba(217, 114, 10, 0.28);
+  --violet: #46485a;
+  --magenta: #b3261e;
+
+  --series-1: #d9720a;
+  --series-2: #46485a;
+  --gradient-bar: linear-gradient(90deg, #46485a 0%, #d9720a 100%);
+  --gradient-glow: rgba(217, 114, 10, 0.24);
+
+  --good: #3f6b21;
+  --warning: #8a5a00;
+  --serious: #a13d0f;
+  --critical: #ba1a1a;
+
+  --surface-translucent: rgba(245, 237, 227, 0.92);
+  --nav-translucent: rgba(255, 250, 243, 0.94);
+}
+
+/* Structural brutalist treatment: sharp corners everywhere (the base
+   stylesheet has ~60 scattered hardcoded border-radius values, hence the
+   blanket override rather than hunting each one down), thick ink borders,
+   hard-offset shadows instead of soft glow, loud uppercase headlines.
+   Entirely scoped to this skin — the default skin's rounded, glow-heavy
+   look is untouched. */
+[data-skin="shinobi-core"] * {
+  border-radius: 0 !important;
+}
+[data-skin="shinobi-core"] .hero-title,
+[data-skin="shinobi-core"] .chart-card-title,
+[data-skin="shinobi-core"] .section-title,
+[data-skin="shinobi-core"] .app-header h1,
+[data-skin="shinobi-core"] .sheet-head h2,
+[data-skin="shinobi-core"] .field-group-heading {
+  font-family: var(--font-headline);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+[data-skin="shinobi-core"] .hero-card,
+[data-skin="shinobi-core"] .chart-card,
+[data-skin="shinobi-core"] .stat-tile,
+[data-skin="shinobi-core"] .ring-card,
+[data-skin="shinobi-core"] .computed-card {
+  border-width: 3px;
+  border-style: solid;
+  box-shadow: 5px 5px 0 0 var(--text-primary);
+}
+[data-skin="shinobi-core"] .btn {
+  border-width: 3px;
+  border-style: solid;
+  border-color: var(--text-primary);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  box-shadow: 4px 4px 0 0 var(--text-primary);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+[data-skin="shinobi-core"] .btn:active {
+  transform: translate(3px, 3px);
+  box-shadow: 1px 1px 0 0 var(--text-primary);
+}
+[data-skin="shinobi-core"] .btn--primary {
+  background: var(--cyan);
+  color: var(--bg);
+  text-shadow: none;
+}
+[data-skin="shinobi-core"] input,
+[data-skin="shinobi-core"] select,
+[data-skin="shinobi-core"] textarea {
+  border-width: 2px !important;
+  border-style: solid;
+  border-color: var(--text-primary);
+}
+[data-skin="shinobi-core"] input:focus,
+[data-skin="shinobi-core"] select:focus,
+[data-skin="shinobi-core"] textarea:focus {
+  border-width: 3px !important;
+  outline: none;
+}
+[data-skin="shinobi-core"] .tab-bar {
+  border-top: 3px solid var(--text-primary);
+  backdrop-filter: none;
+  background: var(--nav-translucent);
+}
+[data-skin="shinobi-core"] .app-header {
+  border-bottom: 3px solid var(--text-primary);
+  backdrop-filter: none;
+}
 .sheet-section { margin-bottom: 22px; }

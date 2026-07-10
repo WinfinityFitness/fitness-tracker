@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.67';
+const APP_VERSION = 'WF_SYS_V.1.71';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1561,10 +1561,13 @@ function loadCheckinForm() {
 /* ---------------------------------------------------------------- */
 /* Status: quick log (Start Day / End Day / Weekend floating logs)     */
 /* ---------------------------------------------------------------- */
-function openStartDayLog() {
+// Populates the sheet's fields for whichever date is selected — called both
+// on first open (today) and whenever the date field itself changes, so a
+// previous day can be picked and edited manually rather than only today.
+function loadStartDayLogFields(date) {
   const profile = getProfile();
   const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
-  const e = getLogs()[todayISO()] || {};
+  const e = getLogs()[date] || {};
   document.getElementById('sdlWeight').value = e.weightKg != null ? round2(fromKg(e.weightKg, wu)) : '';
   document.getElementById('sdlWeightUnitLabel').textContent = wu;
   document.getElementById('sdlSleep').value = e.sleep ?? 3;
@@ -1572,13 +1575,19 @@ function openStartDayLog() {
   document.getElementById('sdlWater250').checked = false;
   document.getElementById('sdlSaveNote').textContent = '';
   document.getElementById('btnShareFromStartDayLog').hidden = true;
+}
+
+function openStartDayLog() {
+  const date = todayISO();
+  document.getElementById('sdlDate').value = date;
+  loadStartDayLogFields(date);
   document.getElementById('startDayLogOverlay').hidden = false;
 }
 
 function saveStartDayLog() {
   const profile = getProfile();
   const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
-  const date = todayISO();
+  const date = document.getElementById('sdlDate').value || todayISO();
   const weightRaw = parseFloat(document.getElementById('sdlWeight').value);
   const partial = {
     weightKg: isNaN(weightRaw) ? null : toKg(weightRaw, wu),
@@ -1594,16 +1603,21 @@ function saveStartDayLog() {
   document.getElementById('btnShareFromStartDayLog').hidden = false;
   renderDashboard();
   if (profile) renderComputedTargets(profile);
-  refreshFuelWaterViews(date);
+  // Refresh the Fuel tab's own currently-selected date, not necessarily the
+  // date just edited here — passing the edited date directly would make the
+  // water orb silently show a past day's data while the rest of the Fuel
+  // tab still shows whatever date it actually has selected.
+  refreshFuelWaterViews(document.getElementById('nutDate').value || todayISO());
   renderNutritionTargets();
   renderNutritionAverages();
   if (document.getElementById('bioDate').value === date) loadBioForDate(date);
   updateTabDots();
 }
 
-function openEndDayLog() {
+// Same as loadStartDayLogFields — populates for whichever date is selected,
+// called on open (today) and whenever the date field changes.
+function loadEndDayLogFields(date) {
   const profile = getProfile();
-  const date = todayISO();
   const e = getLogs()[date] || {};
   document.getElementById('edlSteps').value = e.steps ?? '';
   document.getElementById('edlWorkoutDone').checked = !!e.workoutDone;
@@ -1629,12 +1643,18 @@ function openEndDayLog() {
 
   document.getElementById('edlSaveNote').textContent = '';
   document.getElementById('btnShareFromEndDayLog').hidden = true;
+}
+
+function openEndDayLog() {
+  const date = todayISO();
+  document.getElementById('edlDate').value = date;
+  loadEndDayLogFields(date);
   document.getElementById('endDayLogOverlay').hidden = false;
 }
 
 function saveEndDayLog() {
   const profile = getProfile();
-  const date = todayISO();
+  const date = document.getElementById('edlDate').value || todayISO();
   updateLogFields(date, {
     steps: parseIntOrNull(document.getElementById('edlSteps').value),
     workoutDone: document.getElementById('edlWorkoutDone').checked,
@@ -1693,6 +1713,7 @@ function initQuickLogLaunchers() {
   document.getElementById('btnCloseStartDayLog').addEventListener('click', () => { document.getElementById('startDayLogOverlay').hidden = true; });
   document.getElementById('startDayLogOverlay').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.hidden = true; });
   document.getElementById('sdlSleep').addEventListener('input', e => { document.getElementById('sdlSleepOut').textContent = e.target.value; });
+  document.getElementById('sdlDate').addEventListener('change', e => loadStartDayLogFields(e.target.value || todayISO()));
   document.getElementById('btnSaveStartDayLog').addEventListener('click', saveStartDayLog);
   document.getElementById('btnShareFromStartDayLog').addEventListener('click', () => {
     document.getElementById('startDayLogOverlay').hidden = true;
@@ -1705,6 +1726,7 @@ function initQuickLogLaunchers() {
   ['edlFatigue', 'edlStress', 'edlHunger'].forEach(id => {
     document.getElementById(id).addEventListener('input', e => { document.getElementById(id + 'Out').textContent = e.target.value; });
   });
+  document.getElementById('edlDate').addEventListener('change', e => loadEndDayLogFields(e.target.value || todayISO()));
   document.getElementById('btnSaveEndDayLog').addEventListener('click', saveEndDayLog);
   document.getElementById('btnShareFromEndDayLog').addEventListener('click', () => {
     document.getElementById('endDayLogOverlay').hidden = true;
@@ -4092,27 +4114,32 @@ let customFoodAiPer100g = null;
 // same caveat as any direct total-override: if the Dietary Algorithm is
 // used for this date afterward, saving a meal there recomputes and
 // overwrites these totals from the (possibly empty) meals list.
+function loadManualIntakeFields(date) {
+  const e = getLogs()[date] || {};
+  document.getElementById('manualIntakeCalories').value = e.calories ?? '';
+  document.getElementById('manualIntakeProtein').value = e.protein ?? '';
+  document.getElementById('manualIntakeCarbs').value = e.carbs ?? '';
+  document.getElementById('manualIntakeFat').value = e.fat ?? '';
+  document.getElementById('manualIntakeFiber').value = e.fiber ?? '';
+  document.getElementById('manualIntakeSodium').value = e.sodium ?? '';
+  document.getElementById('manualIntakeNote').textContent = '';
+}
+
 function initManualIntake() {
   const overlay = document.getElementById('manualIntakeOverlay');
 
   document.getElementById('btnOpenManualIntake').addEventListener('click', () => {
     const date = document.getElementById('nutDate').value;
-    const e = getLogs()[date] || {};
-    document.getElementById('manualIntakeDateLabel').textContent = fmtDate(parseISO(date));
-    document.getElementById('manualIntakeCalories').value = e.calories ?? '';
-    document.getElementById('manualIntakeProtein').value = e.protein ?? '';
-    document.getElementById('manualIntakeCarbs').value = e.carbs ?? '';
-    document.getElementById('manualIntakeFat').value = e.fat ?? '';
-    document.getElementById('manualIntakeFiber').value = e.fiber ?? '';
-    document.getElementById('manualIntakeSodium').value = e.sodium ?? '';
-    document.getElementById('manualIntakeNote').textContent = '';
+    document.getElementById('manualIntakeDate').value = date;
+    loadManualIntakeFields(date);
     overlay.hidden = false;
   });
   document.getElementById('btnCloseManualIntake').addEventListener('click', () => { overlay.hidden = true; });
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+  document.getElementById('manualIntakeDate').addEventListener('change', e => loadManualIntakeFields(e.target.value || todayISO()));
 
   document.getElementById('btnManualOverrideSubmit').addEventListener('click', () => {
-    const date = document.getElementById('nutDate').value;
+    const date = document.getElementById('manualIntakeDate').value || todayISO();
     updateLogFields(date, {
       calories: parseFloat(document.getElementById('manualIntakeCalories').value) || 0,
       protein: parseFloat(document.getElementById('manualIntakeProtein').value) || 0,
@@ -4122,8 +4149,18 @@ function initManualIntake() {
       sodium: parseFloat(document.getElementById('manualIntakeSodium').value) || 0,
     });
     overlay.hidden = true;
-    refreshFuelViewsForDate(date);
-    showRestToast('Manual override applied to Daily Fuel Status.');
+    // Only re-point the Fuel tab's own date label if the override was for
+    // the date it's already showing — otherwise just refresh the
+    // date-agnostic parts (they read nutDate internally) so an edit to a
+    // past day doesn't silently relabel the currently-viewed date.
+    if (date === document.getElementById('nutDate').value) {
+      refreshFuelViewsForDate(date);
+    } else {
+      renderNutritionTargets();
+      renderNutritionAverages();
+      updateTabDots();
+    }
+    showRestToast(`Manual override applied for ${fmtDate(parseISO(date))}.`);
   });
 }
 
@@ -8042,6 +8079,25 @@ function initThemeToggle() {
   });
 }
 initThemeToggle();
+
+/* ---------------------------------------------------------------- */
+/* Skin (theme pack) selector — layered on top of the dark/light toggle */
+/* above via a separate [data-skin] attribute, so any skin can still be */
+/* viewed in either light or dark mode.                                 */
+/* ---------------------------------------------------------------- */
+function applySkin(skin) {
+  document.documentElement.setAttribute('data-skin', skin);
+  document.getElementById('skinSelect').value = skin;
+  localStorage.setItem('wft_skin', skin);
+}
+
+function initSkinSelector() {
+  applySkin(localStorage.getItem('wft_skin') || 'default');
+  document.getElementById('skinSelect').addEventListener('change', e => {
+    applySkin(e.target.value);
+  });
+}
+initSkinSelector();
 
 /* ---------------------------------------------------------------- */
 /* Init                                                                 */
