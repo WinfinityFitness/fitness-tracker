@@ -1143,6 +1143,15 @@ tbody tr:nth-child(even) { background: rgba(255,255,255,0.02); }
   font-weight: 800;
   color: var(--cyan);
 }
+.cardio-map-style-btn {
+  flex: 1;
+  padding: 8px 0;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
 .cardio-history { display: flex; flex-direction: column; gap: 0; background: var(--surface-1); border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
 .cardio-history-row {
   display: flex; align-items: center; gap: 10px; padding: 10px 12px;

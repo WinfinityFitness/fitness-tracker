@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.94';
+const APP_VERSION = 'WF_SYS_V.1.95';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -2808,6 +2808,38 @@ function stopCardioTracking() {
 }
 
 let cardioMapInstance = null;
+let cardioMapTileLayer = null;
+
+// Two free, no-API-key tile sources standing in for Google's road map and
+// satellite looks — CARTO Voyager (built on OSM data) is styled close to
+// Google's clean default road map, Esri World Imagery is free aerial
+// photography for the satellite view. Neither needs a key or billing
+// account, unlike the actual Google Maps JS API.
+const CARDIO_MAP_STYLES = {
+  road: {
+    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    options: { maxZoom: 19, subdomains: 'abcd', attribution: '&copy; OpenStreetMap contributors &copy; CARTO' },
+  },
+  satellite: {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    options: { maxZoom: 19, attribution: 'Tiles &copy; Esri' },
+  },
+};
+
+function getCardioMapStyle() {
+  const s = localStorage.getItem('wft_map_style');
+  return CARDIO_MAP_STYLES[s] ? s : 'road';
+}
+
+function setCardioMapStyle(style) {
+  localStorage.setItem('wft_map_style', style);
+  const btn = document.getElementById('btnCardioMapStyle');
+  if (btn) btn.textContent = style === 'satellite' ? 'Satellite' : 'Road';
+  if (!cardioMapInstance) return;
+  if (cardioMapTileLayer) cardioMapInstance.removeLayer(cardioMapTileLayer);
+  const def = CARDIO_MAP_STYLES[style];
+  cardioMapTileLayer = L.tileLayer(def.url, def.options).addTo(cardioMapInstance);
+}
 
 function renderCardioMap(track) {
   const sketch = document.getElementById('cardioRouteSketch');
@@ -2820,10 +2852,8 @@ function renderCardioMap(track) {
   if (cardioMapInstance) { cardioMapInstance.remove(); cardioMapInstance = null; }
   const map = L.map(mapEl, { zoomControl: false, attributionControl: true });
   cardioMapInstance = map;
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap contributors',
-  }).addTo(map);
+  const def = CARDIO_MAP_STYLES[getCardioMapStyle()];
+  cardioMapTileLayer = L.tileLayer(def.url, def.options).addTo(map);
 
   const latlngs = track.map(p => [p.lat, p.lon]);
   const path = L.polyline(latlngs, { color: '#33c8cc', weight: 4, lineCap: 'round', lineJoin: 'round' }).addTo(map);
@@ -3018,6 +3048,11 @@ function initCardioTracker() {
   document.getElementById('btnShareCardio').addEventListener('click', shareCardioSession);
   document.getElementById('btnCardioZoomIn').addEventListener('click', () => { if (cardioMapInstance) cardioMapInstance.zoomIn(); });
   document.getElementById('btnCardioZoomOut').addEventListener('click', () => { if (cardioMapInstance) cardioMapInstance.zoomOut(); });
+  const styleBtn = document.getElementById('btnCardioMapStyle');
+  styleBtn.textContent = getCardioMapStyle() === 'satellite' ? 'Satellite' : 'Road';
+  styleBtn.addEventListener('click', () => {
+    setCardioMapStyle(getCardioMapStyle() === 'satellite' ? 'road' : 'satellite');
+  });
   renderCardioHistory();
 }
 
