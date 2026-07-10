@@ -2779,10 +2779,10 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 /* SKIN: Sovereign Core — Cyber-Brutalist "System Interface" (dark      */
 /* fantasy / game-HUD). Sharp 0px corners, thin 1-2px neon-cyan strokes */
 /* and glow instead of drop shadows, chamfered "blade" buttons.         */
-/* Dark-only by design (the brief explicitly targets "absolute dark     */
-/* mode" — no light palette given, so this skin doesn't redefine        */
-/* [data-theme="light"] and just looks the same either way). Reuses     */
-/* Sora/JetBrains Mono already fetched for Grand Core, plus one extra   */
+/* The brand brief itself only supplied a dark palette, but a follow-up */
+/* tonal-ramp reference gave enough to derive a light companion too —   */
+/* see the [data-theme="light"] block below. Reuses Sora/JetBrains Mono */
+/* already fetched for Grand Core, plus one extra                      */
 /* regular-weight Sora file for body text (the headline weight alone    */
 /* reads too bold at body size). Per instruction: hairline borders      */
 /* throughout, ~0.3-0.6mm (roughly 1-2px at typical mobile density),    */
@@ -2850,7 +2850,49 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   --font-headline: var(--font-display);
 }
 
-/* No [data-theme="light"] override — dark-only by design, per brief. */
+/* Light — derived from the same three seed hues' tonal ramps (cyan/blue/
+   purple) shown in the follow-up palette reference. Pure #00f0ff has
+   almost no contrast on white, so light mode pulls from the DARK end of
+   each ramp for anything used as text/icon/border/fill (matching the
+   reference's "Primary" button swatch, which is a dark teal, not neon
+   cyan) — the vivid tones stay reserved for the dark variant's glow
+   effects, which don't read the same way on a light surface anyway.
+   Shape language (sharp corners, chamfered buttons, hairline borders)
+   is unchanged — only the token values differ here. */
+:root[data-skin="sovereign-core"][data-theme="light"] {
+  --bg: #fafbfc;
+  --bg-elevated: #ffffff;
+  --surface-1: #ffffff;
+  --surface-2: #f0f2f5;
+  --surface-1-rgb: 255,255,255;
+  --surface-2-rgb: 240,242,245;
+  --border: #d0d5db;
+  --border-soft: #e8eaed;
+  --text-primary: #0a0e14;
+  --text-secondary: #3e4850;
+  --text-muted: #6e7881;
+  --gridline: rgba(10, 14, 20, 0.06);
+  --baseline: rgba(10, 14, 20, 0.14);
+
+  --cyan: #00838f;
+  --cyan-dim: #005f66;
+  --cyan-glow: rgba(0, 131, 143, 0.22);
+  --violet: #0058cc;
+  --magenta: #5b00cc;
+
+  --series-1: #00838f;
+  --series-2: #0058cc;
+  --gradient-bar: linear-gradient(90deg, #0058cc 0%, #00838f 100%);
+  --gradient-glow: rgba(0, 131, 143, 0.18);
+
+  --good: #00838f;
+  --warning: #5b00cc;
+  --serious: #a8324a;
+  --critical: #ba1a1a;
+
+  --surface-translucent: rgba(255, 255, 255, 0.85);
+  --nav-translucent: rgba(255, 255, 255, 0.9);
+}
 
 [data-skin="sovereign-core"] * {
   border-radius: 0 !important;
