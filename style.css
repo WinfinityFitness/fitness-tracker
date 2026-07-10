@@ -2499,3 +2499,19 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   background-color: var(--surface-2);
 }
 .bg-crop-preview:active { cursor: grabbing; }
+
+/* Widget Box Fill Transparency (Settings > Custom Background) — fades the
+   solid fill behind cards/widgets so a background photo shows through them
+   too, not just the page behind them. --widget-fill-pct defaults to 100%
+   (fully opaque, i.e. unchanged from normal appearance) and is set by JS
+   from the slider. Uses color-mix() rather than separate RGB-triplet
+   variables per theme, so it works unchanged across every skin/mode. */
+:root { --widget-fill-pct: 100%; }
+.chart-card, .stat-tile, .ring-card, .computed-card {
+  background: color-mix(in srgb, var(--surface-1) var(--widget-fill-pct), transparent);
+}
+.hero-card {
+  background: linear-gradient(160deg,
+    color-mix(in srgb, var(--surface-2) var(--widget-fill-pct), transparent),
+    color-mix(in srgb, var(--surface-1) var(--widget-fill-pct), transparent));
+}

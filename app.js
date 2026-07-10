@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.75';
+const APP_VERSION = 'WF_SYS_V.1.76';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -8128,7 +8128,7 @@ initSkinSelector();
 /* ---------------------------------------------------------------- */
 /* Custom background image (Settings)                                  */
 /* ---------------------------------------------------------------- */
-const BG_SETTINGS_DEFAULT = { mode: 'cover', blur: 0, dim: 0, transparency: 0, cropX: 50, cropY: 50 };
+const BG_SETTINGS_DEFAULT = { mode: 'cover', blur: 0, dim: 0, transparency: 0, widgetFill: 0, cropX: 50, cropY: 50 };
 
 function getBgImageData() {
   try { return JSON.parse(localStorage.getItem('wft_bg_image')); } catch (e) { return null; }
@@ -8185,6 +8185,16 @@ function applyCustomBg() {
   const layer = document.getElementById('customBgLayer');
   const imageEl = document.getElementById('customBgImage');
   const overlayEl = document.getElementById('customBgOverlay');
+
+  // Widget Box Fill Transparency applies regardless of whether a background
+  // photo is set — it's a general "let widgets go see-through" control, not
+  // strictly tied to having an image (works fine over the plain page
+  // pattern too). Slider convention matches Blur/Dim/Transparency above:
+  // 0 = no effect (fully opaque, unchanged), 100 = fully transparent —
+  // color-mix() wants the OPPOSITE (how much fill to keep), hence 100-x.
+  const widgetFill = getBgSettings().widgetFill;
+  document.documentElement.style.setProperty('--widget-fill-pct', (100 - widgetFill) + '%');
+
   if (!imgData || !imgData.dataUrl) {
     layer.hidden = true;
     document.body.classList.remove('has-custom-bg');
@@ -8240,6 +8250,8 @@ function loadBgSettingsIntoUI() {
   document.getElementById('bgDimOut').textContent = s.dim;
   document.getElementById('bgTransparencySlider').value = s.transparency;
   document.getElementById('bgTransparencyOut').textContent = s.transparency;
+  document.getElementById('bgWidgetFillSlider').value = s.widgetFill;
+  document.getElementById('bgWidgetFillOut').textContent = s.widgetFill;
   document.getElementById('bgCropWrap').hidden = s.mode !== 'crop';
   updateCropPreviewBg();
 }
@@ -8299,7 +8311,7 @@ function initCustomBackground() {
     applyCustomBg();
   });
 
-  [['bgBlurSlider', 'blur'], ['bgDimSlider', 'dim'], ['bgTransparencySlider', 'transparency']].forEach(([id, key]) => {
+  [['bgBlurSlider', 'blur'], ['bgDimSlider', 'dim'], ['bgTransparencySlider', 'transparency'], ['bgWidgetFillSlider', 'widgetFill']].forEach(([id, key]) => {
     document.getElementById(id).addEventListener('input', e => {
       const s = getBgSettings();
       s[key] = parseInt(e.target.value, 10);
