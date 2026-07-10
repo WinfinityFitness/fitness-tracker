@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.60';
+const APP_VERSION = 'WF_SYS_V.1.61';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -4267,10 +4267,16 @@ function openAddFoodPanel() {
   document.getElementById('addFoodOverlay').hidden = false;
 }
 
+// Deployed under the name "smooth-service" (Supabase's dashboard "Via
+// Editor" quick-create flow auto-assigns a random slug and it's easy to
+// miss renaming it before deploying — happened twice). The function's
+// actual code/behavior is the food-nutrition estimator described in
+// supabase/functions/estimate-food-nutrition/index.js; only the deployed
+// name diverges from the source folder name.
 async function estimateFoodNutritionWithAI(foodName) {
   let res;
   try {
-    res = await fetch(`${SUPABASE_URL}/functions/v1/estimate-food-nutrition`, {
+    res = await fetch(`${SUPABASE_URL}/functions/v1/smooth-service`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
       body: JSON.stringify({ foodName }),

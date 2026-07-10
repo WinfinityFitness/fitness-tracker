@@ -2,20 +2,24 @@
 // tier so the client never holds the AI API key (embedding it in a public
 // GitHub Pages bundle would let anyone scrape and abuse it).
 //
-// Deploy with the Supabase CLI:
-//   supabase functions deploy estimate-food-nutrition
-// or paste this file into Dashboard -> Edge Functions -> New Function.
+// Plain JavaScript (not TypeScript) on purpose — the Supabase Dashboard's
+// "Via Editor" quick-create flow saves functions as .js, and a bundler
+// parsing this as plain JS chokes on TS type annotations (`: unknown`,
+// `: string`, etc.) with a cryptic "Expected ',', got ':'" error. Types are
+// optional in Deno either way, so keep this file untyped to match reality.
+//
+// Deploy: paste this whole file into Dashboard -> Edge Functions -> the
+// estimate-food-nutrition function -> replace contents -> Deploy.
 //
 // Before it works, set the secret (free key from https://aistudio.google.com/apikey):
-//   supabase secrets set GEMINI_API_KEY=your-key-here
-// (or Dashboard -> Edge Functions -> estimate-food-nutrition -> Secrets)
+// Dashboard -> Edge Functions -> Secrets -> GEMINI_API_KEY
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-function jsonResponse(body: unknown, status = 200) {
+function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
@@ -25,7 +29,7 @@ function jsonResponse(body: unknown, status = 200) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
-  let foodName: string, servingDescription: string | undefined;
+  let foodName, servingDescription;
   try {
     const body = await req.json();
     foodName = body.foodName;
@@ -48,7 +52,7 @@ Respond with ONLY a JSON object, no markdown, no explanation, in exactly this sh
 {"calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "sodium": number}
 All values are per 100g. calories in kcal, protein/carbs/fat/fiber in grams, sodium in milligrams. If unsure, give your best reasonable estimate for a typical serving — never refuse.`;
 
-  let geminiRes: Response;
+  let geminiRes;
   try {
     geminiRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
@@ -72,7 +76,7 @@ All values are per 100g. calories in kcal, protein/carbs/fat/fiber in grams, sod
 
   const geminiData = await geminiRes.json();
   const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  let parsed: any;
+  let parsed;
   try {
     parsed = JSON.parse(text);
   } catch {
