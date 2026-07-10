@@ -2775,6 +2775,169 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   backdrop-filter: blur(20px);
 }
 
+/* ================================================================== */
+/* SKIN: Sovereign Core — Cyber-Brutalist "System Interface" (dark      */
+/* fantasy / game-HUD). Sharp 0px corners, thin 1-2px neon-cyan strokes */
+/* and glow instead of drop shadows, chamfered "blade" buttons.         */
+/* Dark-only by design (the brief explicitly targets "absolute dark     */
+/* mode" — no light palette given, so this skin doesn't redefine        */
+/* [data-theme="light"] and just looks the same either way). Reuses     */
+/* Sora/JetBrains Mono already fetched for Grand Core, plus one extra   */
+/* regular-weight Sora file for body text (the headline weight alone    */
+/* reads too bold at body size). Per instruction: hairline borders      */
+/* throughout, ~0.3-0.6mm (roughly 1-2px at typical mobile density),    */
+/* never the thick 3px+ strokes the other two skins use.                */
+/* ================================================================== */
+@font-face {
+  font-family: 'Sovereign Sora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('fonts/sora-regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Sovereign Sora';
+  font-style: normal;
+  font-weight: 600 800;
+  font-display: swap;
+  src: url('fonts/sora.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Sovereign Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('fonts/jetbrains-mono.woff2') format('woff2');
+}
+
+:root[data-skin="sovereign-core"] {
+  --bg: #0a0e14;
+  --bg-elevated: #10141a;
+  --surface-1: #10141a;
+  --surface-2: #181c22;
+  --surface-1-rgb: 16,20,26;
+  --surface-2-rgb: 24,28,34;
+  --border: #3b494b;
+  --border-soft: #1c222b;
+  --text-primary: #dfe2eb;
+  --text-secondary: #b9cacb;
+  --text-muted: #849495;
+  --gridline: rgba(223, 226, 235, 0.06);
+  --baseline: rgba(223, 226, 235, 0.14);
+
+  --cyan: #00f0ff;
+  --cyan-dim: #006970;
+  --cyan-glow: rgba(0, 240, 255, 0.4);
+  --violet: #0070ff;
+  --magenta: #7000ff;
+
+  --series-1: #00f0ff;
+  --series-2: #0070ff;
+  --gradient-bar: linear-gradient(90deg, #0070ff 0%, #00f0ff 100%);
+  --gradient-glow: rgba(0, 240, 255, 0.3);
+
+  --good: #00f0ff;
+  --warning: #7000ff;
+  --serious: #d5455a;
+  --critical: #ffb4ab;
+
+  --surface-translucent: rgba(10, 14, 20, 0.88);
+  --nav-translucent: rgba(16, 20, 26, 0.9);
+
+  --card-radius: 0;
+  --font-mono: 'Sovereign Mono', ui-monospace, monospace;
+  --font-display: 'Sovereign Sora', system-ui, sans-serif;
+  --font-headline: var(--font-display);
+}
+
+/* No [data-theme="light"] override — dark-only by design, per brief. */
+
+[data-skin="sovereign-core"] * {
+  border-radius: 0 !important;
+}
+[data-skin="sovereign-core"] .hero-title,
+[data-skin="sovereign-core"] .app-header h1 {
+  font-family: var(--font-headline);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 12px var(--cyan-glow);
+}
+[data-skin="sovereign-core"] .chart-card-title,
+[data-skin="sovereign-core"] .section-title,
+[data-skin="sovereign-core"] .sheet-head h2,
+[data-skin="sovereign-core"] .field-group-heading {
+  font-family: var(--font-headline);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+[data-skin="sovereign-core"] .hero-card,
+[data-skin="sovereign-core"] .chart-card,
+[data-skin="sovereign-core"] .stat-tile,
+[data-skin="sovereign-core"] .ring-card,
+[data-skin="sovereign-core"] .computed-card {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  box-shadow: none;
+}
+[data-skin="sovereign-core"] .btn {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--cyan-dim);
+  background: transparent;
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  transition: box-shadow 0.15s ease;
+}
+[data-skin="sovereign-core"] .btn--primary {
+  background: var(--cyan);
+  color: var(--bg);
+  border-color: var(--cyan);
+  box-shadow: 0 0 16px var(--cyan-glow);
+  /* Chamfered "blade" corners on System Actions per the brief. */
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+[data-skin="sovereign-core"] .btn--primary:active {
+  box-shadow: 0 0 24px var(--cyan-glow);
+}
+[data-skin="sovereign-core"] input,
+[data-skin="sovereign-core"] select,
+[data-skin="sovereign-core"] textarea {
+  background: var(--bg) !important;
+  border: none !important;
+  border-bottom: 1px solid var(--cyan-dim) !important;
+}
+[data-skin="sovereign-core"] input:focus,
+[data-skin="sovereign-core"] select:focus,
+[data-skin="sovereign-core"] textarea:focus {
+  border-bottom-width: 2px !important;
+  border-bottom-color: var(--cyan) !important;
+  outline: none;
+  box-shadow: 0 4px 8px -4px var(--cyan-glow);
+}
+[data-skin="sovereign-core"] .chip,
+[data-skin="sovereign-core"] .pill {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  font-family: var(--font-mono);
+  letter-spacing: 0.05em;
+}
+[data-skin="sovereign-core"] .tab-bar {
+  border-width: 1px;
+  border-color: var(--cyan-dim);
+  backdrop-filter: blur(20px);
+}
+[data-skin="sovereign-core"] .app-header {
+  border-bottom-width: 1px;
+  border-bottom-color: var(--cyan-dim);
+  backdrop-filter: blur(20px);
+}
+
 .sheet-section { margin-bottom: 22px; }
 .sheet-section--compact { margin-bottom: 14px; }
 .sheet-section--compact .field-group-heading { margin: 0 0 6px; font-size: 0.86rem; }

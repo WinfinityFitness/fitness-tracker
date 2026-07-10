@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fittracker-v198';
+const CACHE_NAME = 'fittracker-v199';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -16,6 +16,7 @@ const CORE_ASSETS = [
   './fonts/archivo-narrow.woff2',
   './fonts/montserrat-heavy.woff2',
   './fonts/sora.woff2',
+  './fonts/sora-regular.woff2',
   './fonts/space-grotesk.woff2',
   './fonts/jetbrains-mono.woff2',
 ];
