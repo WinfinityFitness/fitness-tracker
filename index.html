@@ -251,7 +251,7 @@
       <input type="date" id="trainDate" class="date-picker-trigger" readonly>
     </label>
 
-    <fieldset class="field-group">
+    <fieldset class="field-group field-group--compact">
       <legend>Session templates</legend>
       <label class="field">
         <span>Load a saved session</span>
@@ -261,7 +261,7 @@
         <button type="button" class="btn btn--primary" id="btnLoadTemplate">Load into this date</button>
         <button type="button" class="btn btn--danger" id="btnDeleteTemplate">Delete</button>
       </div>
-      <label class="field" style="margin-top:12px;">
+      <label class="field" style="margin-top:8px;">
         <span>Save current exercises as</span>
         <input type="text" id="sessionTemplateName" placeholder="e.g. Push Day A">
       </label>
@@ -269,7 +269,7 @@
       <p class="save-note" id="sessionTemplateNote"></p>
     </fieldset>
 
-    <div class="stat-grid">
+    <div class="stat-grid stat-grid--compact">
       <div class="stat-tile">
         <div class="stat-tile-value" id="statWorkoutsWeek">–</div>
         <div class="stat-tile-label">Workouts (7d)</div>
@@ -405,8 +405,6 @@
           <ul class="fuel-macro-legend" id="fuelMacroLegend"></ul>
         </div>
         <div class="fuel-water-col">
-          <p class="mod-tag" style="margin:0;">Mod_hydration_track</p>
-          <p class="water-orb-glass-tag">+250 mL / tap</p>
           <div class="water-pill-row">
             <div class="water-pill">
               <div class="water-pill-fill" id="fuelWaterOrbFill"></div>
@@ -416,6 +414,8 @@
               <button type="button" class="water-orb-arrow-btn" id="btnWaterOrbDown" aria-label="Remove a glass">▼</button>
             </div>
           </div>
+          <p class="mod-tag" style="margin:0;">Mod_hydration_track</p>
+          <p class="water-orb-glass-tag">+250 mL / tap</p>
           <p class="water-orb-target-label"><span id="fuelWaterOrbAmount">0</span> / <span id="fuelWaterOrbTarget">3000</span> mL<span id="fuelWaterOrbAutoTag" class="water-orb-auto-tag" hidden> · auto</span></p>
         </div>
       </div>
@@ -439,10 +439,6 @@
       <div class="gradient-stat-row">
         <div class="gradient-stat-row-head"><span>Sodium</span><span><strong id="fuelSodiumNow">0mg</strong> <span>/ <span id="fuelSodiumTarget">–</span></span></span></div>
         <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="fuelSodiumBar" style="width:0%"><span class="gradient-bar-dot"></span></div></div>
-      </div>
-      <div class="gradient-stat-row">
-        <div class="gradient-stat-row-head"><span>Water</span><span><strong id="fuelWaterNow">0</strong> <span>/ <span id="fuelWaterTarget">–</span> mL</span></span></div>
-        <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="fuelWaterBar" style="width:0%"><span class="gradient-bar-dot"></span></div></div>
       </div>
 
       <div class="dashed-empty" id="nutTargetsEmpty" hidden style="margin-top:12px;">
@@ -534,13 +530,30 @@
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3c0 5 10 5 10 10s-10 5-10 10"/><path d="M17 3c0 5-10 5-10 10s10 5 10 10"/><path d="M8 7h8M7.5 12h9M8 17h8"/></svg>
       Entity Identity
     </button>
+    <p class="hint hint--sm">Your name, age, sex, height, and goals — the core profile that powers every calculation across the app, from calorie targets to body fat %.</p>
 
     <fieldset class="field-group">
       <p class="mod-tag">Mod_bio_log_01</p>
-      <label class="field field--checkbox" id="bioMenstruatingField">
-        <input type="checkbox" id="bioMenstruating">
-        <span>Period</span>
-      </label>
+      <div class="period-field-group" id="bioMenstruatingField">
+        <label class="field field--checkbox">
+          <input type="checkbox" id="bioMenstruating">
+          <span>Period</span>
+        </label>
+        <div class="field-row">
+          <label class="field">
+            <span>Est. days</span>
+            <input type="number" id="bioPeriodDays" min="0" max="14" step="1" placeholder="e.g. 3">
+          </label>
+          <label class="field">
+            <span>Bleeding</span>
+            <select id="bioPeriodFlow">
+              <option value="mild">Mild</option>
+              <option value="normal" selected>Normal</option>
+              <option value="strong">Strong</option>
+            </select>
+          </label>
+        </div>
+      </div>
       <label class="field">
         <span>Stress</span>
         <input type="range" id="bioStress" min="1" max="5" step="1" value="3">
@@ -573,16 +586,18 @@
     </div>
 
     <div class="chart-card">
-      <p class="mod-tag">Mod_water_retain_04</p>
-      <div class="chart-card-head"><span class="chart-card-title">Edema Extrapolation</span></div>
-      <div class="ring-card ring-card--flush" id="waterRetentionOrb"></div>
-      <p class="hint">Illustrative estimate only — from today's carbs + sodium intake (glycogen-bound water) plus your stress/fatigue/sleep average, scaled against your Watson-formula total body water. Not a medical measurement.</p>
-    </div>
-
-    <div class="chart-card">
-      <p class="mod-tag">Mod_bodyfat_05</p>
-      <div class="chart-card-head"><span class="chart-card-title">Body Fat Percentage</span></div>
-      <div class="ring-card ring-card--flush" id="bodyFatRing"></div>
+      <p class="mod-tag">Mod_bodyfat_05 / Mod_water_retain_04</p>
+      <div class="bio-scan-row">
+        <div class="bio-scan-col">
+          <div class="chart-card-head"><span class="chart-card-title">Body Fat Percentage</span></div>
+          <div class="ring-card ring-card--flush" id="bodyFatRing"></div>
+        </div>
+        <div class="bio-scan-col">
+          <div class="chart-card-head"><span class="chart-card-title">Edema Extrapolation</span></div>
+          <div class="ring-card ring-card--flush" id="waterRetentionOrb"></div>
+        </div>
+      </div>
+      <p class="hint hint--sm">Body fat: Jackson-Pollock 7-site skinfold estimate. Edema: illustrative water-retention estimate from today's carbs/sodium intake plus stress/fatigue/sleep average, scaled against your Watson-formula total body water. Neither is a medical measurement.</p>
       <button type="button" class="btn caliper-entry-toggle" id="btnToggleCaliperEntry" aria-expanded="false">
         <span>Caliper Entry Data</span>
         <svg viewBox="0 0 24 24" width="16" height="16" class="caliper-entry-chevron" id="caliperEntryChevron" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -698,7 +713,6 @@
           <button type="button" class="rank-expand-btn" data-target="lbBioRanking" aria-label="Show top 10" title="Show top 10" hidden>⤢</button>
         </div>
       </div>
-      <div class="ring-card" id="lbBioRing" style="border:none;padding:8px 0;"></div>
       <div class="rank-list" id="lbBioRanking"></div>
     </div>
 
@@ -1299,6 +1313,13 @@
       </div>
       <p class="hint" id="bgImageStatus"></p>
 
+      <label class="field">
+        <span>Widget Box Fill Transparency</span>
+        <input type="range" id="bgWidgetFillSlider" min="0" max="100" step="1" value="0">
+        <output id="bgWidgetFillOut">0</output>
+      </label>
+      <p class="hint hint--sm">Fades the fill behind cards/widgets so backgrounds show through them too — works with or without a custom background photo set.</p>
+
       <div class="bg-settings-group" id="bgSettingsGroup" hidden>
         <label class="field">
           <span>Position mode</span>
@@ -1331,12 +1352,6 @@
           <input type="range" id="bgTransparencySlider" min="0" max="100" step="1" value="0">
           <output id="bgTransparencyOut">0</output>
         </label>
-        <label class="field">
-          <span>Widget Box Fill Transparency</span>
-          <input type="range" id="bgWidgetFillSlider" min="0" max="100" step="1" value="0">
-          <output id="bgWidgetFillOut">0</output>
-        </label>
-        <p class="hint hint--sm">Fades the fill behind cards/widgets so the background photo shows through them too — not just the page behind.</p>
       </div>
     </div>
 

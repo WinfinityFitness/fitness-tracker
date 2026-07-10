@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.78';
+const APP_VERSION = 'WF_SYS_V.1.84';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1436,6 +1436,8 @@ function loadBioForDate(date) {
   const e = logs[date] || {};
 
   document.getElementById('bioMenstruating').checked = !!e.menstruating;
+  document.getElementById('bioPeriodDays').value = e.periodDays ?? '';
+  document.getElementById('bioPeriodFlow').value = e.periodFlow || 'normal';
   document.getElementById('bioStress').value = e.stress ?? 3;
   document.getElementById('bioStressOut').textContent = e.stress ?? 3;
   document.getElementById('bioFatigue').value = e.fatigue ?? 3;
@@ -1483,7 +1485,7 @@ function renderBodyFatWidget() {
   const cls = classifyBodyFat(pct, gender);
   document.getElementById('bodyFatEmptyNote').hidden = pct != null;
   renderRing(document.getElementById('bodyFatRing'), pct != null ? Math.min(100, Math.max(0, pct)) : 0, {
-    size: 130, stroke: 9,
+    size: 108, stroke: 8,
     centerText: pct != null ? round2(pct) + '%' : '–',
     label: 'Body Fat',
     sub: carriedFromDate ? `${cls.label} · last logged ${fmtDate(parseISO(carriedFromDate))}` : cls.label,
@@ -1505,6 +1507,8 @@ function initBioLog() {
     const date = document.getElementById('bioDate').value;
     updateLogFields(date, {
       menstruating: document.getElementById('bioMenstruating').checked,
+      periodDays: parseInt(document.getElementById('bioPeriodDays').value, 10) || 0,
+      periodFlow: document.getElementById('bioPeriodFlow').value,
       stress: parseInt(document.getElementById('bioStress').value, 10),
       fatigue: parseInt(document.getElementById('bioFatigue').value, 10),
       hunger: parseInt(document.getElementById('bioHunger').value, 10),
@@ -1566,7 +1570,7 @@ function renderWaterRetentionOrb() {
 
   if (!tbwLiters) {
     renderRing(container, 0, {
-      size: 130, stroke: 9, magenta: true, modTag: 'MOD_WATER_04',
+      size: 108, stroke: 8, magenta: true, modTag: 'MOD_WATER_04',
       centerText: '–', label: 'Edema extrapolation', sub: 'Complete Bio profile to estimate',
     });
     return;
@@ -1582,13 +1586,20 @@ function renderWaterRetentionOrb() {
   const pct = avgLevel; // 1-5 scale maps directly to 1%-5%
   const stateWaterG = (pct / 100) * tbwLiters * 1000;
 
-  const periodBonusG = (profile.gender === 'female' && entry.menstruating) ? 1750 : 0; // +1.5kg-2kg, midpoint
+  // Flow intensity sets the base retention estimate (mild/normal/strong), and
+  // longer estimated duration nudges it up slightly — both are rough
+  // self-reported references, not a clinical model.
+  const PERIOD_FLOW_BONUS_G = { mild: 1000, normal: 1750, strong: 2500 };
+  const periodDaysFactor = 1 + Math.min(entry.periodDays || 0, 7) * 0.05;
+  const periodBonusG = (profile.gender === 'female' && entry.menstruating)
+    ? Math.round((PERIOD_FLOW_BONUS_G[entry.periodFlow] ?? PERIOD_FLOW_BONUS_G.normal) * periodDaysFactor)
+    : 0;
 
   const totalG = glycogenWaterG + stateWaterG + periodBonusG;
   const gaugePct = Math.min(100, (totalG / 3500) * 100);
 
   renderRing(container, gaugePct, {
-    size: 130, stroke: 9, magenta: true, modTag: 'MOD_WATER_04',
+    size: 108, stroke: 8, magenta: true, modTag: 'MOD_WATER_04',
     centerText: round0(totalG) + 'g', label: 'Edema extrapolation', sub: `Estimate for ${fmtDate(parseISO(date))}`,
   });
 }
@@ -6320,7 +6331,6 @@ function renderNutritionTargets() {
   const fiberTarget = round0((calorieTarget / 1000) * 14);
   const sodiumTarget = 2300;
 
-  const waterTarget = effectiveWaterTargetML(date);
   const entry = getLogs()[date] || {};
   const caloriesNow = entry.calories ?? 0;
   const proteinNow = entry.protein ?? 0;
@@ -6328,7 +6338,6 @@ function renderNutritionTargets() {
   const fatNow = entry.fat ?? 0;
   const fiberNow = entry.fiber ?? 0;
   const sodiumNow = entry.sodium ?? 0;
-  const waterNow = entry.water ?? 0;
 
   const carryover = getCalorieCarryover(date, profile);
   const effectiveCalorieTarget = Math.max(1, calorieTarget + carryover);
@@ -6379,10 +6388,6 @@ function renderNutritionTargets() {
   document.getElementById('fuelSodiumNow').textContent = sodiumNow + 'mg';
   document.getElementById('fuelSodiumTarget').textContent = sodiumTarget + 'mg';
   document.getElementById('fuelSodiumBar').style.width = Math.min(100, (sodiumNow / sodiumTarget) * 100) + '%';
-
-  document.getElementById('fuelWaterNow').textContent = waterNow;
-  document.getElementById('fuelWaterTarget').textContent = waterTarget;
-  document.getElementById('fuelWaterBar').style.width = Math.min(100, (waterNow / waterTarget) * 100) + '%';
 }
 
 // Fuel Snapshot ring row: Calories stays a 7-day average (day-to-day intake
@@ -7028,11 +7033,6 @@ function renderNexusRankings(rows) {
 
   const byProgress = dedupeRankRows(rows.filter(r => r.weight_progress_pct != null), (a, b) => a.weight_progress_pct < b.weight_progress_pct).sort((a, b) => a.weight_progress_pct - b.weight_progress_pct);
   renderRankList('lbBioRanking', byProgress, { formatValue: r => (r.weight_progress_pct > 0 ? '+' : '') + r.weight_progress_pct + '%' });
-
-  const avgPct = byProgress.length ? byProgress.reduce((s, r) => s + r.weight_progress_pct, 0) / byProgress.length : null;
-  renderRing(document.getElementById('lbBioRing'), avgPct != null ? Math.min(100, Math.abs(avgPct) * 5) : 0, {
-    size: 96, stroke: 8, centerText: avgPct != null ? round2(avgPct) + '%' : '–', sub: '',
-  });
 
   const byFurthestRun = dedupeRankRows(rows.filter(r => r.furthest_run_km != null), (a, b) => a.furthest_run_km > b.furthest_run_km).sort((a, b) => b.furthest_run_km - a.furthest_run_km);
   renderRankList('lbFurthestRunRanking', byFurthestRun, { formatValue: r => round2(r.furthest_run_km) + ' km' });

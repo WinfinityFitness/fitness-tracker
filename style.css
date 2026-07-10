@@ -433,6 +433,10 @@ body.has-custom-bg { background-color: transparent; }
 }
 .ring-card svg { display: block; }
 .ring-card--flush { background: none; border: none; padding: 6px 0 0; }
+.bio-scan-row { display: grid; grid-template-columns: repeat(2, 1fr); align-items: start; gap: 6px; }
+.bio-scan-col { display: flex; flex-direction: column; align-items: center; text-align: center; min-width: 0; }
+.bio-scan-col .chart-card-head { justify-content: center; }
+.bio-scan-col .chart-card-title { font-size: 0.8rem; }
 .ring-track { stroke: var(--gridline); fill: none; }
 .ring-fill { stroke: var(--cyan); fill: none; stroke-linecap: round; filter: drop-shadow(0 0 5.5px var(--cyan-glow)); transition: stroke-dashoffset 0.6s ease; }
 .ring-fill.violet { stroke: var(--violet); filter: drop-shadow(0 0 5.5px rgba(128,105,214,0.605)); }
@@ -494,6 +498,11 @@ body.has-custom-bg { background-color: transparent; }
 .stat-grid--3 .stat-tile { padding: 8px 8px; }
 .stat-grid--3 .stat-tile-value { font-size: 1.15rem; }
 .stat-grid--3 .stat-tile-label { font-size: 0.58rem; margin-top: 3px; }
+
+/* Compact variant — Training tab Workouts (7d) / Total sets (7d) row */
+.stat-grid--compact .stat-tile { padding: 9px 8px; }
+.stat-grid--compact .stat-tile-value { font-size: 1.2rem; }
+.stat-grid--compact .stat-tile-label { font-size: 0.6rem; margin-top: 3px; }
 
 .perf-grid {
   display: grid;
@@ -815,6 +824,9 @@ button.mission-log-day:hover { border-color: var(--cyan); }
 .field-row { display: flex; gap: 10px; }
 .field-row .field { flex: 1; }
 
+.period-field-group { margin-bottom: 10px; }
+.period-field-group .field-row { margin-top: 4px; }
+
 .field-group {
   border: 1px solid var(--border);
   border-radius: var(--card-radius);
@@ -837,6 +849,18 @@ button.mission-log-day:hover { border-color: var(--cyan); }
   color: var(--text-primary);
   margin: 0 0 10px;
 }
+
+/* Compact variant — Training tab Session templates fieldset */
+.field-group--compact { padding: 10px; }
+.field-group--compact legend { font-size: 0.66rem; padding: 0 3px; }
+.field-group--compact .field { margin-bottom: 8px; gap: 3px; }
+.field-group--compact .field > span { font-size: 0.78rem; }
+.field-group--compact .field input[type="text"],
+.field-group--compact .field select { padding: 7px 8px; font-size: 0.86rem; }
+.field-group--compact .btn-row { gap: 8px; }
+.field-group--compact .btn-row .btn,
+.field-group--compact > .btn { padding: 8px 10px; font-size: 0.8rem; min-width: 0; }
+.field-group--compact .save-note { margin-top: 6px; font-size: 0.76rem; }
 .field-group .extraHabitInput {
   display: block;
   width: 100%;
