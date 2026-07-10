@@ -1291,10 +1291,12 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 /* ---------------- Nexus presence ---------------- */
 .nexus-presence {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  gap: 4px 10px;
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   color: var(--text-secondary);
   background: var(--surface-1);
   border: 1px solid var(--border);

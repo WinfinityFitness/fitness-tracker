@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.93';
+const APP_VERSION = 'WF_SYS_V.1.94';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -697,6 +697,7 @@ function initTabs() {
       }
       if (target === 'leaderboard' && sbConfigured()) {
         pullLeaderboard().then(renderNexusRankings).catch(() => {});
+        refreshAppOpensStat();
         fetchChatMessages().then(renderChatMessages).then(() => {
           if (!currentChatRoomId) markRoomRead('public');
         }).catch(() => {});
@@ -6981,6 +6982,36 @@ function sbConfigured() {
   return !!sb;
 }
 
+// Global (all-users, not per-device) counter of how many times the app has
+// been opened — shown on the Nexus tab. Fires once per app load; the write
+// itself happens server-side via increment_app_opens() (see
+// supabase_app_opens_migration.sql) so a client can never set the count to
+// an arbitrary value, only bump it by one.
+async function incrementAppOpens() {
+  if (!sbConfigured()) return;
+  try {
+    const { data, error } = await sb.rpc('increment_app_opens');
+    if (!error && typeof data === 'number') {
+      const el = document.getElementById('nexusAppOpens');
+      if (el) el.textContent = data.toLocaleString();
+    }
+  } catch (e) { /* best effort, opportunistic */ }
+}
+
+// Re-reads the current total (not just the value from our own increment)
+// so it stays accurate against everyone else's opens too, each time the
+// Nexus tab is actually viewed.
+async function refreshAppOpensStat() {
+  if (!sbConfigured()) return;
+  try {
+    const { data, error } = await sb.from('app_stats').select('open_count').eq('id', 1).single();
+    if (!error && data) {
+      const el = document.getElementById('nexusAppOpens');
+      if (el) el.textContent = Number(data.open_count).toLocaleString();
+    }
+  } catch (e) { /* best effort, opportunistic */ }
+}
+
 const LB_ADJECTIVES = ['Swift', 'Neon', 'Silent', 'Blazing', 'Iron', 'Crimson', 'Frost', 'Turbo', 'Cosmic', 'Rapid'];
 const LB_NOUNS = ['Falcon', 'Tiger', 'Comet', 'Wolf', 'Phoenix', 'Panther', 'Rocket', 'Viper', 'Eagle', 'Storm'];
 
@@ -8589,6 +8620,7 @@ safeInit(initSettingsOverlay, 'initSettingsOverlay');
 safeInit(initAppUpdateButton, 'initAppUpdateButton');
 safeInit(initDonationPrompt, 'initDonationPrompt');
 safeInit(initLastStateRestore, 'initLastStateRestore');
+safeInit(incrementAppOpens, 'incrementAppOpens');
 safeInit(initDigitalId, 'initDigitalId');
 safeInit(() => initClickToRevealHint('adjustedBmiTile', 'adjustedBmiHint'), 'initAdjustedBmiHint');
 safeInit(() => initClickToRevealHint('stepsCaloriesTitle', 'stepsCaloriesHint'), 'initStepsCaloriesHint');
