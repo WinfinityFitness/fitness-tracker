@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.77';
+const APP_VERSION = 'WF_SYS_V.1.78';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -728,16 +728,13 @@ function initSettingsOverlay() {
   document.getElementById('btnCloseSettings').addEventListener('click', () => { overlay.hidden = true; });
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
 
-  const saved = localStorage.getItem('wft_alarm_tone') || 'chime';
-  document.querySelectorAll('input[name="alarmTone"]').forEach(radio => {
-    radio.checked = radio.value === saved;
-    radio.addEventListener('change', () => {
-      if (radio.checked) localStorage.setItem('wft_alarm_tone', radio.value);
-    });
+  const toneSelect = document.getElementById('alarmToneSelect');
+  toneSelect.value = localStorage.getItem('wft_alarm_tone') || 'chime';
+  toneSelect.addEventListener('change', () => {
+    localStorage.setItem('wft_alarm_tone', toneSelect.value);
+    playAlarmTone(toneSelect.value);
   });
-  document.querySelectorAll('.tone-preview-btn').forEach(btn => {
-    btn.addEventListener('click', () => playAlarmTone(btn.dataset.tone));
-  });
+  document.getElementById('btnPreviewAlarmTone').addEventListener('click', () => playAlarmTone(toneSelect.value));
 
   initHydrationReminderSettings();
 }
@@ -2615,7 +2612,7 @@ function renderCardioRouteSketch() {
   const lats = cardioTrack.map(p => p.lat), lons = cardioTrack.map(p => p.lon);
   const minLat = Math.min(...lats), maxLat = Math.max(...lats);
   const minLon = Math.min(...lons), maxLon = Math.max(...lons);
-  const w = 300, h = 160, pad = 12;
+  const w = 300, h = 300, pad = 12;
   const spanLat = Math.max(maxLat - minLat, 0.0001);
   const spanLon = Math.max(maxLon - minLon, 0.0001);
   const points = cardioTrack.map(p => {
@@ -2692,6 +2689,7 @@ function startCardioTracking() {
   document.getElementById('cardioStepsTile').hidden = estimateCardioSteps(0, document.getElementById('cardioType').value) == null;
   document.getElementById('cardioRouteSketch').hidden = false;
   document.getElementById('cardioMapView').hidden = true;
+  document.getElementById('cardioMapZoomRow').hidden = true;
   renderCardioRouteSketch();
 
   cardioWatchId = navigator.geolocation.watchPosition(pos => {
@@ -2765,6 +2763,7 @@ function renderCardioMap(track) {
   if (!window.L || track.length < 2) return; // no internet/Leaflet, or nothing to plot — keep the offline sketch visible
   sketch.hidden = true;
   mapEl.hidden = false;
+  document.getElementById('cardioMapZoomRow').hidden = false;
 
   if (cardioMapInstance) { cardioMapInstance.remove(); cardioMapInstance = null; }
   const map = L.map(mapEl, { zoomControl: false, attributionControl: true });
@@ -2965,6 +2964,8 @@ function initCardioTracker() {
   document.getElementById('btnCardioStart').addEventListener('click', startCardioTracking);
   document.getElementById('btnCardioStop').addEventListener('click', stopCardioTracking);
   document.getElementById('btnShareCardio').addEventListener('click', shareCardioSession);
+  document.getElementById('btnCardioZoomIn').addEventListener('click', () => { if (cardioMapInstance) cardioMapInstance.zoomIn(); });
+  document.getElementById('btnCardioZoomOut').addEventListener('click', () => { if (cardioMapInstance) cardioMapInstance.zoomOut(); });
   renderCardioHistory();
 }
 
