@@ -841,16 +841,24 @@
     </div>
 
     <footer class="app-footer">
-      <button type="button" class="footer-share-btn" id="btnFooterShare" aria-label="Share app">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="18" cy="5" r="3"></circle>
-          <circle cx="6" cy="12" r="3"></circle>
-          <circle cx="18" cy="19" r="3"></circle>
-          <line x1="8.6" y1="10.6" x2="15.4" y2="6.4"></line>
-          <line x1="8.6" y1="13.4" x2="15.4" y2="17.6"></line>
-        </svg>
-        Share
-      </button>
+      <div class="footer-action-row">
+        <button type="button" class="footer-share-btn" id="btnFooterDonate" aria-label="Donate">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"></path>
+          </svg>
+          Donate
+        </button>
+        <button type="button" class="footer-share-btn" id="btnFooterShare" aria-label="Share app">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3"></circle>
+            <circle cx="6" cy="12" r="3"></circle>
+            <circle cx="18" cy="19" r="3"></circle>
+            <line x1="8.6" y1="10.6" x2="15.4" y2="6.4"></line>
+            <line x1="8.6" y1="13.4" x2="15.4" y2="17.6"></line>
+          </svg>
+          Share
+        </button>
+      </div>
       <div class="footer-brand">
         <img src="icons/icon-192.png" alt="" width="40" height="40">
         <div class="footer-brand-name">WINFINITYFITNESS</div>
@@ -2020,6 +2028,7 @@
     </div>
     <div class="donation-qr-view" id="donationQrView" hidden>
       <button class="sheet-close donation-qr-close" id="btnDonationQrClose">✕</button>
+      <p class="donation-qr-message">Donate to the dev to keep the app working and developing to be better. Thank you!</p>
       <img class="donation-qr-img" src="icons/gcash-donate-qr.png" alt="GCash QR code for donation">
       <p class="hint">Scan with the GCash app to send a donation. Thank you for supporting Winfinity!</p>
     </div>

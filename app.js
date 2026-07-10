@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.76';
+const APP_VERSION = 'WF_SYS_V.1.77';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -871,6 +871,10 @@ function initFooterShare() {
       url: shareUrl,
     });
   });
+  // Same GCash QR as the Saturday-night donation prompt — jumps straight to
+  // the QR view since tapping a dedicated Donate button is already explicit
+  // intent, no need for the prompt's IGNORE/SURE step first.
+  document.getElementById('btnFooterDonate').addEventListener('click', openDonationQr);
 }
 
 const FOOTER_TAGLINES = [
@@ -3774,13 +3778,16 @@ function checkDonationPrompt() {
   document.getElementById('donationOverlay').hidden = false;
 }
 
+function openDonationQr() {
+  document.getElementById('donationPromptView').hidden = true;
+  document.getElementById('donationQrView').hidden = false;
+  document.getElementById('donationOverlay').hidden = false;
+}
+
 function initDonationPrompt() {
   const overlay = document.getElementById('donationOverlay');
   document.getElementById('btnDonationIgnore').addEventListener('click', () => { overlay.hidden = true; });
-  document.getElementById('btnDonationSure').addEventListener('click', () => {
-    document.getElementById('donationPromptView').hidden = true;
-    document.getElementById('donationQrView').hidden = false;
-  });
+  document.getElementById('btnDonationSure').addEventListener('click', openDonationQr);
   document.getElementById('btnDonationQrClose').addEventListener('click', () => { overlay.hidden = true; });
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
 }

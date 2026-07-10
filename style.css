@@ -1901,10 +1901,14 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   flex-direction: column;
   gap: 22px;
 }
-.footer-share-btn {
+.footer-action-row {
   position: absolute;
   top: 16px;
   right: 16px;
+  display: flex;
+  gap: 8px;
+}
+.footer-share-btn {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -2044,6 +2048,14 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .donation-btn-ignore { color: var(--text-muted); }
 .donation-qr-view { position: relative; }
 .donation-qr-close { position: absolute; top: -12px; right: -8px; }
+.donation-qr-message {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 4px 0 4px;
+  line-height: 1.4;
+  padding-right: 18px;
+}
 .donation-qr-img {
   width: 100%;
   max-width: 260px;
