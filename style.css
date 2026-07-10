@@ -747,6 +747,7 @@ body.has-custom-bg { background-color: transparent; }
   font-family: inherit;
   width: 100%;
 }
+#sessionTemplateSelect, #cardioType { padding: 7px 8px; font-size: 0.86rem; }
 .field input[type="date"],
 .field input[type="time"] { color-scheme: dark; }
 .date-picker-trigger { cursor: pointer; caret-color: transparent; }
@@ -2584,6 +2585,196 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   border-bottom: 3px solid var(--text-primary);
   backdrop-filter: none;
 }
+
+/* ================================================================== */
+/* SKIN: Grand Core — Solarpunk-Futuristic neo-brutalism. Hyper-rounded */
+/* "inflated" shapes (opposite direction from Shinobi Core's sharp      */
+/* corners), chunky hard-offset shadows, pill-shaped interactive        */
+/* elements, frosted-glass nav bars. Self-hosted fonts, see fonts/.     */
+/* Brand brief only supplied a light palette (explicitly the intended   */
+/* default mode) — that goes in the [data-theme="light"] slot below;    */
+/* the bare/dark slot is a derived companion so the skin still works    */
+/* with the light/dark toggle like every other skin in this app.        */
+/* ================================================================== */
+@font-face {
+  font-family: 'Grand Core Sora';
+  font-style: normal;
+  font-weight: 600 800;
+  font-display: swap;
+  src: url('fonts/sora.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Grand Core Grotesk';
+  font-style: normal;
+  font-weight: 400 500;
+  font-display: swap;
+  src: url('fonts/space-grotesk.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Grand Core Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('fonts/jetbrains-mono.woff2') format('woff2');
+}
+
+/* Dark (default when this skin is selected, i.e. no data-theme="light")
+   — derived; keeps the same vivid accent hues as the light palette but
+   inverts the surfaces so the toggle stays meaningful. */
+:root[data-skin="grand-core"] {
+  --bg: #14181a;
+  --bg-elevated: #1c2124;
+  --surface-1: #1c2124;
+  --surface-2: #232a2d;
+  --surface-1-rgb: 28,33,36;
+  --surface-2-rgb: 35,42,45;
+  --border: #3e4850;
+  --border-soft: rgba(255,255,255,0.08);
+  --text-primary: #f3f0ef;
+  --text-secondary: #bdc8d1;
+  --text-muted: #8a949c;
+  --gridline: rgba(255,255,255,0.08);
+  --baseline: rgba(255,255,255,0.16);
+
+  --cyan: #82cfff;
+  --cyan-dim: #00aeef;
+  --cyan-glow: rgba(130, 207, 255, 0.4);
+  --violet: #79ff5b;
+  --magenta: #ff6b6b;
+
+  --series-1: #82cfff;
+  --series-2: #79ff5b;
+  --gradient-bar: linear-gradient(90deg, #79ff5b 0%, #82cfff 100%);
+  --gradient-glow: rgba(130, 207, 255, 0.35);
+
+  --good: #79ff5b;
+  --warning: #e9c400;
+  --serious: #e0973c;
+  --critical: #ff6b6b;
+
+  --surface-translucent: rgba(20, 24, 26, 0.88);
+  --nav-translucent: rgba(18, 21, 23, 0.9);
+
+  --card-radius: 24px;
+  --font-mono: 'Grand Core Mono', ui-monospace, monospace;
+  --font-display: 'Grand Core Grotesk', system-ui, sans-serif;
+  --font-headline: 'Grand Core Sora', system-ui, sans-serif;
+}
+
+/* Light — the brand brief's actual "Grand Core" palette, verbatim. */
+:root[data-skin="grand-core"][data-theme="light"] {
+  --bg: #fcf9f8;
+  --bg-elevated: #ffffff;
+  --surface-1: #f6f3f2;
+  --surface-2: #f0eded;
+  --surface-1-rgb: 246,243,242;
+  --surface-2-rgb: 240,237,237;
+  --border: #bdc8d1;
+  --border-soft: #e5e2e1;
+  --text-primary: #1c1b1b;
+  --text-secondary: #3e4850;
+  --text-muted: #6e7881;
+  --gridline: rgba(28, 27, 27, 0.08);
+  --baseline: rgba(28, 27, 27, 0.18);
+
+  --cyan: #00aeef;
+  --cyan-dim: #00658d;
+  --cyan-glow: rgba(0, 174, 239, 0.35);
+  --violet: #2ae500;
+  --magenta: #ba1a1a;
+
+  --series-1: #00aeef;
+  --series-2: #2ae500;
+  --gradient-bar: linear-gradient(90deg, #2ae500 0%, #00aeef 100%);
+  --gradient-glow: rgba(0, 174, 239, 0.3);
+
+  --good: #106e00;
+  --warning: #bfa100;
+  --serious: #b5650a;
+  --critical: #ba1a1a;
+
+  --surface-translucent: rgba(252, 249, 248, 0.85);
+  --nav-translucent: rgba(255, 255, 255, 0.88);
+}
+
+/* Structural: hyper-rounded "inflated" shapes everywhere (opposite of
+   Shinobi Core's sharp corners), then interactive elements get pushed all
+   the way to a full pill per the brand's "Interactive Elements" rule.
+   Entirely scoped to this skin. */
+[data-skin="grand-core"] * {
+  border-radius: var(--card-radius) !important;
+}
+[data-skin="grand-core"] .btn,
+[data-skin="grand-core"] input,
+[data-skin="grand-core"] select,
+[data-skin="grand-core"] .chip,
+[data-skin="grand-core"] .pill {
+  border-radius: 9999px !important;
+}
+[data-skin="grand-core"] textarea {
+  border-radius: var(--card-radius) !important;
+}
+[data-skin="grand-core"] .hero-title,
+[data-skin="grand-core"] .chart-card-title,
+[data-skin="grand-core"] .section-title,
+[data-skin="grand-core"] .app-header h1,
+[data-skin="grand-core"] .sheet-head h2,
+[data-skin="grand-core"] .field-group-heading {
+  font-family: var(--font-headline);
+  letter-spacing: -0.01em;
+}
+[data-skin="grand-core"] .hero-card,
+[data-skin="grand-core"] .chart-card,
+[data-skin="grand-core"] .stat-tile,
+[data-skin="grand-core"] .ring-card,
+[data-skin="grand-core"] .computed-card {
+  border-width: 3px;
+  border-style: solid;
+  border-color: var(--text-primary);
+  box-shadow: 4px 4px 0 0 var(--text-primary);
+}
+[data-skin="grand-core"] .btn {
+  border-width: 3px;
+  border-style: solid;
+  border-color: var(--text-primary);
+  font-weight: 700;
+  box-shadow: 4px 4px 0 0 var(--text-primary);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+[data-skin="grand-core"] .btn:active {
+  transform: translate(4px, 4px);
+  box-shadow: 0 0 0 0 var(--text-primary);
+}
+[data-skin="grand-core"] .btn--primary {
+  background: var(--critical);
+  color: #fff;
+  text-shadow: none;
+}
+[data-skin="grand-core"] input,
+[data-skin="grand-core"] select,
+[data-skin="grand-core"] textarea {
+  border-width: 3px !important;
+  border-style: solid;
+  border-color: var(--text-primary);
+}
+[data-skin="grand-core"] .chip,
+[data-skin="grand-core"] .pill {
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+[data-skin="grand-core"] .tab-bar {
+  border-width: 3px;
+  border-color: var(--text-primary);
+  backdrop-filter: blur(20px);
+}
+[data-skin="grand-core"] .app-header {
+  border-bottom-width: 3px;
+  border-color: var(--text-primary);
+  backdrop-filter: blur(20px);
+}
+
 .sheet-section { margin-bottom: 22px; }
 .sheet-section--compact { margin-bottom: 14px; }
 .sheet-section--compact .field-group-heading { margin: 0 0 6px; font-size: 0.86rem; }
