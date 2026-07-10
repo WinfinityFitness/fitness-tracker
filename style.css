@@ -555,6 +555,7 @@ body.has-custom-bg { background-color: transparent; }
 }
 .chart-card-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
 .chart-card-title { font-weight: 700; font-size: 0.95rem; }
+#digitalIdCard, #adjustedBmiTile, #stepsCaloriesTitle { cursor: pointer; }
 .chart-card-sub { font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-muted); }
 .weight-chart { position: relative; width: 100%; }
 .weight-chart svg { width: 100%; height: auto; display: block; overflow: visible; }
@@ -857,14 +858,19 @@ button.mission-log-day:hover { border-color: var(--cyan); }
 /* Compact variant — Training tab Session templates fieldset */
 .field-group--compact { padding: 10px; }
 .field-group--compact legend { font-size: 0.66rem; padding: 0 3px; }
+.field-group--compact .mod-tag { margin-bottom: 2px; }
+.field-group--compact .field-group-heading { margin: 0 0 6px; font-size: 0.86rem; }
 .field-group--compact .field { margin-bottom: 8px; gap: 3px; }
 .field-group--compact .field > span { font-size: 0.78rem; }
 .field-group--compact .field input[type="text"],
+.field-group--compact .field input[type="number"],
+.field-group--compact .field input[type="date"],
 .field-group--compact .field select { padding: 7px 8px; font-size: 0.86rem; }
 .field-group--compact .btn-row { gap: 8px; }
 .field-group--compact .btn-row .btn,
 .field-group--compact > .btn { padding: 8px 10px; font-size: 0.8rem; min-width: 0; }
-.field-group--compact .save-note { margin-top: 6px; font-size: 0.76rem; }
+.field-group--compact .save-note { margin-top: 4px; font-size: 0.76rem; }
+.field-group--compact .section-title-row { margin: 0 0 4px; }
 .field-group .extraHabitInput {
   display: block;
   width: 100%;

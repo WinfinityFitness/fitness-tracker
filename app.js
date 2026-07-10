@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.88';
+const APP_VERSION = 'WF_SYS_V.1.89';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -2018,6 +2018,8 @@ function renderDashboard() {
     document.getElementById('adjustedBMI').textContent = adjusted.adjustedBMI.toFixed(1);
   } else {
     adjTile.hidden = true;
+    adjTile.setAttribute('aria-expanded', 'false');
+    document.getElementById('adjustedBmiHint').hidden = true;
   }
 
   const trendSeries = computeTrendSeries(logsArr);
@@ -7146,9 +7148,27 @@ function getOrCreatePublicId() {
   return localStorage.getItem('wft_public_id');
 }
 
+// Wires a "tap card to reveal an explainer hint" interaction — used by the
+// Digital ID chip and the Adjusted BMI tile so their descriptions stay out
+// of the way until the user actually wants to read them.
+function initClickToRevealHint(cardId, hintId) {
+  const card = document.getElementById(cardId);
+  const hint = document.getElementById(hintId);
+  const toggleHint = () => {
+    const expanded = hint.hidden;
+    hint.hidden = !expanded;
+    card.setAttribute('aria-expanded', String(expanded));
+  };
+  card.addEventListener('click', toggleHint);
+  card.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleHint(); }
+  });
+}
+
 function initDigitalId() {
   document.getElementById('digitalIdValue').textContent = getOrCreatePublicId();
-  document.getElementById('btnCopyDigitalId').addEventListener('click', async function () {
+  document.getElementById('btnCopyDigitalId').addEventListener('click', async function (e) {
+    e.stopPropagation();
     if (!navigator.clipboard) return;
     try {
       await navigator.clipboard.writeText(getOrCreatePublicId());
@@ -7157,6 +7177,7 @@ function initDigitalId() {
       setTimeout(() => this.classList.remove('is-copied'), 1500);
     } catch (e) { /* ignore */ }
   });
+  initClickToRevealHint('digitalIdCard', 'digitalIdHint');
 }
 
 let chatRoomMeta = {}; // roomId -> { name, isDm, createdByKey, otherName }
@@ -8460,6 +8481,8 @@ safeInit(initAppUpdateButton, 'initAppUpdateButton');
 safeInit(initDonationPrompt, 'initDonationPrompt');
 safeInit(initLastStateRestore, 'initLastStateRestore');
 safeInit(initDigitalId, 'initDigitalId');
+safeInit(() => initClickToRevealHint('adjustedBmiTile', 'adjustedBmiHint'), 'initAdjustedBmiHint');
+safeInit(() => initClickToRevealHint('stepsCaloriesTitle', 'stepsCaloriesHint'), 'initStepsCaloriesHint');
 safeInit(initContact, 'initContact');
 safeInit(initFooterShare, 'initFooterShare');
 safeInit(initFooterTagline, 'initFooterTagline');
