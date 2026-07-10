@@ -3,6 +3,8 @@
   --bg-elevated: #12181c;
   --surface-1: #12181c;
   --surface-2: #171f24;
+  --surface-1-rgb: 18,24,28;
+  --surface-2-rgb: 23,31,36;
   --border: rgba(51, 200, 204, 0.12);
   --border-soft: rgba(255,255,255,0.06);
   --text-primary: #dde3e5;
@@ -48,6 +50,8 @@
   --bg-elevated: #fbfcfd;
   --surface-1: #fbfcfd;
   --surface-2: #eceff1;
+  --surface-1-rgb: 251,252,253;
+  --surface-2-rgb: 236,239,241;
   --border: rgba(10, 163, 189, 0.2);
   --border-soft: #e2e8f0;
   --text-primary: #262a2c;
@@ -2395,6 +2399,8 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   --bg-elevated: #281d15;
   --surface-1: #241912;
   --surface-2: #281d15;
+  --surface-1-rgb: 36,25,18;
+  --surface-2-rgb: 40,29,21;
   --border: #a58c7b;
   --border-soft: #564334;
   --text-primary: #f3dfd1;
@@ -2437,6 +2443,8 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   --bg-elevated: #fffaf3;
   --surface-1: #fffaf3;
   --surface-2: #ede1d1;
+  --surface-1-rgb: 255,250,243;
+  --surface-2-rgb: 237,225,209;
   --border: #1b110a;
   --border-soft: #d8c9b3;
   --text-primary: #1b110a;
@@ -2563,23 +2571,19 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 
 /* Widget Box Fill Transparency (Settings > Custom Background) — fades the
    solid fill behind cards/widgets so a background photo shows through them
-   too, not just the page behind them. --widget-fill-pct defaults to 100%
+   too, not just the page behind them. --widget-fill-alpha defaults to 1
    (fully opaque, i.e. unchanged from normal appearance) and is set by JS
-   from the slider. Uses color-mix() rather than separate RGB-triplet
-   variables per theme, so it works unchanged across every skin/mode. */
-:root { --widget-fill-pct: 100%; }
+   from the slider. Deliberately NOT color-mix(): older iOS Safari (e.g.
+   iOS 15) doesn't parse it and drops the whole declaration, leaving the
+   box fully transparent with no way to fix it from the slider. rgba() fed
+   by a plain R,G,B custom property per theme/skin is supported by every
+   browser that understands CSS custom properties at all. */
+:root { --widget-fill-alpha: 1; }
 .chart-card, .stat-tile, .ring-card, .computed-card {
-  /* Fallback for browsers that don't parse color-mix() (older iOS Safari) —
-     without this, an unsupported color-mix() declaration is dropped entirely
-     and the box falls back to the initial "transparent" background instead
-     of just ignoring the slider. Cascade: the later, valid declaration wins
-     wherever color-mix() IS supported; elsewhere this plain color remains. */
-  background: var(--surface-1);
-  background: color-mix(in srgb, var(--surface-1) var(--widget-fill-pct), transparent);
+  background: rgba(var(--surface-1-rgb), var(--widget-fill-alpha));
 }
 .hero-card {
-  background: linear-gradient(160deg, var(--surface-2), var(--surface-1));
   background: linear-gradient(160deg,
-    color-mix(in srgb, var(--surface-2) var(--widget-fill-pct), transparent),
-    color-mix(in srgb, var(--surface-1) var(--widget-fill-pct), transparent));
+    rgba(var(--surface-2-rgb), var(--widget-fill-alpha)),
+    rgba(var(--surface-1-rgb), var(--widget-fill-alpha)));
 }

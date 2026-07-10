@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.87';
+const APP_VERSION = 'WF_SYS_V.1.88';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -2012,15 +2012,12 @@ function renderDashboard() {
   document.getElementById('currentBMI').textContent = bmi ? bmi.toFixed(1) : '–';
 
   const adjTile = document.getElementById('adjustedBmiTile');
-  const adjHint = document.getElementById('adjustedBmiHint');
   const adjusted = (profile && bmi) ? computeAdjustedBMI(profile, bmi, logsArr) : null;
   if (adjusted) {
     adjTile.hidden = false;
-    adjHint.hidden = false;
     document.getElementById('adjustedBMI').textContent = adjusted.adjustedBMI.toFixed(1);
   } else {
     adjTile.hidden = true;
-    adjHint.hidden = true;
   }
 
   const trendSeries = computeTrendSeries(logsArr);
@@ -8268,10 +8265,10 @@ function applyCustomBg() {
   // photo is set — it's a general "let widgets go see-through" control, not
   // strictly tied to having an image (works fine over the plain page
   // pattern too). Slider convention matches Blur/Dim/Transparency above:
-  // 0 = no effect (fully opaque, unchanged), 100 = fully transparent —
-  // color-mix() wants the OPPOSITE (how much fill to keep), hence 100-x.
+  // 0 = no effect (fully opaque, unchanged), 100 = fully transparent — the
+  // CSS rgba() alpha channel wants the OPPOSITE (how opaque to stay), hence 1-x.
   const widgetFill = getBgSettings().widgetFill;
-  document.documentElement.style.setProperty('--widget-fill-pct', (100 - widgetFill) + '%');
+  document.documentElement.style.setProperty('--widget-fill-alpha', (1 - widgetFill / 100).toFixed(2));
 
   if (!imgData || !imgData.dataUrl) {
     layer.hidden = true;
