@@ -83,6 +83,12 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 
+:root { --user-font-scale: 1; }
+html {
+  /* Text Size setting (Settings > Appearance) — scales every rem-based
+     font-size in the app together. Bounded 90%-115% by the slider itself. */
+  font-size: calc(16px * var(--user-font-scale));
+}
 html, body {
   margin: 0;
   padding: 0;
@@ -651,7 +657,7 @@ body.has-custom-bg { background-color: transparent; }
   height: 6px;
   background: var(--gridline);
   border-radius: 4px;
-  margin: 30px 6px 42px;
+  margin: 30px 6px 14px;
 }
 .goal-fill {
   position: absolute;
@@ -680,25 +686,23 @@ body.has-custom-bg { background-color: transparent; }
   background: var(--baseline);
   transform: translateX(-50%);
 }
+.goal-now-lowest-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 6px;
+}
 .goal-now {
-  position: absolute;
-  bottom: -20px;
-  transform: translateX(-50%);
   font-family: var(--font-mono);
   font-size: 0.68rem;
   font-weight: 700;
   color: var(--cyan);
-  white-space: nowrap;
 }
 .goal-lowest {
-  position: absolute;
-  bottom: -38px;
-  transform: translateX(-50%);
   font-family: var(--font-mono);
   font-size: 0.68rem;
   font-weight: 700;
   color: var(--warning);
-  white-space: nowrap;
 }
 
 /* ---------------- Status pill / badge ---------------- */
@@ -746,6 +750,7 @@ body.has-custom-bg { background-color: transparent; }
 .field input[type="date"],
 .field input[type="time"] { color-scheme: dark; }
 .date-picker-trigger { cursor: pointer; caret-color: transparent; }
+.field input.date-picker-trigger { padding: 7px 9px; font-size: 0.86rem; }
 .date-picker-trigger::-webkit-calendar-picker-indicator { display: none; }
 .food-diary-date-picker .date-picker-trigger::-webkit-calendar-picker-indicator { display: none; }
 .mission-log-day.is-selected { background: var(--cyan); color: #04181a; font-weight: 800; box-shadow: 0 0 8px var(--cyan-glow); }
@@ -2067,7 +2072,7 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 }
 .sheet-overlay[hidden] { display: none; }
 .sheet-overlay--stacked { z-index: 160; }
-#datePickerOverlay { z-index: 170; }
+#datePickerOverlay { z-index: 170; padding-left: 18px; padding-right: 18px; }
 
 .donation-overlay {
   position: fixed;

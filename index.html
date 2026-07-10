@@ -95,7 +95,7 @@
     </div>
 
     <div class="chart-card" id="goalProgressCard">
-      <div class="chart-card-head"><span class="chart-card-title">Goal progress</span></div>
+      <div class="chart-card-head"><span class="chart-card-title">GOAL PROGRESS</span></div>
       <p class="empty-note" id="goalEmptyNote">Set your weights in Bio and log a weight entry to see progress.</p>
     </div>
 
@@ -1335,6 +1335,13 @@
         </select>
       </label>
       <p class="hint">Themes work with the light/dark switch above — pick a theme, then toggle light or dark within it.</p>
+      <label class="field" style="margin-top:10px;">
+        <span>Text Size</span>
+        <input type="range" id="textSizeSlider" min="90" max="115" step="5" value="100">
+        <output id="textSizeOut">100%</output>
+      </label>
+      <div class="slider-endpoints"><span>Smaller</span><span>Larger</span></div>
+      <p class="hint hint--sm">Kept within a safe range so text won't overlap or overflow the app's widgets.</p>
     </div>
 
     <div class="sheet-section">
@@ -2163,6 +2170,7 @@
     <div class="assessment-checklist">
       <label class="field field--checkbox"><input type="checkbox" id="assessChkHistory" checked><span>Accomplishment Log History</span></label>
       <label class="field field--checkbox"><input type="checkbox" id="assessChkMeasurements" checked><span>Measurement History</span></label>
+      <label class="field field--checkbox"><input type="checkbox" id="assessChkBodyFat" checked><span>Body Fat % Log</span></label>
       <label class="field field--checkbox"><input type="checkbox" id="assessChkWeight" checked><span>Entity Weight Journey</span></label>
       <label class="field field--checkbox"><input type="checkbox" id="assessChkPerformance" checked><span>Recent Performance (7-day avg)</span></label>
       <label class="field field--checkbox"><input type="checkbox" id="assessChkWorkout" checked><span>Workout Summary</span></label>

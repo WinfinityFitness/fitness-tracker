@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.90';
+const APP_VERSION = 'WF_SYS_V.1.93';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -538,9 +538,32 @@ function initSwipeNavigation() {
 // (.donation-overlay) is deliberately excluded — its multi-step flow
 // (prompt -> QR view) doesn't map cleanly onto a single close button, and
 // it already has its own always-visible IGNORE button.
+// Standard "tap the dim backdrop to close" handler for .sheet-overlay panels.
+// Checking only the click's target isn't enough — on touch devices, a drag
+// or scroll gesture that starts inside the sheet's content but releases
+// over the backdrop (e.g. dragging down past the sheet's edge while trying
+// to scroll it) synthesizes a click whose target IS the backdrop, which
+// would wrongly close the sheet mid-drag. Requiring the press (pointerdown)
+// to have ALSO started on the backdrop makes sure only a genuine tap
+// outside the sheet — not a drag that merely ends there — closes it.
+function bindOverlayBackdropClose(overlay, onClose) {
+  let pressedOnBackdrop = false;
+  overlay.addEventListener('pointerdown', e => { pressedOnBackdrop = (e.target === overlay); });
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay && pressedOnBackdrop) onClose();
+  });
+}
+
 function initBackButtonNav() {
   const DISMISSIBLE_SELECTOR = '.sheet-overlay';
   let handlingPopstate = false;
+  // Set right before the observer's own synthetic history.back() call (from
+  // closing an overlay via X / backdrop tap / any non-back-button UI path).
+  // The popstate that call triggers must NOT also run the "nothing open,
+  // jump to Status" logic below — otherwise closing an overlay with the X
+  // button forces you back to the Status tab instead of just revealing
+  // whatever tab was already underneath it.
+  let closingViaObserver = false;
 
   history.replaceState({ wftNav: true }, '');
 
@@ -555,6 +578,7 @@ function initBackButtonNav() {
         // Closed via the UI (close button / backdrop tap / other code),
         // not via the back button — pop the entry pushed on open so the
         // history stack doesn't drift out of sync with the visible UI.
+        closingViaObserver = true;
         history.back();
       }
     });
@@ -571,6 +595,12 @@ function initBackButtonNav() {
   });
 
   window.addEventListener('popstate', () => {
+    if (closingViaObserver) {
+      // The overlay is already closed (that's what triggered this pop) and
+      // the tab underneath never changed — nothing left to do.
+      closingViaObserver = false;
+      return;
+    }
     handlingPopstate = true;
     let openOverlay = null;
     document.querySelectorAll(DISMISSIBLE_SELECTOR).forEach(el => { if (!el.hidden) openOverlay = el; });
@@ -618,7 +648,7 @@ function initLastStateRestore() {
     };
     const closeBtn = overlay.querySelector('.sheet-close');
     if (closeBtn) closeBtn.addEventListener('click', clearIfCurrent);
-    overlay.addEventListener('click', e => { if (e.target === overlay) clearIfCurrent(); });
+    bindOverlayBackdropClose(overlay, clearIfCurrent);
   });
 }
 
@@ -733,7 +763,7 @@ function initSettingsOverlay() {
   const overlay = document.getElementById('settingsOverlay');
   document.getElementById('btnOpenSettings').addEventListener('click', () => { overlay.hidden = false; });
   document.getElementById('btnCloseSettings').addEventListener('click', () => { overlay.hidden = true; });
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+  bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
 
   const toneSelect = document.getElementById('alarmToneSelect');
   toneSelect.value = localStorage.getItem('wft_alarm_tone') || 'chime';
@@ -750,7 +780,7 @@ function initContact() {
   const overlay = document.getElementById('contactOverlay');
   document.getElementById('btnFooterContact').addEventListener('click', () => { overlay.hidden = false; });
   document.getElementById('btnCloseContact').addEventListener('click', () => { overlay.hidden = true; });
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+  bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
 }
 
 async function generateShareCardBlob({ emoji, title, stats }) {
@@ -910,14 +940,14 @@ function initPrivacyPolicy() {
   const overlay = document.getElementById('privacyOverlay');
   document.getElementById('btnFooterPrivacy').addEventListener('click', () => { overlay.hidden = false; });
   document.getElementById('btnClosePrivacy').addEventListener('click', () => { overlay.hidden = true; });
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+  bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
 }
 
 function initTermsOfService() {
   const overlay = document.getElementById('termsOverlay');
   document.getElementById('btnFooterTerms').addEventListener('click', () => { overlay.hidden = false; });
   document.getElementById('btnCloseTerms').addEventListener('click', () => { overlay.hidden = true; });
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+  bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
 }
 
 async function sharePersonalRecords() {
@@ -942,7 +972,7 @@ function initPRBoardOverlay() {
     overlay.hidden = false;
   });
   document.getElementById('btnClosePRBoard').addEventListener('click', () => { overlay.hidden = true; });
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+  bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
   document.getElementById('btnSharePR').addEventListener('click', sharePersonalRecords);
 }
 
@@ -983,7 +1013,7 @@ function initTimezonePicker() {
     overlay.hidden = false;
   });
   document.getElementById('btnCloseTimezone').addEventListener('click', () => { overlay.hidden = true; });
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+  bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
   document.getElementById('btnSaveTimezone').addEventListener('click', () => {
     localStorage.setItem('wft_timezone', select.value);
     renderDateTimeClock();
@@ -1127,7 +1157,7 @@ function initWeatherLocationPicker() {
 
   document.getElementById('btnWeatherLocation').addEventListener('click', () => { overlay.hidden = false; });
   document.getElementById('btnCloseWeatherLocation').addEventListener('click', () => { overlay.hidden = true; });
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+  bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
 
   searchInput.addEventListener('input', () => {
     clearTimeout(debounceId);
@@ -1903,14 +1933,14 @@ function initMeasureEntryOverlay() {
   const overlay = document.getElementById('measureEntryOverlay');
   document.getElementById('btnOpenMeasureEntry').addEventListener('click', () => { overlay.hidden = false; });
   document.getElementById('btnCloseMeasureEntry').addEventListener('click', () => { overlay.hidden = true; });
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+  bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
 }
 
 function initEntityIdentityOverlay() {
   const overlay = document.getElementById('entityIdentityOverlay');
   document.getElementById('btnOpenEntityIdentity').addEventListener('click', () => { overlay.hidden = false; });
   document.getElementById('btnCloseEntityIdentity').addEventListener('click', () => { overlay.hidden = true; });
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+  bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
 }
 
 /* ---------------------------------------------------------------- */
@@ -2250,7 +2280,7 @@ function initWeightChartToggle() {
 function renderGoalProgress(profile, kgNow, wu, logsArr) {
   const card = document.getElementById('goalProgressCard');
   const emptyNote = document.getElementById('goalEmptyNote');
-  card.querySelectorAll('.goal-track').forEach(el => el.remove());
+  card.querySelectorAll('.goal-track, .goal-now-lowest-row').forEach(el => el.remove());
 
   if (!profile || kgNow == null || profile.goalTargetKg == null) {
     emptyNote.hidden = false;
@@ -2293,21 +2323,25 @@ function renderGoalProgress(profile, kgNow, wu, logsArr) {
     track.appendChild(marker);
   });
 
-  if (lowestKg7d != null) {
-    const lowest = document.createElement('div');
-    lowest.className = 'goal-lowest';
-    lowest.style.left = pctFor(lowestKg7d) + '%';
-    lowest.textContent = `Lowest (7d): ${round2(fromKg(lowestKg7d, wu))}${wu}`;
-    track.appendChild(lowest);
-  }
-
-  const now = document.createElement('div');
-  now.className = 'goal-now';
-  now.style.left = nowPct + '%';
-  now.textContent = `Now: ${round2(fromKg(kgNow, wu))}${wu}`;
-  track.appendChild(now);
-
   card.appendChild(track);
+
+  // Now/Lowest render as a plain justified row below the track rather than
+  // positioned at their weight's % point on the scale — pinning them to the
+  // scale meant a value near either end pushed the (centered, nowrap) label
+  // straight past the card's edge instead of just clipping gracefully.
+  const summaryRow = document.createElement('div');
+  summaryRow.className = 'goal-now-lowest-row';
+  const now = document.createElement('span');
+  now.className = 'goal-now';
+  now.textContent = `Now: ${round2(fromKg(kgNow, wu))}${wu}`;
+  summaryRow.appendChild(now);
+  if (lowestKg7d != null) {
+    const lowest = document.createElement('span');
+    lowest.className = 'goal-lowest';
+    lowest.textContent = `Lowest (7d): ${round2(fromKg(lowestKg7d, wu))}${wu}`;
+    summaryRow.appendChild(lowest);
+  }
+  card.appendChild(summaryRow);
 }
 
 /* ---------------------------------------------------------------- */
@@ -3072,7 +3106,7 @@ function initMissionLog() {
     overlay.hidden = false;
   });
   document.getElementById('btnCloseMissionLog').addEventListener('click', () => { overlay.hidden = true; });
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+  bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
   document.getElementById('btnMissionLogPrev').addEventListener('click', () => {
     missionLogViewDate = new Date(missionLogViewDate.getFullYear(), missionLogViewDate.getMonth() - 1, 1);
     renderMissionLogCalendar();
@@ -3145,7 +3179,7 @@ function openDatePicker(inputEl, title) {
 function initDatePicker() {
   const overlay = document.getElementById('datePickerOverlay');
   document.getElementById('btnCloseDatePicker').addEventListener('click', () => { overlay.hidden = true; });
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+  bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
   document.getElementById('btnDatePickerPrev').addEventListener('click', () => {
     datePickerViewDate = new Date(datePickerViewDate.getFullYear(), datePickerViewDate.getMonth() - 1, 1);
     renderDatePickerGrid(datePickerTargetInput ? datePickerTargetInput.value : null);
@@ -3807,7 +3841,13 @@ function initDonationPrompt() {
   document.getElementById('btnDonationIgnore').addEventListener('click', () => { overlay.hidden = true; });
   document.getElementById('btnDonationSure').addEventListener('click', openDonationQr);
   document.getElementById('btnDonationQrClose').addEventListener('click', () => { overlay.hidden = true; });
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+  // Stop any tap inside the card (the QR image especially — reported
+  // closing the popup on some mobile browsers when tapped, e.g. from a
+  // long-press "save image" gesture leaking a click through afterward)
+  // from ever reaching the backdrop listener below, instead of relying on
+  // a target === overlay check that some browsers don't honor reliably.
+  document.querySelector('.donation-card').addEventListener('click', e => e.stopPropagation());
+  overlay.addEventListener('click', () => { overlay.hidden = true; });
 }
 
 function fireSystemNotification(title, body) {
@@ -4201,7 +4241,7 @@ function initManualIntake() {
     overlay.hidden = false;
   });
   document.getElementById('btnCloseManualIntake').addEventListener('click', () => { overlay.hidden = true; });
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+  bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
   document.getElementById('manualIntakeDate').addEventListener('change', e => loadManualIntakeFields(e.target.value || todayISO()));
 
   document.getElementById('btnManualOverrideSubmit').addEventListener('click', () => {
@@ -4242,7 +4282,7 @@ function initFoodDiary() {
     overlay.hidden = false;
   });
   document.getElementById('btnCloseFoodDiary').addEventListener('click', () => { overlay.hidden = true; editingMealItem = null; });
-  overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.hidden = true; editingMealItem = null; } });
+  bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; editingMealItem = null; });
 
   dateInput.addEventListener('change', () => {
     if (!dateInput.value) return;
@@ -4724,7 +4764,7 @@ function recomputeCustomFoodFromAi() {
 function initAddFoodPanel() {
   const overlay = document.getElementById('addFoodOverlay');
   document.getElementById('btnCloseAddFood').addEventListener('click', () => { overlay.hidden = true; });
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+  bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
 
   const searchInput = document.getElementById('foodSearchInput');
   searchInput.addEventListener('input', () => {
@@ -5888,6 +5928,30 @@ async function generateMeasurementHistoryShareCard({ name, digitalId, date, rows
   return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
 }
 
+async function generateBodyFatHistoryShareCard({ name, digitalId, date, rows }) {
+  const width = 600;
+  const headerH = 116;
+  const columns = [{ label: 'DATE', width: 200 }, { label: 'BODY FAT %', width: 200 }];
+  const tableRows = rows.map(r => [r.date.slice(5), r.pct != null ? round2(r.pct) + '%' : '–']);
+  const tableH = 22 + Math.max(1, tableRows.length) * 22;
+  const footerH = 46;
+  const height = headerH + 20 + tableH + 24 + footerH;
+
+  const { canvas, ctx } = shareCardShell(width, height);
+  drawShareCardHeader(ctx, width, { name, digitalId, date, title: 'BODY FAT % LOG' });
+
+  const y = headerH + 20;
+  if (!tableRows.length) {
+    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px sans-serif';
+    ctx.fillText('No body fat measurements logged yet.', width / 2, y + 20);
+  } else {
+    drawShareTable(ctx, 32, y, width - 64, columns, tableRows);
+  }
+
+  await drawShareCardFooter(ctx, width, height);
+  return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
+}
+
 function computeOutdoorActivitySummary(logsArr) {
   const sessions = [];
   logsArr.forEach(l => (l.cardioSessions || []).forEach(s => sessions.push({ date: l.date, ...s })));
@@ -6204,6 +6268,18 @@ async function buildAssessmentBlobs() {
     }).then(blob => ({ name: 'measurement-history.png', blob })));
   }
 
+  if (document.getElementById('assessChkBodyFat').checked) {
+    const age = profile ? profile.age : null;
+    const gender = profile ? profile.gender : 'male';
+    const bodyFatRows = logsArr.filter(hasLoggedSkinfolds).slice(-7).reverse().map(l => ({
+      date: l.date,
+      pct: l.bodyFatPct ?? computeBodyFatJP7(l.skinfolds || {}, age, gender),
+    }));
+    jobs.push(generateBodyFatHistoryShareCard({
+      name, digitalId, date: nowDate, rows: bodyFatRows,
+    }).then(blob => ({ name: 'bodyfat-log.png', blob })));
+  }
+
   if (document.getElementById('assessChkWeight').checked) {
     const series = weightChartFullJourney ? computeTrendSeries(logsArr) : computeTrendSeries(logsArr).slice(-60);
     const kgNow = currentWeightKg(profile);
@@ -6282,7 +6358,7 @@ function initRequestAssessment() {
   const overlay = document.getElementById('assessmentShareOverlay');
   document.getElementById('btnRequestAssessment').addEventListener('click', openAssessmentOverlay);
   document.getElementById('btnCloseAssessmentShare').addEventListener('click', () => { overlay.hidden = true; });
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+  bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
 
   document.getElementById('btnAssessmentShareSubmit').addEventListener('click', async () => {
     const note = document.getElementById('assessmentShareNote');
@@ -6713,7 +6789,7 @@ function startAutoBackupTimer() {
   if (autoBackupTimerId) clearInterval(autoBackupTimerId);
   autoBackupTimerId = setInterval(() => {
     if (getBackupMode() === 'auto') downloadBackupJSON();
-  }, 30 * 60 * 1000);
+  }, 6 * 60 * 60 * 1000);
 }
 
 function initExport() {
@@ -6734,7 +6810,7 @@ function initExport() {
     const mode = getBackupMode();
     backupModeButtons.forEach(btn => btn.classList.toggle('is-active', btn.dataset.mode === mode));
     backupModeHint.textContent = mode === 'auto'
-      ? 'Auto — backs up automatically every 30 minutes while the app is open.'
+      ? 'Auto — backs up automatically every 6 hours while the app is open.'
       : 'Manual — tap "Back Up Now" whenever you want to save a JSON backup.';
   };
   backupModeButtons.forEach(btn => btn.addEventListener('click', () => {
@@ -8222,6 +8298,39 @@ function initSkinSelector() {
 initSkinSelector();
 
 /* ---------------------------------------------------------------- */
+/* Text size (Settings) — scales the root font-size so every rem-based */
+/* label/value across the app grows or shrinks together. Bounded to     */
+/* 90%-115% (default 100%): the compact stat tiles, chips, and ring     */
+/* center-text this session were tuned tight against their fixed px     */
+/* padding, so anything wider risks text overflowing/overlapping its    */
+/* box — this range is the widest that stays safe across those spots.   */
+/* ---------------------------------------------------------------- */
+const TEXT_SCALE_MIN = 90;
+const TEXT_SCALE_MAX = 115;
+function getTextScale() {
+  const v = parseInt(localStorage.getItem('wft_text_scale'), 10);
+  return (!isNaN(v) && v >= TEXT_SCALE_MIN && v <= TEXT_SCALE_MAX) ? v : 100;
+}
+function applyTextScale(scale) {
+  document.documentElement.style.setProperty('--user-font-scale', (scale / 100).toFixed(2));
+}
+applyTextScale(getTextScale());
+
+function initTextSizeSlider() {
+  const slider = document.getElementById('textSizeSlider');
+  const out = document.getElementById('textSizeOut');
+  const scale = getTextScale();
+  slider.value = scale;
+  out.textContent = scale + '%';
+  slider.addEventListener('input', () => {
+    const v = parseInt(slider.value, 10);
+    out.textContent = v + '%';
+    localStorage.setItem('wft_text_scale', v);
+    applyTextScale(v);
+  });
+}
+
+/* ---------------------------------------------------------------- */
 /* Custom background image (Settings)                                  */
 /* ---------------------------------------------------------------- */
 const BG_SETTINGS_DEFAULT = { mode: 'cover', blur: 0, dim: 0, transparency: 0, widgetFill: 0, cropX: 50, cropY: 50 };
@@ -8515,6 +8624,7 @@ safeInit(initReviewForm, 'initReviewForm');
 safeInit(initExport, 'initExport');
 safeInit(initDrive, 'initDrive');
 safeInit(initCustomBackground, 'initCustomBackground');
+safeInit(initTextSizeSlider, 'initTextSizeSlider');
 safeInit(initLeaderboard, 'initLeaderboard');
 safeInit(initAnnouncementWidget, 'initAnnouncementWidget');
 safeInit(loadSetupForm, 'loadSetupForm');
