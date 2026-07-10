@@ -824,7 +824,9 @@ button.mission-log-day:hover { border-color: var(--cyan); }
 }
 .field--checkbox input { width: 18px; height: 18px; flex: none; accent-color: var(--cyan); }
 .field--checkbox span { font-weight: 500; color: var(--text-primary); }
-.assessment-checklist { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
+.assessment-checklist { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.assessment-checklist .field--checkbox { padding: 2px 0; }
+.assessment-checklist .field--checkbox span { font-size: 0.86rem; }
 
 .field-row { display: flex; gap: 10px; }
 .field-row .field { flex: 1; }
@@ -871,6 +873,12 @@ button.mission-log-day:hover { border-color: var(--cyan); }
 .field-group--compact > .btn { padding: 8px 10px; font-size: 0.8rem; min-width: 0; }
 .field-group--compact .save-note { margin-top: 4px; font-size: 0.76rem; }
 .field-group--compact .section-title-row { margin: 0 0 4px; }
+.field-group--compact .field input[type="date"].date-picker-trigger,
+.field-group--compact .input-unit-wrap input { padding: 7px 8px; font-size: 0.86rem; }
+.field-group--compact .extraHabitInput { padding: 7px 8px; font-size: 0.86rem; margin-bottom: 0; }
+.field-group--compact .proto-row { gap: 6px; margin-bottom: 6px; }
+.field-group--compact .proto-index { font-size: 0.6rem; }
+.field-group--compact .hint { font-size: 0.72rem; margin: 4px 0 6px; }
 .field-group .extraHabitInput {
   display: block;
   width: 100%;
