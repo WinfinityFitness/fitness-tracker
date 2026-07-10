@@ -2980,6 +2980,211 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   backdrop-filter: blur(20px);
 }
 
+/* ================================================================== */
+/* SKIN: Hashira Core — Taisho-era Japanese aesthetic meets brutalist   */
+/* precision (Demon Slayer-adjacent "breathing style" HUD). Sharp 0px   */
+/* corners, katana-cut clipped corners on signature elements, a         */
+/* crimson-to-orange "tempered blade" gradient top border on cards,     */
+/* thin hairline strokes throughout (~0.3-0.6mm / 1-2px, never the      */
+/* brief's literal 4px — kept consistent with Sovereign Core's line     */
+/* weight per instruction). Reuses the Sora/JetBrains Mono files        */
+/* already fetched for the other skins — no new font downloads.         */
+/* Brief only gave a dark palette; light is derived as a "washi paper"  */
+/* companion (warm cream instead of stark white, fitting the brief's    */
+/* own ink-on-paper language) with the same crimson/orange/yellow       */
+/* accents darkened for contrast.                                       */
+/* ================================================================== */
+@font-face {
+  font-family: 'Hashira Sora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('fonts/sora-regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Hashira Sora';
+  font-style: normal;
+  font-weight: 600 800;
+  font-display: swap;
+  src: url('fonts/sora.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Hashira Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('fonts/jetbrains-mono.woff2') format('woff2');
+}
+
+/* Dark (default when this skin is selected, i.e. no data-theme="light"). */
+:root[data-skin="hashira-core"] {
+  --bg: #0a0a0b;
+  --bg-elevated: #1a1a1c;
+  --surface-1: #1a1a1c;
+  --surface-2: #201f20;
+  --surface-1-rgb: 26,26,28;
+  --surface-2-rgb: 32,31,32;
+  --border: #5c4040;
+  --border-soft: rgba(255, 255, 255, 0.06);
+  --text-primary: #f2f2f7;
+  --text-secondary: #e5bdbd;
+  --text-muted: #ab8888;
+  --gridline: rgba(242, 242, 247, 0.06);
+  --baseline: rgba(242, 242, 247, 0.14);
+
+  --cyan: #be002f;
+  --cyan-dim: #680015;
+  --cyan-glow: rgba(190, 0, 47, 0.4);
+  --violet: #ff571a;
+  --magenta: #e9c400;
+
+  --series-1: #be002f;
+  --series-2: #ff571a;
+  --gradient-bar: linear-gradient(90deg, #ff571a 0%, #be002f 100%);
+  --gradient-glow: rgba(190, 0, 47, 0.35);
+
+  --good: #ff571a;
+  --warning: #e9c400;
+  --serious: #ff4d00;
+  --critical: #ffb4ab;
+
+  --surface-translucent: rgba(10, 10, 11, 0.88);
+  --nav-translucent: rgba(19, 19, 20, 0.9);
+
+  --card-radius: 0;
+  --font-mono: 'Hashira Mono', ui-monospace, monospace;
+  --font-display: 'Hashira Sora', system-ui, sans-serif;
+  --font-headline: var(--font-display);
+}
+
+/* Light — "washi paper" companion, not given in the brief. */
+:root[data-skin="hashira-core"][data-theme="light"] {
+  --bg: #f7f3ee;
+  --bg-elevated: #fffcf8;
+  --surface-1: #fffcf8;
+  --surface-2: #f0e9e0;
+  --surface-1-rgb: 255,252,248;
+  --surface-2-rgb: 240,233,224;
+  --border: #d4b8b8;
+  --border-soft: #e8ded4;
+  --text-primary: #1a1213;
+  --text-secondary: #5c4040;
+  --text-muted: #8a6a6a;
+  --gridline: rgba(26, 18, 19, 0.08);
+  --baseline: rgba(26, 18, 19, 0.16);
+
+  --cyan: #92002f;
+  --cyan-dim: #680015;
+  --cyan-glow: rgba(146, 0, 47, 0.22);
+  --violet: #cc4400;
+  --magenta: #8a6d00;
+
+  --series-1: #92002f;
+  --series-2: #cc4400;
+  --gradient-bar: linear-gradient(90deg, #cc4400 0%, #92002f 100%);
+  --gradient-glow: rgba(146, 0, 47, 0.18);
+
+  --good: #cc4400;
+  --warning: #8a6d00;
+  --serious: #b23a00;
+  --critical: #ba1a1a;
+
+  --surface-translucent: rgba(247, 243, 238, 0.85);
+  --nav-translucent: rgba(255, 252, 248, 0.9);
+}
+
+/* Structural: sharp corners everywhere, katana-cut clipped corners on
+   signature elements (primary buttons, hero card), tempered-blade
+   gradient top border on cards, hairline strokes. Entirely scoped to
+   this skin. */
+[data-skin="hashira-core"] * {
+  border-radius: 0 !important;
+}
+[data-skin="hashira-core"] .hero-title,
+[data-skin="hashira-core"] .app-header h1 {
+  font-family: var(--font-headline);
+  font-weight: 800;
+  text-transform: uppercase;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+[data-skin="hashira-core"] .chart-card-title,
+[data-skin="hashira-core"] .section-title,
+[data-skin="hashira-core"] .sheet-head h2,
+[data-skin="hashira-core"] .field-group-heading {
+  font-family: var(--font-headline);
+  font-weight: 700;
+}
+[data-skin="hashira-core"] .hero-card,
+[data-skin="hashira-core"] .chart-card,
+[data-skin="hashira-core"] .stat-tile,
+[data-skin="hashira-core"] .ring-card,
+[data-skin="hashira-core"] .computed-card {
+  border: 1px solid var(--border);
+  /* "Tempered blade" edge: crimson-to-orange gradient, restricted to just
+     the top side via zero border-image-width on the other three. */
+  border-image: linear-gradient(90deg, var(--cyan), var(--violet)) 1;
+  border-image-width: 2px 0 0 0;
+  box-shadow: none;
+}
+[data-skin="hashira-core"] .hero-card {
+  /* Katana-cut: top-right corner sheared at 45deg — the "Signature" tier. */
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+}
+[data-skin="hashira-core"] .btn {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--text-primary);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+[data-skin="hashira-core"] .btn--primary {
+  background: var(--cyan);
+  color: var(--text-primary);
+  border-color: var(--cyan);
+  box-shadow: 2px 2px 0 0 var(--violet);
+  /* Katana-cut top-right corner, the brief's "Signature" button treatment. */
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+}
+[data-skin="hashira-core"] .btn--primary:active {
+  background: var(--violet);
+  border-color: var(--magenta);
+}
+[data-skin="hashira-core"] input,
+[data-skin="hashira-core"] select,
+[data-skin="hashira-core"] textarea {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 2px solid var(--cyan) !important;
+}
+[data-skin="hashira-core"] input:focus,
+[data-skin="hashira-core"] select:focus,
+[data-skin="hashira-core"] textarea:focus {
+  border-bottom-color: var(--magenta) !important;
+  outline: none;
+  box-shadow: 0 4px 6px -4px var(--magenta);
+}
+[data-skin="hashira-core"] .chip,
+[data-skin="hashira-core"] .pill {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  font-family: var(--font-mono);
+  letter-spacing: 0.05em;
+}
+[data-skin="hashira-core"] .tab-bar {
+  border-width: 1px;
+  border-color: var(--cyan);
+  backdrop-filter: blur(14px);
+}
+[data-skin="hashira-core"] .app-header {
+  border-bottom-width: 2px;
+  border-bottom-color: var(--cyan);
+  backdrop-filter: blur(14px);
+}
+
 .sheet-section { margin-bottom: 22px; }
 .sheet-section--compact { margin-bottom: 14px; }
 .sheet-section--compact .field-group-heading { margin: 0 0 6px; font-size: 0.86rem; }
