@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.61';
+const APP_VERSION = 'WF_SYS_V.1.67';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -588,7 +588,6 @@ function initTabs() {
         loadBioForDate(document.getElementById('bioDate').value);
         const p = getProfile();
         if (p) renderComputedTargets(p);
-        renderSleepBarChart();
         renderWaterRetentionOrb();
       }
       if (target === 'leaderboard' && sbConfigured()) {
@@ -971,6 +970,12 @@ function getManualWeatherLocation() {
 }
 
 function initWeatherWidget() {
+  // Icon/temp open weather.com in an external tab — kept off the location-pin
+  // button (a separate element right next to these) so tapping that to change
+  // location doesn't also trigger a tab open.
+  document.getElementById('weatherIcon').addEventListener('click', openWeatherWebsite);
+  document.getElementById('weatherTemp').addEventListener('click', openWeatherWebsite);
+
   let cached = null;
   try { cached = JSON.parse(localStorage.getItem('wft_weather_cache')); } catch (e) { /* ignore */ }
   if (cached && Date.now() - cached.time < 30 * 60 * 1000) renderWeather(cached);
@@ -979,7 +984,7 @@ function initWeatherWidget() {
   if (manualLoc) {
     fetchWeather(manualLoc.lat, manualLoc.lon).then(w => {
       renderWeather(w);
-      localStorage.setItem('wft_weather_cache', JSON.stringify({ ...w, time: Date.now() }));
+      localStorage.setItem('wft_weather_cache', JSON.stringify({ ...w, lat: manualLoc.lat, lon: manualLoc.lon, time: Date.now() }));
     }).catch(() => {
       if (!cached) { document.getElementById('weatherIcon').textContent = '⚠️'; document.getElementById('weatherTemp').textContent = '--°'; }
     });
@@ -992,9 +997,10 @@ function initWeatherWidget() {
   }
   navigator.geolocation.getCurrentPosition(
     pos => {
-      fetchWeather(pos.coords.latitude, pos.coords.longitude).then(w => {
+      const lat = pos.coords.latitude, lon = pos.coords.longitude;
+      fetchWeather(lat, lon).then(w => {
         renderWeather(w);
-        localStorage.setItem('wft_weather_cache', JSON.stringify({ ...w, time: Date.now() }));
+        localStorage.setItem('wft_weather_cache', JSON.stringify({ ...w, lat, lon, time: Date.now() }));
       }).catch(() => {
         if (!cached) { document.getElementById('weatherIcon').textContent = '⚠️'; document.getElementById('weatherTemp').textContent = '--°'; }
       });
@@ -1004,6 +1010,21 @@ function initWeatherWidget() {
     },
     { timeout: 8000 }
   );
+}
+
+// weather.com resolves a plain lat,lon in its "today" URL to the nearest
+// named location page (confirmed via direct request — it 301s to the
+// resolved locality) — no need for its internal opaque location IDs.
+function openWeatherWebsite() {
+  const manualLoc = getManualWeatherLocation();
+  let cached = null;
+  try { cached = JSON.parse(localStorage.getItem('wft_weather_cache')); } catch (e) { /* ignore */ }
+  const lat = (manualLoc && manualLoc.lat) ?? (cached && cached.lat);
+  const lon = (manualLoc && manualLoc.lon) ?? (cached && cached.lon);
+  const url = (lat != null && lon != null)
+    ? `https://weather.com/weather/today/l/${lat},${lon}`
+    : 'https://weather.com/';
+  window.open(url, '_blank', 'noopener');
 }
 
 async function searchWeatherLocations(query) {
@@ -1421,7 +1442,6 @@ function initBioLog() {
     document.getElementById('bioSaveNote').textContent = 'Saved biometrics for ' + date;
     setTimeout(() => { document.getElementById('bioSaveNote').textContent = ''; }, 2000);
     if (profile) renderComputedTargets(profile);
-    renderSleepBarChart();
     renderWaterRetentionOrb();
     if (date === todayISO()) { renderDashboard(); }
     updateTabDots();
@@ -1430,6 +1450,13 @@ function initBioLog() {
   SKINFOLD_SITES.forEach(key => {
     const input = document.getElementById('skin' + key.charAt(0).toUpperCase() + key.slice(1));
     if (input) input.addEventListener('input', renderBodyFatWidget);
+  });
+  document.getElementById('btnToggleCaliperEntry').addEventListener('click', () => {
+    const btn = document.getElementById('btnToggleCaliperEntry');
+    const panel = document.getElementById('caliperEntryPanel');
+    const expanded = panel.hidden;
+    panel.hidden = !expanded;
+    btn.setAttribute('aria-expanded', String(expanded));
   });
   document.getElementById('btnSaveSkinfolds').addEventListener('click', () => {
     const date = document.getElementById('bioDate').value;
@@ -1444,37 +1471,7 @@ function initBioLog() {
   });
 
   loadBioForDate(todayISO());
-  renderSleepBarChart();
   renderWaterRetentionOrb();
-}
-
-function renderSleepBarChart() {
-  const logsArr = sortedLogsArray();
-  const days = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(); d.setDate(d.getDate() - i);
-    const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-    const entry = logsArr.find(l => l.date === iso);
-    days.push({ dateObj: d, sleep: entry ? entry.sleep : null });
-  }
-  const chart = document.getElementById('sleepBarChart');
-  const labels = document.getElementById('sleepBarLabels');
-  chart.innerHTML = ''; labels.innerHTML = '';
-  days.forEach(d => {
-    const col = document.createElement('div');
-    col.className = 'bar-chart-col' + (d.sleep != null ? ' has-value' : '');
-    col.style.height = d.sleep != null ? `${(d.sleep / 5) * 100}%` : '4%';
-    col.title = d.sleep != null ? `${d.sleep}/5` : 'No data';
-    chart.appendChild(col);
-    const lbl = document.createElement('span');
-    lbl.textContent = d.dateObj.toLocaleDateString(undefined, { weekday: 'narrow' });
-    labels.appendChild(lbl);
-  });
-
-  const logged = days.filter(d => d.sleep != null);
-  const avgQuality = logged.length ? logged.reduce((s, d) => s + d.sleep, 0) / logged.length : null;
-  document.getElementById('sleepAvgQuality').textContent = avgQuality != null ? `${avgQuality.toFixed(1)}/5.0` : '–';
-  document.getElementById('sleepConsistency').textContent = `${round0((logged.length / 7) * 100)}%`;
 }
 
 /* Watson (1980) total body water formula, in liters. */
@@ -1597,7 +1594,6 @@ function saveStartDayLog() {
   document.getElementById('btnShareFromStartDayLog').hidden = false;
   renderDashboard();
   if (profile) renderComputedTargets(profile);
-  renderSleepBarChart();
   refreshFuelWaterViews(date);
   renderNutritionTargets();
   renderNutritionAverages();
@@ -1650,7 +1646,6 @@ function saveEndDayLog() {
   document.getElementById('btnShareFromEndDayLog').hidden = false;
   renderDashboard();
   if (profile) renderComputedTargets(profile);
-  renderSleepBarChart();
   renderWaterRetentionOrb();
   if (document.getElementById('bioDate').value === date) loadBioForDate(date);
   updateTabDots();
@@ -4083,6 +4078,54 @@ function shiftFoodDiaryDate(deltaDays) {
 let currentAddFoodMeal = 'breakfast';
 let selectedFoodData = null;
 let foodSearchDebounceId = null;
+// Per-100g baseline from the last AI estimate in the "Not finding it?"
+// custom food form — lets serving size/unit changes auto-rescale the
+// calorie/macro inputs instead of leaving them stuck at the 100g figures.
+// Only set by the AI estimate; a from-scratch manual entry (no AI click)
+// leaves this null, so grams/unit changes don't touch hand-typed values.
+let customFoodAiPer100g = null;
+
+// Directly overrides the day's flat nutrition totals (the same fields
+// Daily Fuel Status reads), bypassing the Dietary Algorithm/meals entirely —
+// for users transferring totals already computed by another app (e.g.
+// MyFitnessPal) rather than logging individual food items here. Note the
+// same caveat as any direct total-override: if the Dietary Algorithm is
+// used for this date afterward, saving a meal there recomputes and
+// overwrites these totals from the (possibly empty) meals list.
+function initManualIntake() {
+  const overlay = document.getElementById('manualIntakeOverlay');
+
+  document.getElementById('btnOpenManualIntake').addEventListener('click', () => {
+    const date = document.getElementById('nutDate').value;
+    const e = getLogs()[date] || {};
+    document.getElementById('manualIntakeDateLabel').textContent = fmtDate(parseISO(date));
+    document.getElementById('manualIntakeCalories').value = e.calories ?? '';
+    document.getElementById('manualIntakeProtein').value = e.protein ?? '';
+    document.getElementById('manualIntakeCarbs').value = e.carbs ?? '';
+    document.getElementById('manualIntakeFat').value = e.fat ?? '';
+    document.getElementById('manualIntakeFiber').value = e.fiber ?? '';
+    document.getElementById('manualIntakeSodium').value = e.sodium ?? '';
+    document.getElementById('manualIntakeNote').textContent = '';
+    overlay.hidden = false;
+  });
+  document.getElementById('btnCloseManualIntake').addEventListener('click', () => { overlay.hidden = true; });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.hidden = true; });
+
+  document.getElementById('btnManualOverrideSubmit').addEventListener('click', () => {
+    const date = document.getElementById('nutDate').value;
+    updateLogFields(date, {
+      calories: parseFloat(document.getElementById('manualIntakeCalories').value) || 0,
+      protein: parseFloat(document.getElementById('manualIntakeProtein').value) || 0,
+      carbs: parseFloat(document.getElementById('manualIntakeCarbs').value) || 0,
+      fat: parseFloat(document.getElementById('manualIntakeFat').value) || 0,
+      fiber: parseFloat(document.getElementById('manualIntakeFiber').value) || 0,
+      sodium: parseFloat(document.getElementById('manualIntakeSodium').value) || 0,
+    });
+    overlay.hidden = true;
+    refreshFuelViewsForDate(date);
+    showRestToast('Manual override applied to Daily Fuel Status.');
+  });
+}
 
 function initFoodDiary() {
   const overlay = document.getElementById('foodDiaryOverlay');
@@ -4263,6 +4306,7 @@ function openAddFoodPanel() {
   document.getElementById('customFoodFat').value = '';
   document.getElementById('customFoodTeachNote').hidden = true;
   document.getElementById('aiEstimateStatus').textContent = '';
+  customFoodAiPer100g = null;
   pendingBarcodeCode = null;
   document.getElementById('addFoodOverlay').hidden = false;
 }
@@ -4557,6 +4601,23 @@ function addFoodItemToDiary(item) {
   showRestToast(`Added "${item.name}" to ${currentAddFoodMeal}.`);
 }
 
+// Rescales the custom-food calorie/macro inputs from the last AI estimate's
+// per-100g baseline whenever serving size or unit changes — only active
+// after an AI estimate has actually been fetched (customFoodAiPer100g set);
+// a fully manual entry (no AI click) is left alone. Only applies here, in
+// the pre-add form — editing an already-logged diary entry is unaffected.
+function recomputeCustomFoodFromAi() {
+  if (!customFoodAiPer100g) return;
+  const qty = parseFloat(document.getElementById('customFoodGrams').value) || 0;
+  const unit = document.getElementById('customFoodUnit').value;
+  const grams = servingUnitToGrams(qty, unit);
+  const scale = grams / 100;
+  document.getElementById('customFoodCalories').value = round0(customFoodAiPer100g.calories * scale);
+  document.getElementById('customFoodProtein').value = round0(customFoodAiPer100g.protein * scale);
+  document.getElementById('customFoodCarbs').value = round0(customFoodAiPer100g.carbs * scale);
+  document.getElementById('customFoodFat').value = round0(customFoodAiPer100g.fat * scale);
+}
+
 function initAddFoodPanel() {
   const overlay = document.getElementById('addFoodOverlay');
   document.getElementById('btnCloseAddFood').addEventListener('click', () => { overlay.hidden = true; });
@@ -4601,12 +4662,12 @@ function initAddFoodPanel() {
     aiBtn.disabled = true;
     try {
       const est = await estimateFoodNutritionWithAI(name);
+      customFoodAiPer100g = { calories: est.calories || 0, protein: est.protein || 0, carbs: est.carbs || 0, fat: est.fat || 0 };
       document.getElementById('customFoodGrams').value = 100;
-      document.getElementById('customFoodCalories').value = round0(est.calories);
-      document.getElementById('customFoodProtein').value = round0(est.protein);
-      document.getElementById('customFoodCarbs').value = round0(est.carbs);
-      document.getElementById('customFoodFat').value = round0(est.fat);
-      statusEl.textContent = '⚠️ AI estimate for 100g — low accuracy, review before saving.';
+      document.getElementById('customFoodUnit').value = 'g';
+      document.getElementById('customFoodUnitWarning').hidden = true;
+      recomputeCustomFoodFromAi();
+      statusEl.textContent = '⚠️ AI estimate for 100g — low accuracy, review before saving. Change serving size/unit below and the values will rescale automatically.';
     } catch (e) {
       statusEl.textContent = e.message || 'AI estimate unavailable — check your connection or add manually.';
     } finally {
@@ -4637,7 +4698,9 @@ function initAddFoodPanel() {
 
   document.getElementById('customFoodUnit').addEventListener('change', e => {
     document.getElementById('customFoodUnitWarning').hidden = isServingUnitPrecise(e.target.value);
+    recomputeCustomFoodFromAi();
   });
+  document.getElementById('customFoodGrams').addEventListener('input', recomputeCustomFoodFromAi);
 
   document.getElementById('btnAddCustomFood').addEventListener('click', () => {
     const name = document.getElementById('customFoodName').value.trim();
@@ -5948,8 +6011,44 @@ function loadCoachAssignment() {
   document.getElementById('coachRefeedEnd').value = (profile && profile.refeedEnd) || '';
 }
 
+async function refreshCoachAssignmentFromServer() {
+  const note = document.getElementById('coachRefreshNote');
+  const btn = document.getElementById('btnRefreshCoachAssignment');
+  if (!sbConfigured()) { note.textContent = 'Not available offline.'; return; }
+  const profile = getProfile();
+  if (!profile) { note.textContent = 'Set up your profile in BIO first.'; return; }
+  btn.disabled = true;
+  note.textContent = 'Checking for a new assignment…';
+  try {
+    const shareKey = getOrCreateShareKey();
+    const { data, error } = await sb.from('assigned_targets').select('*').eq('share_key', shareKey).maybeSingle();
+    if (error) throw error;
+    if (!data) {
+      note.textContent = 'No assignment from your coach yet.';
+      return;
+    }
+    profile.coachCalorieTarget = data.calorie_target;
+    profile.coachStepGoal = data.step_goal;
+    profile.coachWorkoutsPerWeek = data.workouts_per_week;
+    profile.refeedCalories = data.refeed_calories;
+    profile.refeedStart = data.refeed_start;
+    profile.refeedEnd = data.refeed_end;
+    saveProfile(profile);
+    loadCoachAssignment();
+    renderNutritionTargets();
+    renderDashboard();
+    renderTrainingStats();
+    note.textContent = 'Refreshed — assignment updated ' + fmtDate(parseISO(data.updated_at.slice(0, 10))) + '.';
+  } catch (e) {
+    note.textContent = e.message || 'Could not check for an assignment — try again.';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function initCoachAssignment() {
   loadCoachAssignment();
+  document.getElementById('btnRefreshCoachAssignment').addEventListener('click', refreshCoachAssignmentFromServer);
   document.getElementById('btnSaveCoachAssignment').addEventListener('click', () => {
     const profile = getProfile();
     const note = document.getElementById('coachAssignmentNote');
@@ -6215,11 +6314,52 @@ function renderNutritionTargets() {
   document.getElementById('fuelWaterBar').style.width = Math.min(100, (waterNow / waterTarget) * 100) + '%';
 }
 
+// Fuel Snapshot ring row: Calories stays a 7-day average (day-to-day intake
+// is noisy, the trend is what matters); Protein and Water are today's
+// values (they're things you act on today, not a trailing average).
+function ringCurrentVsTarget(current, target, unitSuffix) {
+  const pct = target ? Math.min(100, (current / target) * 100) : 0;
+  const centerHtml = target != null
+    ? `<div style="line-height:1.15;text-align:center;">
+        <div style="font-size:15px;font-weight:800;font-family:var(--font-mono);color:var(--text-primary);">${round0(current)}${unitSuffix || ''}</div>
+        <div style="font-size:9px;font-family:var(--font-mono);color:var(--text-muted);">/${round0(target)}${unitSuffix || ''}</div>
+      </div>`
+    : undefined;
+  return { pct, centerHtml };
+}
+
 function renderNutritionAverages() {
+  const profile = getProfile();
+  const today = todayISO();
+  const todayEntry = getLogs()[today] || {};
   const logsArr = sortedLogsArray();
-  document.getElementById('avgCalories').textContent = fmtOrDash(avgOfLastNDays(logsArr, 'calories', 7), v => round0(v));
-  document.getElementById('avgProtein').textContent = fmtOrDash(avgOfLastNDays(logsArr, 'protein', 7), v => round0(v) + ' g');
-  document.getElementById('avgWater').textContent = fmtOrDash(avgOfLastNDays(logsArr, 'water', 7), v => round2(v));
+
+  const avgCalories = avgOfLastNDays(logsArr, 'calories', 7);
+  const calorieTarget = profile ? getEffectiveCalorieTarget(profile, today) : null;
+  const calRing = ringCurrentVsTarget(avgCalories ?? 0, calorieTarget, '');
+  renderRing(document.getElementById('avgCaloriesRing'), avgCalories != null ? calRing.pct : 0, {
+    size: 96, stroke: 7, gradient: true,
+    centerHtml: avgCalories != null ? calRing.centerHtml : undefined,
+    label: 'Calories', sub: '7-day avg',
+  });
+
+  const kg = profile ? currentWeightKg(profile) : null;
+  const targets = (profile && kg) ? computeTargets(profile, kg) : null;
+  const proteinTarget = targets ? round0((targets.protein[0] + targets.protein[1]) / 2) : null;
+  const protRing = ringCurrentVsTarget(todayEntry.protein ?? 0, proteinTarget, 'g');
+  renderRing(document.getElementById('avgProteinRing'), protRing.pct, {
+    size: 96, stroke: 7, gradient: true,
+    centerHtml: protRing.centerHtml,
+    label: 'Protein', sub: 'Today',
+  });
+
+  const waterTarget = effectiveWaterTargetML(today);
+  const waterRing = ringCurrentVsTarget(todayEntry.water ?? 0, waterTarget, '');
+  renderRing(document.getElementById('avgWaterRing'), waterRing.pct, {
+    size: 96, stroke: 7, gradient: true,
+    centerHtml: waterRing.centerHtml,
+    label: 'Water', sub: 'Today',
+  });
 }
 
 /* ---------------------------------------------------------------- */
@@ -7374,6 +7514,7 @@ function refreshAnnouncementMenuState() {
   const loggedIn = isAdminLoggedIn();
   document.getElementById('btnAdminLogin').hidden = loggedIn;
   document.getElementById('btnAdminPost').hidden = !loggedIn;
+  document.getElementById('btnAdminAssignTargets').hidden = !loggedIn;
   document.getElementById('btnAdminLogout').hidden = !loggedIn;
 }
 
@@ -7407,6 +7548,14 @@ function initAnnouncementWidget() {
     document.getElementById('adminPostText').value = currentAnnouncementText;
     document.getElementById('adminPostNote').textContent = '';
     document.getElementById('adminPostOverlay').hidden = false;
+  });
+  document.getElementById('btnAdminAssignTargets').addEventListener('click', () => {
+    menu.hidden = true;
+    ['adminAssignTargetId', 'adminAssignCalorie', 'adminAssignSteps', 'adminAssignWorkouts', 'adminAssignRefeedCalories', 'adminAssignRefeedStart', 'adminAssignRefeedEnd'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('adminAssignTargetsNote').textContent = '';
+    document.getElementById('adminAssignTargetsOverlay').hidden = false;
   });
 
   const loginOverlay = document.getElementById('adminLoginOverlay');
@@ -7457,6 +7606,44 @@ function initAnnouncementWidget() {
       showRestToast('Announcement posted.');
     } catch (e) {
       noteEl.textContent = 'Failed to post — try again.';
+    }
+  });
+
+  const assignOverlay = document.getElementById('adminAssignTargetsOverlay');
+  document.getElementById('btnCloseAdminAssignTargets').addEventListener('click', () => { assignOverlay.hidden = true; });
+  assignOverlay.addEventListener('click', e => { if (e.target === assignOverlay) assignOverlay.hidden = true; });
+
+  document.getElementById('btnAdminAssignTargetsSubmit').addEventListener('click', async () => {
+    const noteEl = document.getElementById('adminAssignTargetsNote');
+    if (!isAdminLoggedIn()) { noteEl.textContent = 'Not logged in.'; return; }
+    const targetId = document.getElementById('adminAssignTargetId').value.trim();
+    if (!targetId) { noteEl.textContent = "Enter the user's Digital ID."; return; }
+    const refeedStart = document.getElementById('adminAssignRefeedStart').value || null;
+    const refeedEnd = document.getElementById('adminAssignRefeedEnd').value || null;
+    if (refeedStart && refeedEnd && refeedStart > refeedEnd) {
+      noteEl.textContent = 'Refeed start date must be on or before the end date.';
+      return;
+    }
+    noteEl.textContent = 'Assigning…';
+    try {
+      const { error } = await sb.rpc('assign_targets', {
+        p_admin_digital_id: adminSession.digitalId,
+        p_admin_password: adminSession.password,
+        p_target_digital_id: targetId,
+        p_calorie_target: parseIntOrNull(document.getElementById('adminAssignCalorie').value),
+        p_step_goal: parseIntOrNull(document.getElementById('adminAssignSteps').value),
+        p_workouts_per_week: parseIntOrNull(document.getElementById('adminAssignWorkouts').value),
+        p_refeed_calories: parseIntOrNull(document.getElementById('adminAssignRefeedCalories').value),
+        p_refeed_start: refeedStart,
+        p_refeed_end: refeedEnd,
+      });
+      if (error) throw error;
+      assignOverlay.hidden = true;
+      showRestToast(`Targets assigned to ${targetId}.`);
+    } catch (e) {
+      noteEl.textContent = (e.message && e.message.includes('No user found'))
+        ? 'No user found with that Digital ID.'
+        : 'Failed to assign — try again.';
     }
   });
 
@@ -7913,6 +8100,7 @@ safeInit(initWeightChartToggle, 'initWeightChartToggle');
 safeInit(initNutrition, 'initNutrition');
 safeInit(initFoodDiary, 'initFoodDiary');
 safeInit(initAddFoodPanel, 'initAddFoodPanel');
+safeInit(initManualIntake, 'initManualIntake');
 safeInit(initBarcodeScanner, 'initBarcodeScanner');
 safeInit(initBioLog, 'initBioLog');
 safeInit(initReviewForm, 'initReviewForm');

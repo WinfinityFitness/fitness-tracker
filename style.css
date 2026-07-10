@@ -361,7 +361,8 @@ body {
   gap: 2px;
 }
 .weather-widget .datetime-label { justify-content: center; margin-bottom: 4px; }
-.weather-icon { font-size: 1.7rem; line-height: 1; }
+.weather-icon { font-size: 1.7rem; line-height: 1; cursor: pointer; }
+.weather-temp { cursor: pointer; }
 .weather-icon .wx-icon { width: 30px; height: 30px; display: block; }
 .weather-temp {
   font-family: var(--font-mono);
@@ -391,6 +392,8 @@ body {
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
 }
+.ring-row--3 { grid-template-columns: repeat(3, 1fr); }
+.ring-row--3 .ring-card { padding: 10px 4px; }
 .ring-card {
   background: var(--surface-1);
   border: 1px solid var(--border);
@@ -867,6 +870,10 @@ button.mission-log-day:hover { border-color: var(--cyan); }
 .hint--warning { color: var(--warning); background: var(--surface-2); border: 1px solid var(--warning); border-radius: 5px; padding: 6px 10px; }
 .hint--sm { font-size: 0.68rem; margin: 3px 0 0; line-height: 1.35; }
 .skinfold-grid { display: flex; flex-direction: column; gap: 12px; margin: 10px 0; }
+.caliper-entry-toggle { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; }
+.caliper-entry-chevron { transition: transform 0.2s ease; flex: none; }
+.caliper-entry-toggle[aria-expanded="true"] .caliper-entry-chevron { transform: rotate(180deg); }
+.caliper-entry-panel { margin-top: 12px; }
 
 .computed-card {
   background: var(--surface-1);

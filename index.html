@@ -216,14 +216,6 @@
       <button type="submit" class="btn btn--primary">Save check-in</button>
       <p class="save-note" id="checkinSaveNote"></p>
     </form>
-
-    <h2 class="section-title">Body measurement scan</h2>
-    <p class="hint">Should ideally be filled once a week, every Sunday morning, fasted.</p>
-    <div class="chart-card" style="position:relative;">
-      <p class="mod-tag">MOD_BIOSCAN_10</p>
-      <div class="measure-guide" id="measureGuide"></div>
-      <button type="button" class="measure-entry-btn" id="btnOpenMeasureEntry">User<br>Entry</button>
-    </div>
   </section>
 
   <!-- ============ TRAINING ============ -->
@@ -481,20 +473,17 @@
       Dietary Algorithm
     </button>
 
-    <h2 class="section-title">Averages (7-day)</h2>
-    <div class="stat-grid stat-grid--3">
-      <div class="stat-tile">
-        <div class="stat-tile-value" id="avgCalories">–</div>
-        <div class="stat-tile-label">Calories</div>
-      </div>
-      <div class="stat-tile">
-        <div class="stat-tile-value" id="avgProtein">–</div>
-        <div class="stat-tile-label">Protein</div>
-      </div>
-      <div class="stat-tile">
-        <div class="stat-tile-value" id="avgWater">–</div>
-        <div class="stat-tile-label">Water</div>
-      </div>
+    <button type="button" class="btn glass-emboss diet-algo-btn" id="btnOpenManualIntake">
+      <svg viewBox="0 0 24 24" width="16" height="16" class="diet-icon" fill="none" stroke="var(--cyan)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      Dietary Manual Input
+    </button>
+    <p class="hint">For users using other calorie tracking, calculator and counting apps like MyFitnessPal etc., transfer data here.</p>
+
+    <h2 class="section-title">Fuel Snapshot</h2>
+    <div class="ring-row ring-row--3">
+      <div class="ring-card" id="avgCaloriesRing"></div>
+      <div class="ring-card" id="avgProteinRing"></div>
+      <div class="ring-card" id="avgWaterRing"></div>
     </div>
 
     <h2 class="section-title">Coach assignment</h2>
@@ -505,7 +494,13 @@
     </button>
     <fieldset class="field-group">
       <p class="mod-tag">Mod_coach_07</p>
-      <p class="field-group-heading">Assigned Targets (Optional Override)</p>
+      <div class="section-title-row">
+        <p class="field-group-heading" style="margin:0;">Assigned Targets (Optional Override)</p>
+        <button type="button" class="icon-btn glass-emboss" id="btnRefreshCoachAssignment" aria-label="Refresh assigned targets from coach">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+        </button>
+      </div>
+      <p class="save-note" id="coachRefreshNote"></p>
       <label class="field">
         <span>Calorie intake assignment (kcal)</span>
         <input type="number" id="coachCalorieInput" placeholder="e.g. 2000">
@@ -580,15 +575,12 @@
     <button type="button" class="btn btn--primary" id="btnSaveBio">Initialize sync</button>
     <p class="save-note" id="bioSaveNote"></p>
 
-    <div class="chart-card">
-      <p class="mod-tag">Mod_sleep_viz_07</p>
-      <div class="chart-card-head"><span class="chart-card-title">Sleep Cycles (7D)</span></div>
-      <div class="bar-chart" id="sleepBarChart"></div>
-      <div class="bar-chart-labels" id="sleepBarLabels"></div>
-      <div class="sleep-stats-row">
-        <div><span class="stat-tile-label">Avg quality</span><div class="stat-tile-value" id="sleepAvgQuality">–</div></div>
-        <div><span class="stat-tile-label">Consistency</span><div class="stat-tile-value" id="sleepConsistency">–</div></div>
-      </div>
+    <h2 class="section-title">Body measurement scan</h2>
+    <p class="hint">Should ideally be filled once a week, every Sunday morning, fasted.</p>
+    <div class="chart-card" style="position:relative;">
+      <p class="mod-tag">MOD_BIOSCAN_10</p>
+      <div class="measure-guide" id="measureGuide"></div>
+      <button type="button" class="measure-entry-btn" id="btnOpenMeasureEntry">User<br>Entry</button>
     </div>
 
     <div class="chart-card">
@@ -601,8 +593,13 @@
     <div class="chart-card">
       <p class="mod-tag">Mod_bodyfat_05</p>
       <div class="chart-card-head"><span class="chart-card-title">Body Fat Percentage</span></div>
-      <p class="hint">Jackson-Pollock 7-Site skinfold method. Pinch each site with skinfold calipers and enter the reading in millimeters (mm) — both men and women are measured at the same seven locations.</p>
       <div class="ring-card ring-card--flush" id="bodyFatRing"></div>
+      <button type="button" class="btn caliper-entry-toggle" id="btnToggleCaliperEntry" aria-expanded="false">
+        <span>Caliper Entry Data</span>
+        <svg viewBox="0 0 24 24" width="16" height="16" class="caliper-entry-chevron" id="caliperEntryChevron" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="caliper-entry-panel" id="caliperEntryPanel" hidden>
+      <p class="hint">Jackson-Pollock 7-Site skinfold method. Pinch each site with skinfold calipers and enter the reading in millimeters (mm) — both men and women are measured at the same seven locations.</p>
       <div class="skinfold-grid">
         <label class="field">
           <span>Chest (mm)</span>
@@ -643,6 +640,7 @@
       <p class="hint" id="bodyFatEmptyNote">Set your age and gender in Entity Identity, then enter all 7 sites to compute your body fat %.</p>
       <button type="button" class="btn btn--primary" id="btnSaveSkinfolds">Save skinfold measurements</button>
       <p class="save-note" id="skinfoldSaveNote"></p>
+      </div>
     </div>
 
     <div class="computed-card">
@@ -758,6 +756,7 @@
           <div class="announcement-menu" id="announcementMenu" hidden>
             <button type="button" class="announcement-menu-item" id="btnAdminLogin">Admin Log In</button>
             <button type="button" class="announcement-menu-item" id="btnAdminPost" hidden>Post Announcement</button>
+            <button type="button" class="announcement-menu-item" id="btnAdminAssignTargets" hidden>Assign Targets</button>
             <button type="button" class="announcement-menu-item" id="btnAdminLogout" hidden>Log Out</button>
           </div>
         </div>
@@ -1588,6 +1587,45 @@
   </div>
 </div>
 
+<div class="sheet-overlay" id="manualIntakeOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Manual Input of Macros and Micros</h2>
+      <button class="sheet-close" id="btnCloseManualIntake">✕</button>
+    </div>
+    <p class="hint">Overrides the Dietary Algorithm's totals for <span id="manualIntakeDateLabel"></span> — this is what Daily Fuel Status will show.</p>
+    <p class="field-group-heading" style="font-size:0.8rem;">Macros</p>
+    <label class="field">
+      <span>Calories (kcal)</span>
+      <input type="number" id="manualIntakeCalories" placeholder="e.g. 2000">
+    </label>
+    <label class="field">
+      <span>Protein (g)</span>
+      <input type="number" id="manualIntakeProtein" placeholder="e.g. 150">
+    </label>
+    <label class="field">
+      <span>Carbs (g)</span>
+      <input type="number" id="manualIntakeCarbs" placeholder="e.g. 200">
+    </label>
+    <label class="field">
+      <span>Fat (g)</span>
+      <input type="number" id="manualIntakeFat" placeholder="e.g. 60">
+    </label>
+    <p class="field-group-heading" style="font-size:0.8rem;">Micros</p>
+    <label class="field">
+      <span>Fiber (g)</span>
+      <input type="number" id="manualIntakeFiber" placeholder="e.g. 25">
+    </label>
+    <label class="field">
+      <span>Sodium (mg)</span>
+      <input type="number" id="manualIntakeSodium" placeholder="e.g. 2300">
+    </label>
+    <button type="button" class="btn btn--primary" id="btnManualOverrideSubmit" style="width:100%;margin-top:10px;">Manual Override</button>
+    <p class="save-note" id="manualIntakeNote"></p>
+  </div>
+</div>
+
 <div class="sheet-overlay" id="foodDiaryOverlay" hidden>
   <div class="sheet">
     <div class="sheet-handle"></div>
@@ -1978,6 +2016,47 @@
     </label>
     <button type="button" class="btn btn--primary" id="btnAdminPostSubmit" style="width:100%;margin-top:10px;">Post</button>
     <p class="save-note" id="adminPostNote"></p>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="adminAssignTargetsOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Assign Targets</h2>
+      <button class="sheet-close" id="btnCloseAdminAssignTargets">✕</button>
+    </div>
+    <label class="field">
+      <span>User's Digital ID</span>
+      <input type="text" id="adminAssignTargetId" placeholder="WF-XXXXXX" autocomplete="off" autocapitalize="characters">
+    </label>
+    <label class="field">
+      <span>Calorie intake assignment (kcal)</span>
+      <input type="number" id="adminAssignCalorie" placeholder="e.g. 2000">
+    </label>
+    <label class="field">
+      <span>Steps target assignment</span>
+      <input type="number" id="adminAssignSteps" placeholder="e.g. 10000">
+    </label>
+    <label class="field">
+      <span>Workouts per week assignment</span>
+      <input type="number" id="adminAssignWorkouts" min="0" max="14" placeholder="e.g. 4">
+    </label>
+    <p class="field-group-heading" style="font-size:0.8rem;">Refeed</p>
+    <label class="field">
+      <span>+Calories</span>
+      <input type="number" id="adminAssignRefeedCalories" placeholder="e.g. 300">
+    </label>
+    <label class="field">
+      <span>Start date</span>
+      <input type="date" id="adminAssignRefeedStart" class="date-picker-trigger" readonly>
+    </label>
+    <label class="field">
+      <span>End date</span>
+      <input type="date" id="adminAssignRefeedEnd" class="date-picker-trigger" readonly>
+    </label>
+    <button type="button" class="btn btn--primary" id="btnAdminAssignTargetsSubmit" style="width:100%;margin-top:10px;">Assign</button>
+    <p class="save-note" id="adminAssignTargetsNote"></p>
   </div>
 </div>
 
