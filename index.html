@@ -16,6 +16,11 @@
 </head>
 <body>
 
+<div class="custom-bg-layer" id="customBgLayer" hidden>
+  <div class="custom-bg-image" id="customBgImage"></div>
+  <div class="custom-bg-overlay" id="customBgOverlay"></div>
+</div>
+
 <div class="splash-screen" id="splashScreen">
   <img class="splash-logo" src="icons/icon-512.png" alt="Winfinity">
   <p class="splash-caption">Masarap talaga kumain at matulog, pero mas masarap if ikaw mismo masarap din</p>
@@ -86,6 +91,29 @@
         </p>
         <div class="weather-icon" id="weatherIcon">⛅</div>
         <div class="weather-temp" id="weatherTemp">--°</div>
+      </div>
+    </div>
+
+    <div class="chart-card" id="goalProgressCard">
+      <div class="chart-card-head"><span class="chart-card-title">Goal progress</span></div>
+      <p class="empty-note" id="goalEmptyNote">Set your weights in Bio and log a weight entry to see progress.</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-card-head">
+        <span class="chart-card-title">ENTITY WEIGHT JOURNEY</span>
+        <div class="fuel-status-head-right">
+          <span class="chart-card-sub" id="chartRange"></span>
+          <button type="button" class="icon-btn glass-emboss" id="btnShareWeightJourney" aria-label="Share weight journey and goal progress">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
+          </button>
+        </div>
+      </div>
+      <div id="weightChart" class="weight-chart"></div>
+      <div class="chart-legend" id="chartLegend"></div>
+      <div class="empty-note" id="chartEmptyNote">
+        <p>Insufficient data points for visual projection. Log at least one weight entry to initialize trend.</p>
+        <button type="button" class="btn btn--primary btn--sm" id="btnGoToBioFromChart">Initialize sync</button>
       </div>
     </div>
 
@@ -178,35 +206,6 @@
         <span><span class="legend-swatch" style="background:var(--cyan)"></span>Steps</span>
         <span><span class="legend-swatch" style="background:var(--violet)"></span>Calories</span>
       </div>
-    </div>
-
-    <div class="chart-card">
-      <p class="mod-tag">Synchronization pulse</p>
-      <p class="hint">7-day steps trend, scaled relative to your highest day in this window.</p>
-      <svg class="pulse-linechart" id="pulseSparkline" viewBox="0 0 280 50" preserveAspectRatio="none"></svg>
-    </div>
-
-    <div class="chart-card">
-      <div class="chart-card-head">
-        <span class="chart-card-title">ENTITY WEIGHT JOURNEY</span>
-        <div class="fuel-status-head-right">
-          <span class="chart-card-sub" id="chartRange"></span>
-          <button type="button" class="icon-btn glass-emboss" id="btnShareWeightJourney" aria-label="Share weight journey and goal progress">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
-          </button>
-        </div>
-      </div>
-      <div id="weightChart" class="weight-chart"></div>
-      <div class="chart-legend" id="chartLegend"></div>
-      <div class="empty-note" id="chartEmptyNote">
-        <p>Insufficient data points for visual projection. Log at least one weight entry to initialize trend.</p>
-        <button type="button" class="btn btn--primary btn--sm" id="btnGoToBioFromChart">Initialize sync</button>
-      </div>
-    </div>
-
-    <div class="chart-card" id="goalProgressCard">
-      <div class="chart-card-head"><span class="chart-card-title">Goal progress</span></div>
-      <p class="empty-note" id="goalEmptyNote">Set your weights in Bio and log a weight entry to see progress.</p>
     </div>
 
     <form id="checkinForm">
@@ -375,38 +374,6 @@
       <input type="date" id="nutDate" class="date-picker-trigger" readonly>
     </label>
 
-    <div class="water-orb-card">
-      <div class="water-orb-card-head">
-        <span class="mod-tag" style="margin:0;">Mod_hydration_track</span>
-        <span class="water-orb-glass-tag">+250 mL / tap</span>
-      </div>
-      <div class="water-orb-row">
-        <button type="button" class="water-orb-arrow-btn" id="btnWaterOrbDown" aria-label="Remove a glass">▼</button>
-        <div class="water-orb">
-          <svg viewBox="0 0 100 100" class="water-orb-svg">
-            <defs>
-              <clipPath id="waterOrbClip"><circle cx="50" cy="50" r="46"></circle></clipPath>
-              <linearGradient id="waterOrbGrad" x1="0" y1="1" x2="0" y2="0">
-                <stop offset="0%" stop-color="#1f6fd6"></stop>
-                <stop offset="100%" stop-color="#2de2e6"></stop>
-              </linearGradient>
-            </defs>
-            <circle cx="50" cy="50" r="46" class="water-orb-track"></circle>
-            <g clip-path="url(#waterOrbClip)">
-              <rect id="fuelWaterOrbFill" class="water-orb-fill" x="0" y="100" width="100" height="0"></rect>
-            </g>
-            <circle cx="50" cy="50" r="46" class="water-orb-outline"></circle>
-          </svg>
-          <div class="water-orb-center">
-            <span class="water-orb-amount" id="fuelWaterOrbAmount">0</span>
-            <span class="water-orb-unit">mL</span>
-          </div>
-        </div>
-        <button type="button" class="water-orb-arrow-btn water-orb-arrow-btn--up" id="btnWaterOrbUp" aria-label="Add a glass">▲</button>
-      </div>
-      <p class="water-orb-target-label">Target: <span id="fuelWaterOrbTarget">3000</span> mL<span id="fuelWaterOrbAutoTag" class="water-orb-auto-tag" hidden> · auto</span></p>
-    </div>
-
     <div class="hero-card fuel-status-card" id="fuelStatusCard">
       <div class="chart-card-head">
         <p class="mod-tag" style="margin:0;">Current performance</p>
@@ -429,10 +396,23 @@
       <h3 class="fuel-status-title">Daily Fuel Status</h3>
 
       <div class="fuel-cal-row">
-        <div class="fuel-cal-ring" id="fuelCalorieRing"></div>
-        <div class="fuel-macro-pie-wrap">
-          <div class="fuel-macro-pie" id="fuelMacroPie"></div>
+        <div class="fuel-cal-col">
+          <div class="fuel-cal-ring" id="fuelCalorieRing"></div>
           <ul class="fuel-macro-legend" id="fuelMacroLegend"></ul>
+        </div>
+        <div class="fuel-water-col">
+          <p class="mod-tag" style="margin:0;">Mod_hydration_track</p>
+          <p class="water-orb-glass-tag">+250 mL / tap</p>
+          <div class="water-pill-row">
+            <div class="water-pill">
+              <div class="water-pill-fill" id="fuelWaterOrbFill"></div>
+            </div>
+            <div class="water-pill-btns">
+              <button type="button" class="water-orb-arrow-btn water-orb-arrow-btn--up" id="btnWaterOrbUp" aria-label="Add a glass">▲</button>
+              <button type="button" class="water-orb-arrow-btn" id="btnWaterOrbDown" aria-label="Remove a glass">▼</button>
+            </div>
+          </div>
+          <p class="water-orb-target-label"><span id="fuelWaterOrbAmount">0</span> / <span id="fuelWaterOrbTarget">3000</span> mL<span id="fuelWaterOrbAutoTag" class="water-orb-auto-tag" hidden> · auto</span></p>
         </div>
       </div>
 
@@ -1295,6 +1275,51 @@
         </select>
       </label>
       <p class="hint">Themes work with the light/dark switch above — pick a theme, then toggle light or dark within it.</p>
+    </div>
+
+    <div class="sheet-section">
+      <p class="field-group-heading">Custom Background</p>
+      <p class="hint">Upload a photo to use as the app background — auto-resized to a size that's plenty sharp for a phone screen without eating your storage.</p>
+      <div class="bg-upload-row">
+        <input type="file" id="bgImageInput" accept="image/*" hidden>
+        <button type="button" class="btn" id="btnChooseBgImage">Choose Image</button>
+        <button type="button" class="btn btn--danger" id="btnRemoveBgImage" hidden>Remove</button>
+      </div>
+      <p class="hint" id="bgImageStatus"></p>
+
+      <div class="bg-settings-group" id="bgSettingsGroup" hidden>
+        <label class="field">
+          <span>Position mode</span>
+          <select id="bgModeSelect">
+            <option value="cover">Fill</option>
+            <option value="contain">Fit</option>
+            <option value="center">Center</option>
+            <option value="tile">Tile</option>
+            <option value="crop">Crop &amp; Position</option>
+          </select>
+        </label>
+
+        <div class="bg-crop-wrap" id="bgCropWrap" hidden>
+          <p class="hint hint--sm">Drag inside the box to choose what part of the photo shows.</p>
+          <div class="bg-crop-preview" id="bgCropPreview"></div>
+        </div>
+
+        <label class="field">
+          <span>Blur</span>
+          <input type="range" id="bgBlurSlider" min="0" max="20" step="1" value="0">
+          <output id="bgBlurOut">0</output>
+        </label>
+        <label class="field">
+          <span>Dim</span>
+          <input type="range" id="bgDimSlider" min="0" max="100" step="1" value="0">
+          <output id="bgDimOut">0</output>
+        </label>
+        <label class="field">
+          <span>Transparency</span>
+          <input type="range" id="bgTransparencySlider" min="0" max="100" step="1" value="0">
+          <output id="bgTransparencyOut">0</output>
+        </label>
+      </div>
     </div>
 
     <div class="sheet-section">

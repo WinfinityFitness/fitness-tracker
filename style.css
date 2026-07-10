@@ -99,6 +99,29 @@ body {
   background-size: auto, auto, 320px 320px;
   background-attachment: fixed, fixed, fixed;
 }
+/* A custom background photo shows through as the base layer — the radial
+   gradients + pattern above stay on top (their low opacity lets the photo's
+   own color read through), only the flat --bg color underneath is dropped. */
+body.has-custom-bg { background-color: transparent; }
+
+.custom-bg-layer { position: fixed; inset: 0; z-index: -1; overflow: hidden; }
+.custom-bg-layer[hidden] { display: none; }
+.custom-bg-image {
+  position: absolute;
+  inset: -24px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  transition: filter 0.15s ease, opacity 0.15s ease;
+}
+.custom-bg-overlay {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
 :root[data-theme="light"] body {
   background-image:
     radial-gradient(ellipse 600px 300px at 20% 0%, rgba(10,163,189,0.08), transparent 60%),
@@ -296,10 +319,10 @@ body {
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--card-radius);
-  padding: 16px 18px;
+  padding: 11px 14px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 .datetime-info { flex: 7; min-width: 0; }
 .datetime-label {
@@ -308,24 +331,24 @@ body {
   justify-content: space-between;
   gap: 6px;
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 0.62rem;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin: 0 0 6px;
+  margin: 0 0 4px;
 }
 .datetime-date {
-  font-size: 1.1rem;
+  font-size: 0.92rem;
   font-weight: 800;
   color: var(--text-primary);
-  margin: 0 0 2px;
+  margin: 0 0 1px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .datetime-clock {
   font-family: var(--font-mono);
-  font-size: 1.5rem;
+  font-size: 1.22rem;
   font-weight: 800;
   color: var(--cyan);
   text-shadow: 0 0 12px var(--cyan-glow);
@@ -364,10 +387,10 @@ body {
   text-align: center;
   gap: 2px;
 }
-.weather-widget .datetime-label { justify-content: center; margin-bottom: 4px; }
-.weather-icon { font-size: 1.7rem; line-height: 1; cursor: pointer; }
+.weather-widget .datetime-label { justify-content: center; margin-bottom: 3px; }
+.weather-icon { font-size: 1.4rem; line-height: 1; cursor: pointer; }
 .weather-temp { cursor: pointer; }
-.weather-icon .wx-icon { width: 30px; height: 30px; display: block; }
+.weather-icon .wx-icon { width: 24px; height: 24px; display: block; }
 .weather-temp {
   font-family: var(--font-mono);
   font-size: 0.95rem;
@@ -566,7 +589,6 @@ body {
 
 /* Bar chart (sleep architecture style) */
 .bar-chart { display: flex; align-items: flex-end; gap: 4px; height: 90px; }
-.pulse-linechart { width: 100%; height: 50px; display: block; overflow: visible; }
 .volume-linechart { width: 100%; height: 90px; display: block; overflow: visible; }
 .volume-linechart circle { cursor: pointer; }
 .empty-note .btn { margin-top: 10px; display: inline-flex; width: auto; }
@@ -690,6 +712,7 @@ body {
 .field input[type="text"],
 .field input[type="number"],
 .field input[type="date"],
+.field input[type="time"],
 .field select,
 .field textarea {
   font-size: 1rem;
@@ -701,7 +724,8 @@ body {
   font-family: inherit;
   width: 100%;
 }
-.field input[type="date"] { color-scheme: dark; }
+.field input[type="date"],
+.field input[type="time"] { color-scheme: dark; }
 .date-picker-trigger { cursor: pointer; caret-color: transparent; }
 .date-picker-trigger::-webkit-calendar-picker-indicator { display: none; }
 .food-diary-date-picker .date-picker-trigger::-webkit-calendar-picker-indicator { display: none; }
@@ -930,26 +954,22 @@ button.mission-log-day:hover { border-color: var(--cyan); }
 .fuel-status-title { margin: 2px 0 4px; font-size: 1.05rem; font-weight: 800; }
 .fuel-cal-row {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
   margin-bottom: 8px;
 }
-.fuel-cal-ring {
+.fuel-cal-col {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  flex: none;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
 }
-.fuel-macro-pie-wrap { display: flex; align-items: center; justify-content: center; gap: 12px; }
-.fuel-macro-pie {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  flex: none;
-  box-shadow: inset 0 0 0 1px var(--border-soft);
-}
+.fuel-cal-ring { display: flex; flex-direction: column; align-items: center; text-align: center; flex: none; }
+.fuel-water-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: none; }
 .fuel-macro-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; font-size: 0.78rem; color: var(--text-secondary); min-width: 0; }
 .fuel-macro-legend li { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .fuel-macro-legend strong { color: var(--text-primary); font-family: var(--font-mono); }
@@ -2183,48 +2203,43 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 }
 .icon-btn:hover { border-color: var(--cyan); color: var(--cyan); }
 
-.water-orb-card {
-  background: var(--surface-1);
-  border: 1px solid var(--border-soft);
-  border-radius: 10px;
-  padding: 14px;
-  margin-bottom: 14px;
+.water-orb-glass-tag { font-family: var(--font-mono); font-size: 0.62rem; color: var(--text-muted); }
+.water-pill-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.water-pill {
+  position: relative;
+  width: 32px;
+  height: 128px;
+  border-radius: 16px;
+  border: 2px solid var(--border-soft);
+  background: var(--surface-2);
+  overflow: hidden;
+  box-shadow: inset 0 0 6px rgba(0,0,0,0.3);
+  flex: none;
 }
-.water-orb-card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.water-orb-glass-tag { font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-muted); }
-.water-orb-row { display: flex; align-items: center; justify-content: center; gap: 20px; }
-.water-orb { position: relative; width: 120px; height: 120px; flex: none; }
-.water-orb-svg { width: 100%; height: 100%; }
-.water-orb-track { fill: var(--surface-2); stroke: var(--border-soft); stroke-width: 1; }
-.water-orb-fill { fill: url(#waterOrbGrad); transition: y 0.4s ease, height 0.4s ease; }
-.water-orb-outline { fill: none; stroke: var(--cyan-dim); stroke-width: 2; }
-.water-orb-center {
+.water-pill-fill {
   position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
+  bottom: 0; left: 0; right: 0;
+  height: 0%;
+  background: linear-gradient(180deg, #2de2e6, #1f6fd6);
+  transition: height 0.4s ease;
 }
-.water-orb-amount { font-family: var(--font-mono); font-size: 1.3rem; font-weight: 800; color: var(--text-primary); text-shadow: 0 1px 4px rgba(0,0,0,0.55); }
-.water-orb-unit { font-family: var(--font-mono); font-size: 0.62rem; color: var(--text-secondary); text-shadow: 0 1px 4px rgba(0,0,0,0.55); }
+.water-pill-btns { display: flex; flex-direction: column; gap: 6px; }
 .water-orb-arrow-btn {
   flex: none;
-  width: 44px;
-  height: 44px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   background: var(--surface-2);
   border: 1px solid var(--border-soft);
   color: var(--text-primary);
-  font-size: 1.1rem;
+  font-size: 0.7rem;
   line-height: 1;
   cursor: pointer;
 }
 .water-orb-arrow-btn--up { color: var(--cyan); border-color: var(--cyan-dim); }
 .water-orb-arrow-btn:hover { border-color: var(--cyan); }
 .water-orb-arrow-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.water-orb-target-label { text-align: center; font-family: var(--font-mono); font-size: 0.74rem; color: var(--text-muted); margin: 10px 0 0; }
+.water-orb-target-label { text-align: center; font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-muted); margin: 6px 0 0; white-space: nowrap; }
 .water-orb-auto-tag { color: var(--cyan); text-transform: uppercase; letter-spacing: 0.04em; }
 
 .food-search-results { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; max-height: 260px; overflow-y: auto; }
@@ -2465,3 +2480,22 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   backdrop-filter: none;
 }
 .sheet-section { margin-bottom: 22px; }
+
+/* ---------------- Custom background upload (Settings) ---------------- */
+.bg-upload-row { display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.bg-settings-group { display: flex; flex-direction: column; gap: 4px; margin-top: 14px; }
+.bg-crop-wrap { margin: 4px 0 8px; }
+.bg-crop-preview {
+  width: 100%;
+  height: 160px;
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
+  cursor: grab;
+  touch-action: none;
+  margin-top: 6px;
+  background-color: var(--surface-2);
+}
+.bg-crop-preview:active { cursor: grabbing; }

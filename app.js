@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.71';
+const APP_VERSION = 'WF_SYS_V.1.75';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -517,6 +517,75 @@ function initSwipeNavigation() {
     const nextIdx = Math.max(0, Math.min(btns.length - 1, dx < 0 ? activeIdx + 1 : activeIdx - 1));
     if (nextIdx !== activeIdx) btns[nextIdx].click();
   }, { passive: true });
+}
+
+// Android hardware/gesture back button: closes the topmost open sheet, or
+// returns to the previously viewed tab, instead of the TWA/browser default
+// (exiting the app) — only falls through to that default once nothing is
+// open and the user is already on the Status (home) tab.
+//
+// Generic by design rather than hand-wiring history.pushState into each of
+// the ~20 individual overlay open functions: a MutationObserver watches
+// every .sheet-overlay's `hidden` attribute and pushes/pops a history entry
+// whenever one opens/closes, however it was opened or closed (trigger
+// button, backdrop tap, or another code path). The donation prompt
+// (.donation-overlay) is deliberately excluded — its multi-step flow
+// (prompt -> QR view) doesn't map cleanly onto a single close button, and
+// it already has its own always-visible IGNORE button.
+function initBackButtonNav() {
+  const DISMISSIBLE_SELECTOR = '.sheet-overlay';
+  let handlingPopstate = false;
+
+  history.replaceState({ wftNav: true }, '');
+
+  const observer = new MutationObserver(mutations => {
+    if (handlingPopstate) return;
+    mutations.forEach(m => {
+      const el = m.target;
+      if (!(el instanceof Element) || !el.matches(DISMISSIBLE_SELECTOR)) return;
+      if (!el.hidden) {
+        history.pushState({ wftNav: true }, '');
+      } else {
+        // Closed via the UI (close button / backdrop tap / other code),
+        // not via the back button — pop the entry pushed on open so the
+        // history stack doesn't drift out of sync with the visible UI.
+        history.back();
+      }
+    });
+  });
+  document.querySelectorAll(DISMISSIBLE_SELECTOR).forEach(el => {
+    observer.observe(el, { attributes: true, attributeFilter: ['hidden'] });
+  });
+
+  document.querySelectorAll('.tab-btn[data-target]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (handlingPopstate) return;
+      history.pushState({ wftNav: true }, '');
+    });
+  });
+
+  window.addEventListener('popstate', () => {
+    handlingPopstate = true;
+    let openOverlay = null;
+    document.querySelectorAll(DISMISSIBLE_SELECTOR).forEach(el => { if (!el.hidden) openOverlay = el; });
+    if (openOverlay) {
+      const closeBtn = openOverlay.querySelector('.sheet-close');
+      if (closeBtn) closeBtn.click(); else openOverlay.hidden = true;
+    } else {
+      const activeTab = document.querySelector('.tab-btn.is-active');
+      if (activeTab && activeTab.dataset.target !== 'status') {
+        const statusBtn = document.querySelector('.tab-btn[data-target="status"]');
+        if (statusBtn) statusBtn.click();
+      }
+      // Else: already on Status with nothing open — let the browser/TWA's
+      // own back behavior proceed (exits the app), the expected outcome at
+      // the true "root" screen.
+    }
+    // MutationObserver callbacks run as a microtask (before this timeout's
+    // macrotask), so it still sees handlingPopstate=true and correctly
+    // skips pushing/popping for the change just made above.
+    setTimeout(() => { handlingPopstate = false; }, 0);
+  });
 }
 
 // Curated top-level overlays worth restoring on reopen — each maps to the
@@ -1872,33 +1941,6 @@ function renderStepsCaloriesChart() {
   });
 }
 
-function renderPulseSparkline() {
-  const logsArr = sortedLogsArray();
-  const days = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(); d.setDate(d.getDate() - i);
-    const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-    const entry = logsArr.find(l => l.date === iso);
-    days.push(entry && entry.steps != null ? entry.steps : 0);
-  }
-  const max = Math.max(...days, 1);
-  const w = 280, h = 50, pad = 4;
-  const stepX = w / (days.length - 1);
-  const points = days.map((v, i) => ({
-    x: i * stepX,
-    y: h - pad - (v / max) * (h - pad * 2),
-  }));
-  const linePath = points.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-  const areaPath = `M${points[0].x.toFixed(1)},${h} ${linePath.replace(/^M/, 'L')} L${points[points.length - 1].x.toFixed(1)},${h} Z`;
-  const last = points[points.length - 1];
-
-  const svg = document.getElementById('pulseSparkline');
-  svg.innerHTML = `
-    <path d="${areaPath}" fill="var(--cyan)" opacity="0.12"></path>
-    <path d="${linePath}" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-    <circle cx="${last.x.toFixed(1)}" cy="${last.y.toFixed(1)}" r="3.2" fill="var(--cyan)"></circle>
-  `;
-}
 
 
 function renderDashboard() {
@@ -2001,7 +2043,6 @@ function renderDashboard() {
 
   renderWeightChart(trendSeries, wu);
   renderGoalProgress(profile, kgNow, wu, logsArr);
-  renderPulseSparkline();
   renderStepsCaloriesChart();
 }
 
@@ -4853,8 +4894,7 @@ function renderFuelWaterOrb(date) {
   const target = effectiveWaterTargetML(date);
   const now = (getLogs()[date] || {}).water || 0;
   const pct = Math.max(0, Math.min(100, (now / target) * 100));
-  document.getElementById('fuelWaterOrbFill').setAttribute('y', 100 - pct);
-  document.getElementById('fuelWaterOrbFill').setAttribute('height', pct);
+  document.getElementById('fuelWaterOrbFill').style.height = pct + '%';
   document.getElementById('fuelWaterOrbAmount').textContent = now;
   document.getElementById('fuelWaterOrbTarget').textContent = target;
   document.getElementById('fuelWaterOrbAutoTag').hidden = !(profile && profile.autoWaterGoal);
@@ -6301,26 +6341,12 @@ function renderNutritionTargets() {
   const proteinKcal = proteinNow * 4;
   const carbKcal = carbsNow * 4;
   const fatKcal = fatNow * 9;
-  const macroKcalTotal = proteinKcal + carbKcal + fatKcal;
-  const macroPie = document.getElementById('fuelMacroPie');
   const macroLegend = document.getElementById('fuelMacroLegend');
   const macros = [
-    { label: 'Protein', kcal: proteinKcal, colorVar: '--cyan', dot: 'macro-protein' },
-    { label: 'Carbs', kcal: carbKcal, colorVar: '--violet', dot: 'macro-carbs' },
-    { label: 'Fat', kcal: fatKcal, colorVar: '--warning', dot: 'macro-fat' },
+    { label: 'Protein', kcal: proteinKcal, dot: 'macro-protein' },
+    { label: 'Carbs', kcal: carbKcal, dot: 'macro-carbs' },
+    { label: 'Fat', kcal: fatKcal, dot: 'macro-fat' },
   ];
-  if (macroKcalTotal > 0) {
-    let acc = 0;
-    const stops = macros.map(m => {
-      const start = (acc / macroKcalTotal) * 100;
-      acc += m.kcal;
-      const end = (acc / macroKcalTotal) * 100;
-      return `var(${m.colorVar}) ${start}% ${end}%`;
-    }).join(', ');
-    macroPie.style.background = `conic-gradient(${stops})`;
-  } else {
-    macroPie.style.background = 'var(--gridline)';
-  }
   macroLegend.innerHTML = macros.map(m => {
     const pctOfIntake = caloriesNow > 0 ? Math.round((m.kcal / caloriesNow) * 100) : 0;
     return `<li><span class="macro-dot ${m.dot}"></span>${m.label} <strong>${pctOfIntake}%</strong> of intake</li>`;
@@ -8100,6 +8126,220 @@ function initSkinSelector() {
 initSkinSelector();
 
 /* ---------------------------------------------------------------- */
+/* Custom background image (Settings)                                  */
+/* ---------------------------------------------------------------- */
+const BG_SETTINGS_DEFAULT = { mode: 'cover', blur: 0, dim: 0, transparency: 0, cropX: 50, cropY: 50 };
+
+function getBgImageData() {
+  try { return JSON.parse(localStorage.getItem('wft_bg_image')); } catch (e) { return null; }
+}
+function getBgSettings() {
+  try { return Object.assign({}, BG_SETTINGS_DEFAULT, JSON.parse(localStorage.getItem('wft_bg_settings')) || {}); }
+  catch (e) { return Object.assign({}, BG_SETTINGS_DEFAULT); }
+}
+function saveBgSettings(s) { localStorage.setItem('wft_bg_settings', JSON.stringify(s)); }
+
+// Resizes to a size that's plenty sharp for a phone screen (no point storing
+// a 12MP photo when the display it's shown on is a few hundred px wide) and
+// compresses to JPEG, keeping localStorage usage reasonable. Also samples a
+// 1x1 downscale of the result to get an average color — used to tint the
+// layer behind the image so it "blends" instead of sitting on a mismatched
+// flat background when blur/transparency/tiling reveal the edges.
+function resizeAndCompressImage(file) {
+  return new Promise((resolve, reject) => {
+    const MAX_DIM = 1440;
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read that file.'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Could not read that image.'));
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          const scale = MAX_DIM / Math.max(width, height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+
+        const swatch = document.createElement('canvas');
+        swatch.width = 1; swatch.height = 1;
+        const swatchCtx = swatch.getContext('2d');
+        swatchCtx.drawImage(canvas, 0, 0, 1, 1);
+        const [r, g, b] = swatchCtx.getImageData(0, 0, 1, 1).data;
+
+        resolve({ dataUrl, dominantColor: `rgb(${r}, ${g}, ${b})` });
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function applyCustomBg() {
+  const imgData = getBgImageData();
+  const layer = document.getElementById('customBgLayer');
+  const imageEl = document.getElementById('customBgImage');
+  const overlayEl = document.getElementById('customBgOverlay');
+  if (!imgData || !imgData.dataUrl) {
+    layer.hidden = true;
+    document.body.classList.remove('has-custom-bg');
+    return;
+  }
+  const s = getBgSettings();
+  layer.hidden = false;
+  document.body.classList.add('has-custom-bg');
+  layer.style.backgroundColor = imgData.dominantColor || '';
+  imageEl.style.backgroundImage = `url(${imgData.dataUrl})`;
+  if (s.mode === 'tile') {
+    imageEl.style.backgroundSize = 'auto';
+    imageEl.style.backgroundRepeat = 'repeat';
+    imageEl.style.backgroundPosition = '0 0';
+  } else if (s.mode === 'contain') {
+    imageEl.style.backgroundSize = 'contain';
+    imageEl.style.backgroundRepeat = 'no-repeat';
+    imageEl.style.backgroundPosition = 'center';
+  } else if (s.mode === 'center') {
+    imageEl.style.backgroundSize = 'auto';
+    imageEl.style.backgroundRepeat = 'no-repeat';
+    imageEl.style.backgroundPosition = 'center';
+  } else if (s.mode === 'crop') {
+    imageEl.style.backgroundSize = 'cover';
+    imageEl.style.backgroundRepeat = 'no-repeat';
+    imageEl.style.backgroundPosition = `${s.cropX}% ${s.cropY}%`;
+  } else {
+    imageEl.style.backgroundSize = 'cover';
+    imageEl.style.backgroundRepeat = 'no-repeat';
+    imageEl.style.backgroundPosition = 'center';
+  }
+  imageEl.style.filter = s.blur > 0 ? `blur(${s.blur}px)` : 'none';
+  imageEl.style.opacity = String(1 - (s.transparency / 100));
+  overlayEl.style.opacity = String(s.dim / 100);
+}
+applyCustomBg();
+
+function updateCropPreviewBg() {
+  const imgData = getBgImageData();
+  const preview = document.getElementById('bgCropPreview');
+  if (!imgData) return;
+  const s = getBgSettings();
+  preview.style.backgroundImage = `url(${imgData.dataUrl})`;
+  preview.style.backgroundPosition = `${s.cropX}% ${s.cropY}%`;
+}
+
+function loadBgSettingsIntoUI() {
+  const s = getBgSettings();
+  document.getElementById('bgModeSelect').value = s.mode;
+  document.getElementById('bgBlurSlider').value = s.blur;
+  document.getElementById('bgBlurOut').textContent = s.blur;
+  document.getElementById('bgDimSlider').value = s.dim;
+  document.getElementById('bgDimOut').textContent = s.dim;
+  document.getElementById('bgTransparencySlider').value = s.transparency;
+  document.getElementById('bgTransparencyOut').textContent = s.transparency;
+  document.getElementById('bgCropWrap').hidden = s.mode !== 'crop';
+  updateCropPreviewBg();
+}
+
+function initCustomBackground() {
+  const fileInput = document.getElementById('bgImageInput');
+  const statusEl = document.getElementById('bgImageStatus');
+  const settingsGroup = document.getElementById('bgSettingsGroup');
+  const removeBtn = document.getElementById('btnRemoveBgImage');
+
+  function refreshUploadUiState() {
+    const has = !!(getBgImageData() && getBgImageData().dataUrl);
+    settingsGroup.hidden = !has;
+    removeBtn.hidden = !has;
+    statusEl.textContent = has ? 'Background image set.' : 'No background image set.';
+  }
+
+  document.getElementById('btnChooseBgImage').addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files[0];
+    fileInput.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { statusEl.textContent = 'Please choose an image file.'; return; }
+    statusEl.textContent = 'Processing image…';
+    try {
+      const { dataUrl, dominantColor } = await resizeAndCompressImage(file);
+      // Resize/compress above already keeps normal photos well under this —
+      // this only catches pathological cases (e.g. a giant single-color PNG
+      // that doesn't compress well as JPEG source).
+      if (dataUrl.length > 2000000) {
+        statusEl.textContent = 'That image is too large even after compressing — try a smaller photo.';
+        return;
+      }
+      localStorage.setItem('wft_bg_image', JSON.stringify({ dataUrl, dominantColor }));
+      refreshUploadUiState();
+      loadBgSettingsIntoUI();
+      applyCustomBg();
+      statusEl.textContent = 'Background image set.';
+    } catch (e) {
+      statusEl.textContent = e.message || 'Could not process that image — try another.';
+    }
+  });
+
+  removeBtn.addEventListener('click', () => {
+    localStorage.removeItem('wft_bg_image');
+    refreshUploadUiState();
+    applyCustomBg();
+  });
+
+  document.getElementById('bgModeSelect').addEventListener('change', e => {
+    const s = getBgSettings();
+    s.mode = e.target.value;
+    saveBgSettings(s);
+    document.getElementById('bgCropWrap').hidden = s.mode !== 'crop';
+    if (s.mode === 'crop') updateCropPreviewBg();
+    applyCustomBg();
+  });
+
+  [['bgBlurSlider', 'blur'], ['bgDimSlider', 'dim'], ['bgTransparencySlider', 'transparency']].forEach(([id, key]) => {
+    document.getElementById(id).addEventListener('input', e => {
+      const s = getBgSettings();
+      s[key] = parseInt(e.target.value, 10);
+      saveBgSettings(s);
+      document.getElementById(id.replace('Slider', 'Out')).textContent = e.target.value;
+      applyCustomBg();
+    });
+  });
+
+  // Drag-to-reposition on the crop preview box — only relevant in Crop &
+  // Position mode, but harmless to leave wired otherwise (box is hidden).
+  const cropPreview = document.getElementById('bgCropPreview');
+  let dragging = false, startX = 0, startY = 0, startCropX = 50, startCropY = 50;
+  cropPreview.addEventListener('pointerdown', e => {
+    dragging = true;
+    startX = e.clientX; startY = e.clientY;
+    const s = getBgSettings();
+    startCropX = s.cropX; startCropY = s.cropY;
+    cropPreview.setPointerCapture(e.pointerId);
+  });
+  cropPreview.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const rect = cropPreview.getBoundingClientRect();
+    const dxPct = ((e.clientX - startX) / rect.width) * 100;
+    const dyPct = ((e.clientY - startY) / rect.height) * 100;
+    const s = getBgSettings();
+    s.cropX = Math.max(0, Math.min(100, startCropX - dxPct));
+    s.cropY = Math.max(0, Math.min(100, startCropY - dyPct));
+    saveBgSettings(s);
+    cropPreview.style.backgroundPosition = `${s.cropX}% ${s.cropY}%`;
+    applyCustomBg();
+  });
+  cropPreview.addEventListener('pointerup', () => { dragging = false; });
+  cropPreview.addEventListener('pointercancel', () => { dragging = false; });
+
+  refreshUploadUiState();
+  loadBgSettingsIntoUI();
+}
+
+/* ---------------------------------------------------------------- */
 /* Init                                                                 */
 /* ---------------------------------------------------------------- */
 document.getElementById('headerToday').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
@@ -8122,6 +8362,7 @@ function safeInit(fn, label) {
 safeInit(migrateWaterUnitsIfNeeded, 'migrateWaterUnitsIfNeeded');
 safeInit(initTabs, 'initTabs');
 safeInit(initSwipeNavigation, 'initSwipeNavigation');
+safeInit(initBackButtonNav, 'initBackButtonNav');
 safeInit(() => {
   document.getElementById('btnGoToBioFromChart').addEventListener('click', () => {
     document.querySelector('.tab-btn[data-target="bio"]').click();
@@ -8162,6 +8403,7 @@ safeInit(initBioLog, 'initBioLog');
 safeInit(initReviewForm, 'initReviewForm');
 safeInit(initExport, 'initExport');
 safeInit(initDrive, 'initDrive');
+safeInit(initCustomBackground, 'initCustomBackground');
 safeInit(initLeaderboard, 'initLeaderboard');
 safeInit(initAnnouncementWidget, 'initAnnouncementWidget');
 safeInit(loadSetupForm, 'loadSetupForm');
