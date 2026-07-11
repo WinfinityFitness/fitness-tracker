@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.2.2';
+const APP_VERSION = 'WF_SYS_V.2.4';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -3940,6 +3940,93 @@ function fireSystemNotification(title, body) {
 }
 
 /* ---------------------------------------------------------------- */
+/* Web Push (real background notifications)                            */
+/* Unlike fireSystemNotification() above, this delivers even with the  */
+/* app fully closed and the phone locked — the tradeoff is it needs a  */
+/* server (the send-push Edge Function) to trigger it, so for now it's */
+/* only wired to new DM messages (see notify_dm_push() in              */
+/* supabase_push_notifications_migration.sql), not the scheduled       */
+/* reminders, which still use the foreground-only path above.          */
+/* ---------------------------------------------------------------- */
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
+async function subscribeToPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !sbConfigured()) return false;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    }
+    const json = sub.toJSON();
+    const { error } = await sb.rpc('upsert_push_subscription', {
+      p_share_key: getOrCreateShareKey(),
+      p_endpoint: json.endpoint,
+      p_p256dh: json.keys.p256dh,
+      p_auth: json.keys.auth,
+    });
+    if (error) throw error;
+    localStorage.setItem('wft_push_enabled', '1');
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function unsubscribeFromPush() {
+  localStorage.setItem('wft_push_enabled', '0');
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) {
+      const endpoint = sub.endpoint;
+      await sub.unsubscribe();
+      if (sbConfigured()) await sb.rpc('delete_push_subscription', { p_endpoint: endpoint });
+    }
+  } catch (e) { /* best effort */ }
+}
+
+function initPushNotifications() {
+  const toggle = document.getElementById('pushNotifToggle');
+  const hint = document.getElementById('pushNotifHint');
+  if (!toggle) return;
+  const supported = ('serviceWorker' in navigator) && ('PushManager' in window);
+  if (!supported) {
+    toggle.disabled = true;
+    if (hint) hint.textContent = 'Not supported on this browser.';
+    return;
+  }
+  const wasEnabled = localStorage.getItem('wft_push_enabled') === '1';
+  toggle.checked = wasEnabled && Notification.permission === 'granted';
+  toggle.addEventListener('change', async () => {
+    if (toggle.checked) {
+      if (Notification.permission !== 'granted') {
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') { toggle.checked = false; return; }
+      }
+      const ok = await subscribeToPush();
+      if (!ok) { toggle.checked = false; if (hint) hint.textContent = 'Could not enable — check your connection and try again.'; }
+    } else {
+      await unsubscribeFromPush();
+    }
+  });
+  // Re-subscribe silently on load if previously opted in (e.g. the browser
+  // dropped the old subscription) and permission is still granted.
+  if (toggle.checked) subscribeToPush();
+}
+
+/* ---------------------------------------------------------------- */
 /* Hydration reminders                                                 */
 /* Best-effort only (same caveat as checkMeasurementReminder): a PWA   */
 /* can't wake up in the background at an exact time, so a clock-based  */
@@ -7501,6 +7588,7 @@ async function checkUnreadMessages(dmRoomIds) {
   localStorage.setItem('wft_chat_last_read', JSON.stringify(chatLastRead));
   document.getElementById('tabDotDm').hidden = !anyDmUnread;
   document.getElementById('tabDotPublic').hidden = !publicUnread;
+  document.getElementById('chatBellDmDot').hidden = !anyDmUnread;
 }
 
 function markRoomRead(roomId) {
@@ -7511,6 +7599,7 @@ function markRoomRead(roomId) {
     if (chatRoomMeta[roomId]) chatRoomMeta[roomId].unread = false;
     const stillAnyDmUnread = Object.values(chatRoomMeta).some(m => m.isDm && m.unread);
     document.getElementById('tabDotDm').hidden = !stillAnyDmUnread;
+    document.getElementById('chatBellDmDot').hidden = !stillAnyDmUnread;
   }
 }
 
@@ -7625,13 +7714,17 @@ function renderChatMessages(messages) {
   const myName = effectiveLeaderboardName();
   const inDm = currentChatRoomId && chatRoomMeta[currentChatRoomId] && chatRoomMeta[currentChatRoomId].isDm;
   messages.forEach(m => {
+    const isOwn = m.code_name === myName;
     const row = document.createElement('div');
-    row.className = 'chat-row';
+    row.className = 'chat-row ' + (isOwn ? 'chat-row--own' : 'chat-row--other');
     const time = new Date(m.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-    const nameHtml = (!inDm && m.code_name !== myName)
+    // Own bubbles and 1:1 DMs skip the name label (you know who you are, and
+    // the DM partner's name is already in the room header) — group chat
+    // bubbles from others still need it to tell speakers apart.
+    const nameHtml = (!isOwn && !inDm)
       ? `<span class="chat-name chat-name-link" data-dm-name="${escapeHtml(m.code_name)}">${escapeHtml(m.code_name)}</span>`
-      : `<span class="chat-name">${escapeHtml(m.code_name)}</span>`;
-    row.innerHTML = `<span class="chat-time">[${time}]</span> ${nameHtml}: <span class="chat-msg">${escapeHtml(m.message)}</span>`;
+      : '';
+    row.innerHTML = `${nameHtml}<div class="chat-bubble"><span class="chat-msg">${escapeHtml(m.message)}</span><span class="chat-time">${time}</span></div>`;
     list.appendChild(row);
   });
   list.querySelectorAll('[data-dm-name]').forEach(el => {
@@ -8737,6 +8830,7 @@ safeInit(initExport, 'initExport');
 safeInit(initDrive, 'initDrive');
 safeInit(initCustomBackground, 'initCustomBackground');
 safeInit(initTextSizeSlider, 'initTextSizeSlider');
+safeInit(initPushNotifications, 'initPushNotifications');
 safeInit(initLeaderboard, 'initLeaderboard');
 safeInit(initAnnouncementWidget, 'initAnnouncementWidget');
 safeInit(loadSetupForm, 'loadSetupForm');

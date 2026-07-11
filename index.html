@@ -785,6 +785,7 @@
             <button type="button" class="chat-bell-btn" id="btnChatInvites" aria-label="Group invites" title="Group invites">
               <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
               <span class="chat-bell-badge" id="chatBellBadge" hidden>0</span>
+              <span class="chat-bell-dm-dot" id="chatBellDmDot" hidden></span>
             </button>
             <div class="chat-invites-popover" id="chatInvitesPopover" hidden></div>
           </div>
@@ -1342,6 +1343,7 @@
           <option value="grand-core">Grand Core</option>
           <option value="sovereign-core">Sovereign Core</option>
           <option value="hashira-core">Hashira Core</option>
+          <option value="asanoha-digital">Asanoha Digital</option>
         </select>
       </label>
       <p class="hint">Themes work with the light/dark switch above — pick a theme, then toggle light or dark within it. Grand Core is designed for light mode.</p>
@@ -1418,6 +1420,19 @@
         </select>
         <button type="button" class="btn tone-preview-btn" id="btnPreviewAlarmTone" aria-label="Preview tone">▶</button>
       </div>
+    </div>
+
+    <div class="sheet-section">
+      <p class="field-group-heading">Push Notifications</p>
+      <p class="hint">Delivered even when the app is fully closed and your phone is locked — unlike the reminders below, which only fire while the app is open. Currently powers new direct message alerts.</p>
+      <div class="theme-toggle-row">
+        <span>Enable push notifications</span>
+        <label class="switch">
+          <input type="checkbox" id="pushNotifToggle">
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+        </label>
+      </div>
+      <p class="hint hint--sm" id="pushNotifHint"></p>
     </div>
 
     <div class="sheet-section">

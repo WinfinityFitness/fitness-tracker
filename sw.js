@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fittracker-v201';
+const CACHE_NAME = 'fittracker-v203';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -19,6 +19,8 @@ const CORE_ASSETS = [
   './fonts/sora-regular.woff2',
   './fonts/space-grotesk.woff2',
   './fonts/jetbrains-mono.woff2',
+  './fonts/syne.woff2',
+  './fonts/plus-jakarta-sans.woff2',
 ];
 
 self.addEventListener('install', event => {
@@ -54,6 +56,36 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('message', event => {
   if (event.data === 'SKIP_WAITING') self.skipWaiting();
+});
+
+// Fires even with the app fully closed and the phone locked — that's the
+// whole point of Web Push over the in-page Notification API, which needs
+// the app's own JS actively running. Payload comes from the send-push
+// Edge Function (see supabase/functions/send-push/).
+self.addEventListener('push', event => {
+  let data = { title: 'Winfinity Tracker', body: 'You have a new notification.' };
+  try { if (event.data) data = Object.assign(data, event.data.json()); } catch (e) { /* ignore malformed payload */ }
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: './icons/icon-192.png',
+      badge: './icons/icon-192.png',
+      vibrate: [200, 100, 200],
+      data: { url: './' },
+    })
+  );
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || './';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientsArr => {
+      const existing = clientsArr.find(c => c.url.includes(self.registration.scope));
+      if (existing) return existing.focus();
+      return self.clients.openWindow(targetUrl);
+    })
+  );
 });
 
 self.addEventListener('fetch', event => {

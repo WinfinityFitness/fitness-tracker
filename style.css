@@ -1538,11 +1538,30 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   box-shadow: 0 0 60px rgba(0,0,0,0.6);
 }
 #chatCard.is-expanded .chat-list { flex: 1; max-height: none; }
-.chat-row { font-size: 0.8rem; line-height: 1.4; color: var(--text-secondary); }
-.chat-time { font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-muted); }
-.chat-name { color: var(--cyan); font-weight: 700; }
+/* Messenger/Viber-style bubbles — outline only (no fill), own messages
+   right-aligned, received messages left-aligned. Kept as compact as
+   possible: no avatars, name label only shown for other people's
+   messages in a group room (skipped for your own bubbles and for 1:1
+   DMs, where the header already names who you're talking to). */
+.chat-row { display: flex; flex-direction: column; max-width: 80%; }
+.chat-row--own { align-self: flex-end; align-items: flex-end; }
+.chat-row--other { align-self: flex-start; align-items: flex-start; }
+.chat-name { display: block; color: var(--cyan); font-weight: 700; font-size: 0.6rem; margin: 0 0 2px 8px; }
 .chat-name-link { cursor: pointer; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 2px; }
-.chat-msg { color: var(--text-primary); }
+.chat-bubble {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 5px 9px;
+  background: transparent;
+}
+.chat-row--own .chat-bubble { border-color: var(--cyan); border-bottom-right-radius: 3px; }
+.chat-row--other .chat-bubble { border-color: var(--violet); border-bottom-left-radius: 3px; }
+.chat-msg { color: var(--text-primary); font-size: 0.78rem; line-height: 1.35; word-break: break-word; }
+.chat-time { font-family: var(--font-mono); font-size: 0.56rem; color: var(--text-muted); flex: none; white-space: nowrap; }
 .chat-input-row { display: flex; gap: 8px; }
 .chat-input-row input {
   flex: 1;
@@ -1587,6 +1606,18 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   box-shadow: 0 0 5px var(--critical);
 }
 .chat-bell-badge[hidden] { display: none; }
+.chat-bell-dm-dot {
+  position: absolute;
+  bottom: -1px;
+  left: -1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--good);
+  box-shadow: 0 0 5px var(--good);
+  border: 1.5px solid var(--surface-1);
+}
+.chat-bell-dm-dot[hidden] { display: none; }
 .chat-invites-popover {
   position: absolute;
   top: calc(100% + 8px);
@@ -3183,6 +3214,197 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   border-bottom-width: 2px;
   border-bottom-color: var(--cyan);
   backdrop-filter: blur(14px);
+}
+
+/* ================================================================== */
+/* SKIN: Asanoha Digital — "Kawaii-futurism." Soft pink-tinted surfaces */
+/* with charcoal-black 2px borders (sticker/manga-panel look, no        */
+/* shadow at rest), Deep Magenta primary + Bamboo Green secondary, a    */
+/* moderate 8px "rounded-geometric" radius (softer than Sovereign/      */
+/* Hashira's sharp 0px, tighter than Grand Core's hyper-round 24px).    */
+/* Interactive elements shift 2px with a hard magenta shadow only on    */
+/* press, per the brief's "physical pop-out" spec. Hairline borders     */
+/* elsewhere kept thin per instruction; the 2px card/button borders     */
+/* here are the brief's own explicit spec, not the thick 3-4px style    */
+/* the earlier brutalist skins use. Reuses Space Grotesk already        */
+/* fetched for Grand Core; Syne + Plus Jakarta Sans are new downloads.  */
+/* Brief only gave a light palette (its stated default) — dark is a     */
+/* derived companion, consistent with every other skin in this app.    */
+/* ================================================================== */
+@font-face {
+  font-family: 'Asanoha Syne';
+  font-style: normal;
+  font-weight: 700 800;
+  font-display: swap;
+  src: url('fonts/syne.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Asanoha Jakarta';
+  font-style: normal;
+  font-weight: 400 500;
+  font-display: swap;
+  src: url('fonts/plus-jakarta-sans.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Asanoha Grotesk';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('fonts/space-grotesk.woff2') format('woff2');
+}
+
+/* Dark (default when this skin is selected, i.e. no data-theme="light")
+   — derived; keeps the same magenta/green accents, inverted surfaces. */
+:root[data-skin="asanoha-digital"] {
+  --bg: #1a1416;
+  --bg-elevated: #221a1d;
+  --surface-1: #221a1d;
+  --surface-2: #2a2023;
+  --surface-1-rgb: 34,26,29;
+  --surface-2-rgb: 42,32,35;
+  --border: #4a383d;
+  --border-soft: rgba(255, 255, 255, 0.07);
+  --text-primary: #f7efeb;
+  --text-secondary: #eabbc0;
+  --text-muted: #a98d92;
+  --gridline: rgba(247, 239, 235, 0.07);
+  --baseline: rgba(247, 239, 235, 0.16);
+
+  --cyan: #ffb1c3;
+  --cyan-dim: #970046;
+  --cyan-glow: rgba(255, 177, 195, 0.4);
+  --violet: #96d947;
+  --magenta: #ff8fa3;
+
+  --series-1: #ffb1c3;
+  --series-2: #96d947;
+  --gradient-bar: linear-gradient(90deg, #96d947 0%, #ffb1c3 100%);
+  --gradient-glow: rgba(255, 177, 195, 0.35);
+
+  --good: #96d947;
+  --warning: #ff8fa3;
+  --serious: #e0567a;
+  --critical: #ffb4ab;
+
+  --surface-translucent: rgba(26, 20, 22, 0.88);
+  --nav-translucent: rgba(24, 18, 20, 0.9);
+
+  --card-radius: 8px;
+  --font-mono: 'Asanoha Grotesk', ui-monospace, monospace;
+  --font-display: 'Asanoha Jakarta', system-ui, sans-serif;
+  --font-headline: 'Asanoha Syne', system-ui, sans-serif;
+}
+
+/* Light — the brief's actual palette, verbatim (its stated default). */
+:root[data-skin="asanoha-digital"][data-theme="light"] {
+  --bg: #fff8f5;
+  --bg-elevated: #ffffff;
+  --surface-1: #faf2ee;
+  --surface-2: #f4ece8;
+  --surface-1-rgb: 250,242,238;
+  --surface-2-rgb: 244,236,232;
+  --border: #e0bec4;
+  --border-soft: #eee7e3;
+  --text-primary: #1e1b19;
+  --text-secondary: #594046;
+  --text-muted: #8d7075;
+  --gridline: rgba(30, 27, 25, 0.06);
+  --baseline: rgba(30, 27, 25, 0.16);
+
+  --cyan: #970046;
+  --cyan-dim: #7a0038;
+  --cyan-glow: rgba(151, 0, 70, 0.28);
+  --violet: #416e00;
+  --magenta: #c9184a;
+
+  --series-1: #970046;
+  --series-2: #416e00;
+  --gradient-bar: linear-gradient(90deg, #416e00 0%, #970046 100%);
+  --gradient-glow: rgba(151, 0, 70, 0.22);
+
+  --good: #416e00;
+  --warning: #c9184a;
+  --serious: #a3123f;
+  --critical: #ba1a1a;
+
+  --surface-translucent: rgba(255, 248, 245, 0.88);
+  --nav-translucent: rgba(255, 255, 255, 0.9);
+}
+
+/* Structural: rounded-geometric 8px everywhere, charcoal-black 2px
+   borders with NO shadow at rest (sticker/manga-panel look), then a
+   hard magenta offset shadow + 2px shift only while pressed — the
+   brief's "physical pop-out" interactive state. Entirely scoped to
+   this skin. */
+[data-skin="asanoha-digital"] * {
+  border-radius: var(--card-radius) !important;
+}
+[data-skin="asanoha-digital"] .hero-title,
+[data-skin="asanoha-digital"] .chart-card-title,
+[data-skin="asanoha-digital"] .section-title,
+[data-skin="asanoha-digital"] .app-header h1,
+[data-skin="asanoha-digital"] .sheet-head h2,
+[data-skin="asanoha-digital"] .field-group-heading {
+  font-family: var(--font-headline);
+  letter-spacing: -0.01em;
+}
+[data-skin="asanoha-digital"] .hero-card,
+[data-skin="asanoha-digital"] .chart-card,
+[data-skin="asanoha-digital"] .stat-tile,
+[data-skin="asanoha-digital"] .ring-card,
+[data-skin="asanoha-digital"] .computed-card {
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--text-primary);
+  box-shadow: none;
+}
+[data-skin="asanoha-digital"] .btn {
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--text-primary);
+  font-weight: 700;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+[data-skin="asanoha-digital"] .btn:active {
+  transform: translate(-2px, -2px);
+  box-shadow: 4px 4px 0 0 var(--cyan);
+}
+[data-skin="asanoha-digital"] .btn--primary {
+  background: var(--cyan);
+  color: var(--bg);
+  text-shadow: none;
+}
+[data-skin="asanoha-digital"] input,
+[data-skin="asanoha-digital"] select,
+[data-skin="asanoha-digital"] textarea {
+  border-width: 2px !important;
+  border-style: solid;
+  border-color: var(--text-primary);
+  background: var(--bg-elevated) !important;
+}
+[data-skin="asanoha-digital"] input:focus,
+[data-skin="asanoha-digital"] select:focus,
+[data-skin="asanoha-digital"] textarea:focus {
+  border-color: var(--cyan) !important;
+  outline: none;
+}
+[data-skin="asanoha-digital"] .chip,
+[data-skin="asanoha-digital"] .pill {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--violet);
+  color: var(--violet);
+  font-family: var(--font-mono);
+}
+[data-skin="asanoha-digital"] .tab-bar {
+  border-width: 2px;
+  border-color: var(--text-primary);
+  backdrop-filter: none;
+}
+[data-skin="asanoha-digital"] .app-header {
+  border-bottom-width: 2px;
+  border-bottom-color: var(--text-primary);
+  backdrop-filter: none;
 }
 
 .sheet-section { margin-bottom: 22px; }
