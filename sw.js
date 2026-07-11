@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fittracker-v207';
+const CACHE_NAME = 'fittracker-v208';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -63,7 +63,10 @@ self.addEventListener('message', event => {
 // the app's own JS actively running. Payload comes from the send-push
 // Edge Function (see supabase/functions/send-push/).
 self.addEventListener('push', event => {
-  let data = { title: 'Winfinity Tracker', body: 'You have a new notification.' };
+  // url lets a specific reminder (e.g. the Start/End Day Log pushes from
+  // check-reminders) deep-link straight to the relevant sheet instead of
+  // just opening the app to whatever tab it was last on.
+  let data = { title: 'Winfinity Tracker', body: 'You have a new notification.', url: './' };
   try { if (event.data) data = Object.assign(data, event.data.json()); } catch (e) { /* ignore malformed payload */ }
   event.waitUntil(
     self.registration.showNotification(data.title, {
@@ -71,7 +74,7 @@ self.addEventListener('push', event => {
       icon: './icons/icon-192.png',
       badge: './icons/icon-192.png',
       vibrate: [200, 100, 200],
-      data: { url: './' },
+      data: { url: data.url || './' },
     })
   );
 });
@@ -82,7 +85,12 @@ self.addEventListener('notificationclick', event => {
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientsArr => {
       const existing = clientsArr.find(c => c.url.includes(self.registration.scope));
-      if (existing) return existing.focus();
+      if (existing) {
+        // Already open — a fresh navigation would reload and lose state, so
+        // just tell the running page which sheet to open instead.
+        existing.postMessage({ type: 'DEEP_LINK', url: targetUrl });
+        return existing.focus();
+      }
       return self.clients.openWindow(targetUrl);
     })
   );

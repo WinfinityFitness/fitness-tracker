@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.2.8';
+const APP_VERSION = 'WF_SYS_V.2.9';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1769,6 +1769,29 @@ function openEndDayLog() {
   document.getElementById('edlDate').value = date;
   loadEndDayLogFields(date);
   document.getElementById('endDayLogOverlay').hidden = false;
+}
+
+// Reminder push notifications (Start/End Day Log) deep-link into the
+// matching sheet instead of just opening the app. Two delivery paths from
+// the service worker: a cold-open navigates to ?openSheet=..., an
+// already-open tab gets a postMessage instead (a fresh navigation would
+// reload the page and lose whatever the user was doing).
+function handleDeepLinkUrl(url) {
+  try {
+    const sheet = new URL(url, location.href).searchParams.get('openSheet');
+    if (sheet === 'startDayLog') openStartDayLog();
+    else if (sheet === 'endDayLog') openEndDayLog();
+  } catch (e) { /* ignore malformed url */ }
+}
+
+function initDeepLinkHandling() {
+  handleDeepLinkUrl(location.href);
+  if (location.search) history.replaceState({}, '', location.pathname);
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', event => {
+      if (event.data && event.data.type === 'DEEP_LINK') handleDeepLinkUrl(event.data.url);
+    });
+  }
 }
 
 function saveEndDayLog() {
@@ -3977,6 +4000,11 @@ async function subscribeToPush() {
     });
     if (error) throw error;
     localStorage.setItem('wft_push_enabled', '1');
+    // First-time subscribers may already have hydration reminders configured
+    // locally from before this feature existed — push those up now instead
+    // of waiting for them to re-open and re-save that settings screen.
+    const profile = getProfile();
+    if (profile && profile.hydrationReminders) syncReminderSettingsToServer(profile.hydrationReminders);
     return true;
   } catch (e) {
     return false;
@@ -4167,7 +4195,32 @@ function loadHydroReminderSettings() {
   document.getElementById('hydroMeal1').value = meals[1];
   document.getElementById('hydroMeal2').value = meals[2];
   document.getElementById('hydroHourlyEnabled').checked = hr.hourlyEnabled !== false;
+  document.getElementById('logRemindersEnabled').checked = !!hr.logRemindersEnabled;
   document.getElementById('hydroReminderFields').style.display = hr.enabled ? '' : 'none';
+}
+
+// Pushes reminder schedule + timezone to Supabase so the check-reminders
+// Edge Function can fire Start/End Day Log and hydration pushes on a
+// schedule, even with the app closed — the local-only path above
+// (checkHydrationReminders) only works while the app's own JS is running.
+// Best-effort: if it fails (offline, Nexus not configured), the reminders
+// still work locally, they just won't reach you in the background.
+async function syncReminderSettingsToServer(hr) {
+  if (!sbConfigured()) return;
+  try {
+    const shareKey = getOrCreateShareKey();
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    await sb.rpc('upsert_reminder_settings', {
+      p_share_key: shareKey,
+      p_timezone: timezone,
+      p_hydration_enabled: !!hr.enabled,
+      p_wake_time: hr.wakeTime || '07:00',
+      p_bed_time: hr.bedTime || '22:00',
+      p_meal_times: hr.mealTimes || ['07:00', '12:00', '19:00'],
+      p_hourly_enabled: hr.hourlyEnabled !== false,
+      p_log_reminders_enabled: !!hr.logRemindersEnabled,
+    });
+  } catch (e) { /* best effort — local reminders still work */ }
 }
 
 function initHydrationReminderSettings() {
@@ -4189,6 +4242,7 @@ function initHydrationReminderSettings() {
         document.getElementById('hydroMeal2').value || '19:00',
       ],
       hourlyEnabled: document.getElementById('hydroHourlyEnabled').checked,
+      logRemindersEnabled: document.getElementById('logRemindersEnabled').checked,
     };
     saveProfile(profile);
     document.getElementById('hydroSaveNote').textContent = 'Reminder schedule saved.';
@@ -4198,6 +4252,7 @@ function initHydrationReminderSettings() {
       Notification.requestPermission().catch(() => {});
     }
     checkHydrationReminders();
+    syncReminderSettingsToServer(profile.hydrationReminders);
   });
 }
 
@@ -8881,6 +8936,7 @@ safeInit(initDrive, 'initDrive');
 safeInit(initCustomBackground, 'initCustomBackground');
 safeInit(initTextSizeSlider, 'initTextSizeSlider');
 safeInit(initPushNotifications, 'initPushNotifications');
+safeInit(initDeepLinkHandling, 'initDeepLinkHandling');
 safeInit(initLeaderboard, 'initLeaderboard');
 safeInit(initAnnouncementWidget, 'initAnnouncementWidget');
 safeInit(loadSetupForm, 'loadSetupForm');
