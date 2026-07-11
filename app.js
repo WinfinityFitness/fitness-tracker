@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.2.4';
+const APP_VERSION = 'WF_SYS_V.2.5';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -4001,29 +4001,45 @@ function initPushNotifications() {
   const toggle = document.getElementById('pushNotifToggle');
   const hint = document.getElementById('pushNotifHint');
   if (!toggle) return;
-  const supported = ('serviceWorker' in navigator) && ('PushManager' in window);
+  // Some Android TWA/WebView environments support ServiceWorker + PushManager
+  // while leaving window.Notification entirely undefined (permission display
+  // is handled natively instead) — checking only the first two used to pass
+  // "supported" here and then throw on the very next line reading
+  // Notification.permission, silently aborting before the toggle's change
+  // listener ever got attached (the toggle looked inert, tap did nothing).
+  const supported = ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window);
   if (!supported) {
     toggle.disabled = true;
-    if (hint) hint.textContent = 'Not supported on this browser.';
+    if (hint) hint.textContent = 'Not supported in this app’s browser engine.';
     return;
   }
-  const wasEnabled = localStorage.getItem('wft_push_enabled') === '1';
-  toggle.checked = wasEnabled && Notification.permission === 'granted';
-  toggle.addEventListener('change', async () => {
-    if (toggle.checked) {
-      if (Notification.permission !== 'granted') {
-        const perm = await Notification.requestPermission();
-        if (perm !== 'granted') { toggle.checked = false; return; }
+  try {
+    const wasEnabled = localStorage.getItem('wft_push_enabled') === '1';
+    toggle.checked = wasEnabled && Notification.permission === 'granted';
+    toggle.addEventListener('change', async () => {
+      if (toggle.checked) {
+        try {
+          if (Notification.permission !== 'granted') {
+            const perm = await Notification.requestPermission();
+            if (perm !== 'granted') { toggle.checked = false; return; }
+          }
+          const ok = await subscribeToPush();
+          if (!ok) { toggle.checked = false; if (hint) hint.textContent = 'Could not enable — check your connection and try again.'; }
+        } catch (e) {
+          toggle.checked = false;
+          if (hint) hint.textContent = 'Could not enable on this device.';
+        }
+      } else {
+        await unsubscribeFromPush();
       }
-      const ok = await subscribeToPush();
-      if (!ok) { toggle.checked = false; if (hint) hint.textContent = 'Could not enable — check your connection and try again.'; }
-    } else {
-      await unsubscribeFromPush();
-    }
-  });
-  // Re-subscribe silently on load if previously opted in (e.g. the browser
-  // dropped the old subscription) and permission is still granted.
-  if (toggle.checked) subscribeToPush();
+    });
+    // Re-subscribe silently on load if previously opted in (e.g. the browser
+    // dropped the old subscription) and permission is still granted.
+    if (toggle.checked) subscribeToPush();
+  } catch (e) {
+    toggle.disabled = true;
+    if (hint) hint.textContent = 'Not supported in this app’s browser engine.';
+  }
 }
 
 /* ---------------------------------------------------------------- */
