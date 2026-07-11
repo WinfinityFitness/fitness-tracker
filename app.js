@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.2.7';
+const APP_VERSION = 'WF_SYS_V.2.8';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -7468,6 +7468,41 @@ function initDigitalId() {
   initClickToRevealHint('digitalIdCard', 'digitalIdHint');
 }
 
+const DIGITAL_ID_PATTERN = /^WF-[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/;
+
+function initDigitalIdOverride() {
+  const input = document.getElementById('digitalIdOverrideInput');
+  const btn = document.getElementById('btnSetDigitalId');
+  const note = document.getElementById('digitalIdOverrideNote');
+  if (!input || !btn) return;
+  btn.addEventListener('click', async () => {
+    const value = input.value.trim().toUpperCase();
+    if (!DIGITAL_ID_PATTERN.test(value)) {
+      note.textContent = 'Must match the format WF-XXXXXX (6 letters/numbers, no 0, O, 1, or I).';
+      return;
+    }
+    localStorage.setItem('wft_public_id', value);
+    const displayEl = document.getElementById('digitalIdValue');
+    if (displayEl) displayEl.textContent = value;
+    btn.disabled = true;
+    note.textContent = 'Saved locally. Syncing to Nexus…';
+    if (sbConfigured()) {
+      try {
+        const shareKey = getOrCreateShareKey();
+        const { error } = await sb.rpc('set_public_id', { p_share_key: shareKey, p_public_id: value });
+        if (error) throw error;
+        note.textContent = 'Digital ID updated and synced.';
+      } catch (e) {
+        note.textContent = 'Saved locally, but syncing failed — it may already be taken by another record, or you’re offline. Try "Sync to Nexus" on the Nexus tab later.';
+      }
+    } else {
+      note.textContent = 'Saved locally. Not synced (Nexus not configured).';
+    }
+    btn.disabled = false;
+    input.value = '';
+  });
+}
+
 let chatRoomMeta = {}; // roomId -> { name, isDm, createdByKey, otherName }
 let chatLastRead = {}; // roomId (or 'public') -> ISO timestamp
 try { chatLastRead = JSON.parse(localStorage.getItem('wft_chat_last_read')) || {}; } catch (e) { chatLastRead = {}; }
@@ -8809,6 +8844,7 @@ safeInit(initDonationPrompt, 'initDonationPrompt');
 safeInit(initLastStateRestore, 'initLastStateRestore');
 safeInit(incrementAppOpens, 'incrementAppOpens');
 safeInit(initDigitalId, 'initDigitalId');
+safeInit(initDigitalIdOverride, 'initDigitalIdOverride');
 safeInit(() => initClickToRevealHint('adjustedBmiTile', 'adjustedBmiHint'), 'initAdjustedBmiHint');
 safeInit(() => initClickToRevealHint('stepsCaloriesTitle', 'stepsCaloriesHint'), 'initStepsCaloriesHint');
 safeInit(initContact, 'initContact');

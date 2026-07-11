@@ -1436,6 +1436,17 @@
     </div>
 
     <div class="sheet-section">
+      <p class="field-group-heading">Digital ID Override</p>
+      <p class="hint">Your Digital ID lives in this browser's local storage — clearing site data (or reinstalling) resets it. If you need to reclaim a previous ID, enter it here. Format: WF- followed by 6 letters/numbers (no 0, O, 1, or I).</p>
+      <label class="field">
+        <span>New Digital ID</span>
+        <input type="text" id="digitalIdOverrideInput" placeholder="e.g. WF-B932GB" maxlength="9" style="text-transform:uppercase;">
+      </label>
+      <button type="button" class="btn btn--primary" id="btnSetDigitalId">Set Digital ID</button>
+      <p class="save-note" id="digitalIdOverrideNote"></p>
+    </div>
+
+    <div class="sheet-section">
       <p class="field-group-heading">Hydration Reminders</p>
       <p class="hint">Best-effort: a PWA can't wake up in the background at an exact time, so these fire while the app is open (checked every few minutes) using the schedule below, based on general hydration guidance.</p>
       <div class="theme-toggle-row">
