@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.2.6';
+const APP_VERSION = 'WF_SYS_V.2.7';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -4001,40 +4001,31 @@ function initPushNotifications() {
   const toggle = document.getElementById('pushNotifToggle');
   const hint = document.getElementById('pushNotifHint');
   if (!toggle) return;
-  // TEMPORARY DIAGNOSTIC — shows exactly what this device's browser engine
-  // reports, so we can see precisely where setup is failing instead of
-  // guessing blind. Remove once the real cause is confirmed.
-  const diag = {
-    sw: ('serviceWorker' in navigator),
-    push: ('PushManager' in window),
-    notif: ('Notification' in window),
-    perm: (('Notification' in window) ? (function () { try { return Notification.permission; } catch (e) { return 'ERR:' + e.message; } })() : 'n/a'),
-  };
-  if (hint) hint.textContent = `DIAG sw:${diag.sw} push:${diag.push} notif:${diag.notif} perm:${diag.perm}`;
-
-  const supported = diag.sw && diag.push && diag.notif;
+  // Some Android TWA/WebView environments support ServiceWorker + PushManager
+  // while leaving window.Notification entirely undefined — check for all
+  // three so unsupported devices get a clear disabled state instead of a
+  // silent crash before the toggle's change listener ever attaches.
+  const supported = ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window);
   if (!supported) {
     toggle.disabled = true;
+    if (hint) hint.textContent = 'Not supported in this app’s browser engine.';
     return;
   }
   try {
     const wasEnabled = localStorage.getItem('wft_push_enabled') === '1';
     toggle.checked = wasEnabled && Notification.permission === 'granted';
     toggle.addEventListener('change', async () => {
-      if (hint) hint.textContent = 'DIAG: change event fired, checked=' + toggle.checked;
       if (toggle.checked) {
         try {
           if (Notification.permission !== 'granted') {
             const perm = await Notification.requestPermission();
-            if (hint) hint.textContent = 'DIAG: requestPermission -> ' + perm;
             if (perm !== 'granted') { toggle.checked = false; return; }
           }
           const ok = await subscribeToPush();
-          if (hint) hint.textContent = 'DIAG: subscribeToPush -> ' + ok;
-          if (!ok) { toggle.checked = false; }
+          if (!ok) { toggle.checked = false; if (hint) hint.textContent = 'Could not enable — check your connection and try again.'; }
         } catch (e) {
           toggle.checked = false;
-          if (hint) hint.textContent = 'DIAG error: ' + (e && e.message);
+          if (hint) hint.textContent = 'Could not enable on this device.';
         }
       } else {
         await unsubscribeFromPush();
@@ -4045,7 +4036,7 @@ function initPushNotifications() {
     if (toggle.checked) subscribeToPush();
   } catch (e) {
     toggle.disabled = true;
-    if (hint) hint.textContent = 'DIAG setup error: ' + (e && e.message);
+    if (hint) hint.textContent = 'Not supported in this app’s browser engine.';
   }
 }
 
