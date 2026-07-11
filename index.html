@@ -94,29 +94,6 @@
       </div>
     </div>
 
-    <div class="chart-card" id="goalProgressCard">
-      <div class="chart-card-head"><span class="chart-card-title">GOAL PROGRESS</span></div>
-      <p class="empty-note" id="goalEmptyNote">Set your weights in Bio and log a weight entry to see progress.</p>
-    </div>
-
-    <div class="chart-card">
-      <div class="chart-card-head">
-        <span class="chart-card-title">ENTITY WEIGHT JOURNEY</span>
-        <div class="fuel-status-head-right">
-          <span class="chart-card-sub" id="chartRange"></span>
-          <button type="button" class="icon-btn glass-emboss" id="btnShareWeightJourney" aria-label="Share weight journey and goal progress">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
-          </button>
-        </div>
-      </div>
-      <div id="weightChart" class="weight-chart"></div>
-      <div class="chart-legend" id="chartLegend"></div>
-      <div class="empty-note" id="chartEmptyNote">
-        <p>Insufficient data points for visual projection. Log at least one weight entry to initialize trend.</p>
-        <button type="button" class="btn btn--primary btn--sm" id="btnGoToBioFromChart">Initialize sync</button>
-      </div>
-    </div>
-
     <h2 class="section-title section-title--neon">Quick log</h2>
     <div class="chart-card chart-card--neon">
       <p class="mod-tag">MOD_QUICK_05</p>
@@ -149,6 +126,29 @@
           </svg>
           <span>Weekend Log</span>
         </button>
+      </div>
+    </div>
+
+    <div class="chart-card" id="goalProgressCard">
+      <div class="chart-card-head"><span class="chart-card-title">GOAL PROGRESS</span></div>
+      <p class="empty-note" id="goalEmptyNote">Set your weights in Bio and log a weight entry to see progress.</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-card-head">
+        <span class="chart-card-title">ENTITY WEIGHT JOURNEY</span>
+        <div class="fuel-status-head-right">
+          <span class="chart-card-sub" id="chartRange"></span>
+          <button type="button" class="icon-btn glass-emboss" id="btnShareWeightJourney" aria-label="Share weight journey and goal progress">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
+          </button>
+        </div>
+      </div>
+      <div id="weightChart" class="weight-chart"></div>
+      <div class="chart-legend" id="chartLegend"></div>
+      <div class="empty-note" id="chartEmptyNote">
+        <p>Insufficient data points for visual projection. Log at least one weight entry to initialize trend.</p>
+        <button type="button" class="btn btn--primary btn--sm" id="btnGoToBioFromChart">Initialize sync</button>
       </div>
     </div>
 
@@ -243,13 +243,9 @@
         <line x1="8" y1="2.5" x2="8" y2="6"></line>
         <line x1="16" y1="2.5" x2="16" y2="6"></line>
       </svg>
-      Temporal Mission Log
+      <span id="missionLogBtnDate">Temporal Mission Log</span>
     </button>
-
-    <label class="field">
-      <span>Date</span>
-      <input type="date" id="trainDate" class="date-picker-trigger" readonly>
-    </label>
+    <input type="date" id="trainDate" hidden>
 
     <fieldset class="field-group field-group--compact">
       <legend>Session templates</legend>
@@ -306,8 +302,8 @@
       <label class="field">
         <span>Activity type</span>
         <select id="cardioType">
+          <option value="walk" selected>Walk</option>
           <option value="run">Run</option>
-          <option value="walk">Walk</option>
           <option value="ride">Ride</option>
         </select>
       </label>
@@ -379,10 +375,16 @@
       <p class="hero-sub">Execute precise metabolic protocol for <span class="accent-text" id="fuelDateLabel"></span></p>
     </div>
 
-    <label class="field">
-      <span>Date</span>
-      <input type="date" id="nutDate" class="date-picker-trigger" readonly>
-    </label>
+    <button type="button" class="btn mission-log-btn" id="btnOpenFuelLog">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+        <line x1="3" y1="10" x2="21" y2="10"></line>
+        <line x1="8" y1="2.5" x2="8" y2="6"></line>
+        <line x1="16" y1="2.5" x2="16" y2="6"></line>
+      </svg>
+      <span id="fuelLogBtnDate">Temporal Fuel Log</span>
+    </button>
+    <input type="date" id="nutDate" hidden>
 
     <div class="hero-card fuel-status-card" id="fuelStatusCard">
       <div class="chart-card-head">
@@ -420,9 +422,11 @@
               <button type="button" class="water-orb-arrow-btn" id="btnWaterOrbDown" aria-label="Remove a glass">▼</button>
             </div>
           </div>
-          <p class="mod-tag" style="margin:0;">Mod_hydration_track</p>
-          <p class="water-orb-glass-tag">+250 mL / tap</p>
-          <p class="water-orb-target-label"><span id="fuelWaterOrbAmount">0</span> / <span id="fuelWaterOrbTarget">3000</span> mL<span id="fuelWaterOrbAutoTag" class="water-orb-auto-tag" hidden> · auto</span></p>
+          <div class="water-pill-tags">
+            <p class="mod-tag">Mod_hydration_track</p>
+            <p class="water-orb-glass-tag">+250 mL / tap</p>
+            <p class="water-orb-target-label"><span id="fuelWaterOrbAmount">0</span> / <span id="fuelWaterOrbTarget">3000</span> mL<span id="fuelWaterOrbAutoTag" class="water-orb-auto-tag" hidden> · auto</span></p>
+          </div>
         </div>
       </div>
 
@@ -527,10 +531,16 @@
       <p class="hero-sub">Terminal interface for entity protocol execution and biological data synchronization.</p>
     </div>
 
-    <label class="field">
-      <span>Date</span>
-      <input type="date" id="bioDate" class="date-picker-trigger" readonly>
-    </label>
+    <button type="button" class="btn mission-log-btn" id="btnOpenBioLog">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+        <line x1="3" y1="10" x2="21" y2="10"></line>
+        <line x1="8" y1="2.5" x2="8" y2="6"></line>
+        <line x1="16" y1="2.5" x2="16" y2="6"></line>
+      </svg>
+      <span id="bioLogBtnDate">Temporal Entity Log</span>
+    </button>
+    <input type="date" id="bioDate" hidden>
 
     <button type="button" class="btn glass-emboss entity-identity-btn" id="btnOpenEntityIdentity">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3c0 5 10 5 10 10s-10 5-10 10"/><path d="M17 3c0 5-10 5-10 10s10 5 10 10"/><path d="M8 7h8M7.5 12h9M8 17h8"/></svg>
@@ -596,20 +606,25 @@
       <div class="bio-scan-row">
         <div class="bio-scan-col">
           <div class="chart-card-head"><span class="chart-card-title">Body Fat Percentage</span></div>
-          <div class="ring-card ring-card--flush" id="bodyFatRing"></div>
+          <div class="ring-card ring-card--flush bio-orb" id="bodyFatRing" role="button" tabindex="0" aria-expanded="false" aria-label="Show body fat percentage method"></div>
+          <p class="hint hint--sm bio-orb-desc" id="bodyFatDesc" hidden>Jackson-Pollock 7-site skinfold estimate. Not a medical measurement.</p>
         </div>
         <div class="bio-scan-col">
           <div class="chart-card-head"><span class="chart-card-title">Edema Extrapolation</span></div>
-          <div class="ring-card ring-card--flush" id="waterRetentionOrb"></div>
+          <div class="ring-card ring-card--flush bio-orb" id="waterRetentionOrb" role="button" tabindex="0" aria-expanded="false" aria-label="Show edema extrapolation method"></div>
+          <p class="hint hint--sm bio-orb-desc" id="waterRetentionDesc" hidden>Illustrative water-retention estimate from today's carbs/sodium intake plus stress/fatigue/sleep average, scaled against your Watson-formula total body water. Not a medical measurement.</p>
         </div>
       </div>
-      <p class="hint hint--sm">Body fat: Jackson-Pollock 7-site skinfold estimate. Edema: illustrative water-retention estimate from today's carbs/sodium intake plus stress/fatigue/sleep average, scaled against your Watson-formula total body water. Neither is a medical measurement.</p>
       <button type="button" class="btn caliper-entry-toggle" id="btnToggleCaliperEntry" aria-expanded="false">
         <span>Caliper Entry Data</span>
         <svg viewBox="0 0 24 24" width="16" height="16" class="caliper-entry-chevron" id="caliperEntryChevron" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
       <div class="caliper-entry-panel" id="caliperEntryPanel" hidden>
       <p class="hint">Jackson-Pollock 7-Site skinfold method. Pinch each site with skinfold calipers and enter the reading in millimeters (mm) — both men and women are measured at the same seven locations.</p>
+      <label class="field">
+        <span>Date</span>
+        <input type="date" id="skinfoldDate" class="date-picker-trigger" readonly>
+      </label>
       <div class="skinfold-grid">
         <label class="field">
           <span>Chest (mm)</span>
@@ -680,76 +695,6 @@
       <span><strong id="nexusAppOpens">–</strong> total app opens</span>
     </div>
     <p class="empty-note" id="lbEmptyNote" hidden>No Nexus data yet. Tap Sync to share and see others.</p>
-
-    <div class="chart-card">
-      <p class="mod-tag">MOD_CHRONOS_01</p>
-      <div class="chart-card-head">
-        <span class="chart-card-title">Steps Ranking</span>
-        <div class="fuel-status-head-right">
-          <button type="button" class="icon-btn glass-emboss rank-share-btn" data-target="lbStepsRanking" data-title="Steps Ranking" aria-label="Share Steps Ranking">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
-          </button>
-          <button type="button" class="rank-expand-btn" data-target="lbStepsRanking" aria-label="Show top 10" title="Show top 10" hidden>⤢</button>
-        </div>
-      </div>
-      <div class="rank-list" id="lbStepsRanking"></div>
-    </div>
-
-    <div class="chart-card">
-      <p class="mod-tag">MOD_FORCE_02</p>
-      <div class="chart-card-head">
-        <span class="chart-card-title">Training Volume</span>
-        <div class="fuel-status-head-right">
-          <button type="button" class="icon-btn glass-emboss rank-share-btn" data-target="lbVolumeRanking" data-title="Training Volume" aria-label="Share Training Volume">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
-          </button>
-          <button type="button" class="rank-expand-btn" data-target="lbVolumeRanking" aria-label="Show top 10" title="Show top 10" hidden>⤢</button>
-        </div>
-      </div>
-      <div class="rank-list" id="lbVolumeRanking"></div>
-    </div>
-
-    <div class="chart-card">
-      <p class="mod-tag">MOD_BIO_03</p>
-      <div class="chart-card-head">
-        <span class="chart-card-title">Bio-Adaptation</span>
-        <div class="fuel-status-head-right">
-          <button type="button" class="icon-btn glass-emboss rank-share-btn" data-target="lbBioRanking" data-title="Bio-Adaptation" aria-label="Share Bio-Adaptation">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
-          </button>
-          <button type="button" class="rank-expand-btn" data-target="lbBioRanking" aria-label="Show top 10" title="Show top 10" hidden>⤢</button>
-        </div>
-      </div>
-      <div class="rank-list" id="lbBioRanking"></div>
-    </div>
-
-    <div class="chart-card">
-      <p class="mod-tag">MOD_RUN_FAR_04</p>
-      <div class="chart-card-head">
-        <span class="chart-card-title">Furthest Run</span>
-        <div class="fuel-status-head-right">
-          <button type="button" class="icon-btn glass-emboss rank-share-btn" data-target="lbFurthestRunRanking" data-title="Furthest Run" aria-label="Share Furthest Run">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
-          </button>
-          <button type="button" class="rank-expand-btn" data-target="lbFurthestRunRanking" aria-label="Show top 10" title="Show top 10" hidden>⤢</button>
-        </div>
-      </div>
-      <div class="rank-list" id="lbFurthestRunRanking"></div>
-    </div>
-
-    <div class="chart-card">
-      <p class="mod-tag">MOD_RUN_FAST_05</p>
-      <div class="chart-card-head">
-        <span class="chart-card-title">Fastest Run</span>
-        <div class="fuel-status-head-right">
-          <button type="button" class="icon-btn glass-emboss rank-share-btn" data-target="lbFastestRunRanking" data-title="Fastest Run" aria-label="Share Fastest Run">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
-          </button>
-          <button type="button" class="rank-expand-btn" data-target="lbFastestRunRanking" aria-label="Show top 10" title="Show top 10" hidden>⤢</button>
-        </div>
-      </div>
-      <div class="rank-list" id="lbFastestRunRanking"></div>
-    </div>
 
     <div class="chart-card announcement-card" id="announcementCard">
       <div class="chart-card-head">
@@ -866,6 +811,78 @@
       <div id="chatUserMenuGroups" hidden></div>
     </div>
 
+    <div class="chat-reaction-menu" id="chatReactionMenu" hidden></div>
+
+    <div class="chart-card">
+      <p class="mod-tag">MOD_CHRONOS_01</p>
+      <div class="chart-card-head">
+        <span class="chart-card-title">Steps Ranking</span>
+        <div class="fuel-status-head-right">
+          <button type="button" class="icon-btn glass-emboss rank-share-btn" data-target="lbStepsRanking" data-title="Steps Ranking" aria-label="Share Steps Ranking">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
+          </button>
+          <button type="button" class="rank-expand-btn" data-target="lbStepsRanking" aria-label="Show top 10" title="Show top 10" hidden>⤢</button>
+        </div>
+      </div>
+      <div class="rank-list" id="lbStepsRanking"></div>
+    </div>
+
+    <div class="chart-card">
+      <p class="mod-tag">MOD_FORCE_02</p>
+      <div class="chart-card-head">
+        <span class="chart-card-title">Training Volume</span>
+        <div class="fuel-status-head-right">
+          <button type="button" class="icon-btn glass-emboss rank-share-btn" data-target="lbVolumeRanking" data-title="Training Volume" aria-label="Share Training Volume">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
+          </button>
+          <button type="button" class="rank-expand-btn" data-target="lbVolumeRanking" aria-label="Show top 10" title="Show top 10" hidden>⤢</button>
+        </div>
+      </div>
+      <div class="rank-list" id="lbVolumeRanking"></div>
+    </div>
+
+    <div class="chart-card">
+      <p class="mod-tag">MOD_BIO_03</p>
+      <div class="chart-card-head">
+        <span class="chart-card-title">Bio-Adaptation</span>
+        <div class="fuel-status-head-right">
+          <button type="button" class="icon-btn glass-emboss rank-share-btn" data-target="lbBioRanking" data-title="Bio-Adaptation" aria-label="Share Bio-Adaptation">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
+          </button>
+          <button type="button" class="rank-expand-btn" data-target="lbBioRanking" aria-label="Show top 10" title="Show top 10" hidden>⤢</button>
+        </div>
+      </div>
+      <div class="rank-list" id="lbBioRanking"></div>
+    </div>
+
+    <div class="chart-card">
+      <p class="mod-tag">MOD_RUN_FAR_04</p>
+      <div class="chart-card-head">
+        <span class="chart-card-title">Furthest Run</span>
+        <div class="fuel-status-head-right">
+          <button type="button" class="icon-btn glass-emboss rank-share-btn" data-target="lbFurthestRunRanking" data-title="Furthest Run" aria-label="Share Furthest Run">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
+          </button>
+          <button type="button" class="rank-expand-btn" data-target="lbFurthestRunRanking" aria-label="Show top 10" title="Show top 10" hidden>⤢</button>
+        </div>
+      </div>
+      <div class="rank-list" id="lbFurthestRunRanking"></div>
+    </div>
+
+    <div class="chart-card">
+      <p class="mod-tag">MOD_RUN_FAST_05</p>
+      <div class="chart-card-head">
+        <span class="chart-card-title">Fastest Run</span>
+        <div class="fuel-status-head-right">
+          <button type="button" class="icon-btn glass-emboss rank-share-btn" data-target="lbFastestRunRanking" data-title="Fastest Run" aria-label="Share Fastest Run">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
+          </button>
+          <button type="button" class="rank-expand-btn" data-target="lbFastestRunRanking" aria-label="Show top 10" title="Show top 10" hidden>⤢</button>
+        </div>
+      </div>
+      <div class="rank-list" id="lbFastestRunRanking"></div>
+    </div>
+
     <footer class="app-footer">
       <div class="footer-action-row">
         <button type="button" class="footer-share-btn" id="btnFooterDonate" aria-label="Donate">
@@ -927,6 +944,17 @@
     </button>
 
     <div class="sheet-section">
+      <div class="btn-row">
+        <button type="button" class="btn caliper-entry-toggle" id="btnToggleDailyReview" aria-expanded="false">
+          <span>Daily Review</span>
+          <svg viewBox="0 0 24 24" width="16" height="16" class="caliper-entry-chevron" id="dailyReviewChevron" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <button type="button" class="btn caliper-entry-toggle" id="btnToggleWeeklyReview" aria-expanded="false">
+          <span>Weekly Review</span>
+          <svg viewBox="0 0 24 24" width="16" height="16" class="caliper-entry-chevron" id="weeklyReviewChevron" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+      </div>
+      <div class="caliper-entry-panel" id="dailyReviewPanel" hidden>
       <p class="mod-tag">Mod_review_daily_11</p>
       <p class="field-group-heading">Daily Review</p>
       <form id="dailyReviewForm">
@@ -958,9 +986,9 @@
         <button type="submit" class="btn btn--primary">Save daily review</button>
         <p class="save-note" id="dailyReviewSaveNote"></p>
       </form>
-    </div>
+      </div>
 
-    <div class="sheet-section">
+      <div class="caliper-entry-panel" id="weeklyReviewPanel" hidden>
       <p class="mod-tag">Mod_review_12</p>
       <p class="field-group-heading">Weekly Review</p>
       <form id="reviewForm">
@@ -996,6 +1024,7 @@
         <button type="submit" class="btn btn--primary">Save weekly review</button>
         <p class="save-note" id="reviewSaveNote"></p>
       </form>
+      </div>
     </div>
 
     <div class="sheet-section sheet-section--compact">
@@ -1041,52 +1070,54 @@
     </div>
 
     <div class="sheet-section">
-      <p class="mod-tag">Mod_history_16</p>
-      <p class="field-group-heading">Accomplishment Log History</p>
-      <div class="table-wrap">
-        <table id="historyTable">
-          <thead>
-            <tr><th>Date</th><th>Weight</th><th>Steps</th><th>Cal</th><th>Protein</th><th>Sleep</th><th>Exercises</th></tr>
-          </thead>
-          <tbody id="historyBody"></tbody>
-        </table>
-      </div>
-      <p class="empty-note" id="historyEmptyNote">No logs yet.</p>
-    </div>
+      <button type="button" class="btn caliper-entry-toggle" id="btnToggleHistoryLogs" aria-expanded="false">
+        <span>History Logs</span>
+        <svg viewBox="0 0 24 24" width="16" height="16" class="caliper-entry-chevron" id="historyLogsChevron" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="caliper-entry-panel" id="historyLogsPanel" hidden>
+        <p class="mod-tag">Mod_history_16</p>
+        <p class="field-group-heading">Accomplishment Log History</p>
+        <div class="table-wrap">
+          <table id="historyTable">
+            <thead>
+              <tr><th>Date</th><th>Weight</th><th>Steps</th><th>Cal</th><th>Protein</th><th>Sleep</th><th>Exercises</th></tr>
+            </thead>
+            <tbody id="historyBody"></tbody>
+          </table>
+        </div>
+        <p class="empty-note" id="historyEmptyNote">No logs yet.</p>
 
-    <div class="sheet-section">
-      <p class="mod-tag">Mod_mhistory_17</p>
-      <p class="field-group-heading">Measurement Log History</p>
-      <div class="table-wrap">
-        <table id="measureHistoryTable">
-          <thead>
-            <tr>
-              <th>Date</th><th>Chest</th><th>Shoulder</th><th>L.Bicep</th><th>R.Bicep</th>
-              <th>2" Above</th><th>Stomach</th><th>2" Below</th><th>Hips</th>
-              <th>L.Thigh</th><th>R.Thigh</th><th>L.Calf</th><th>R.Calf</th>
-            </tr>
-          </thead>
-          <tbody id="measureHistoryBody"></tbody>
-        </table>
-      </div>
-      <p class="empty-note" id="measureHistoryEmptyNote">No measurements logged yet.</p>
-    </div>
+        <p class="mod-tag">Mod_mhistory_17</p>
+        <p class="field-group-heading">Measurement Log History</p>
+        <div class="table-wrap">
+          <table id="measureHistoryTable">
+            <thead>
+              <tr>
+                <th>Date</th><th>Chest</th><th>Shoulder</th><th>L.Bicep</th><th>R.Bicep</th>
+                <th>2" Above</th><th>Stomach</th><th>2" Below</th><th>Hips</th>
+                <th>L.Thigh</th><th>R.Thigh</th><th>L.Calf</th><th>R.Calf</th>
+              </tr>
+            </thead>
+            <tbody id="measureHistoryBody"></tbody>
+          </table>
+        </div>
+        <p class="empty-note" id="measureHistoryEmptyNote">No measurements logged yet.</p>
 
-    <div class="sheet-section">
-      <p class="mod-tag">Mod_bfhistory_18</p>
-      <p class="field-group-heading">Body Fat Percentage Log History</p>
-      <div class="table-wrap">
-        <table id="bodyFatHistoryTable">
-          <thead>
-            <tr>
-              <th>Date</th><th>Chest</th><th>Abdomen</th><th>Thigh</th><th>Triceps</th>
-              <th>Suprailiac</th><th>Subscapular</th><th>Midaxillary</th><th>Body Fat %</th>
-            </tr>
-          </thead>
-          <tbody id="bodyFatHistoryBody"></tbody>
-        </table>
+        <p class="mod-tag">Mod_bfhistory_18</p>
+        <p class="field-group-heading">Body Fat Percentage Log History</p>
+        <div class="table-wrap">
+          <table id="bodyFatHistoryTable">
+            <thead>
+              <tr>
+                <th>Date</th><th>Chest</th><th>Abdomen</th><th>Thigh</th><th>Triceps</th>
+                <th>Suprailiac</th><th>Subscapular</th><th>Midaxillary</th><th>Body Fat %</th>
+              </tr>
+            </thead>
+            <tbody id="bodyFatHistoryBody"></tbody>
+          </table>
+        </div>
+        <p class="empty-note" id="bodyFatHistoryEmptyNote">No skinfold measurements logged yet.</p>
       </div>
-      <p class="empty-note" id="bodyFatHistoryEmptyNote">No skinfold measurements logged yet.</p>
     </div>
   </section>
 
@@ -1343,7 +1374,7 @@
           <option value="grand-core">Grand Core</option>
           <option value="sovereign-core">Sovereign Core</option>
           <option value="hashira-core">Hashira Core</option>
-          <option value="asanoha-digital">Asanoha Digital</option>
+          <option value="asanoha-digital">Nezuko Digital</option>
         </select>
       </label>
       <p class="hint">Themes work with the light/dark switch above — pick a theme, then toggle light or dark within it. Grand Core is designed for light mode.</p>
@@ -1435,14 +1466,18 @@
       <p class="hint hint--sm" id="pushNotifHint"></p>
     </div>
 
-    <div class="sheet-section">
-      <p class="field-group-heading">Digital ID Override</p>
-      <p class="hint">Your Digital ID lives in this browser's local storage — clearing site data (or reinstalling) resets it. If you need to reclaim a previous ID, enter it here. Format: WF- followed by 6 letters/numbers (no 0, O, 1, or I).</p>
+    <div class="sheet-section" id="digitalIdOverrideSection" hidden>
+      <p class="field-group-heading">Admin: Digital ID Transfer</p>
+      <p class="hint">Your own Digital ID is restored automatically from your local/Drive backup now, so this is only for fixing another user's ID (e.g. a duplicate row after a data wipe). Everything tied to their account moves to the new ID, fully replacing whatever was already there.</p>
+      <label class="field">
+        <span>User Digital ID</span>
+        <input type="text" id="digitalIdOverrideFromInput" placeholder="e.g. WF-4JVFB4" maxlength="9" style="text-transform:uppercase;">
+      </label>
       <label class="field">
         <span>New Digital ID</span>
         <input type="text" id="digitalIdOverrideInput" placeholder="e.g. WF-B932GB" maxlength="9" style="text-transform:uppercase;">
       </label>
-      <button type="button" class="btn btn--primary" id="btnSetDigitalId">Set Digital ID</button>
+      <button type="button" class="btn btn--primary" id="btnSetDigitalId">Transfer Digital ID</button>
       <p class="save-note" id="digitalIdOverrideNote"></p>
     </div>
 
@@ -1491,6 +1526,12 @@
           <span>Also remind me to log (Start/End Day) at wake-up and bedtime</span>
         </label>
         <p class="hint hint--sm">Uses the same wake-up/bedtime above, as a separate notification — tapping it opens the log directly instead of just the app.</p>
+        <label class="field field--checkbox">
+          <input type="checkbox" id="progressPhotoReminderEnabled">
+          <span>Remind me to take Progress Photo &amp; Measurements (Sundays only, at wake-up time)</span>
+        </label>
+        <p class="hint hint--sm">Fires once a week, Sunday at your wake-up time above, as two separate notifications — tapping "Progress Photo" opens your camera, tapping "Take Measurements" opens Measurement Entry directly.</p>
+        <input type="file" accept="image/*" capture="environment" id="progressPhotoCameraInput" hidden>
         <button type="button" class="btn btn--sm" id="btnSaveHydroReminders">Save reminder schedule</button>
         <p class="hint" id="hydroSaveNote"></p>
       </div>

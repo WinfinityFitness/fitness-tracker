@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.2.9';
+const APP_VERSION = 'WF_SYS_V.3.3';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1484,6 +1484,16 @@ function loadBioForDate(date) {
   document.getElementById('bioHungerOut').textContent = e.hunger ?? 3;
   document.getElementById('bioMenstruatingField').hidden = !profile || profile.gender !== 'female';
 
+  document.getElementById('skinfoldDate').value = date;
+  loadSkinfoldsForDate(date);
+}
+
+// Caliper Entry Data has its own date field (separate from the Bio tab's
+// main Temporal Entity Log date) so past skinfold readings can be corrected
+// without also jumping the stress/fatigue/period fields to that date.
+function loadSkinfoldsForDate(date) {
+  const logs = getLogs();
+  const e = logs[date] || {};
   const skinfolds = e.skinfolds || {};
   SKINFOLD_SITES.forEach(key => {
     const input = document.getElementById('skin' + key.charAt(0).toUpperCase() + key.slice(1));
@@ -1504,7 +1514,7 @@ function readSkinfoldInputs() {
 
 function renderBodyFatWidget() {
   const profile = getProfile();
-  const date = document.getElementById('bioDate').value || todayISO();
+  const date = document.getElementById('skinfoldDate').value || todayISO();
   const skinfolds = readSkinfoldInputs();
   const sum = SKINFOLD_SITES.reduce((s, key) => s + skinfolds[key], 0);
   const age = profile ? profile.age : null;
@@ -1530,9 +1540,39 @@ function renderBodyFatWidget() {
   });
 }
 
+// Body Fat / Edema orbs: tap to reveal the methodology note, auto-hides
+// after 2 minutes, or tap the orb again to close it early.
+function initBioOrbDescToggle(ringId, descId) {
+  const ring = document.getElementById(ringId);
+  const desc = document.getElementById(descId);
+  let hideTimer = null;
+  const close = () => {
+    desc.hidden = true;
+    ring.setAttribute('aria-expanded', 'false');
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+  };
+  const toggle = () => {
+    if (!desc.hidden) { close(); return; }
+    desc.hidden = false;
+    ring.setAttribute('aria-expanded', 'true');
+    if (hideTimer) clearTimeout(hideTimer);
+    hideTimer = setTimeout(close, 120000);
+  };
+  ring.addEventListener('click', toggle);
+  ring.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+  });
+}
+
 function initBioLog() {
+  initBioOrbDescToggle('bodyFatRing', 'bodyFatDesc');
+  initBioOrbDescToggle('waterRetentionOrb', 'waterRetentionDesc');
   document.getElementById('bioDate').value = todayISO();
-  document.getElementById('bioDate').addEventListener('change', e => loadBioForDate(e.target.value));
+  updateBioLogBtnLabel();
+  document.getElementById('bioDate').addEventListener('change', e => {
+    loadBioForDate(e.target.value);
+    updateBioLogBtnLabel();
+  });
 
   ['bioStress', 'bioFatigue', 'bioHunger'].forEach(id => {
     const input = document.getElementById(id);
@@ -1570,8 +1610,9 @@ function initBioLog() {
     panel.hidden = !expanded;
     btn.setAttribute('aria-expanded', String(expanded));
   });
+  document.getElementById('skinfoldDate').addEventListener('change', e => loadSkinfoldsForDate(e.target.value));
   document.getElementById('btnSaveSkinfolds').addEventListener('click', () => {
-    const date = document.getElementById('bioDate').value;
+    const date = document.getElementById('skinfoldDate').value;
     const skinfolds = readSkinfoldInputs();
     const profile = getProfile();
     const bodyFatPct = computeBodyFatJP7(skinfolds, profile ? profile.age : null, profile ? profile.gender : 'male');
@@ -1776,11 +1817,54 @@ function openEndDayLog() {
 // the service worker: a cold-open navigates to ?openSheet=..., an
 // already-open tab gets a postMessage instead (a fresh navigation would
 // reload the page and lose whatever the user was doing).
+function openDailyFuelStatus() {
+  const tabBtn = document.querySelector('.tab-btn[data-target="nutrition"]');
+  if (tabBtn) tabBtn.click();
+  const card = document.getElementById('fuelStatusCard');
+  if (card) setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+}
+
+function openMeasureEntry() {
+  const overlay = document.getElementById('measureEntryOverlay');
+  if (overlay) overlay.hidden = false;
+}
+
+// Tapping the weekly "Progress Photo" reminder opens the device camera
+// directly via a hidden capture input, rather than just opening the app —
+// there's no in-app photo library, so the captured shot is handed straight
+// back to the OS as a normal downloaded file (same pattern as CSV/JSON
+// backups elsewhere in this app), landing in the phone's usual gallery/
+// downloads instead of being stored anywhere in Winfinity itself.
+function openProgressPhotoCamera() {
+  const input = document.getElementById('progressPhotoCameraInput');
+  if (input) input.click();
+}
+
+function initProgressPhotoCamera() {
+  const input = document.getElementById('progressPhotoCameraInput');
+  if (!input) return;
+  input.addEventListener('change', () => {
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `progress-photo-${todayISO()}.jpg`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    showRestToast('Progress photo saved.');
+  });
+}
+
 function handleDeepLinkUrl(url) {
   try {
     const sheet = new URL(url, location.href).searchParams.get('openSheet');
     if (sheet === 'startDayLog') openStartDayLog();
     else if (sheet === 'endDayLog') openEndDayLog();
+    else if (sheet === 'dailyFuel') openDailyFuelStatus();
+    else if (sheet === 'measureEntry') openMeasureEntry();
+    else if (sheet === 'progressPhoto') openProgressPhotoCamera();
   } catch (e) { /* ignore malformed url */ }
 }
 
@@ -1990,19 +2074,33 @@ function renderStepsCaloriesChart() {
   const container = document.getElementById('stepsCaloriesChart');
   const labels = document.getElementById('stepsCaloriesLabels');
   container.innerHTML = ''; labels.innerHTML = '';
+  // Bars are capped at MAX_SCALE% of goal visually; anything past 100% of
+  // goal renders as a second, differently-colored segment stacked on top of
+  // the base bar so going over the target is obvious at a glance instead of
+  // just blending into a taller bar of the same color.
+  const buildBar = (modifierClass, pct, title) => {
+    const bar = document.createElement('div');
+    bar.className = 'dual-bar ' + modifierClass;
+    bar.title = title;
+    const base = document.createElement('div');
+    base.className = 'dual-bar-base';
+    base.style.height = `${(Math.min(100, pct) / MAX_SCALE) * 100}%`;
+    bar.appendChild(base);
+    if (pct > 100) {
+      const over = document.createElement('div');
+      over.className = 'dual-bar-over';
+      over.style.height = `${(Math.min(MAX_SCALE, pct) - 100) / MAX_SCALE * 100}%`;
+      bar.appendChild(over);
+    }
+    return bar;
+  };
+
   days.forEach(d => {
     const col = document.createElement('div');
     col.className = 'dual-bar-day';
 
-    const stepsBar = document.createElement('div');
-    stepsBar.className = 'dual-bar dual-bar--steps';
-    stepsBar.style.height = `${Math.min(100, (d.stepsPct / MAX_SCALE) * 100)}%`;
-    stepsBar.title = `Steps: ${round0(d.stepsPct)}% of daily goal`;
-
-    const calBar = document.createElement('div');
-    calBar.className = 'dual-bar dual-bar--calories';
-    calBar.style.height = `${Math.min(100, (d.calPct / MAX_SCALE) * 100)}%`;
-    calBar.title = `Calories: ${round0(d.calPct)}% of daily target`;
+    const stepsBar = buildBar('dual-bar--steps', d.stepsPct, `Steps: ${round0(d.stepsPct)}% of daily goal`);
+    const calBar = buildBar('dual-bar--calories', d.calPct, `Calories: ${round0(d.calPct)}% of daily target`);
 
     col.appendChild(stepsBar);
     col.appendChild(calBar);
@@ -3043,13 +3141,22 @@ async function shareCardioSession() {
   shareViaWebShare({ title: 'Winfinity Tracker — Activity', text }, blob);
 }
 
+function deleteCardioSession(date, sessionIndex) {
+  if (!confirm('Delete this activity? This cannot be undone.')) return;
+  const logs = getLogs();
+  const sessions = (logs[date] && logs[date].cardioSessions) || [];
+  sessions.splice(sessionIndex, 1);
+  updateLogFields(date, { cardioSessions: sessions });
+  renderCardioHistory();
+}
+
 function renderCardioHistory() {
   const logsArr = sortedLogsArray().slice().reverse();
   const unit = distUnitForProfile(getProfile());
   const container = document.getElementById('cardioHistory');
   const empty = document.getElementById('cardioHistoryEmpty');
   const rows = [];
-  logsArr.forEach(l => { (l.cardioSessions || []).forEach(s => rows.push({ date: l.date, ...s })); });
+  logsArr.forEach(l => { (l.cardioSessions || []).forEach((s, i) => rows.push({ date: l.date, sessionIndex: i, ...s })); });
   container.innerHTML = '';
   if (!rows.length) { empty.hidden = false; return; }
   empty.hidden = true;
@@ -3060,8 +3167,17 @@ function renderCardioHistory() {
     row.innerHTML = `<span class="cardio-history-date">${s.date}</span>
       <span class="cardio-history-type">${s.type}</span>
       <span class="cardio-history-dist">${dist.toFixed(2)} ${unit}</span>
-      <span class="cardio-history-dur">${formatCardioDuration(s.durationSec)}</span>`;
+      <span class="cardio-history-dur">${formatCardioDuration(s.durationSec)}</span>
+      <button type="button" class="cardio-history-delete" data-date="${s.date}" data-index="${s.sessionIndex}" aria-label="Delete activity">✕</button>`;
     container.appendChild(row);
+  });
+}
+
+function initCardioHistoryDelete() {
+  document.getElementById('cardioHistory').addEventListener('click', e => {
+    const btn = e.target.closest('.cardio-history-delete');
+    if (!btn) return;
+    deleteCardioSession(btn.dataset.date, parseInt(btn.dataset.index, 10));
   });
 }
 
@@ -3077,6 +3193,7 @@ function initCardioTracker() {
     setCardioMapStyle(getCardioMapStyle() === 'satellite' ? 'road' : 'satellite');
   });
   initClickToRevealHint('btnToggleActivityHistory', 'activityHistoryPanel');
+  initCardioHistoryDelete();
   renderCardioHistory();
 }
 
@@ -3139,6 +3256,7 @@ function renderMissionLogCalendar() {
   const periodDays = showPeriod ? getPeriodDaysSet() : new Set();
   const carryoverResets = getCarryoverResets();
   const todayIso = todayISO();
+  const selectedIso = document.getElementById('trainDate').value;
 
   document.getElementById('missionLogPeriodLegend').hidden = !showPeriod;
 
@@ -3153,7 +3271,7 @@ function renderMissionLogCalendar() {
   }
   for (let d = 1; d <= daysInMonth; d++) {
     const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    cells.push({ day: d, iso, isToday: iso === todayIso, isWorkout: workoutDays.has(iso), isPeriod: periodDays.has(iso), isReset: !!carryoverResets[iso] });
+    cells.push({ day: d, iso, isToday: iso === todayIso, isSelected: iso === selectedIso, isWorkout: workoutDays.has(iso), isPeriod: periodDays.has(iso), isReset: !!carryoverResets[iso] });
   }
   let nextDay = 1;
   while (cells.length % 7 !== 0) { cells.push({ day: nextDay++, muted: true }); }
@@ -3164,19 +3282,39 @@ function renderMissionLogCalendar() {
     if (c.muted) classes.push('is-muted');
     if (c.isWorkout) classes.push('is-workout');
     if (c.isToday) classes.push('is-today');
+    if (c.isSelected) classes.push('is-selected');
     if (c.isPeriod) classes.push('is-period');
     if (c.isReset) classes.push('is-reset');
     const dot = c.isPeriod ? '<span class="mission-log-period-dot"></span>' : '';
     const resetDot = c.isReset ? '<span class="mission-log-reset-dot"></span>' : '';
-    const isoAttr = c.iso ? ` data-iso="${c.iso}"` : '';
-    return `<div class="${classes.join(' ')}"${isoAttr}>${c.day}${dot}${resetDot}</div>`;
+    if (c.muted) return `<div class="${classes.join(' ')}">${c.day}</div>`;
+    return `<button type="button" class="${classes.join(' ')}" data-iso="${c.iso}">${c.day}${dot}${resetDot}</button>`;
   }).join('');
+}
+
+function updateCalendarBtnLabel(inputId, labelId, prefixText) {
+  const dateVal = document.getElementById(inputId).value;
+  const label = document.getElementById(labelId);
+  if (!label || !dateVal) return;
+  label.textContent = `${prefixText} · ${fmtDate(parseISO(dateVal))}`;
+}
+
+function updateMissionLogBtnLabel() {
+  updateCalendarBtnLabel('trainDate', 'missionLogBtnDate', 'Temporal Mission Log');
+}
+function updateFuelLogBtnLabel() {
+  updateCalendarBtnLabel('nutDate', 'fuelLogBtnDate', 'Temporal Fuel Log');
+}
+function updateBioLogBtnLabel() {
+  updateCalendarBtnLabel('bioDate', 'bioLogBtnDate', 'Temporal Entity Log');
 }
 
 function initMissionLog() {
   const overlay = document.getElementById('missionLogOverlay');
   document.getElementById('btnOpenMissionLog').addEventListener('click', () => {
-    missionLogViewDate = new Date();
+    const current = document.getElementById('trainDate').value;
+    const base = current ? parseISO(current) : new Date();
+    missionLogViewDate = new Date(base.getFullYear(), base.getMonth(), 1);
     renderMissionLogCalendar();
     overlay.hidden = false;
   });
@@ -3191,13 +3329,22 @@ function initMissionLog() {
     renderMissionLogCalendar();
   });
   document.getElementById('missionLogGrid').addEventListener('click', e => {
-    const cell = e.target.closest('.mission-log-day.is-reset');
+    const cell = e.target.closest('.mission-log-day[data-iso]');
     if (!cell) return;
     const iso = cell.dataset.iso;
-    const rec = getCarryoverResets()[iso];
-    if (!rec) return;
-    const label = rec.balanceBefore > 0 ? `+${round0(rec.balanceBefore)} kcal banked` : `${round0(rec.balanceBefore)} kcal overflow`;
-    showRestToast(`Carryover reset on ${fmtDate(parseISO(iso))}: ${label} cleared.`);
+    if (cell.classList.contains('is-reset')) {
+      const rec = getCarryoverResets()[iso];
+      if (rec) {
+        const label = rec.balanceBefore > 0 ? `+${round0(rec.balanceBefore)} kcal banked` : `${round0(rec.balanceBefore)} kcal overflow`;
+        showRestToast(`Carryover reset on ${fmtDate(parseISO(iso))}: ${label} cleared.`);
+      }
+    }
+    const dateEl = document.getElementById('trainDate');
+    dateEl.value = iso;
+    localStorage.setItem('wft_active_train_date', iso);
+    loadTrainingForDate(iso);
+    updateMissionLogBtnLabel();
+    overlay.hidden = true;
   });
 }
 
@@ -3285,22 +3432,23 @@ function initDatePicker() {
   });
 
   const titles = {
-    trainDate: 'Training Date', nutDate: 'Fuel Date', bioDate: 'Bio Date',
+    nutDate: 'Temporal Fuel Log', bioDate: 'Temporal Entity Log',
     reviewDate: 'Week Ending', setupStartDate: 'Challenge Start', measureDate: 'Measurement Date',
     foodDiaryDateInput: 'Food Diary Date',
     coachRefeedStart: 'Refeed Start', coachRefeedEnd: 'Refeed End',
-    dailyReviewDate: 'Daily Review Date',
+    dailyReviewDate: 'Daily Review Date', skinfoldDate: 'Caliper Entry Date',
   };
   // Each entry marks, on that input's calendar, the days that already have
-  // data relevant to it — training days on trainDate, nutrition days on
-  // nutDate, etc. Inputs with no "has logs" concept (challenge start date,
-  // refeed range picks) are simply omitted, leaving their calendar plain.
+  // data relevant to it — nutrition days on nutDate, etc. (trainDate uses
+  // its own Temporal Mission Log calendar instead of this generic picker.)
+  // Inputs with no "has logs" concept (challenge start date, refeed range
+  // picks) are simply omitted, leaving their calendar plain.
   const DATE_PICKER_HIGHLIGHT_SETS = {
-    trainDate: getWorkoutDaysSet,
     nutDate: getNutritionDaysSet,
     foodDiaryDateInput: getNutritionDaysSet,
     bioDate: getBioDaysSet,
     measureDate: getMeasurementDaysSet,
+    skinfoldDate: () => getLogDaysSet(hasLoggedSkinfolds),
     reviewDate: () => new Set(Object.keys(getReviews())),
     dailyReviewDate: () => {
       const reviews = getDailyReviews();
@@ -3313,14 +3461,30 @@ function initDatePicker() {
       openDatePicker(input, titles[input.id] || 'Select Date', getHighlight ? getHighlight() : null);
     });
   });
+
+  // Fuel/Bio tabs use a single "Temporal ___ Log" button (like Training's
+  // Temporal Mission Log) instead of a visible date field — the button opens
+  // this same shared calendar, targeting the tab's now-hidden date input.
+  const calendarBtnLinks = { btnOpenFuelLog: 'nutDate', btnOpenBioLog: 'bioDate' };
+  Object.entries(calendarBtnLinks).forEach(([btnId, inputId]) => {
+    const btn = document.getElementById(btnId);
+    const input = document.getElementById(inputId);
+    if (!btn || !input) return;
+    btn.addEventListener('click', () => {
+      const getHighlight = DATE_PICKER_HIGHLIGHT_SETS[inputId];
+      openDatePicker(input, titles[inputId] || 'Select Date', getHighlight ? getHighlight() : null);
+    });
+  });
 }
 
 function initTraining() {
   document.getElementById('trainDate').value = getActiveTrainingDate();
   localStorage.setItem('wft_active_train_date', document.getElementById('trainDate').value);
+  updateMissionLogBtnLabel();
   document.getElementById('trainDate').addEventListener('change', e => {
     localStorage.setItem('wft_active_train_date', e.target.value);
     loadTrainingForDate(e.target.value);
+    updateMissionLogBtnLabel();
   });
 
   document.getElementById('btnAddExercise').addEventListener('click', () => {
@@ -3530,6 +3694,7 @@ function initTraining() {
       digitalId: getOrCreatePublicId(),
       dateTime: `${fmtDate(parseISO(trainDate))} · ${timeStr}`,
       summary: lastWorkoutSummary,
+      volumeTrend: computeVolumeTrendData(),
     });
     shareViaWebShare({ title: 'Winfinity Tracker — Workout Summary', text }, blob);
   });
@@ -3555,6 +3720,19 @@ function renderTrainingStats() {
   document.getElementById('statSetsWeek').textContent = sets;
   renderPRBoard();
   renderVolumeTrendChart();
+}
+
+// Same "last 8 gym days" volume data renderVolumeTrendChart() draws as an
+// SVG on the Training tab, reused here so the share cards can draw the
+// identical trend as a canvas chart.
+function computeVolumeTrendData() {
+  const profile = getProfile();
+  const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
+  const logsArr = sortedLogsArray();
+  const gymDays = logsArr.filter(l => l.exercises && l.exercises.some(ex => ex.sets.some(s => s.completed))).slice(-8);
+  const volumes = gymDays.map(l => fromKg(computeDayVolumeKg(l), wu));
+  const labels = gymDays.map(l => { const d = parseISO(l.date); return `${d.getMonth() + 1}/${d.getDate()}`; });
+  return { wu, volumes, labels, total: round0(volumes.reduce((s, v) => s + v, 0)) };
 }
 
 function computeDayVolumeKg(entry) {
@@ -4196,6 +4374,7 @@ function loadHydroReminderSettings() {
   document.getElementById('hydroMeal2').value = meals[2];
   document.getElementById('hydroHourlyEnabled').checked = hr.hourlyEnabled !== false;
   document.getElementById('logRemindersEnabled').checked = !!hr.logRemindersEnabled;
+  document.getElementById('progressPhotoReminderEnabled').checked = !!hr.progressPhotoReminderEnabled;
   document.getElementById('hydroReminderFields').style.display = hr.enabled ? '' : 'none';
 }
 
@@ -4219,6 +4398,7 @@ async function syncReminderSettingsToServer(hr) {
       p_meal_times: hr.mealTimes || ['07:00', '12:00', '19:00'],
       p_hourly_enabled: hr.hourlyEnabled !== false,
       p_log_reminders_enabled: !!hr.logRemindersEnabled,
+      p_progress_photo_enabled: !!hr.progressPhotoReminderEnabled,
     });
   } catch (e) { /* best effort — local reminders still work */ }
 }
@@ -4243,6 +4423,7 @@ function initHydrationReminderSettings() {
       ],
       hourlyEnabled: document.getElementById('hydroHourlyEnabled').checked,
       logRemindersEnabled: document.getElementById('logRemindersEnabled').checked,
+      progressPhotoReminderEnabled: document.getElementById('progressPhotoReminderEnabled').checked,
     };
     saveProfile(profile);
     document.getElementById('hydroSaveNote').textContent = 'Reminder schedule saved.';
@@ -5276,7 +5457,29 @@ function drawSharePie(ctx, cx, cy, r, slices) {
   ctx.restore();
 }
 
-async function generateFuelStatusShareCard({ name, digitalId, date, caloriesNow, calorieTarget, macros }) {
+// Draws the vertical water-fill pill from the in-app Daily Fuel Status
+// widget (see .water-pill in style.css) directly onto a canvas 2D context.
+function drawShareWaterPill(ctx, x, y, w, h, pct) {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(51,200,204,0.5)'; ctx.lineWidth = 2;
+  roundRectPath(ctx, x, y, w, h, w / 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fill();
+  ctx.stroke();
+
+  const clamped = Math.max(0, Math.min(100, pct));
+  const fillH = (clamped / 100) * (h - 4);
+  ctx.save();
+  roundRectPath(ctx, x, y, w, h, w / 2);
+  ctx.clip();
+  const grad = ctx.createLinearGradient(0, y + h - fillH, 0, y + h);
+  grad.addColorStop(0, '#2de2e6'); grad.addColorStop(1, '#1f6fd6');
+  ctx.fillStyle = grad;
+  ctx.fillRect(x, y + h - fillH, w, fillH);
+  ctx.restore();
+  ctx.restore();
+}
+
+async function generateFuelStatusShareCard({ name, digitalId, date, caloriesNow, calorieTarget, macros, waterNow, waterTarget }) {
   const canvas = document.createElement('canvas');
   canvas.width = 600; canvas.height = 760;
   const ctx = canvas.getContext('2d');
@@ -5312,18 +5515,32 @@ async function generateFuelStatusShareCard({ name, digitalId, date, caloriesNow,
   ctx.font = 'bold 30px sans-serif';
   ctx.fillText('Daily Fuel Status', 300, 138);
 
-  // Calorie ring.
+  // Calorie ring (left) + water pill (right), matching the in-app row that
+  // pairs the calorie ring with the water-fill pill side by side.
   const caloriePct = calorieTarget > 0 ? (caloriesNow / calorieTarget) * 100 : 0;
-  drawShareRing(ctx, 300, 300, 110, 20, caloriePct, ['#8b6bf2', '#3f8ff0', '#2de2e6']);
+  const ringCx = 220, ringCy = 290, ringR = 95;
+  drawShareRing(ctx, ringCx, ringCy, ringR, 18, caloriePct, ['#8b6bf2', '#3f8ff0', '#2de2e6']);
+  ctx.textAlign = 'center';
   ctx.fillStyle = '#dde3e5';
-  ctx.font = 'bold 52px monospace';
-  ctx.fillText(Math.round(Math.min(100, caloriePct)) + '%', 300, 318);
+  ctx.font = 'bold 46px monospace';
+  ctx.fillText(Math.round(Math.min(100, caloriePct)) + '%', ringCx, ringCy + 10);
   ctx.fillStyle = '#7e8e95';
   ctx.font = '14px monospace';
-  ctx.fillText('CALORIES', 300, 448);
+  ctx.fillText('CALORIES', ringCx, ringCy + ringR + 34);
   ctx.fillStyle = '#dde3e5';
-  ctx.font = 'bold 22px sans-serif';
-  ctx.fillText(`${caloriesNow} / ${calorieTarget} kcal`, 300, 478);
+  ctx.font = 'bold 20px sans-serif';
+  ctx.fillText(`${caloriesNow} / ${calorieTarget} kcal`, ringCx, ringCy + ringR + 62);
+
+  if (waterTarget != null) {
+    const pillX = 462, pillW = 40, pillY = ringCy - ringR + 5, pillH = ringR * 2 - 10;
+    const waterPct = waterTarget > 0 ? (waterNow / waterTarget) * 100 : 0;
+    drawShareWaterPill(ctx, pillX, pillY, pillW, pillH, waterPct);
+    const pillCx = pillX + pillW / 2;
+    ctx.fillStyle = '#7e8e95'; ctx.font = '14px monospace';
+    ctx.fillText('WATER', pillCx, ringCy + ringR + 34);
+    ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 18px sans-serif';
+    ctx.fillText(`${waterNow} / ${waterTarget} mL`, pillCx, ringCy + ringR + 62);
+  }
 
   // Macro pie (left) + legend (right of the pie), matching the in-app row.
   const pieCx = 210, pieCy = 590, pieR = 58;
@@ -5382,6 +5599,8 @@ async function shareDailyFuelStatus() {
     caloriesNow,
     calorieTarget,
     macros,
+    waterNow: entry.water || 0,
+    waterTarget: effectiveWaterTargetML(date),
   });
   shareViaWebShare({ title: 'Winfinity Tracker — Daily Fuel', text }, blob);
 }
@@ -5396,19 +5615,20 @@ function roundRectPath(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-async function generateWorkoutSummaryShareCard({ name, digitalId, dateTime, summary }) {
+async function generateWorkoutSummaryShareCard({ name, digitalId, dateTime, summary, volumeTrend }) {
   const wu = summary.wu;
   const prCount = summary.exercises.filter(e => e.isPR).length;
   const width = 600;
   const rowH = 106;
   const headerH = 158;
   const statsH = 92 + 26;
+  const trendH = (volumeTrend && volumeTrend.volumes.length) ? 190 : 0;
   const prBannerH = prCount > 0 ? 44 : 0;
   const exercisesH = summary.exercises.length
     ? summary.exercises.length * rowH
     : 50;
   const footerH = 46;
-  const height = headerH + statsH + prBannerH + exercisesH + footerH;
+  const height = headerH + statsH + trendH + prBannerH + exercisesH + footerH;
 
   const canvas = document.createElement('canvas');
   canvas.width = width; canvas.height = height;
@@ -5452,6 +5672,43 @@ async function generateWorkoutSummaryShareCard({ name, digitalId, dateTime, summ
     ctx.fillText(t.label, x + tileW / 2, y + 74);
   });
   y += 92 + 26;
+
+  if (trendH) {
+    ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 15px sans-serif';
+    ctx.fillText('Total Lift Volume (Last 8 Gym Days)', 32, y + 4);
+    ctx.textAlign = 'right'; ctx.fillStyle = '#7e8e95'; ctx.font = '13px monospace';
+    ctx.fillText(`${volumeTrend.total.toLocaleString()} ${volumeTrend.wu} total`, width - 32, y + 4);
+
+    const plotX = 32, plotW = width - 64, plotH = 100, plotY = y + 20;
+    const { volumes, labels } = volumeTrend;
+    const max = Math.max(...volumes, 1);
+    const stepX = volumes.length > 1 ? plotW / (volumes.length - 1) : 0;
+    const points = volumes.map((v, i) => ({
+      x: plotX + (volumes.length > 1 ? i * stepX : plotW / 2),
+      y: plotY + plotH - (v / max) * plotH,
+    }));
+
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, plotY + plotH);
+    points.forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.lineTo(points[points.length - 1].x, plotY + plotH);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(51,200,204,0.12)';
+    ctx.fill();
+
+    ctx.beginPath();
+    points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    ctx.strokeStyle = '#33c8cc'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.stroke();
+
+    ctx.fillStyle = '#33c8cc';
+    points.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill(); });
+
+    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '10px monospace';
+    points.forEach((p, i) => ctx.fillText(labels[i], p.x, plotY + plotH + 18));
+
+    y += trendH;
+  }
 
   if (prCount > 0) {
     ctx.textAlign = 'center'; ctx.fillStyle = '#dba52c'; ctx.font = 'bold 18px monospace';
@@ -6168,16 +6425,29 @@ async function generateMeasurementHistoryShareCard({ name, digitalId, date, rows
 async function generateBodyFatHistoryShareCard({ name, digitalId, date, rows }) {
   const width = 600;
   const headerH = 116;
+  const orbR = 70, orbStroke = 14;
+  const orbH = orbR * 2 + 56;
   const columns = [{ label: 'DATE', width: 200 }, { label: 'BODY FAT %', width: 200 }];
   const tableRows = rows.map(r => [r.date.slice(5), r.pct != null ? round2(r.pct) + '%' : '–']);
   const tableH = 22 + Math.max(1, tableRows.length) * 22;
   const footerH = 46;
-  const height = headerH + 20 + tableH + 24 + footerH;
+  const height = headerH + orbH + 20 + tableH + 24 + footerH;
 
   const { canvas, ctx } = shareCardShell(width, height);
   drawShareCardHeader(ctx, width, { name, digitalId, date, title: 'BODY FAT % LOG' });
 
-  const y = headerH + 20;
+  // Orb matches the in-app Body Fat ring: latest reading, cyan stroke,
+  // percentage centered inside — same shape used across the app's tabs.
+  const latestPct = rows.length ? rows[0].pct : null;
+  const orbCx = width / 2, orbCy = headerH + orbR + 8;
+  drawShareRing(ctx, orbCx, orbCy, orbR, orbStroke, latestPct != null ? Math.min(100, Math.max(0, latestPct)) : 0, ['#33c8cc', '#33c8cc']);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 30px monospace';
+  ctx.fillText(latestPct != null ? round2(latestPct) + '%' : '–', orbCx, orbCy + 11);
+  ctx.fillStyle = '#7e8e95'; ctx.font = '13px monospace';
+  ctx.fillText('BODY FAT', orbCx, orbCy + orbR + 34);
+
+  const y = headerH + orbH + 20;
   if (!tableRows.length) {
     ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px sans-serif';
     ctx.fillText('No body fat measurements logged yet.', width / 2, y + 20);
@@ -6300,17 +6570,26 @@ async function generateRecentPerformanceShareCard({ name, digitalId, date, perfI
   const chartX = 32, chartW = width - 64, chartPlotH = 110;
   const dayW = chartW / days.length;
   const barPairW = Math.min(20, dayW * 0.28);
+  // Anything past 100% of goal draws as a second, warning-colored segment
+  // stacked on top of the base bar — matches the overflow highlight on the
+  // live in-app Steps vs Calories chart.
+  const drawGoalBar = (x, pct, color) => {
+    const baseY = plotY + chartPlotH;
+    const baseH = Math.max(2, (Math.min(100, pct) / 130) * chartPlotH);
+    ctx.fillStyle = color;
+    ctx.fillRect(x, baseY - baseH, barPairW, baseH);
+    if (pct > 100) {
+      const overH = (Math.min(130, pct) - 100) / 130 * chartPlotH;
+      ctx.fillStyle = '#dba52c';
+      ctx.fillRect(x, baseY - baseH - overH, barPairW, overH);
+    }
+  };
   days.forEach((d, i) => {
     const cx = chartX + i * dayW + dayW / 2;
-    const baseY = plotY + chartPlotH;
-    const stepsH = Math.max(2, (Math.min(100, (d.stepsPct / 130) * 100) / 100) * chartPlotH);
-    const calH = Math.max(2, (Math.min(100, (d.calPct / 130) * 100) / 100) * chartPlotH);
-    ctx.fillStyle = '#2de2e6';
-    ctx.fillRect(cx - barPairW - 2, baseY - stepsH, barPairW, stepsH);
-    ctx.fillStyle = '#8069d6';
-    ctx.fillRect(cx + 2, baseY - calH, barPairW, calH);
+    drawGoalBar(cx - barPairW - 2, d.stepsPct, '#2de2e6');
+    drawGoalBar(cx + 2, d.calPct, '#8069d6');
     ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '10px monospace';
-    ctx.fillText(d.weekday, cx, baseY + 16);
+    ctx.fillText(d.weekday, cx, plotY + chartPlotH + 16);
   });
   ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(chartX, plotY + chartPlotH); ctx.lineTo(chartX + chartW, plotY + chartPlotH); ctx.stroke();
@@ -6367,10 +6646,12 @@ async function shareRecentPerformance() {
 
 function initNutrition() {
   document.getElementById('nutDate').value = todayISO();
+  updateFuelLogBtnLabel();
   document.getElementById('nutDate').addEventListener('change', e => {
     loadNutritionForDate(e.target.value);
     renderNutritionTargets();
     refreshFuelWaterViews(e.target.value);
+    updateFuelLogBtnLabel();
   });
   document.getElementById('btnGoToBioFromFuel').addEventListener('click', () => {
     document.querySelector('.tab-btn[data-target="bio"]').click();
@@ -6555,6 +6836,7 @@ async function buildAssessmentBlobs() {
     const summary = computeWorkoutSummaryFromExercises(exercisesForDate, trainDate);
     jobs.push(generateWorkoutSummaryShareCard({
       name, digitalId, dateTime: fmtDate(parseISO(trainDate)), summary,
+      volumeTrend: computeVolumeTrendData(),
     }).then(blob => ({ name: 'workout-summary.png', blob })));
   }
 
@@ -6580,6 +6862,8 @@ async function buildAssessmentBlobs() {
     ];
     jobs.push(generateFuelStatusShareCard({
       name, digitalId, date: fmtDate(parseISO(date)), caloriesNow, calorieTarget, macros,
+      waterNow: entry.water || 0,
+      waterTarget: effectiveWaterTargetML(date),
     }).then(blob => ({ name: 'daily-fuel-status.png', blob })));
   }
 
@@ -7002,8 +7286,19 @@ async function exportCSV(logsArr, filenamePrefix) {
   alert('CSV downloaded: ' + filename + '\nOpen your email app, start a new message, and attach the file from Downloads.');
 }
 
+// Digital ID (public_id) + the private share_key it's tied to ride along in
+// every backup so restoring on a wiped/new device reclaims the SAME Nexus
+// identity automatically instead of minting a fresh one — that split is what
+// caused the leaderboard to show two rows for one person after a data wipe.
+function getBackupPayload(extra) {
+  return Object.assign({
+    profile: getProfile(), logs: getLogs(), reviews: getReviews(),
+    digitalId: getOrCreatePublicId(), shareKey: getOrCreateShareKey(),
+  }, extra || {});
+}
+
 function downloadBackupJSON() {
-  const data = { profile: getProfile(), logs: getLogs(), reviews: getReviews() };
+  const data = getBackupPayload();
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -7066,7 +7361,12 @@ function initExport() {
       if (data.profile) saveProfile(data.profile);
       if (data.logs) saveLogs(data.logs);
       if (data.reviews) saveReviews(data.reviews);
-      alert('Backup restored.');
+      // Reclaim the same Nexus identity this backup was saved under, so the
+      // device doesn't mint a fresh share_key/Digital ID and end up split
+      // across two leaderboard rows.
+      if (data.shareKey) localStorage.setItem('wft_lb_share_key', data.shareKey);
+      if (data.digitalId) localStorage.setItem('wft_public_id', data.digitalId);
+      alert('Backup restored.' + (data.digitalId ? ` Digital ID ${data.digitalId} reclaimed.` : ''));
       loadSetupForm();
       loadCheckinForm();
       renderDashboard();
@@ -7170,7 +7470,7 @@ async function saveToDrive(manual) {
     return;
   }
   setDriveStatus('Syncing…');
-  const data = { profile: getProfile(), logs: getLogs(), reviews: getReviews(), savedAt: new Date().toISOString() };
+  const data = getBackupPayload({ savedAt: new Date().toISOString() });
   const body = JSON.stringify(data, null, 2);
   const fileId = localStorage.getItem('wft_drive_file_id');
   try {
@@ -7457,11 +7757,19 @@ let currentChatRoomId = localStorage.getItem('wft_chat_room') || null;
 
 async function fetchChatMessages() {
   const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  let q = sb.from('chat_messages').select('code_name, message, created_at').gte('created_at', cutoff);
+  let q = sb.from('chat_messages').select('id, code_name, message, created_at, deleted, sender_share_key').gte('created_at', cutoff);
   q = currentChatRoomId ? q.eq('room_id', currentChatRoomId) : q.is('room_id', null);
   const { data, error } = await q.order('created_at', { ascending: false }).limit(50);
   if (error) throw error;
-  return (data || []).slice().reverse();
+  const messages = (data || []).slice().reverse();
+  const ids = messages.map(m => m.id);
+  if (ids.length) {
+    const { data: reactions } = await sb.from('chat_message_reactions').select('message_id, share_key, emoji').in('message_id', ids);
+    const byMsg = {};
+    (reactions || []).forEach(r => { (byMsg[r.message_id] = byMsg[r.message_id] || []).push(r); });
+    messages.forEach(m => { m.reactions = byMsg[m.id] || []; });
+  }
+  return messages;
 }
 
 async function postChatMessage(text) {
@@ -7471,6 +7779,7 @@ async function postChatMessage(text) {
     code_name: effectiveLeaderboardName(),
     message: trimmed,
     room_id: currentChatRoomId || null,
+    sender_share_key: getOrCreateShareKey(),
   });
   if (error) throw error;
 }
@@ -7508,6 +7817,15 @@ function initClickToRevealHint(cardId, hintId) {
   });
 }
 
+function initReviewToggles() {
+  initClickToRevealHint('btnToggleDailyReview', 'dailyReviewPanel');
+  initClickToRevealHint('btnToggleWeeklyReview', 'weeklyReviewPanel');
+}
+
+function initHistoryLogsToggle() {
+  initClickToRevealHint('btnToggleHistoryLogs', 'historyLogsPanel');
+}
+
 function initDigitalId() {
   document.getElementById('digitalIdValue').textContent = getOrCreatePublicId();
   document.getElementById('btnCopyDigitalId').addEventListener('click', async function (e) {
@@ -7525,36 +7843,48 @@ function initDigitalId() {
 
 const DIGITAL_ID_PATTERN = /^WF-[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/;
 
+// Admin-only tool: reassigns a Digital ID from one user's account to
+// another label server-side, replacing whatever was already at the target
+// ID. Ordinary self-service reclaim now happens automatically via backup
+// restore (see getBackupPayload/fileRestore) instead of this tool.
+function refreshDigitalIdOverrideVisibility() {
+  const section = document.getElementById('digitalIdOverrideSection');
+  if (section) section.hidden = !isAdminLoggedIn();
+}
+
 function initDigitalIdOverride() {
-  const input = document.getElementById('digitalIdOverrideInput');
+  const fromInput = document.getElementById('digitalIdOverrideFromInput');
+  const toInput = document.getElementById('digitalIdOverrideInput');
   const btn = document.getElementById('btnSetDigitalId');
   const note = document.getElementById('digitalIdOverrideNote');
-  if (!input || !btn) return;
+  if (!fromInput || !toInput || !btn) return;
+  refreshDigitalIdOverrideVisibility();
   btn.addEventListener('click', async () => {
-    const value = input.value.trim().toUpperCase();
-    if (!DIGITAL_ID_PATTERN.test(value)) {
-      note.textContent = 'Must match the format WF-XXXXXX (6 letters/numbers, no 0, O, 1, or I).';
+    if (!isAdminLoggedIn()) { note.textContent = 'Admin login required.'; return; }
+    const fromId = fromInput.value.trim().toUpperCase();
+    const toId = toInput.value.trim().toUpperCase();
+    if (!DIGITAL_ID_PATTERN.test(fromId) || !DIGITAL_ID_PATTERN.test(toId)) {
+      note.textContent = 'Both IDs must match the format WF-XXXXXX (6 letters/numbers, no 0, O, 1, or I).';
       return;
     }
-    localStorage.setItem('wft_public_id', value);
-    const displayEl = document.getElementById('digitalIdValue');
-    if (displayEl) displayEl.textContent = value;
+    if (fromId === toId) { note.textContent = 'User Digital ID and New Digital ID must be different.'; return; }
+    if (!sbConfigured()) { note.textContent = 'Not available offline.'; return; }
+    if (!confirm(`Move all of ${fromId}'s data to ${toId}? This fully replaces whatever currently exists at ${toId}. This cannot be undone.`)) return;
     btn.disabled = true;
-    note.textContent = 'Saved locally. Syncing to Nexus…';
-    if (sbConfigured()) {
-      try {
-        const shareKey = getOrCreateShareKey();
-        const { error } = await sb.rpc('set_public_id', { p_share_key: shareKey, p_public_id: value });
-        if (error) throw error;
-        note.textContent = 'Digital ID updated and synced.';
-      } catch (e) {
-        note.textContent = 'Saved locally, but syncing failed — it may already be taken by another record, or you’re offline. Try "Sync to Nexus" on the Nexus tab later.';
-      }
-    } else {
-      note.textContent = 'Saved locally. Not synced (Nexus not configured).';
+    note.textContent = 'Transferring…';
+    try {
+      const { error } = await sb.rpc('admin_transfer_digital_id', {
+        p_digital_id: adminSession.digitalId, p_password: adminSession.password,
+        p_old_public_id: fromId, p_new_public_id: toId,
+      });
+      if (error) throw error;
+      note.textContent = `Transferred. ${fromId} is now ${toId}.`;
+      fromInput.value = '';
+      toInput.value = '';
+    } catch (e) {
+      note.textContent = 'Transfer failed: ' + (e.message || 'no user found with that Digital ID, or you\'re offline.');
     }
     btn.disabled = false;
-    input.value = '';
   });
 }
 
@@ -7808,6 +8138,12 @@ function renderInvitesPopover(invitedRows) {
   });
 }
 
+function aggregateReactions(reactions) {
+  const counts = {};
+  (reactions || []).forEach(r => { counts[r.emoji] = (counts[r.emoji] || 0) + 1; });
+  return counts;
+}
+
 function renderChatMessages(messages) {
   const list = document.getElementById('lbChatList');
   list.innerHTML = '';
@@ -7816,6 +8152,7 @@ function renderChatMessages(messages) {
     return;
   }
   const myName = effectiveLeaderboardName();
+  const myShareKey = getOrCreateShareKey();
   const inDm = currentChatRoomId && chatRoomMeta[currentChatRoomId] && chatRoomMeta[currentChatRoomId].isDm;
   messages.forEach(m => {
     const isOwn = m.code_name === myName;
@@ -7828,13 +8165,121 @@ function renderChatMessages(messages) {
     const nameHtml = (!isOwn && !inDm)
       ? `<span class="chat-name chat-name-link" data-dm-name="${escapeHtml(m.code_name)}">${escapeHtml(m.code_name)}</span>`
       : '';
-    row.innerHTML = `${nameHtml}<div class="chat-bubble"><span class="chat-msg">${escapeHtml(m.message)}</span><span class="chat-time">${time}</span></div>`;
+    const myReaction = (m.reactions || []).find(r => r.share_key === myShareKey);
+    const bubbleInner = m.deleted
+      ? `<span class="chat-msg chat-msg-unsent">Unsent a message</span><span class="chat-time">${time}</span>`
+      : `<span class="chat-msg">${escapeHtml(m.message)}</span><span class="chat-time">${time}</span>`;
+    const counts = aggregateReactions(m.reactions);
+    const reactionsHtml = Object.keys(counts).length
+      ? `<div class="chat-reactions">${Object.entries(counts).map(([emoji, count]) =>
+          `<span class="chat-reaction-pill${myReaction && myReaction.emoji === emoji ? ' is-mine' : ''}">${emoji}${count > 1 ? ' ' + count : ''}</span>`
+        ).join('')}</div>`
+      : '';
+    row.innerHTML = `${nameHtml}<div class="chat-bubble" data-msg-id="${m.id}" data-deleted="${m.deleted ? 1 : 0}" data-own="${isOwn ? 1 : 0}" data-my-reaction="${myReaction ? myReaction.emoji : ''}">${bubbleInner}</div>${reactionsHtml}`;
     list.appendChild(row);
   });
   list.querySelectorAll('[data-dm-name]').forEach(el => {
     el.addEventListener('click', e => openChatUserMenu(el.dataset.dmName, e.clientX, e.clientY));
   });
   list.scrollTop = list.scrollHeight;
+}
+
+/* ---- Press-and-hold a chat bubble: emoji reactions + unsend ---- */
+const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+let chatReactionTargetId = null;
+
+function closeChatReactionMenu() {
+  document.getElementById('chatReactionMenu').hidden = true;
+  chatReactionTargetId = null;
+}
+
+function openChatReactionMenu(bubble, x, y) {
+  const messageId = Number(bubble.dataset.msgId);
+  const isOwn = bubble.dataset.own === '1';
+  const myReaction = bubble.dataset.myReaction || '';
+  chatReactionTargetId = messageId;
+  const menu = document.getElementById('chatReactionMenu');
+  const emojiRow = `<div class="chat-reaction-emoji-row">${QUICK_REACTIONS.map(e =>
+    `<button type="button" class="chat-reaction-emoji-btn${myReaction === e ? ' is-active' : ''}" data-emoji="${e}">${e}</button>`
+  ).join('')}</div>`;
+  const unsendBtn = isOwn ? `<button type="button" class="chat-room-menu-item chat-room-menu-item--danger" id="btnUnsendChat">Unsend</button>` : '';
+  menu.innerHTML = emojiRow + unsendBtn;
+  menu.hidden = false;
+  const menuWidth = 240;
+  menu.style.left = Math.max(8, Math.min(x, window.innerWidth - menuWidth - 12)) + 'px';
+  menu.style.top = Math.max(8, Math.min(y, window.innerHeight - 140)) + 'px';
+}
+
+async function setChatReaction(messageId, emoji) {
+  if (!sbConfigured()) return;
+  try {
+    await sb.rpc('set_chat_reaction', { p_message_id: messageId, p_share_key: getOrCreateShareKey(), p_emoji: emoji });
+    renderChatMessages(await fetchChatMessages());
+  } catch (e) { showRestToast('Could not update reaction.'); }
+}
+
+async function unsendChatMessage(messageId) {
+  if (!confirm('Unsend this message? Others will see "Unsent a message" instead.')) return;
+  if (!sbConfigured()) return;
+  try {
+    await sb.rpc('unsend_chat_message', { p_message_id: messageId, p_share_key: getOrCreateShareKey() });
+    renderChatMessages(await fetchChatMessages());
+    showRestToast('Message unsent.');
+  } catch (e) { showRestToast('Could not unsend message.'); }
+}
+
+// Event-delegated on the persistent #lbChatList container (bound once) so it
+// keeps working across every renderChatMessages() re-render, which replaces
+// the bubbles' innerHTML but not the container itself.
+function bindChatLongPress(list) {
+  const HOLD_MS = 450;
+  let pressTimer = null;
+  const start = (bubble, x, y) => {
+    if (bubble.dataset.deleted === '1') return;
+    pressTimer = setTimeout(() => {
+      pressTimer = null;
+      if (navigator.vibrate) navigator.vibrate(15);
+      openChatReactionMenu(bubble, x, y);
+    }, HOLD_MS);
+  };
+  const cancel = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } };
+  list.addEventListener('touchstart', e => {
+    const bubble = e.target.closest('.chat-bubble');
+    if (!bubble) return;
+    const t = e.touches[0];
+    start(bubble, t.clientX, t.clientY);
+  }, { passive: true });
+  list.addEventListener('touchend', cancel);
+  list.addEventListener('touchmove', cancel);
+  list.addEventListener('mousedown', e => {
+    const bubble = e.target.closest('.chat-bubble');
+    if (!bubble) return;
+    start(bubble, e.clientX, e.clientY);
+  });
+  list.addEventListener('mouseup', cancel);
+  list.addEventListener('mouseleave', cancel);
+}
+
+function initChatReactionMenu() {
+  bindChatLongPress(document.getElementById('lbChatList'));
+  document.getElementById('chatReactionMenu').addEventListener('click', e => {
+    const emojiBtn = e.target.closest('.chat-reaction-emoji-btn');
+    if (emojiBtn) {
+      const isActive = emojiBtn.classList.contains('is-active');
+      closeChatReactionMenu();
+      setChatReaction(chatReactionTargetId, isActive ? null : emojiBtn.dataset.emoji);
+      return;
+    }
+    if (e.target.id === 'btnUnsendChat') {
+      const messageId = chatReactionTargetId;
+      closeChatReactionMenu();
+      unsendChatMessage(messageId);
+    }
+  });
+  document.addEventListener('click', e => {
+    const menu = document.getElementById('chatReactionMenu');
+    if (!menu.hidden && !menu.contains(e.target) && !e.target.closest('.chat-bubble')) closeChatReactionMenu();
+  });
 }
 
 async function startDM(otherName) {
@@ -8059,6 +8504,7 @@ function refreshAnnouncementMenuState() {
   document.getElementById('btnAdminPost').hidden = !loggedIn;
   document.getElementById('btnAdminAssignTargets').hidden = !loggedIn;
   document.getElementById('btnAdminLogout').hidden = !loggedIn;
+  refreshDigitalIdOverrideVisibility();
 }
 
 function initAnnouncementWidget() {
@@ -8345,6 +8791,7 @@ function initGroupChat() {
   document.getElementById('btnCloseRoomMembers').addEventListener('click', () => { membersPanel.hidden = true; });
 
   initChatUserMenu();
+  initChatReactionMenu();
 
   const addInviteeToGroup = () => {
     const input = document.getElementById('inviteGroupInput');
@@ -8931,12 +9378,15 @@ safeInit(initBarcodeScanner, 'initBarcodeScanner');
 safeInit(initBioLog, 'initBioLog');
 safeInit(initDailyReviewForm, 'initDailyReviewForm');
 safeInit(initReviewForm, 'initReviewForm');
+safeInit(initReviewToggles, 'initReviewToggles');
+safeInit(initHistoryLogsToggle, 'initHistoryLogsToggle');
 safeInit(initExport, 'initExport');
 safeInit(initDrive, 'initDrive');
 safeInit(initCustomBackground, 'initCustomBackground');
 safeInit(initTextSizeSlider, 'initTextSizeSlider');
 safeInit(initPushNotifications, 'initPushNotifications');
 safeInit(initDeepLinkHandling, 'initDeepLinkHandling');
+safeInit(initProgressPhotoCamera, 'initProgressPhotoCamera');
 safeInit(initLeaderboard, 'initLeaderboard');
 safeInit(initAnnouncementWidget, 'initAnnouncementWidget');
 safeInit(loadSetupForm, 'loadSetupForm');

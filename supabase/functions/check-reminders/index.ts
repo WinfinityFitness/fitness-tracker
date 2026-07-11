@@ -38,6 +38,7 @@ interface ReminderRow {
   meal_times: string[];
   hourly_enabled: boolean;
   log_reminders_enabled: boolean;
+  progress_photo_enabled: boolean;
   last_sent: Record<string, string>;
 }
 
@@ -69,14 +70,14 @@ function getHydrationSlots(row: ReminderRow): Slot[] {
   const mealLabels = ['Breakfast', 'Lunch', 'Dinner'];
 
   const slots: Slot[] = [{
-    id: 'wake', time: minToTimeStr(wakeMin), url: './',
+    id: 'wake', time: minToTimeStr(wakeMin), url: './?openSheet=dailyFuel',
     title: '💧 Hydration reminder',
     body: 'Morning! Drink 1-2 glasses of water (~250-500 mL) to rehydrate after sleep.',
   }];
 
   meals.forEach((mt, i) => {
     slots.push({
-      id: 'meal' + i, time: minToTimeStr(timeStrToMin(mt) - 30), url: './',
+      id: 'meal' + i, time: minToTimeStr(timeStrToMin(mt) - 30), url: './?openSheet=dailyFuel',
       title: '💧 Hydration reminder',
       body: `Drink a glass of water (~250 mL) before ${mealLabels[i].toLowerCase()} to prep digestion.`,
     });
@@ -87,13 +88,13 @@ function getHydrationSlots(row: ReminderRow): Slot[] {
     for (let m = wakeMin + 60; m < cutoff; m += 60) {
       const tooClose = slots.some((s) => Math.abs(timeStrToMin(s.time) - m) < 20);
       if (!tooClose) {
-        slots.push({ id: 'hourly' + m, time: minToTimeStr(m), url: './', title: '💧 Hydration reminder', body: 'Time for a cup of water (~250 mL).' });
+        slots.push({ id: 'hourly' + m, time: minToTimeStr(m), url: './?openSheet=dailyFuel', title: '💧 Hydration reminder', body: 'Time for a cup of water (~250 mL).' });
       }
     }
   }
 
   slots.push({
-    id: 'bed', time: minToTimeStr(bedMin - 120), url: './',
+    id: 'bed', time: minToTimeStr(bedMin - 120), url: './?openSheet=dailyFuel',
     title: '💧 Hydration reminder',
     body: "If you're thirsty, a small glass now — then taper off fluids before bed so you're not up at night.",
   });
@@ -117,6 +118,24 @@ function getLogReminderSlots(row: ReminderRow): Slot[] {
   ];
 }
 
+// Sunday only, at wake-up time — two separate notifications (mirroring the
+// Start/End Day Log split above) since they open two different things:
+// Progress Photo opens the device camera directly, Take Measurements opens
+// the Measurement Entry sheet.
+function getProgressPhotoSlots(row: ReminderRow, isSunday: boolean): Slot[] {
+  if (!row.progress_photo_enabled || !isSunday) return [];
+  return [
+    {
+      id: 'progress_photo', time: row.wake_time || '07:00', url: './?openSheet=progressPhoto',
+      title: '📸 Progress Photo', body: "It's Sunday — time for your weekly progress photo.",
+    },
+    {
+      id: 'take_measurements', time: row.wake_time || '07:00', url: './?openSheet=measureEntry',
+      title: '📏 Take Measurements', body: "It's Sunday — log this week's body measurements.",
+    },
+  ];
+}
+
 function getLocalNowMinutes(timezone: string): number {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: timezone || 'UTC', hour: '2-digit', minute: '2-digit', hour12: false,
@@ -127,6 +146,12 @@ function getLocalNowMinutes(timezone: string): number {
 }
 function getLocalDateStr(timezone: string): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: timezone || 'UTC' }).format(new Date());
+}
+// dateStr is already the correct local calendar date (from getLocalDateStr),
+// so parsing it as UTC midnight and reading getUTCDay() gives the right
+// weekday regardless of what timezone this function itself runs in.
+function isSundayDateStr(dateStr: string): boolean {
+  return new Date(dateStr + 'T00:00:00Z').getUTCDay() === 0;
 }
 
 async function sendPushToShareKey(shareKey: string, title: string, body: string, url: string) {
@@ -166,7 +191,7 @@ Deno.serve(async (_req: Request) => {
     const nowMin = getLocalNowMinutes(row.timezone);
     const today = getLocalDateStr(row.timezone);
     const lastSent = row.last_sent || {};
-    const slots = [...getHydrationSlots(row), ...getLogReminderSlots(row)];
+    const slots = [...getHydrationSlots(row), ...getLogReminderSlots(row), ...getProgressPhotoSlots(row, isSundayDateStr(today))];
     const updates: Record<string, string> = {};
 
     for (const slot of slots) {
