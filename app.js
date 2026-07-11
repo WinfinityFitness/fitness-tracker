@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.3.3';
+const APP_VERSION = 'WF_SYS_V.3.4';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1476,6 +1476,7 @@ function loadBioForDate(date) {
   document.getElementById('bioMenstruating').checked = !!e.menstruating;
   document.getElementById('bioPeriodDays').value = e.periodDays ?? '';
   document.getElementById('bioPeriodFlow').value = e.periodFlow || 'normal';
+  document.getElementById('bioPeriodDetailsRow').hidden = !e.menstruating;
   document.getElementById('bioStress').value = e.stress ?? 3;
   document.getElementById('bioStressOut').textContent = e.stress ?? 3;
   document.getElementById('bioFatigue').value = e.fatigue ?? 3;
@@ -1578,6 +1579,10 @@ function initBioLog() {
     const input = document.getElementById(id);
     const out = document.getElementById(id + 'Out');
     input.addEventListener('input', () => { out.textContent = input.value; });
+  });
+
+  document.getElementById('bioMenstruating').addEventListener('change', e => {
+    document.getElementById('bioPeriodDetailsRow').hidden = !e.target.checked;
   });
 
   document.getElementById('btnSaveBio').addEventListener('click', () => {
