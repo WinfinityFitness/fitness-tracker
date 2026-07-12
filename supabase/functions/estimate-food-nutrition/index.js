@@ -29,17 +29,20 @@ function jsonResponse(body, status = 200) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
-  let foodName, servingDescription;
+  let foodName, servingDescription, imageBase64, imageMimeType;
   try {
     const body = await req.json();
     foodName = body.foodName;
     servingDescription = body.servingDescription;
+    imageBase64 = body.imageBase64;
+    imageMimeType = body.imageMimeType;
   } catch {
     return jsonResponse({ error: 'Invalid request body' }, 400);
   }
 
-  if (!foodName || typeof foodName !== 'string') {
-    return jsonResponse({ error: 'foodName is required' }, 400);
+  const hasImage = imageBase64 && typeof imageBase64 === 'string';
+  if (!hasImage && (!foodName || typeof foodName !== 'string')) {
+    return jsonResponse({ error: 'foodName or imageBase64 is required' }, 400);
   }
 
   const apiKey = Deno.env.get('GEMINI_API_KEY');
@@ -47,10 +50,26 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'AI estimation is not configured yet — ask the app owner to set GEMINI_API_KEY.' }, 500);
   }
 
-  const prompt = `Estimate the nutrition facts per 100 grams for this food: "${foodName}"${servingDescription ? ` (${servingDescription})` : ''}.
+  // Photo-based estimate also asks Gemini to name the dish (so the client
+  // can pre-fill the food name field) — text-only requests already know
+  // the name from what the user typed, so that field is just echoed back.
+  const parts = [];
+  if (hasImage) {
+    parts.push({
+      text: `Identify the food shown in this photo and estimate its nutrition facts per 100 grams.
+Respond with ONLY a JSON object, no markdown, no explanation, in exactly this shape:
+{"name": string, "calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "sodium": number}
+All nutrition values are per 100g. calories in kcal, protein/carbs/fat/fiber in grams, sodium in milligrams. If multiple foods are visible, estimate for the combined plate as a whole. If unsure, give your best reasonable estimate — never refuse.`,
+    });
+    parts.push({ inlineData: { mimeType: imageMimeType || 'image/jpeg', data: imageBase64 } });
+  } else {
+    parts.push({
+      text: `Estimate the nutrition facts per 100 grams for this food: "${foodName}"${servingDescription ? ` (${servingDescription})` : ''}.
 Respond with ONLY a JSON object, no markdown, no explanation, in exactly this shape:
 {"calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "sodium": number}
-All values are per 100g. calories in kcal, protein/carbs/fat/fiber in grams, sodium in milligrams. If unsure, give your best reasonable estimate for a typical serving — never refuse.`;
+All values are per 100g. calories in kcal, protein/carbs/fat/fiber in grams, sodium in milligrams. If unsure, give your best reasonable estimate for a typical serving — never refuse.`,
+    });
+  }
 
   let geminiRes;
   try {
@@ -60,7 +79,7 @@ All values are per 100g. calories in kcal, protein/carbs/fat/fiber in grams, sod
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
+          contents: [{ parts }],
           generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
         }),
       }
@@ -84,6 +103,7 @@ All values are per 100g. calories in kcal, protein/carbs/fat/fiber in grams, sod
   }
 
   return jsonResponse({
+    name: hasImage ? (parsed.name || null) : undefined,
     calories: Number(parsed.calories) || 0,
     protein: Number(parsed.protein) || 0,
     carbs: Number(parsed.carbs) || 0,

@@ -954,6 +954,16 @@ button.mission-log-day:hover { border-color: var(--cyan); }
 @media (prefers-reduced-motion: reduce) {
   .ai-spinner { animation-duration: 1.6s; }
 }
+.ai-photo-preview {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border);
+  margin-top: 8px;
+}
+.ai-photo-preview[hidden] { display: none; }
 
 .quick-log-btn-row { display: flex; gap: 8px; }
 .quick-log-btn {

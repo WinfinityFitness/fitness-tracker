@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.4.8';
+const APP_VERSION = 'WF_SYS_V.4.9';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -4896,6 +4896,10 @@ function openAddFoodPanel() {
   document.getElementById('customFoodTeachNote').hidden = true;
   document.getElementById('aiEstimateStatus').textContent = '';
   document.getElementById('aiEstimateSpinner').hidden = true;
+  document.getElementById('aiPhotoStatus').textContent = '';
+  document.getElementById('aiPhotoSpinner').hidden = true;
+  document.getElementById('aiPhotoPreview').hidden = true;
+  document.getElementById('aiPhotoPreview').src = '';
   customFoodAiPer100g = null;
   pendingBarcodeCode = null;
   document.getElementById('addFoodOverlay').hidden = false;
@@ -4921,6 +4925,27 @@ async function estimateFoodNutritionWithAI(foodName) {
   let data;
   try { data = await res.json(); } catch (e) { throw new Error('AI estimate unavailable — try again later.'); }
   if (!res.ok) throw new Error(data.error || 'AI estimate failed');
+  return data;
+}
+
+// Same Edge Function as above, extended to also accept a photo — Gemini
+// identifies the food and estimates nutrition from the image in one call.
+// imageBase64 is RAW base64 (no "data:image/jpeg;base64," prefix — Gemini's
+// inlineData.data field wants just the encoded bytes).
+async function estimateFoodNutritionFromPhoto(imageBase64, mimeType) {
+  let res;
+  try {
+    res = await fetch(`${SUPABASE_URL}/functions/v1/smooth-service`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ imageBase64, imageMimeType: mimeType }),
+    });
+  } catch (e) {
+    throw new Error('AI photo estimate unavailable — check your connection.');
+  }
+  let data;
+  try { data = await res.json(); } catch (e) { throw new Error('AI photo estimate unavailable — try again later.'); }
+  if (!res.ok) throw new Error(data.error || 'AI photo estimate failed');
   return data;
 }
 
@@ -5265,6 +5290,43 @@ function initAddFoodPanel() {
     } finally {
       aiBtn.disabled = false;
       aiSpinner.hidden = true;
+    }
+  });
+
+  const photoBtn = document.getElementById('btnEstimateAiPhoto');
+  const photoSpinner = document.getElementById('aiPhotoSpinner');
+  const photoInput = document.getElementById('aiPhotoInput');
+  const photoPreview = document.getElementById('aiPhotoPreview');
+  photoBtn.addEventListener('click', () => photoInput.click());
+  photoInput.addEventListener('change', async () => {
+    const file = photoInput.files[0];
+    photoInput.value = '';
+    if (!file) return;
+    const statusEl = document.getElementById('aiPhotoStatus');
+    statusEl.textContent = 'Reading photo…';
+    photoBtn.disabled = true;
+    photoSpinner.hidden = false;
+    try {
+      const { dataUrl } = await resizeAndCompressImage(file);
+      photoPreview.src = dataUrl;
+      photoPreview.hidden = false;
+      statusEl.textContent = 'Estimating from photo…';
+      // dataUrl looks like "data:image/jpeg;base64,<bytes>" — Gemini's
+      // inlineData.data wants just the bytes after the comma.
+      const rawBase64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+      const est = await estimateFoodNutritionFromPhoto(rawBase64, 'image/jpeg');
+      if (est.name) document.getElementById('customFoodName').value = est.name;
+      customFoodAiPer100g = { calories: est.calories || 0, protein: est.protein || 0, carbs: est.carbs || 0, fat: est.fat || 0 };
+      document.getElementById('customFoodGrams').value = 100;
+      document.getElementById('customFoodUnit').value = 'g';
+      document.getElementById('customFoodUnitWarning').hidden = true;
+      recomputeCustomFoodFromAi();
+      statusEl.textContent = '⚠️ AI photo estimate for 100g — low accuracy, review before saving. Weigh the actual food and adjust the serving size below for a real result.';
+    } catch (e) {
+      statusEl.textContent = e.message || 'AI photo estimate unavailable — check your connection or add manually.';
+    } finally {
+      photoBtn.disabled = false;
+      photoSpinner.hidden = true;
     }
   });
 
