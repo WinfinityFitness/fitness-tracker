@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.4.2';
+const APP_VERSION = 'WF_SYS_V.4.6';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -47,6 +47,9 @@ function updateLogFields(date, partial) {
   const logs = getLogs();
   logs[date] = Object.assign({ date }, logs[date] || {}, partial);
   saveLogs(logs);
+  // Any real log write means this is no longer "untouched seed data" — see
+  // isDemoDataActive()/checkDemoDataExpiry() further down.
+  localStorage.removeItem('wft_demo_seeded_at');
   return logs[date];
 }
 
@@ -7375,6 +7378,7 @@ function initExport() {
       // across two leaderboard rows.
       if (data.shareKey) localStorage.setItem('wft_lb_share_key', data.shareKey);
       if (data.digitalId) localStorage.setItem('wft_public_id', data.digitalId);
+      localStorage.removeItem('wft_demo_seeded_at');
       alert('Backup restored.' + (data.digitalId ? ` Digital ID ${data.digitalId} reclaimed.` : ''));
       loadSetupForm();
       loadCheckinForm();
@@ -7664,12 +7668,19 @@ async function autoSyncDriveBackupToNexus() {
   } catch (e) { /* best effort — don't block the backup flow on Nexus sync failure */ }
 }
 
+// Rows untouched for 7+ days quietly drop out of rankings/counts here —
+// the row itself is never deleted server-side, so the moment that person
+// syncs again (updated_at refreshes) they reappear automatically. Nothing
+// on their own device is touched by this at all.
+const LEADERBOARD_INACTIVE_MS = 7 * 24 * 60 * 60 * 1000;
+
 async function pullLeaderboard() {
   const { data, error } = await sb.from('leaderboard')
     .select('code_name, public_id, weight, weight_unit, weight_progress, weight_progress_pct, steps, volume_lifted, volume_unit, furthest_run_km, fastest_run_pace_sec, updated_at')
     .order('updated_at', { ascending: false });
   if (error) throw error;
-  return data || [];
+  const cutoff = Date.now() - LEADERBOARD_INACTIVE_MS;
+  return (data || []).filter(r => r.updated_at && new Date(r.updated_at).getTime() >= cutoff);
 }
 
 async function removeFromLeaderboard() {
@@ -8691,13 +8702,19 @@ async function updateLeaderboard() {
   const note = document.getElementById('lbSaveNote');
   note.textContent = 'Syncing…';
   try {
-    if (localStorage.getItem('wft_lb_optin') === '1') await pushLeaderboardEntry();
+    // Never push auto-seeded sample stats to the public leaderboard — a
+    // brand-new user who hasn't logged anything real yet would otherwise
+    // show up in rankings with fake numbers the moment they hit Sync.
+    const isDemo = isDemoDataActive();
+    if (localStorage.getItem('wft_lb_optin') === '1' && !isDemo) await pushLeaderboardEntry();
     const rows = await pullLeaderboard();
     renderNexusRankings(rows);
     await refreshChatRooms();
     const messages = await fetchChatMessages();
     renderChatMessages(messages);
-    note.textContent = 'Synced ' + new Date().toLocaleTimeString();
+    note.textContent = isDemo
+      ? 'Synced — stats not shared yet (you\'re still viewing sample demo data). Log something real or clear it in Settings to share your own.'
+      : 'Synced ' + new Date().toLocaleTimeString();
   } catch (e) {
     note.textContent = 'Sync failed: ' + (e.message || 'check your connection');
   }
@@ -9202,11 +9219,15 @@ function generateSeedLogs(profile) {
   const targets = computeTargets(profile, startWeightKg);
   const proteinTarget = targets ? Math.round((targets.protein[0] + targets.protein[1]) / 2) : 120;
 
-  const logs = {};
-  for (let i = 7; i >= 0; i--) {
+  const isoForOffset = (i) => {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  };
+
+  const logs = {};
+  for (let i = 7; i >= 0; i--) {
+    const iso = isoForOffset(i);
 
     const weekFrac = (7 - i) / 7;
     const weightKg = round2(startWeightKg - 0.15 * weekFrac + Math.sin(i * 1.7) * 0.1);
@@ -9230,25 +9251,40 @@ function generateSeedLogs(profile) {
     };
   }
 
-  // One day with a completed workout — feeds the volume trend chart, PR
-  // board, and Workout Summary share card.
-  const trainIso = Object.keys(logs).sort()[Object.keys(logs).length - 2];
-  logs[trainIso].workout = true;
-  logs[trainIso].exercises = [
-    { name: 'Barbell Squat', restSeconds: 120, notes: '', unit: wu, sets: [
-      { reps: 8, weightKg: round2(startWeightKg * 0.6), completed: true },
-      { reps: 8, weightKg: round2(startWeightKg * 0.65), completed: true },
-      { reps: 6, weightKg: round2(startWeightKg * 0.7), completed: true },
-    ] },
-    { name: 'Bench Press', restSeconds: 120, notes: '', unit: wu, sets: [
-      { reps: 10, weightKg: round2(startWeightKg * 0.4), completed: true },
-      { reps: 8, weightKg: round2(startWeightKg * 0.45), completed: true },
-    ] },
-  ];
+  // Push/Pull/Legs split across 3 of the 8 days — a realistic weekly
+  // routine shape (inspired by a real logged program's exercise variety)
+  // rather than one token workout, with every weight scaled off the
+  // profile's own starting bodyweight instead of fixed absolute numbers.
+  const bw = startWeightKg;
+  const mkSet = (reps, mult) => ({ reps, weightKg: round2(bw * mult), completed: true });
+  const WORKOUT_SPLITS = {
+    push: [
+      { name: 'Bench Press', restSeconds: 150, notes: '', unit: wu, sets: [mkSet(8, 0.55), mkSet(6, 0.65), mkSet(5, 0.7)] },
+      { name: 'Chest Press Machine', restSeconds: 120, notes: '', unit: wu, sets: [mkSet(12, 0.3), mkSet(10, 0.35), mkSet(10, 0.35)] },
+      { name: 'Lateral Raise Machine', restSeconds: 90, notes: '', unit: wu, sets: [mkSet(15, 0.12), mkSet(12, 0.14), mkSet(10, 0.14)] },
+      { name: 'Tricep Push Down', restSeconds: 90, notes: '', unit: wu, sets: [mkSet(12, 0.25), mkSet(12, 0.25), mkSet(10, 0.28)] },
+    ],
+    pull: [
+      { name: 'Deadlift', restSeconds: 180, notes: '', unit: wu, sets: [mkSet(5, 0.9), mkSet(3, 1.0), mkSet(3, 1.05)] },
+      { name: 'Lat Pull Down', restSeconds: 120, notes: '', unit: wu, sets: [mkSet(12, 0.4), mkSet(10, 0.45), mkSet(10, 0.45)] },
+      { name: 'Row Machine', restSeconds: 120, notes: '', unit: wu, sets: [mkSet(10, 0.45), mkSet(10, 0.5), mkSet(8, 0.5)] },
+      { name: 'Hammer Curls', restSeconds: 90, notes: '', unit: wu, sets: [mkSet(10, 0.15), mkSet(10, 0.16), mkSet(8, 0.18)] },
+    ],
+    legs: [
+      { name: 'Squats', restSeconds: 150, notes: '', unit: wu, sets: [mkSet(10, 0.7), mkSet(8, 0.8), mkSet(6, 0.9)] },
+      { name: 'Leg Press Machine', restSeconds: 120, notes: '', unit: wu, sets: [mkSet(15, 0.9), mkSet(12, 1.0), mkSet(12, 1.0)] },
+      { name: 'Leg Extensions', restSeconds: 90, notes: '', unit: wu, sets: [mkSet(15, 0.2), mkSet(15, 0.2), mkSet(12, 0.22)] },
+    ],
+  };
+  [{ i: 6, split: 'push' }, { i: 4, split: 'pull' }, { i: 1, split: 'legs' }].forEach(({ i, split }) => {
+    const iso = isoForOffset(i);
+    logs[iso].workout = true;
+    logs[iso].exercises = WORKOUT_SPLITS[split];
+  });
 
   // One day with body measurements + skinfolds — feeds the Body Fat orb,
   // Edema orb, and Measurement/Body Fat history tables.
-  const measureIso = Object.keys(logs).sort()[0];
+  const measureIso = isoForOffset(7);
   logs[measureIso].measurements = {
     chest: 96, shoulder: 112, lBicep: 32, rBicep: 32.5,
     abdSupra: 82, stomach: 86, abdInfra: 90, hips: 98,
@@ -9258,7 +9294,7 @@ function generateSeedLogs(profile) {
   logs[measureIso].bodyFatPct = computeBodyFatJP7(logs[measureIso].skinfolds, profile.age, profile.gender) ?? 18;
 
   // One day with an outdoor cardio session — feeds Outdoor Activity Summary.
-  const cardioIso = Object.keys(logs).sort()[3];
+  const cardioIso = isoForOffset(3);
   logs[cardioIso].cardioSessions = [
     { type: 'run', distanceKm: 4.2, durationSec: 1560, startedAt: new Date(cardioIso + 'T07:00:00').toISOString(), maxSpeedKmh: 11.5 },
   ];
@@ -9266,11 +9302,46 @@ function generateSeedLogs(profile) {
   return logs;
 }
 
+const DEMO_SEEDED_AT_KEY = 'wft_demo_seeded_at';
+const DEMO_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
+
 function seedNewUserDemoData(profile) {
   if (!profile) return;
   saveLogs(generateSeedLogs(profile));
+  localStorage.setItem(DEMO_SEEDED_AT_KEY, String(Date.now()));
   const overlay = document.getElementById('welcomeDemoOverlay');
   if (overlay) overlay.hidden = false;
+}
+
+// True while the current data is still exactly what was auto-seeded — the
+// flag is cleared the moment any real log write happens (see
+// updateLogFields) or a backup is restored, so this only stays true for a
+// brand-new user who hasn't touched anything yet.
+function isDemoDataActive() {
+  return !!localStorage.getItem(DEMO_SEEDED_AT_KEY);
+}
+
+// Runs once per app open. If a user seeded demo data and never logged
+// anything real for a full 7 days, wipe the sample data automatically —
+// same effect as tapping Clear All Data, minus the confirm dialogs since
+// nothing real is at risk (a user who'd logged anything real would have
+// already cleared this flag via updateLogFields). Restoring a backup also
+// clears the flag (see fileRestore handler), so a returning user who
+// restores their real data is never affected by this.
+function checkDemoDataExpiry() {
+  const seededAt = localStorage.getItem(DEMO_SEEDED_AT_KEY);
+  if (!seededAt) return;
+  if (Date.now() - Number(seededAt) < DEMO_EXPIRY_MS) return;
+  saveLogs({});
+  saveReviews({});
+  saveDailyReviews({});
+  localStorage.removeItem(DEMO_SEEDED_AT_KEY);
+  renderDashboard();
+  renderHistory();
+  renderMeasureHistory();
+  renderBodyFatHistory();
+  updateTabDots();
+  showRestToast('Sample demo data cleared after a week of inactivity — ready for your real first log.');
 }
 
 function initWelcomeDemoOverlay() {
@@ -9290,6 +9361,7 @@ function initClearAllData() {
     saveLogs({});
     saveReviews({});
     saveDailyReviews({});
+    localStorage.removeItem('wft_demo_seeded_at');
     note.textContent = 'All data cleared. Your Entity Identity profile is untouched.';
     setTimeout(() => { note.textContent = ''; }, 4000);
     renderDashboard();
@@ -9524,11 +9596,18 @@ function applyCustomBg() {
   // photo is set — it's a general "let widgets go see-through" control, not
   // strictly tied to having an image (works fine over the plain page
   // pattern too). Slider convention matches Blur/Dim/Transparency above:
-  // 0 = no effect (fully opaque, unchanged), 100 = fully transparent — the
-  // CSS rgba() alpha channel wants the OPPOSITE (how opaque to stay), hence 1-x.
+  // 0 = no effect (fully opaque, unchanged), 100 = fully transparent.
+  // Squaring the slider fraction before subtracting from 1 (rather than a
+  // flat 1-x) keeps the fill looking nearly solid through the low end of
+  // the slider and only ramps the see-through effect up sharply near the
+  // top — a flat linear mapping made it look maxed-out by ~30%, since the
+  // eye is far more sensitive to alpha loss near full opacity than a
+  // straight percentage suggests.
   const bgSettingsForWidgets = getBgSettings();
-  document.documentElement.style.setProperty('--widget-fill-alpha', (1 - bgSettingsForWidgets.widgetFill / 100).toFixed(2));
-  document.documentElement.style.setProperty('--widget-opacity', (1 - bgSettingsForWidgets.widgetOpacity / 100).toFixed(2));
+  const fillFrac = bgSettingsForWidgets.widgetFill / 100;
+  const opacityFrac = bgSettingsForWidgets.widgetOpacity / 100;
+  document.documentElement.style.setProperty('--widget-fill-alpha', (1 - fillFrac * fillFrac).toFixed(2));
+  document.documentElement.style.setProperty('--widget-opacity', (1 - opacityFrac * opacityFrac).toFixed(2));
 
   if (!imgData || !imgData.dataUrl) {
     layer.hidden = true;
@@ -9794,6 +9873,7 @@ setTimeout(() => {
   splash.classList.add('splash-hide');
   setTimeout(() => { splash.hidden = true; }, 400);
   initAdSplash();
+  checkDemoDataExpiry();
   checkDataReminder();
   setTimeout(checkMeasurementReminder, 6000);
   cleanupOldHydrationFiredKeys();
