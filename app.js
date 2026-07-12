@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.4.6';
+const APP_VERSION = 'WF_SYS_V.4.7';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -7320,6 +7320,7 @@ function downloadBackupJSON() {
   localStorage.setItem('wft_drive_last_backup', todayISO());
   renderDashboard();
   autoSyncDriveBackupToNexus();
+  maybeAutoApplyUpdate();
 }
 
 function getBackupMode() {
@@ -7514,6 +7515,7 @@ async function saveToDrive(manual) {
     renderDashboard();
     activateNexusFastChat();
     autoSyncDriveBackupToNexus();
+    maybeAutoApplyUpdate();
   } catch (e) {
     setDriveStatus('Sync failed — will retry on next save.');
   }
@@ -8715,6 +8717,7 @@ async function updateLeaderboard() {
     note.textContent = isDemo
       ? 'Synced — stats not shared yet (you\'re still viewing sample demo data). Log something real or clear it in Settings to share your own.'
       : 'Synced ' + new Date().toLocaleTimeString();
+    maybeAutoApplyUpdate();
   } catch (e) {
     note.textContent = 'Sync failed: ' + (e.message || 'check your connection');
   }
@@ -10009,6 +10012,31 @@ async function checkAndApplyAppUpdate() {
 function initAppUpdateButton() {
   document.getElementById('settingsAppVersion').textContent = APP_VERSION;
   document.getElementById('btnCheckUpdate').addEventListener('click', checkAndApplyAppUpdate);
+
+  const autoToggle = document.getElementById('autoUpdateToggle');
+  autoToggle.checked = localStorage.getItem('wft_auto_update') === '1';
+  autoToggle.addEventListener('change', () => {
+    localStorage.setItem('wft_auto_update', autoToggle.checked ? '1' : '0');
+  });
+}
+
+// Called right after a Sync to Nexus / local backup / Drive backup
+// succeeds — those are the safe checkpoints the Auto-update toggle in
+// Settings promises, since everything's already saved by the time this
+// runs. Silently does nothing if the toggle is off, no update is actually
+// waiting, or the update system isn't available — never surprises a user
+// who hasn't opted in, and never reloads them out of an unsaved change
+// elsewhere (every write in this app is already synchronous-to-localStorage,
+// so there's nothing "unsaved" left standing regardless of when this fires).
+async function maybeAutoApplyUpdate() {
+  if (localStorage.getItem('wft_auto_update') !== '1') return;
+  if (!swRegistration) return;
+  const found = swRegistration.waiting ? true : await checkForUpdate();
+  if (!found || !swRegistration.waiting) return;
+  showRestToast('Update found — applying automatically…');
+  clearUpdateAvailable();
+  swRegistration.waiting.postMessage('SKIP_WAITING');
+  setTimeout(() => { if (!swReloadedOnce) location.reload(); }, 4000);
 }
 
 
