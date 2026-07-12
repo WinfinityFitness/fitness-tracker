@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.3.6';
+const APP_VERSION = 'WF_SYS_V.3.8';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -8409,12 +8409,14 @@ function renderChatMessages(messages) {
       ? `<span class="chat-msg chat-msg-unsent">Unsent a message</span><span class="chat-time">${time}</span>`
       : `<span class="chat-msg">${escapeHtml(m.message)}</span><span class="chat-time">${time}</span>`;
     const counts = aggregateReactions(m.reactions);
+    const totalReactions = (m.reactions || []).length;
+    // One small combined badge (all distinct emojis + total count) rather
+    // than a pill per emoji — matches Messenger's single overlapping badge
+    // instead of a row of separate chips that would collide at this size.
     const reactionsHtml = Object.keys(counts).length
-      ? `<div class="chat-reactions">${Object.entries(counts).map(([emoji, count]) =>
-          `<span class="chat-reaction-pill${myReaction && myReaction.emoji === emoji ? ' is-mine' : ''}">${emoji}${count > 1 ? ' ' + count : ''}</span>`
-        ).join('')}</div>`
+      ? `<div class="chat-reactions"><span class="chat-reaction-pill${myReaction ? ' is-mine' : ''}">${Object.keys(counts).join('')}${totalReactions > 1 ? ' ' + totalReactions : ''}</span></div>`
       : '';
-    row.innerHTML = `${nameHtml}<div class="chat-bubble" data-msg-id="${m.id}" data-deleted="${m.deleted ? 1 : 0}" data-own="${isOwn ? 1 : 0}" data-my-reaction="${myReaction ? myReaction.emoji : ''}">${bubbleInner}</div>${reactionsHtml}`;
+    row.innerHTML = `${nameHtml}<div class="chat-bubble" data-msg-id="${m.id}" data-deleted="${m.deleted ? 1 : 0}" data-own="${isOwn ? 1 : 0}" data-my-reaction="${myReaction ? myReaction.emoji : ''}">${bubbleInner}${reactionsHtml}</div>`;
     list.appendChild(row);
   });
   list.querySelectorAll('[data-dm-name]').forEach(el => {
@@ -8499,8 +8501,21 @@ function bindChatLongPress(list) {
   list.addEventListener('mouseleave', cancel);
 }
 
+// Double-tap/double-click a bubble as a quicker alternative to the
+// press-and-hold above — dblclick fires naturally on both touch and mouse,
+// so no custom tap-timing tracking is needed.
+function bindChatDoubleTap(list) {
+  list.addEventListener('dblclick', e => {
+    const bubble = e.target.closest('.chat-bubble');
+    if (!bubble || bubble.dataset.deleted === '1') return;
+    if (navigator.vibrate) navigator.vibrate(15);
+    openChatReactionMenu(bubble, e.clientX, e.clientY);
+  });
+}
+
 function initChatReactionMenu() {
   bindChatLongPress(document.getElementById('lbChatList'));
+  bindChatDoubleTap(document.getElementById('lbChatList'));
   document.getElementById('chatReactionMenu').addEventListener('click', e => {
     const emojiBtn = e.target.closest('.chat-reaction-emoji-btn');
     if (emojiBtn) {
@@ -9166,6 +9181,120 @@ function renderInviteToGroupChips() {
 /* ---------------------------------------------------------------- */
 /* Onboarding (first run — borrows the real Bio/DNA profile form)      */
 /* ---------------------------------------------------------------- */
+// Brand-new users start on a totally empty dashboard — every graph, ring,
+// and orb is blank, which doesn't show off what the app actually looks
+// like once it has data. This backfills the last 7 days plus today with
+// plausible sample entries (scaled to the profile's own targets, not
+// generic numbers) purely so first impressions have something to look at;
+// see the Clear All Data button in Settings and the welcome popup below for
+// how a user gets back to a clean slate.
+function generateSeedLogs(profile) {
+  const wu = profile.weightUnit || 'kg';
+  const startWeightKg = profile.startWeightKg || 70;
+  const calorieTarget = getEffectiveCalorieTarget(profile) || 2000;
+  const stepGoal = getEffectiveStepGoal(profile) || 8000;
+  const waterGoal = profile.waterGoal || 3000;
+  const targets = computeTargets(profile, startWeightKg);
+  const proteinTarget = targets ? Math.round((targets.protein[0] + targets.protein[1]) / 2) : 120;
+
+  const logs = {};
+  for (let i = 7; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+
+    const weekFrac = (7 - i) / 7;
+    const weightKg = round2(startWeightKg - 0.15 * weekFrac + Math.sin(i * 1.7) * 0.1);
+    const steps = Math.round(stepGoal * (0.7 + Math.sin(i) * 0.22));
+    const calories = Math.round(calorieTarget * (0.85 + Math.cos(i) * 0.12));
+    const protein = Math.round(proteinTarget * (0.85 + (i % 3) * 0.05));
+    const carbs = Math.round((calories * 0.45) / 4);
+    const fat = Math.round((calories * 0.25) / 9);
+
+    logs[iso] = {
+      date: iso,
+      weightKg, steps, calories, protein, carbs, fat,
+      fiber: 18 + (i % 4) * 3,
+      sodium: 1900 + (i % 3) * 250,
+      water: Math.round(waterGoal * (0.65 + (i % 4) * 0.1)),
+      sleep: 2 + (i % 3),
+      stress: 2 + (i % 3),
+      fatigue: 2 + ((i + 1) % 3),
+      hunger: 2 + ((i + 2) % 3),
+      workout: false,
+    };
+  }
+
+  // One day with a completed workout — feeds the volume trend chart, PR
+  // board, and Workout Summary share card.
+  const trainIso = Object.keys(logs).sort()[Object.keys(logs).length - 2];
+  logs[trainIso].workout = true;
+  logs[trainIso].exercises = [
+    { name: 'Barbell Squat', restSeconds: 120, notes: '', unit: wu, sets: [
+      { reps: 8, weightKg: round2(startWeightKg * 0.6), completed: true },
+      { reps: 8, weightKg: round2(startWeightKg * 0.65), completed: true },
+      { reps: 6, weightKg: round2(startWeightKg * 0.7), completed: true },
+    ] },
+    { name: 'Bench Press', restSeconds: 120, notes: '', unit: wu, sets: [
+      { reps: 10, weightKg: round2(startWeightKg * 0.4), completed: true },
+      { reps: 8, weightKg: round2(startWeightKg * 0.45), completed: true },
+    ] },
+  ];
+
+  // One day with body measurements + skinfolds — feeds the Body Fat orb,
+  // Edema orb, and Measurement/Body Fat history tables.
+  const measureIso = Object.keys(logs).sort()[0];
+  logs[measureIso].measurements = {
+    chest: 96, shoulder: 112, lBicep: 32, rBicep: 32.5,
+    abdSupra: 82, stomach: 86, abdInfra: 90, hips: 98,
+    lThigh: 56, rThigh: 56.5, lCalf: 37, rCalf: 37,
+  };
+  logs[measureIso].skinfolds = { chest: 10, abdomen: 16, thigh: 14, triceps: 11, suprailiac: 12, subscapular: 13, midaxillary: 9 };
+  logs[measureIso].bodyFatPct = computeBodyFatJP7(logs[measureIso].skinfolds, profile.age, profile.gender) ?? 18;
+
+  // One day with an outdoor cardio session — feeds Outdoor Activity Summary.
+  const cardioIso = Object.keys(logs).sort()[3];
+  logs[cardioIso].cardioSessions = [
+    { type: 'run', distanceKm: 4.2, durationSec: 1560, startedAt: new Date(cardioIso + 'T07:00:00').toISOString(), maxSpeedKmh: 11.5 },
+  ];
+
+  return logs;
+}
+
+function seedNewUserDemoData(profile) {
+  if (!profile) return;
+  saveLogs(generateSeedLogs(profile));
+  const overlay = document.getElementById('welcomeDemoOverlay');
+  if (overlay) overlay.hidden = false;
+}
+
+function initWelcomeDemoOverlay() {
+  const overlay = document.getElementById('welcomeDemoOverlay');
+  const btn = document.getElementById('btnCloseWelcomeDemo');
+  if (!overlay || !btn) return;
+  btn.addEventListener('click', () => { overlay.hidden = true; });
+}
+
+function initClearAllData() {
+  const btn = document.getElementById('btnClearAllData');
+  const note = document.getElementById('clearAllDataNote');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    if (!confirm('Clear ALL logs, reviews, and history? Your Entity Identity profile is kept, but every day you\'ve logged will be gone unless you\'ve saved a backup. This cannot be undone.')) return;
+    if (!confirm('Really sure? This is permanent — tap OK only if you have a backup or genuinely want to start over.')) return;
+    saveLogs({});
+    saveReviews({});
+    saveDailyReviews({});
+    note.textContent = 'All data cleared. Your Entity Identity profile is untouched.';
+    setTimeout(() => { note.textContent = ''; }, 4000);
+    renderDashboard();
+    renderHistory();
+    renderMeasureHistory();
+    renderBodyFatHistory();
+    updateTabDots();
+  });
+}
+
 function initOnboarding(onComplete) {
   if (getProfile()) { if (onComplete) onComplete(); return; }
 
@@ -9193,6 +9322,7 @@ function initOnboarding(onComplete) {
       if (originalNextSibling) originalParent.insertBefore(form, originalNextSibling);
       else originalParent.appendChild(form);
       overlay.hidden = true;
+      seedNewUserDemoData(getProfile());
       if (onComplete) onComplete();
     }, 0);
   });
@@ -9327,7 +9457,7 @@ function initTextSizeSlider() {
 /* ---------------------------------------------------------------- */
 /* Custom background image (Settings)                                  */
 /* ---------------------------------------------------------------- */
-const BG_SETTINGS_DEFAULT = { mode: 'cover', blur: 0, dim: 0, transparency: 0, widgetFill: 0, cropX: 50, cropY: 50 };
+const BG_SETTINGS_DEFAULT = { mode: 'cover', blur: 0, dim: 45, transparency: 0, widgetFill: 0, widgetOpacity: 0, cropX: 50, cropY: 50 };
 
 function getBgImageData() {
   try { return JSON.parse(localStorage.getItem('wft_bg_image')); } catch (e) { return null; }
@@ -9391,8 +9521,9 @@ function applyCustomBg() {
   // pattern too). Slider convention matches Blur/Dim/Transparency above:
   // 0 = no effect (fully opaque, unchanged), 100 = fully transparent — the
   // CSS rgba() alpha channel wants the OPPOSITE (how opaque to stay), hence 1-x.
-  const widgetFill = getBgSettings().widgetFill;
-  document.documentElement.style.setProperty('--widget-fill-alpha', (1 - widgetFill / 100).toFixed(2));
+  const bgSettingsForWidgets = getBgSettings();
+  document.documentElement.style.setProperty('--widget-fill-alpha', (1 - bgSettingsForWidgets.widgetFill / 100).toFixed(2));
+  document.documentElement.style.setProperty('--widget-opacity', (1 - bgSettingsForWidgets.widgetOpacity / 100).toFixed(2));
 
   if (!imgData || !imgData.dataUrl) {
     layer.hidden = true;
@@ -9451,6 +9582,8 @@ function loadBgSettingsIntoUI() {
   document.getElementById('bgTransparencyOut').textContent = s.transparency;
   document.getElementById('bgWidgetFillSlider').value = s.widgetFill;
   document.getElementById('bgWidgetFillOut').textContent = s.widgetFill;
+  document.getElementById('bgWidgetOpacitySlider').value = s.widgetOpacity;
+  document.getElementById('bgWidgetOpacityOut').textContent = s.widgetOpacity;
   document.getElementById('bgCropWrap').hidden = s.mode !== 'crop';
   updateCropPreviewBg();
 }
@@ -9510,7 +9643,7 @@ function initCustomBackground() {
     applyCustomBg();
   });
 
-  [['bgBlurSlider', 'blur'], ['bgDimSlider', 'dim'], ['bgTransparencySlider', 'transparency'], ['bgWidgetFillSlider', 'widgetFill']].forEach(([id, key]) => {
+  [['bgBlurSlider', 'blur'], ['bgDimSlider', 'dim'], ['bgTransparencySlider', 'transparency'], ['bgWidgetFillSlider', 'widgetFill'], ['bgWidgetOpacitySlider', 'widgetOpacity']].forEach(([id, key]) => {
     document.getElementById(id).addEventListener('input', e => {
       const s = getBgSettings();
       s[key] = parseInt(e.target.value, 10);
@@ -9623,6 +9756,8 @@ safeInit(initReviewToggles, 'initReviewToggles');
 safeInit(initHistoryLogsToggle, 'initHistoryLogsToggle');
 safeInit(initExport, 'initExport');
 safeInit(initDrive, 'initDrive');
+safeInit(initClearAllData, 'initClearAllData');
+safeInit(initWelcomeDemoOverlay, 'initWelcomeDemoOverlay');
 safeInit(initCustomBackground, 'initCustomBackground');
 safeInit(initTextSizeSlider, 'initTextSizeSlider');
 safeInit(initPushNotifications, 'initPushNotifications');

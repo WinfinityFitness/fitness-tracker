@@ -127,7 +127,10 @@ body.has-custom-bg { background-color: transparent; }
 .custom-bg-overlay {
   position: absolute;
   inset: 0;
-  background: #000;
+  /* Uses the theme's own dark/light surface anchor rather than a hardcoded
+     #000 — dims toward black on dark themes, washes toward white on light
+     ones, so text stays legible over a custom background either way. */
+  background: var(--surface-1);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s ease;
@@ -1568,6 +1571,7 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .chat-name { display: block; color: var(--cyan); font-weight: 700; font-size: 0.6rem; margin: 0 0 2px 8px; }
 .chat-name-link { cursor: pointer; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 2px; }
 .chat-bubble {
+  position: relative;
   display: inline-flex;
   align-items: baseline;
   gap: 6px;
@@ -1582,15 +1586,26 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .chat-msg { color: var(--text-primary); font-size: 0.78rem; line-height: 1.35; word-break: break-word; }
 .chat-msg-unsent { font-style: italic; color: var(--text-muted); }
 .chat-time { font-family: var(--font-mono); font-size: 0.56rem; color: var(--text-muted); flex: none; white-space: nowrap; }
-.chat-reactions { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 8px 0; }
-.chat-row--own .chat-reactions { justify-content: flex-end; }
+/* Overlapping badge at the bubble's bottom-right corner — same fixed spot
+   for sent AND received bubbles, matching Messenger (it doesn't mirror to
+   the opposite corner for received messages). */
+.chat-reactions {
+  position: absolute;
+  bottom: -8px;
+  right: -2px;
+  display: flex;
+  margin: 0;
+  z-index: 1;
+}
 .chat-reaction-pill {
-  font-size: 0.68rem;
-  background: var(--surface-2);
+  font-size: 0.58rem;
+  background: var(--surface-1);
   border: 1px solid var(--border-soft);
-  border-radius: 10px;
-  padding: 1px 6px;
-  line-height: 1.4;
+  border-radius: 8px;
+  padding: 0 4px;
+  line-height: 1.5;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.45);
 }
 .chat-reaction-pill.is-mine { border-color: var(--cyan); }
 .chat-input-row { display: flex; gap: 8px; }
@@ -1913,28 +1928,27 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 }
 .measure-entry-btn {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  bottom: 8px;
+  right: 8px;
   z-index: 2;
-  width: 104px;
-  height: 104px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
-  line-height: 1.25;
+  line-height: 1.2;
   background: rgba(6, 20, 26, 0.55);
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
   border: 1px solid var(--cyan-dim);
   color: var(--cyan);
   font-family: var(--font-mono);
-  font-size: 0.74rem;
+  font-size: 0.52rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   cursor: pointer;
   filter: drop-shadow(0 0 8px var(--cyan-glow));
   transition: background 0.15s ease;
@@ -3576,12 +3590,41 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
    box fully transparent with no way to fix it from the slider. rgba() fed
    by a plain R,G,B custom property per theme/skin is supported by every
    browser that understands CSS custom properties at all. */
-:root { --widget-fill-alpha: 1; }
-.chart-card, .stat-tile, .ring-card, .computed-card {
+:root { --widget-fill-alpha: 1; --widget-opacity: 1; }
+/* Both sliders fade the card's FILL only, via a ::before layer placed
+   behind the real content (z-index: -1) — never the real element's own
+   `opacity`, which would cascade onto every descendant and wash out
+   buttons, input fields, and text inside along with it (CSS opacity can't
+   be "undone" by a child). Border stays on the real element, fully opaque,
+   for a crisp edge regardless of either slider. Header, footer, nav bar,
+   and the chat card are deliberately excluded below and stay fully solid. */
+.chart-card, .stat-tile, .ring-card, .computed-card, .hero-card,
+.datetime-card, .ex-card, .session-done-card, .cardio-history, .selected-food-card {
+  position: relative;
+  background: none;
+}
+.chart-card::before, .stat-tile::before, .ring-card::before, .computed-card::before, .hero-card::before,
+.datetime-card::before, .ex-card::before, .session-done-card::before, .cardio-history::before, .selected-food-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  opacity: var(--widget-opacity);
+}
+.chart-card::before, .stat-tile::before, .ring-card::before, .computed-card::before,
+.datetime-card::before, .ex-card::before, .session-done-card::before, .cardio-history::before {
   background: rgba(var(--surface-1-rgb), var(--widget-fill-alpha));
 }
-.hero-card {
+.selected-food-card::before {
+  background: rgba(var(--surface-2-rgb), var(--widget-fill-alpha));
+}
+.hero-card::before {
   background: linear-gradient(160deg,
     rgba(var(--surface-2-rgb), var(--widget-fill-alpha)),
     rgba(var(--surface-1-rgb), var(--widget-fill-alpha)));
 }
+
+/* Chatroom is excluded entirely from both sliders — always solid. */
+#chatCard { background: var(--surface-1); }
+#chatCard::before { content: none; }

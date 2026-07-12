@@ -1104,6 +1104,14 @@
       <p class="hint">Once connected, finishing a workout automatically backs up your data to a file named "winfinity-fitness-backup.json" in your Drive. Requires an internet connection.</p>
     </div>
 
+    <div class="sheet-section sheet-section--compact">
+      <p class="mod-tag">Mod_cleardata_16</p>
+      <p class="field-group-heading">Clear All Data</p>
+      <p class="hint">Wipes all logs, reviews, and history from this device. Your Entity Identity profile is kept — you'll go straight into logging your own data afterward. This cannot be undone unless you've saved a backup.</p>
+      <button type="button" class="btn btn--danger" id="btnClearAllData">Clear all data</button>
+      <p class="save-note" id="clearAllDataNote"></p>
+    </div>
+
     <div class="sheet-section">
       <button type="button" class="btn caliper-entry-toggle" id="btnToggleHistoryLogs" aria-expanded="false">
         <span>History Logs</span>
@@ -1438,6 +1446,12 @@
         <output id="bgWidgetFillOut">0</output>
       </label>
       <p class="hint hint--sm">Fades the fill behind cards/widgets so backgrounds show through them too — works with or without a custom background photo set.</p>
+      <label class="field">
+        <span>Widget Opacity</span>
+        <input type="range" id="bgWidgetOpacitySlider" min="0" max="100" step="1" value="0">
+        <output id="bgWidgetOpacityOut">0</output>
+      </label>
+      <p class="hint hint--sm">Fades the whole widget as one unit — border and content included — instead of just the fill.</p>
 
       <div class="bg-settings-group" id="bgSettingsGroup" hidden>
         <label class="field">
@@ -2151,6 +2165,20 @@
       <button type="button" class="btn btn--primary" id="btnSaveMeasurements">Save measurements</button>
       <p class="save-note" id="measureSaveNote"></p>
     </fieldset>
+  </div>
+</div>
+
+<div class="donation-overlay" id="welcomeDemoOverlay" hidden>
+  <div class="donation-card">
+    <img class="donation-logo" src="icons/icon-512.png" alt="Winfinity">
+    <p class="donation-message" style="text-align:left;">
+      On initial open, the tracker is pre-logged with sample data for the last 7 days (plus today) — full weight, fuel, and training entries — so you can see what the graphs, rings, and other visuals look like right away.<br><br>
+      All of it is editable. When you're ready to start your own journey: go to <strong>Menu → Settings</strong> and tap <strong>"Clear all data."</strong> Everything except your Entity Identity profile will be wiped, ready for your real day one.<br><br>
+      Already have a backup? Restore it from <strong>Settings → Backup</strong> (local JSON) or Google Drive instead.
+    </p>
+    <div class="donation-btn-row">
+      <button type="button" class="btn btn--primary" id="btnCloseWelcomeDemo" style="flex:1;">Got it</button>
+    </div>
   </div>
 </div>
 
