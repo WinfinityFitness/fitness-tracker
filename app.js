@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.3.8';
+const APP_VERSION = 'WF_SYS_V.3.9';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9457,7 +9457,7 @@ function initTextSizeSlider() {
 /* ---------------------------------------------------------------- */
 /* Custom background image (Settings)                                  */
 /* ---------------------------------------------------------------- */
-const BG_SETTINGS_DEFAULT = { mode: 'cover', blur: 0, dim: 45, transparency: 0, widgetFill: 0, widgetOpacity: 0, cropX: 50, cropY: 50 };
+const BG_SETTINGS_DEFAULT = { mode: 'cover', blur: 0, dim: 0, transparency: 0, widgetFill: 0, widgetOpacity: 0, cropX: 50, cropY: 50 };
 
 function getBgImageData() {
   try { return JSON.parse(localStorage.getItem('wft_bg_image')); } catch (e) { return null; }
