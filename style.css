@@ -937,8 +937,23 @@ button.mission-log-day:hover { border-color: var(--cyan); }
 .btn--sm { padding: 8px 12px; font-size: 0.8rem; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
 .btn--danger { color: var(--critical); }
-.btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .btn-row .btn { flex: 1; min-width: 140px; }
+
+.ai-spinner {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--border-soft);
+  border-top-color: var(--cyan);
+  animation: ai-spinner-spin 0.7s linear infinite;
+}
+.ai-spinner[hidden] { display: none; }
+@keyframes ai-spinner-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .ai-spinner { animation-duration: 1.6s; }
+}
 
 .quick-log-btn-row { display: flex; gap: 8px; }
 .quick-log-btn {
@@ -1586,17 +1601,17 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .chat-msg { color: var(--text-primary); font-size: 0.78rem; line-height: 1.35; word-break: break-word; }
 .chat-msg-unsent { font-style: italic; color: var(--text-muted); }
 .chat-time { font-family: var(--font-mono); font-size: 0.56rem; color: var(--text-muted); flex: none; white-space: nowrap; }
-/* Overlapping badge at the bubble's bottom-right corner — same fixed spot
-   for sent AND received bubbles, matching Messenger (it doesn't mirror to
-   the opposite corner for received messages). */
+/* Overlapping badge on the bubble's bottom corner — bottom-right for
+   received messages, bottom-left for your own (mirrored, per request). */
 .chat-reactions {
   position: absolute;
   bottom: -8px;
-  right: -2px;
   display: flex;
   margin: 0;
   z-index: 1;
 }
+.chat-row--other .chat-reactions { right: -2px; }
+.chat-row--own .chat-reactions { left: -2px; }
 .chat-reaction-pill {
   font-size: 0.58rem;
   background: var(--surface-1);
@@ -1827,7 +1842,7 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .chat-new-group .input-unit-wrap input { flex: 1; }
 .chat-user-menu {
   position: fixed;
-  z-index: 200;
+  z-index: 310;
   width: 220px;
   max-width: 80vw;
   max-height: 300px;
@@ -1841,7 +1856,7 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .chat-user-menu[hidden] { display: none; }
 .chat-reaction-menu {
   position: fixed;
-  z-index: 200;
+  z-index: 310;
   min-width: 220px;
   max-width: 86vw;
   background: var(--bg-elevated);
@@ -3146,6 +3161,30 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   border-color: var(--border);
   font-family: var(--font-mono);
   letter-spacing: 0.05em;
+}
+/* These navigation/action buttons borrow the Digital ID chip's card look
+   (filled surface, plain border) instead of the transparent glass-outline
+   treatment every other .btn gets on this skin. */
+[data-skin="sovereign-core"] #btnOpenStartDayLog,
+[data-skin="sovereign-core"] #btnOpenEndDayLog,
+[data-skin="sovereign-core"] #btnOpenWeekendLog,
+[data-skin="sovereign-core"] #btnOpenMissionLog,
+[data-skin="sovereign-core"] #btnToggleActivityHistory,
+[data-skin="sovereign-core"] #btnOpenFuelLog,
+[data-skin="sovereign-core"] #btnOpenFoodDiary,
+[data-skin="sovereign-core"] #btnRequestAssessment,
+[data-skin="sovereign-core"] #btnOpenBioLog,
+[data-skin="sovereign-core"] #btnOpenEntityIdentity,
+[data-skin="sovereign-core"] #btnOpenSettings,
+[data-skin="sovereign-core"] #btnToggleDailyReview,
+[data-skin="sovereign-core"] #btnToggleWeeklyReview,
+[data-skin="sovereign-core"] #btnBackup,
+[data-skin="sovereign-core"] #btnClearAllData,
+[data-skin="sovereign-core"] #btnToggleHistoryLogs {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  box-shadow: none;
 }
 [data-skin="sovereign-core"] .tab-bar {
   border-width: 1px;

@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.3.9';
+const APP_VERSION = 'WF_SYS_V.4.2';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -4872,6 +4872,7 @@ function openAddFoodPanel() {
   document.getElementById('customFoodFat').value = '';
   document.getElementById('customFoodTeachNote').hidden = true;
   document.getElementById('aiEstimateStatus').textContent = '';
+  document.getElementById('aiEstimateSpinner').hidden = true;
   customFoodAiPer100g = null;
   pendingBarcodeCode = null;
   document.getElementById('addFoodOverlay').hidden = false;
@@ -5220,12 +5221,14 @@ function initAddFoodPanel() {
   document.getElementById('selectedFoodUnit').addEventListener('change', updateSelectedFoodPreview);
 
   const aiBtn = document.getElementById('btnEstimateAiNutrition');
+  const aiSpinner = document.getElementById('aiEstimateSpinner');
   aiBtn.addEventListener('click', async () => {
     const name = document.getElementById('customFoodName').value.trim();
     const statusEl = document.getElementById('aiEstimateStatus');
     if (!name) { statusEl.textContent = 'Enter a food name first.'; return; }
     statusEl.textContent = 'Estimating with AI…';
     aiBtn.disabled = true;
+    aiSpinner.hidden = false;
     try {
       const est = await estimateFoodNutritionWithAI(name);
       customFoodAiPer100g = { calories: est.calories || 0, protein: est.protein || 0, carbs: est.carbs || 0, fat: est.fat || 0 };
@@ -5238,6 +5241,7 @@ function initAddFoodPanel() {
       statusEl.textContent = e.message || 'AI estimate unavailable — check your connection or add manually.';
     } finally {
       aiBtn.disabled = false;
+      aiSpinner.hidden = true;
     }
   });
 
@@ -8520,8 +8524,9 @@ function initChatReactionMenu() {
     const emojiBtn = e.target.closest('.chat-reaction-emoji-btn');
     if (emojiBtn) {
       const isActive = emojiBtn.classList.contains('is-active');
+      const messageId = chatReactionTargetId;
       closeChatReactionMenu();
-      setChatReaction(chatReactionTargetId, isActive ? null : emojiBtn.dataset.emoji);
+      setChatReaction(messageId, isActive ? null : emojiBtn.dataset.emoji);
       return;
     }
     if (e.target.id === 'btnUnsendChat') {
