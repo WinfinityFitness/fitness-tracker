@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.4.7';
+const APP_VERSION = 'WF_SYS_V.4.8';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -691,11 +691,13 @@ function initTabs() {
         renderNutritionTargets();
         renderNutritionAverages();
         refreshFuelWaterViews(nutDate);
+        // Computed Targets widget now lives at the bottom of this tab (see
+        // the Coach Assignment <-> Computed Targets tab swap).
+        const pForTargets = getProfile();
+        if (pForTargets) renderComputedTargets(pForTargets);
       }
       if (target === 'bio') {
         loadBioForDate(document.getElementById('bioDate').value);
-        const p = getProfile();
-        if (p) renderComputedTargets(p);
         renderWaterRetentionOrb();
       }
       if (target === 'leaderboard' && sbConfigured()) {
@@ -1811,6 +1813,13 @@ function loadEndDayLogFields(date) {
 
   document.getElementById('edlSaveNote').textContent = '';
   document.getElementById('btnShareFromEndDayLog').hidden = true;
+
+  // Day Review, embedded here so finishing End Day Log also covers it —
+  // shares the same dailyReviews storage as the standalone Settings panel.
+  const review = getDailyReviews()[date] || {};
+  document.getElementById('edlReviewStruggle').value = review.struggle || '';
+  document.getElementById('edlReviewFix').value = review.fix || '';
+  renderDailyReviewChecklist(date, 'edl');
 }
 
 function openEndDayLog() {
@@ -1896,12 +1905,23 @@ function saveEndDayLog() {
     stress: parseInt(document.getElementById('edlStress').value, 10),
     hunger: parseInt(document.getElementById('edlHunger').value, 10),
   });
+  const reviews = getDailyReviews();
+  reviews[date] = {
+    date,
+    struggle: document.getElementById('edlReviewStruggle').value,
+    fix: document.getElementById('edlReviewFix').value,
+  };
+  saveDailyReviews(reviews);
+
   document.getElementById('edlSaveNote').textContent = 'Saved.';
   document.getElementById('btnShareFromEndDayLog').hidden = false;
   renderDashboard();
   if (profile) renderComputedTargets(profile);
   renderWaterRetentionOrb();
   if (document.getElementById('bioDate').value === date) loadBioForDate(date);
+  // Keep the standalone Settings Daily Review panel in sync if it's showing
+  // the same date, since both now share the same underlying storage.
+  if (document.getElementById('dailyReviewDate').value === date) loadDailyReviewForDate(date);
   updateTabDots();
 }
 
@@ -7071,17 +7091,23 @@ function computeDailyReviewChecklist(date) {
   };
 }
 
-function renderDailyReviewChecklist(date) {
+// prefix lets the same checklist render into either the standalone Daily
+// Review panel (Settings, ids drCheck*) or the copy embedded under End Day
+// Log (ids edlCheck*) — both read the same computeDailyReviewChecklist().
+function renderDailyReviewChecklist(date, prefix) {
+  prefix = prefix || 'dr';
   const c = computeDailyReviewChecklist(date);
-  document.getElementById('drCheckWeight').checked = c.weight;
-  document.getElementById('drCheckSleep').checked = c.sleep;
-  document.getElementById('drCheckSteps').checked = c.steps;
-  document.getElementById('drCheckLevels').checked = c.levels;
-  document.getElementById('drCheckWater').checked = c.water;
-  document.getElementById('drCheckTraining').checked = c.training;
-  document.getElementById('drCheckCalories').checked = c.calories;
-  document.getElementById('drCheckProtein').checked = c.protein;
-  document.getElementById('drCheckCardio').checked = c.cardio;
+  const el = suffix => document.getElementById(prefix + 'Check' + suffix);
+  if (!el('Weight')) return;
+  el('Weight').checked = c.weight;
+  el('Sleep').checked = c.sleep;
+  el('Steps').checked = c.steps;
+  el('Levels').checked = c.levels;
+  el('Water').checked = c.water;
+  el('Training').checked = c.training;
+  el('Calories').checked = c.calories;
+  el('Protein').checked = c.protein;
+  el('Cardio').checked = c.cardio;
 }
 
 function loadDailyReviewForDate(date) {

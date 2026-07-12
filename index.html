@@ -476,51 +476,10 @@
       <div class="ring-card" id="avgWaterRing"></div>
     </div>
 
-    <h2 class="section-title">Coach assignment</h2>
-    <p class="hint">Contact Coach Win for assessment to get a new assignment next week.</p>
-    <button type="button" class="btn glass-emboss entity-identity-btn" id="btnRequestAssessment">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-      REQUEST ASSESSMENT
-    </button>
-    <fieldset class="field-group field-group--compact">
-      <p class="mod-tag">Mod_coach_07</p>
-      <div class="section-title-row">
-        <p class="field-group-heading" style="margin:0;">Assigned Targets (Optional Override)</p>
-        <button type="button" class="icon-btn glass-emboss" id="btnRefreshCoachAssignment" aria-label="Refresh assigned targets from coach">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
-        </button>
-      </div>
-      <p class="save-note" id="coachRefreshNote"></p>
-      <label class="field">
-        <span>Calorie intake assignment (kcal)</span>
-        <input type="number" id="coachCalorieInput" placeholder="e.g. 2000">
-      </label>
-      <label class="field">
-        <span>Steps target assignment</span>
-        <input type="number" id="coachStepsInput" placeholder="e.g. 10000">
-      </label>
-      <label class="field">
-        <span>Workouts per week assignment</span>
-        <input type="number" id="coachWorkoutsInput" min="0" max="14" placeholder="e.g. 4">
-      </label>
-
-      <p class="field-group-heading">Refeed</p>
-      <label class="field">
-        <span>+Calories</span>
-        <input type="number" id="coachRefeedCalories" placeholder="e.g. 300">
-      </label>
-      <label class="field">
-        <span>Start date</span>
-        <input type="date" id="coachRefeedStart" class="date-picker-trigger" readonly>
-      </label>
-      <label class="field">
-        <span>End date</span>
-        <input type="date" id="coachRefeedEnd" class="date-picker-trigger" readonly>
-      </label>
-
-      <button type="button" class="btn btn--primary" id="btnSaveCoachAssignment">Save assignment</button>
-      <p class="save-note" id="coachAssignmentNote"></p>
-    </fieldset>
+    <div class="computed-card">
+      <h3>Computed targets</h3>
+      <dl class="computed-list" id="computedList"></dl>
+    </div>
   </section>
 
   <!-- ============ BIO ============ -->
@@ -668,10 +627,51 @@
       </div>
     </div>
 
-    <div class="computed-card">
-      <h3>Computed targets</h3>
-      <dl class="computed-list" id="computedList"></dl>
-    </div>
+    <h2 class="section-title">Coach assignment</h2>
+    <p class="hint">Contact Coach Win for assessment to get a new assignment next week.</p>
+    <button type="button" class="btn glass-emboss entity-identity-btn" id="btnRequestAssessment">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      REQUEST ASSESSMENT
+    </button>
+    <fieldset class="field-group field-group--compact">
+      <p class="mod-tag">Mod_coach_07</p>
+      <div class="section-title-row">
+        <p class="field-group-heading" style="margin:0;">Assigned Targets (Optional Override)</p>
+        <button type="button" class="icon-btn glass-emboss" id="btnRefreshCoachAssignment" aria-label="Refresh assigned targets from coach">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+        </button>
+      </div>
+      <p class="save-note" id="coachRefreshNote"></p>
+      <label class="field">
+        <span>Calorie intake assignment (kcal)</span>
+        <input type="number" id="coachCalorieInput" placeholder="e.g. 2000">
+      </label>
+      <label class="field">
+        <span>Steps target assignment</span>
+        <input type="number" id="coachStepsInput" placeholder="e.g. 10000">
+      </label>
+      <label class="field">
+        <span>Workouts per week assignment</span>
+        <input type="number" id="coachWorkoutsInput" min="0" max="14" placeholder="e.g. 4">
+      </label>
+
+      <p class="field-group-heading">Refeed</p>
+      <label class="field">
+        <span>+Calories</span>
+        <input type="number" id="coachRefeedCalories" placeholder="e.g. 300">
+      </label>
+      <label class="field">
+        <span>Start date</span>
+        <input type="date" id="coachRefeedStart" class="date-picker-trigger" readonly>
+      </label>
+      <label class="field">
+        <span>End date</span>
+        <input type="date" id="coachRefeedEnd" class="date-picker-trigger" readonly>
+      </label>
+
+      <button type="button" class="btn btn--primary" id="btnSaveCoachAssignment">Save assignment</button>
+      <p class="save-note" id="coachAssignmentNote"></p>
+    </fieldset>
   </section>
 
   <!-- ============ GLOBAL NEXUS ============ -->
@@ -2433,6 +2433,30 @@
       <output id="edlHungerOut">3</output>
       <div class="slider-endpoints"><span>Satiated</span><span>Famine</span></div>
     </label>
+
+    <p class="field-group-heading" style="margin-top:16px;">Day Review</p>
+    <label class="field">
+      <span>What is your struggles today?</span>
+      <textarea id="edlReviewStruggle" rows="2"></textarea>
+    </label>
+    <label class="field">
+      <span>How do you think you can fix that struggle?</span>
+      <textarea id="edlReviewFix" rows="2"></textarea>
+    </label>
+    <fieldset class="field-group">
+      <p class="field-group-heading" style="font-size:0.8rem;">Did you fill in complete?</p>
+      <label class="field field--checkbox"><input type="checkbox" id="edlCheckWeight" disabled><span>Morning Weight</span></label>
+      <label class="field field--checkbox"><input type="checkbox" id="edlCheckSleep" disabled><span>Sleep Quality</span></label>
+      <label class="field field--checkbox"><input type="checkbox" id="edlCheckSteps" disabled><span>Day Steps</span></label>
+      <label class="field field--checkbox"><input type="checkbox" id="edlCheckLevels" disabled><span>Stress/Fatigue/Hunger levels</span></label>
+      <label class="field field--checkbox"><input type="checkbox" id="edlCheckWater" disabled><span>Water intake</span></label>
+      <label class="field field--checkbox"><input type="checkbox" id="edlCheckTraining" disabled><span>Training</span></label>
+      <label class="field field--checkbox"><input type="checkbox" id="edlCheckCalories" disabled><span>Calories</span></label>
+      <label class="field field--checkbox"><input type="checkbox" id="edlCheckProtein" disabled><span>Protein</span></label>
+      <label class="field field--checkbox"><input type="checkbox" id="edlCheckCardio" disabled><span>Cardio (optional)</span></label>
+    </fieldset>
+    <p class="hint hint--sm">The checklist above fills in automatically from what you've already logged today.</p>
+
     <button type="button" class="btn btn--primary" id="btnSaveEndDayLog" style="width:100%;margin-top:10px;">Confirm &amp; Save</button>
     <p class="save-note" id="edlSaveNote"></p>
     <button type="button" class="btn share-result-btn" id="btnShareFromEndDayLog" hidden>Share</button>
