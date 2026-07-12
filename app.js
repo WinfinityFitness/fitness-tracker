@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.5.2';
+const APP_VERSION = 'WF_SYS_V.5.3';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -10047,21 +10047,37 @@ if ('serviceWorker' in navigator) {
     // anything it imports) from HTTP cache during an update check — without
     // this, a stale cached copy of sw.js can make every check falsely
     // report "already latest" until the HTTP cache entry happens to expire.
-    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(async reg => {
       swRegistration = reg;
-      if (reg.waiting && navigator.serviceWorker.controller) markUpdateAvailable();
-      // Background auto-check: silently looks for updates every 15 minutes
-      // while the app is open, and again shortly after boot. It only ever
-      // downloads/installs the new worker — it never applies it on its own,
-      // so nothing reloads or interrupts you until you tap Update Now.
-      // Admin's "Updates enabled" kill switch (Settings, admin-only) skips
-      // this scheduling entirely when off — no version ever gets downloaded
-      // in the background while it's paused.
-      updatesGloballyEnabled().then(enabled => {
-        if (!enabled) return;
-        setTimeout(() => checkForUpdate(), 5000);
-        setInterval(() => checkForUpdate(), 15 * 60 * 1000);
-      });
+
+      const enabled = await updatesGloballyEnabled();
+      if (!enabled) {
+        // Admin's "Updates enabled" kill switch (Settings, admin-only) is
+        // off — don't even look, so a paused build genuinely never checks.
+        if (reg.waiting && navigator.serviceWorker.controller) markUpdateAvailable();
+        return;
+      }
+
+      // Cold-launch check: look for an update right away and, if one's
+      // already waiting (found now, or left over from a previous session
+      // that never got applied), apply it immediately — before the splash
+      // screen even finishes — instead of opening on a possibly-stale
+      // cached version and only mentioning it later. This is the ONE place
+      // that auto-applies without asking; the reload it triggers (via the
+      // controllerchange listener below) just restarts the app once,
+      // landing on the fresh build. Updates found later in the same
+      // session (the 15-min interval below) intentionally still only get
+      // marked available rather than force-applied, so nothing yanks an
+      // active session out from under the user mid-use — only the initial
+      // open auto-updates.
+      if (reg.waiting && navigator.serviceWorker.controller) {
+        reg.waiting.postMessage('SKIP_WAITING');
+      } else {
+        const found = await checkForUpdate();
+        if (found && reg.waiting) reg.waiting.postMessage('SKIP_WAITING');
+      }
+
+      setInterval(() => checkForUpdate(), 15 * 60 * 1000);
     }).catch(() => {});
   });
   // Fires once the new worker actually takes control (after SKIP_WAITING) —
