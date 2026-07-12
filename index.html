@@ -958,6 +958,8 @@
         <div class="footer-col">
           <h4>Social</h4>
           <a class="footer-link" href="http://winfinityfitness.com" target="_blank" rel="noopener noreferrer">Webpage</a>
+          <a class="footer-link" href="https://www.facebook.com/winfinityfit/" target="_blank" rel="noopener noreferrer" id="footerFacebookLink">Facebook</a>
+          <a class="footer-link" href="https://www.instagram.com/windalchamp/" target="_blank" rel="noopener noreferrer" id="footerInstagramLink">Instagram</a>
         </div>
       </div>
     </footer>
@@ -1615,6 +1617,15 @@
         </label>
       </div>
       <p class="hint hint--sm">When on, a pending update installs automatically right after you Sync to Nexus or Back Up (local or Drive) — those are safe checkpoints since your data's already saved. The app reloads once, right after.</p>
+
+      <div class="theme-toggle-row" id="updatesEnabledRow" style="margin-top:12px;" hidden>
+        <span>Updates enabled (app-wide)</span>
+        <label class="switch">
+          <input type="checkbox" id="updatesEnabledToggle">
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+        </label>
+      </div>
+      <p class="hint hint--sm" id="updatesEnabledHint" hidden>Admin only. Turn this off to freeze every user on their current version — no one's app will check for or apply an update until it's switched back on.</p>
     </div>
   </div>
 </div>
@@ -2346,6 +2357,15 @@
     <label class="field">
       <span>End date</span>
       <input type="date" id="adminAssignRefeedEnd" class="date-picker-trigger" readonly>
+    </label>
+    <p class="field-group-heading" style="font-size:0.8rem;">Footer Social Links</p>
+    <label class="field">
+      <span>Facebook &amp; Instagram visibility</span>
+      <select id="adminAssignSocialLinks">
+        <option value="">No change</option>
+        <option value="show">Show</option>
+        <option value="hide">Hide</option>
+      </select>
     </label>
     <button type="button" class="btn btn--primary" id="btnAdminAssignTargetsSubmit" style="width:100%;margin-top:10px;">Assign</button>
     <p class="save-note" id="adminAssignTargetsNote"></p>

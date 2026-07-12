@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.5.0';
+const APP_VERSION = 'WF_SYS_V.5.2';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -940,6 +940,26 @@ function initFooterTagline() {
     lastIdx = idx;
     el.textContent = `"${FOOTER_TAGLINES[idx]}"`;
   }, 15000);
+}
+
+// Facebook/Instagram footer links are visible by default for everyone, same
+// as before — an admin can selectively HIDE (or re-show) them for one
+// specific Digital ID via an Assign Targets push, a discreet per-user
+// override riding along on the same coach-assignment refresh channel,
+// applied the moment that user pulls it (see
+// refreshCoachAssignmentFromServer), whether or not they save the visible
+// targets afterward.
+function applyFooterSocialLinksVisibility(visible) {
+  const fb = document.getElementById('footerFacebookLink');
+  const ig = document.getElementById('footerInstagramLink');
+  if (fb) fb.hidden = !visible;
+  if (ig) ig.hidden = !visible;
+}
+
+function initFooterSocialLinks() {
+  const profile = getProfile();
+  const visible = !profile || profile.footerSocialLinksVisible !== false;
+  applyFooterSocialLinksVisibility(visible);
 }
 
 function initPrivacyPolicy() {
@@ -6811,6 +6831,13 @@ async function refreshCoachAssignmentFromServer() {
     profile.refeedCalories = data.refeed_calories;
     profile.refeedStart = data.refeed_start;
     profile.refeedEnd = data.refeed_end;
+    // Applied immediately on refresh, independent of whether the visible
+    // targets below get saved — same pull the coach assignment itself
+    // uses, just a second field riding along on it.
+    if (data.show_social_links !== null && data.show_social_links !== undefined) {
+      profile.footerSocialLinksVisible = data.show_social_links;
+      applyFooterSocialLinksVisibility(profile.footerSocialLinksVisible);
+    }
     saveProfile(profile);
     loadCoachAssignment();
     renderNutritionTargets();
@@ -7968,6 +7995,10 @@ function refreshDigitalIdOverrideVisibility() {
     adManagerSection.hidden = !loggedIn;
     if (loggedIn) renderAdManagerProducts();
   }
+  const updatesRow = document.getElementById('updatesEnabledRow');
+  if (updatesRow) updatesRow.hidden = !loggedIn;
+  const updatesHint = document.getElementById('updatesEnabledHint');
+  if (updatesHint) updatesHint.hidden = !loggedIn;
 }
 
 function initDigitalIdOverride() {
@@ -8078,6 +8109,21 @@ async function isAdFreeUser() {
 
 const AD_SPLASH_COUNTDOWN_SEC = 10;
 
+// Single-row app_settings-style table (named ad_settings historically, now
+// also holds the updates kill switch) — fetched once and cached so the ad
+// splash and the update-check gating below don't each pay their own
+// network round trip.
+let cachedAdSettingsPromise = null;
+function fetchAdSettings() {
+  if (!sbConfigured()) return Promise.resolve(null);
+  if (!cachedAdSettingsPromise) {
+    cachedAdSettingsPromise = sb.from('ad_settings').select('ads_enabled, updates_enabled').eq('id', 1).maybeSingle()
+      .then(({ data }) => data)
+      .catch(() => null);
+  }
+  return cachedAdSettingsPromise;
+}
+
 // Startup ad splash: global ads_enabled switch, then per-user ad-free grant,
 // then picks a random active product from ad_products. Silently does
 // nothing if any of those aren't available (offline, not configured, no
@@ -8085,7 +8131,7 @@ const AD_SPLASH_COUNTDOWN_SEC = 10;
 async function initAdSplash() {
   if (!sbConfigured()) return;
   try {
-    const { data: settings } = await sb.from('ad_settings').select('ads_enabled').eq('id', 1).maybeSingle();
+    const settings = await fetchAdSettings();
     if (!settings || !settings.ads_enabled) return;
     if (await isAdFreeUser()) return;
 
@@ -8126,8 +8172,10 @@ async function initAdSplash() {
 async function renderAdManagerProducts() {
   if (!sbConfigured() || !isAdminLoggedIn()) return;
   const toggle = document.getElementById('adsEnabledToggle');
-  const { data: settings } = await sb.from('ad_settings').select('ads_enabled').eq('id', 1).maybeSingle();
+  const updatesToggle = document.getElementById('updatesEnabledToggle');
+  const { data: settings } = await sb.from('ad_settings').select('ads_enabled, updates_enabled').eq('id', 1).maybeSingle();
   if (toggle) toggle.checked = !!(settings && settings.ads_enabled);
+  if (updatesToggle) updatesToggle.checked = !settings || settings.updates_enabled !== false;
 
   const { data: products } = await sb.from('ad_products').select('*').order('created_at', { ascending: false });
   const list = document.getElementById('adManagerList');
@@ -8907,7 +8955,7 @@ function initAnnouncementWidget() {
   });
   document.getElementById('btnAdminAssignTargets').addEventListener('click', () => {
     menu.hidden = true;
-    ['adminAssignTargetId', 'adminAssignCalorie', 'adminAssignSteps', 'adminAssignWorkouts', 'adminAssignRefeedCalories', 'adminAssignRefeedStart', 'adminAssignRefeedEnd'].forEach(id => {
+    ['adminAssignTargetId', 'adminAssignCalorie', 'adminAssignSteps', 'adminAssignWorkouts', 'adminAssignRefeedCalories', 'adminAssignRefeedStart', 'adminAssignRefeedEnd', 'adminAssignSocialLinks'].forEach(id => {
       document.getElementById(id).value = '';
     });
     document.getElementById('adminAssignTargetsNote').textContent = '';
@@ -8980,6 +9028,8 @@ function initAnnouncementWidget() {
       noteEl.textContent = 'Refeed start date must be on or before the end date.';
       return;
     }
+    const socialLinksSel = document.getElementById('adminAssignSocialLinks').value;
+    const showSocialLinks = socialLinksSel === 'show' ? true : socialLinksSel === 'hide' ? false : null;
     noteEl.textContent = 'Assigning…';
     try {
       const { error } = await sb.rpc('assign_targets', {
@@ -8992,6 +9042,7 @@ function initAnnouncementWidget() {
         p_refeed_calories: parseIntOrNull(document.getElementById('adminAssignRefeedCalories').value),
         p_refeed_start: refeedStart,
         p_refeed_end: refeedEnd,
+        p_show_social_links: showSocialLinks,
       });
       if (error) throw error;
       assignOverlay.hidden = true;
@@ -9901,6 +9952,7 @@ safeInit(() => initClickToRevealHint('stepsCaloriesTitle', 'stepsCaloriesHint'),
 safeInit(initContact, 'initContact');
 safeInit(initFooterShare, 'initFooterShare');
 safeInit(initFooterTagline, 'initFooterTagline');
+safeInit(initFooterSocialLinks, 'initFooterSocialLinks');
 safeInit(initPrivacyPolicy, 'initPrivacyPolicy');
 safeInit(initTermsOfService, 'initTermsOfService');
 safeInit(initPRBoardOverlay, 'initPRBoardOverlay');
@@ -10002,8 +10054,14 @@ if ('serviceWorker' in navigator) {
       // while the app is open, and again shortly after boot. It only ever
       // downloads/installs the new worker — it never applies it on its own,
       // so nothing reloads or interrupts you until you tap Update Now.
-      setTimeout(() => checkForUpdate(), 5000);
-      setInterval(() => checkForUpdate(), 15 * 60 * 1000);
+      // Admin's "Updates enabled" kill switch (Settings, admin-only) skips
+      // this scheduling entirely when off — no version ever gets downloaded
+      // in the background while it's paused.
+      updatesGloballyEnabled().then(enabled => {
+        if (!enabled) return;
+        setTimeout(() => checkForUpdate(), 5000);
+        setInterval(() => checkForUpdate(), 15 * 60 * 1000);
+      });
     }).catch(() => {});
   });
   // Fires once the new worker actually takes control (after SKIP_WAITING) —
@@ -10076,6 +10134,12 @@ async function checkAndApplyAppUpdate() {
   overlay.hidden = false;
   statusEl.textContent = 'Checking for updates…';
 
+  if (!(await updatesGloballyEnabled())) {
+    statusEl.textContent = 'Updates are currently paused — check back later.';
+    setTimeout(() => { overlay.hidden = true; }, 2200);
+    return;
+  }
+
   if (!swRegistration) {
     statusEl.textContent = 'Update system unavailable — try closing and reopening the app.';
     setTimeout(() => { overlay.hidden = true; }, 2200);
@@ -10106,6 +10170,33 @@ function initAppUpdateButton() {
   autoToggle.addEventListener('change', () => {
     localStorage.setItem('wft_auto_update', autoToggle.checked ? '1' : '0');
   });
+
+  const updatesToggle = document.getElementById('updatesEnabledToggle');
+  if (updatesToggle) {
+    updatesToggle.addEventListener('change', async () => {
+      if (!isAdminLoggedIn()) { updatesToggle.checked = !updatesToggle.checked; return; }
+      const desired = updatesToggle.checked;
+      try {
+        const { error } = await sb.rpc('admin_set_updates_enabled', {
+          p_digital_id: adminSession.digitalId, p_password: adminSession.password, p_enabled: desired,
+        });
+        if (error) throw error;
+        cachedAdSettingsPromise = null; // next check picks up the new value instead of the stale cache
+        showRestToast(desired ? 'Updates re-enabled app-wide.' : 'Updates paused app-wide — everyone stays on their current version.');
+      } catch (e) {
+        updatesToggle.checked = !desired;
+        showRestToast('Could not update setting.');
+      }
+    });
+  }
+}
+
+// Global admin kill switch — false only when an admin explicitly turned it
+// off server-side. Any failure (offline, not configured) fails OPEN so a
+// network hiccup never accidentally freezes everyone on an old build.
+async function updatesGloballyEnabled() {
+  const settings = await fetchAdSettings();
+  return !settings || settings.updates_enabled !== false;
 }
 
 // Called right after a Sync to Nexus / local backup / Drive backup
@@ -10119,6 +10210,7 @@ function initAppUpdateButton() {
 async function maybeAutoApplyUpdate() {
   if (localStorage.getItem('wft_auto_update') !== '1') return;
   if (!swRegistration) return;
+  if (!(await updatesGloballyEnabled())) return;
   const found = swRegistration.waiting ? true : await checkForUpdate();
   if (!found || !swRegistration.waiting) return;
   showRestToast('Update found — applying automatically…');
