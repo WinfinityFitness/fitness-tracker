@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.3.4';
+const APP_VERSION = 'WF_SYS_V.3.6';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -7853,8 +7853,16 @@ const DIGITAL_ID_PATTERN = /^WF-[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/;
 // ID. Ordinary self-service reclaim now happens automatically via backup
 // restore (see getBackupPayload/fileRestore) instead of this tool.
 function refreshDigitalIdOverrideVisibility() {
+  const loggedIn = isAdminLoggedIn();
   const section = document.getElementById('digitalIdOverrideSection');
-  if (section) section.hidden = !isAdminLoggedIn();
+  if (section) section.hidden = !loggedIn;
+  const adFreeSection = document.getElementById('adFreeOverrideSection');
+  if (adFreeSection) adFreeSection.hidden = !loggedIn;
+  const adManagerSection = document.getElementById('adManagerSection');
+  if (adManagerSection) {
+    adManagerSection.hidden = !loggedIn;
+    if (loggedIn) renderAdManagerProducts();
+  }
 }
 
 function initDigitalIdOverride() {
@@ -7890,6 +7898,232 @@ function initDigitalIdOverride() {
       note.textContent = 'Transfer failed: ' + (e.message || 'no user found with that Digital ID, or you\'re offline.');
     }
     btn.disabled = false;
+  });
+}
+
+// Admin-only: grants/revokes a per-Digital-ID ad-free window. There's no
+// automatic way to confirm a GCash donation actually came in (no payment
+// webhook exists), so the admin manually verifies it, then grants a
+// time-limited window here — it expires on its own, nothing to remember to
+// revoke.
+function initAdFreeOverride() {
+  const idInput = document.getElementById('adFreeDigitalIdInput');
+  const hoursInput = document.getElementById('adFreeHoursInput');
+  const note = document.getElementById('adFreeNote');
+  const grantBtn = document.getElementById('btnGrantAdFree');
+  const revokeBtn = document.getElementById('btnRevokeAdFree');
+  if (!idInput || !grantBtn || !revokeBtn) return;
+
+  grantBtn.addEventListener('click', async () => {
+    if (!isAdminLoggedIn()) { note.textContent = 'Admin login required.'; return; }
+    const targetId = idInput.value.trim().toUpperCase();
+    const hours = parseInt(hoursInput.value, 10) || 24;
+    if (!DIGITAL_ID_PATTERN.test(targetId)) { note.textContent = 'Must match the format WF-XXXXXX.'; return; }
+    if (!sbConfigured()) { note.textContent = 'Not available offline.'; return; }
+    grantBtn.disabled = true;
+    note.textContent = 'Granting…';
+    try {
+      const { error } = await sb.rpc('admin_grant_ad_free', {
+        p_digital_id: adminSession.digitalId, p_password: adminSession.password,
+        p_target_public_id: targetId, p_hours: hours,
+      });
+      if (error) throw error;
+      note.textContent = `${targetId} is ad-free for the next ${hours}h.`;
+    } catch (e) {
+      note.textContent = 'Failed: ' + (e.message || 'no user found with that Digital ID, or you\'re offline.');
+    }
+    grantBtn.disabled = false;
+  });
+
+  revokeBtn.addEventListener('click', async () => {
+    if (!isAdminLoggedIn()) { note.textContent = 'Admin login required.'; return; }
+    const targetId = idInput.value.trim().toUpperCase();
+    if (!DIGITAL_ID_PATTERN.test(targetId)) { note.textContent = 'Must match the format WF-XXXXXX.'; return; }
+    if (!sbConfigured()) { note.textContent = 'Not available offline.'; return; }
+    revokeBtn.disabled = true;
+    note.textContent = 'Revoking…';
+    try {
+      const { error } = await sb.rpc('admin_revoke_ad_free', {
+        p_digital_id: adminSession.digitalId, p_password: adminSession.password,
+        p_target_public_id: targetId,
+      });
+      if (error) throw error;
+      note.textContent = `Ad-free access revoked for ${targetId}.`;
+    } catch (e) {
+      note.textContent = 'Failed: ' + (e.message || 'you\'re offline.');
+    }
+    revokeBtn.disabled = false;
+  });
+}
+
+// Per-user ad-free check — only meaningful for accounts that have a
+// leaderboard row at all (i.e. have synced to Nexus with sharing on at
+// least once); a device that's never synced simply has no row to check, so
+// this returns false for it and the global ad_settings switch is the only
+// thing that applies.
+async function isAdFreeUser() {
+  if (!sbConfigured()) return false;
+  const shareKey = localStorage.getItem('wft_lb_share_key');
+  if (!shareKey) return false;
+  try {
+    const { data } = await sb.from('leaderboard').select('ad_free_until').eq('share_key', shareKey).maybeSingle();
+    return !!(data && data.ad_free_until && new Date(data.ad_free_until) > new Date());
+  } catch (e) { return false; }
+}
+
+const AD_SPLASH_COUNTDOWN_SEC = 10;
+
+// Startup ad splash: global ads_enabled switch, then per-user ad-free grant,
+// then picks a random active product from ad_products. Silently does
+// nothing if any of those aren't available (offline, not configured, no
+// products yet) — an ad that fails to load should never block app entry.
+async function initAdSplash() {
+  if (!sbConfigured()) return;
+  try {
+    const { data: settings } = await sb.from('ad_settings').select('ads_enabled').eq('id', 1).maybeSingle();
+    if (!settings || !settings.ads_enabled) return;
+    if (await isAdFreeUser()) return;
+
+    const { data: products } = await sb.from('ad_products').select('*').eq('active', true);
+    if (!products || !products.length) return;
+
+    const product = products[Math.floor(Math.random() * products.length)];
+    const overlay = document.getElementById('adSplashOverlay');
+    document.getElementById('adSplashImage').src = product.image_url;
+    document.getElementById('adSplashName').textContent = product.name;
+    document.getElementById('adSplashLink').href = product.link_url;
+
+    const closeBtn = document.getElementById('btnAdSplashClose');
+    const countdownEl = document.getElementById('adSplashCountdown');
+    closeBtn.disabled = true;
+    closeBtn.classList.remove('is-ready');
+    let remaining = AD_SPLASH_COUNTDOWN_SEC;
+    countdownEl.textContent = remaining;
+    overlay.hidden = false;
+
+    const tick = setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearInterval(tick);
+        closeBtn.disabled = false;
+        closeBtn.classList.add('is-ready');
+      } else {
+        countdownEl.textContent = remaining;
+      }
+    }, 1000);
+
+    closeBtn.addEventListener('click', () => { overlay.hidden = true; }, { once: true });
+  } catch (e) { /* best effort — never block app entry over a failed ad load */ }
+}
+
+// Admin-only widget on the Nexus tab: app-wide ads on/off switch plus the
+// editable ad_products list that feeds initAdSplash() above.
+async function renderAdManagerProducts() {
+  if (!sbConfigured() || !isAdminLoggedIn()) return;
+  const toggle = document.getElementById('adsEnabledToggle');
+  const { data: settings } = await sb.from('ad_settings').select('ads_enabled').eq('id', 1).maybeSingle();
+  if (toggle) toggle.checked = !!(settings && settings.ads_enabled);
+
+  const { data: products } = await sb.from('ad_products').select('*').order('created_at', { ascending: false });
+  const list = document.getElementById('adManagerList');
+  const empty = document.getElementById('adManagerEmptyNote');
+  if (!list) return;
+  list.innerHTML = '';
+  if (!products || !products.length) { empty.hidden = false; return; }
+  empty.hidden = true;
+
+  products.forEach(p => {
+    const row = document.createElement('div');
+    row.className = 'ad-manager-row' + (p.active ? '' : ' ad-manager-inactive');
+    row.innerHTML = `
+      <img class="ad-manager-thumb" src="${escapeHtml(p.image_url)}" alt="">
+      <div class="ad-manager-info">
+        <div class="ad-manager-name">${escapeHtml(p.name)}${p.active ? '' : ' (inactive)'}</div>
+        <span class="ad-manager-link">${escapeHtml(p.link_url)}</span>
+      </div>
+      <div class="ad-manager-actions">
+        <button type="button" class="btn btn--sm" data-edit-ad="${p.id}">Edit</button>
+        <button type="button" class="btn btn--danger btn--sm" data-delete-ad="${p.id}">Delete</button>
+      </div>`;
+    list.appendChild(row);
+  });
+  list.querySelectorAll('[data-edit-ad]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = products.find(x => String(x.id) === btn.dataset.editAd);
+      if (!p) return;
+      document.getElementById('adFormId').value = p.id;
+      document.getElementById('adFormName').value = p.name;
+      document.getElementById('adFormImage').value = p.image_url;
+      document.getElementById('adFormLink').value = p.link_url;
+      document.getElementById('adFormActive').checked = p.active;
+      document.getElementById('btnCancelAdEdit').hidden = false;
+    });
+  });
+  list.querySelectorAll('[data-delete-ad]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Delete this ad product?')) return;
+      try {
+        await sb.rpc('admin_delete_ad_product', {
+          p_digital_id: adminSession.digitalId, p_password: adminSession.password, p_id: Number(btn.dataset.deleteAd),
+        });
+        renderAdManagerProducts();
+      } catch (e) { showRestToast('Could not delete ad.'); }
+    });
+  });
+}
+
+function resetAdForm() {
+  document.getElementById('adFormId').value = '';
+  document.getElementById('adFormName').value = '';
+  document.getElementById('adFormImage').value = '';
+  document.getElementById('adFormLink').value = '';
+  document.getElementById('adFormActive').checked = true;
+  document.getElementById('btnCancelAdEdit').hidden = true;
+}
+
+function initAdManager() {
+  const toggle = document.getElementById('adsEnabledToggle');
+  if (!toggle) return;
+
+  toggle.addEventListener('change', async () => {
+    if (!isAdminLoggedIn()) { toggle.checked = !toggle.checked; return; }
+    const desired = toggle.checked;
+    try {
+      const { error } = await sb.rpc('admin_set_ads_enabled', {
+        p_digital_id: adminSession.digitalId, p_password: adminSession.password, p_enabled: desired,
+      });
+      if (error) throw error;
+      showRestToast(desired ? 'Ads enabled app-wide.' : 'Ads paused app-wide.');
+    } catch (e) {
+      toggle.checked = !desired;
+      showRestToast('Could not update ad setting.');
+    }
+  });
+
+  document.getElementById('btnCancelAdEdit').addEventListener('click', resetAdForm);
+
+  document.getElementById('btnSaveAdProduct').addEventListener('click', async () => {
+    const note = document.getElementById('adManagerNote');
+    if (!isAdminLoggedIn()) { note.textContent = 'Admin login required.'; return; }
+    const idVal = document.getElementById('adFormId').value;
+    const name = document.getElementById('adFormName').value.trim();
+    const image = document.getElementById('adFormImage').value.trim();
+    const link = document.getElementById('adFormLink').value.trim();
+    const active = document.getElementById('adFormActive').checked;
+    if (!name || !image || !link) { note.textContent = 'Fill in name, image URL, and link.'; return; }
+    note.textContent = 'Saving…';
+    try {
+      const { error } = await sb.rpc('admin_upsert_ad_product', {
+        p_digital_id: adminSession.digitalId, p_password: adminSession.password,
+        p_id: idVal ? Number(idVal) : null, p_name: name, p_image_url: image, p_link_url: link, p_active: active,
+      });
+      if (error) throw error;
+      note.textContent = 'Saved.';
+      resetAdForm();
+      renderAdManagerProducts();
+    } catch (e) {
+      note.textContent = 'Failed: ' + (e.message || 'you\'re offline.');
+    }
   });
 }
 
@@ -9352,6 +9586,8 @@ safeInit(initLastStateRestore, 'initLastStateRestore');
 safeInit(incrementAppOpens, 'incrementAppOpens');
 safeInit(initDigitalId, 'initDigitalId');
 safeInit(initDigitalIdOverride, 'initDigitalIdOverride');
+safeInit(initAdFreeOverride, 'initAdFreeOverride');
+safeInit(initAdManager, 'initAdManager');
 safeInit(() => initClickToRevealHint('adjustedBmiTile', 'adjustedBmiHint'), 'initAdjustedBmiHint');
 safeInit(() => initClickToRevealHint('stepsCaloriesTitle', 'stepsCaloriesHint'), 'initStepsCaloriesHint');
 safeInit(initContact, 'initContact');
@@ -9417,6 +9653,7 @@ setTimeout(() => {
   if (!splash) return;
   splash.classList.add('splash-hide');
   setTimeout(() => { splash.hidden = true; }, 400);
+  initAdSplash();
   checkDataReminder();
   setTimeout(checkMeasurementReminder, 6000);
   cleanupOldHydrationFiredKeys();

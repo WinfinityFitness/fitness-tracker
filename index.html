@@ -696,6 +696,41 @@
     </div>
     <p class="empty-note" id="lbEmptyNote" hidden>No Nexus data yet. Tap Sync to share and see others.</p>
 
+    <div class="chart-card" id="adManagerSection" hidden>
+      <p class="mod-tag">Admin_ads_01</p>
+      <div class="chart-card-head"><span class="chart-card-title">Admin: Startup Ad Splash</span></div>
+      <div class="theme-toggle-row">
+        <span>Ads enabled (app-wide)</span>
+        <label class="switch">
+          <input type="checkbox" id="adsEnabledToggle">
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+        </label>
+      </div>
+      <p class="hint hint--sm">Turn this off to pause the startup ad splash for everyone — useful while you don't have any affiliate links set up yet.</p>
+      <div id="adManagerList"></div>
+      <p class="empty-note" id="adManagerEmptyNote" hidden>No ad products yet — add one below.</p>
+      <p class="field-group-heading" style="font-size:0.8rem;margin-top:14px;">Add / edit ad</p>
+      <input type="hidden" id="adFormId">
+      <label class="field">
+        <span>Product name</span>
+        <input type="text" id="adFormName" placeholder="e.g. Resistance Bands Set">
+      </label>
+      <label class="field">
+        <span>Image URL</span>
+        <input type="text" id="adFormImage" placeholder="https://...">
+      </label>
+      <label class="field">
+        <span>Affiliate link</span>
+        <input type="text" id="adFormLink" placeholder="https://...">
+      </label>
+      <label class="field field--checkbox"><input type="checkbox" id="adFormActive" checked><span>Active</span></label>
+      <div class="btn-row">
+        <button type="button" class="btn btn--primary" id="btnSaveAdProduct">Save ad</button>
+        <button type="button" class="btn" id="btnCancelAdEdit" hidden>Cancel edit</button>
+      </div>
+      <p class="save-note" id="adManagerNote"></p>
+    </div>
+
     <div class="chart-card announcement-card" id="announcementCard">
       <div class="chart-card-head">
         <p class="mod-tag" style="margin:0;">Nexus Announcement</p>
@@ -1481,6 +1516,24 @@
       <p class="save-note" id="digitalIdOverrideNote"></p>
     </div>
 
+    <div class="sheet-section" id="adFreeOverrideSection" hidden>
+      <p class="field-group-heading">Admin: Ad-Free Access</p>
+      <p class="hint">Manually confirm their GCash donation came in first (there's no automatic payment confirmation), then grant a time-limited ad-free window — it expires on its own, nothing to remember to revoke.</p>
+      <label class="field">
+        <span>Digital ID</span>
+        <input type="text" id="adFreeDigitalIdInput" placeholder="e.g. WF-B932GB" maxlength="9" style="text-transform:uppercase;">
+      </label>
+      <label class="field">
+        <span>Hours</span>
+        <input type="number" id="adFreeHoursInput" min="1" step="1" value="24">
+      </label>
+      <div class="btn-row">
+        <button type="button" class="btn btn--primary" id="btnGrantAdFree">Grant ad-free</button>
+        <button type="button" class="btn" id="btnRevokeAdFree">Revoke ad-free</button>
+      </div>
+      <p class="save-note" id="adFreeNote"></p>
+    </div>
+
     <div class="sheet-section">
       <p class="field-group-heading">Hydration Reminders</p>
       <p class="hint">Best-effort: a PWA can't wake up in the background at an exact time, so these fire while the app is open (checked every few minutes) using the schedule below, based on general hydration guidance.</p>
@@ -2142,6 +2195,21 @@
     </div>
     <div class="mission-log-grid" id="datePickerGrid"></div>
     <button type="button" class="btn btn--sm" id="btnDatePickerToday" style="margin-top:12px;">Jump to today</button>
+  </div>
+</div>
+
+<div class="ad-splash-overlay" id="adSplashOverlay" hidden>
+  <div class="ad-splash-card">
+    <button type="button" class="ad-splash-close" id="btnAdSplashClose" disabled aria-label="Close ad">
+      <span class="ad-splash-countdown" id="adSplashCountdown">10</span>
+      <svg class="ad-splash-x-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
+    </button>
+    <a href="#" target="_blank" rel="noopener sponsored" id="adSplashLink" class="ad-splash-link">
+      <p class="ad-splash-eyebrow">Sponsored</p>
+      <img id="adSplashImage" class="ad-splash-image" alt="" src="">
+      <p class="ad-splash-name" id="adSplashName"></p>
+      <p class="ad-splash-cta">Tap to view →</p>
+    </a>
   </div>
 </div>
 

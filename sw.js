@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fittracker-v213';
+const CACHE_NAME = 'fittracker-v215';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -73,7 +73,9 @@ self.addEventListener('push', event => {
       body: data.body,
       icon: './icons/icon-192.png',
       badge: './icons/icon-192.png',
-      vibrate: [200, 100, 200],
+      // No explicit vibrate pattern — like most well-behaved apps, this lets
+      // Android's own per-app notification vibration setting decide instead
+      // of forcing a fixed buzz regardless of what the phone is set to.
       data: { url: data.url || './' },
     })
   );
