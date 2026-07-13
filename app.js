@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.5.8';
+const APP_VERSION = 'WF_SYS_V.5.9';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -10527,7 +10527,7 @@ function updateWidgetOpacityPreview() {
   const fillAlpha = 1 - fillFrac * fillFrac;
   const opacityAlpha = 1 - opacityFrac * opacityFrac;
   const effectiveAlpha = (fillAlpha * opacityAlpha).toFixed(2);
-  document.getElementById('widgetOpacityPreviewSwatch').style.background = `rgba(var(--surface-1-rgb), ${effectiveAlpha})`;
+  document.getElementById('widgetOpacityPreviewFill').style.background = `rgba(var(--surface-1-rgb), ${effectiveAlpha})`;
 }
 
 // Crop position previews via drag before Apply commits it (see

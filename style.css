@@ -198,6 +198,7 @@ body.has-custom-bg { background-color: transparent; }
   gap: 8px;
 }
 .brand { display: flex; align-items: center; gap: 8px; }
+.header-right { display: flex; align-items: center; gap: 8px; }
 .brand-logo { display: block; filter: drop-shadow(0 0 6px var(--cyan-glow)); }
 .app-header h1 {
   font-family: var(--font-mono);
@@ -3777,22 +3778,40 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 /* ---------------- Custom background upload (Settings) ---------------- */
 .opacity-preview-row { display: flex; align-items: center; gap: 12px; margin: 10px 0 4px; }
 .opacity-preview-swatch {
+  position: relative;
   flex: none;
   width: 64px;
   height: 40px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: rgba(var(--surface-1-rgb), 1);
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
 }
+/* Stands in for a custom background photo sitting behind your widgets —
+   the fill layer on top is what the sliders actually control. */
+.opacity-preview-swatch-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url('icons/icon-192.png');
+  background-size: cover;
+  background-position: center;
+}
+.opacity-preview-swatch-fill {
+  position: absolute;
+  inset: 0;
+  background: rgba(var(--surface-1-rgb), 1);
+}
 .opacity-preview-swatch span {
+  position: relative;
+  z-index: 1;
   font-family: var(--font-mono);
   font-size: 0.6rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: var(--text-secondary);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
 }
 .bg-upload-row { display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
 .bg-settings-group { display: flex; flex-direction: column; gap: 4px; margin-top: 14px; }

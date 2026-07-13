@@ -30,9 +30,11 @@
   <div class="brand">
     <img class="brand-logo" src="icons/icon-192.png" alt="" width="28" height="28">
     <h1>WINFINITY</h1>
+  </div>
+  <div class="header-right">
+    <span class="app-header-sub" id="headerToday"></span>
     <img class="brand-logo mode-icon" id="headerModeIcon" src="" alt="" width="28" height="28" hidden>
   </div>
-  <span class="app-header-sub" id="headerToday"></span>
 </header>
 
 <div class="global-announcement-strip" id="globalAnnouncementStrip" hidden>
@@ -1520,8 +1522,12 @@
       <p class="hint">Upload a photo to use as the app background — auto-resized to a size that's plenty sharp for a phone screen without eating your storage.</p>
 
       <div class="opacity-preview-row">
-        <div class="opacity-preview-swatch" id="widgetOpacityPreviewSwatch" aria-hidden="true"><span>Preview</span></div>
-        <p class="hint hint--sm" style="margin:0;">Drag the sliders below to preview, then tap Apply to update the whole app.</p>
+        <div class="opacity-preview-swatch" id="widgetOpacityPreviewSwatch" aria-hidden="true">
+          <div class="opacity-preview-swatch-bg"></div>
+          <div class="opacity-preview-swatch-fill" id="widgetOpacityPreviewFill"></div>
+          <span>Preview</span>
+        </div>
+        <p class="hint hint--sm" style="margin:0;">Shown over the Winfinity logo, like a background photo would sit behind your widgets. Drag the sliders below to preview, then tap Apply to update the whole app.</p>
       </div>
       <label class="field">
         <span>Widget Box Fill Transparency</span>
