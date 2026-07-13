@@ -1498,6 +1498,10 @@
       </div>
       <p class="hint" id="bgImageStatus"></p>
 
+      <div class="opacity-preview-row">
+        <div class="opacity-preview-swatch" id="widgetOpacityPreviewSwatch" aria-hidden="true"><span>Preview</span></div>
+        <p class="hint hint--sm" style="margin:0;">Drag the sliders below to preview, then tap Apply to update the whole app.</p>
+      </div>
       <label class="field">
         <span>Widget Box Fill Transparency</span>
         <input type="range" id="bgWidgetFillSlider" min="0" max="100" step="1" value="0">
@@ -1510,6 +1514,7 @@
         <output id="bgWidgetOpacityOut">0</output>
       </label>
       <p class="hint hint--sm">Fades the whole widget as one unit — border and content included — instead of just the fill.</p>
+      <button type="button" class="btn btn--primary" id="btnApplyWidgetOpacity" disabled>Apply</button>
 
       <div class="bg-settings-group" id="bgSettingsGroup" hidden>
         <label class="field">

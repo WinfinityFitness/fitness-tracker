@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.5.4';
+const APP_VERSION = 'WF_SYS_V.5.5';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9990,6 +9990,21 @@ function applyCustomBg() {
 }
 applyCustomBg();
 
+// Mirrors the exact math applyCustomBg() uses for --widget-fill-alpha /
+// --widget-opacity, but reads live off the sliders (not saved settings) and
+// only paints the small swatch — never touches the real app-wide CSS vars.
+// Both effects stack on the same fill layer in the real CSS (see the
+// .chart-card::before rule), so the preview multiplies them the same way,
+// otherwise the preview wouldn't match what Apply actually produces.
+function updateWidgetOpacityPreview() {
+  const fillFrac = parseInt(document.getElementById('bgWidgetFillSlider').value, 10) / 100;
+  const opacityFrac = parseInt(document.getElementById('bgWidgetOpacitySlider').value, 10) / 100;
+  const fillAlpha = 1 - fillFrac * fillFrac;
+  const opacityAlpha = 1 - opacityFrac * opacityFrac;
+  const effectiveAlpha = (fillAlpha * opacityAlpha).toFixed(2);
+  document.getElementById('widgetOpacityPreviewSwatch').style.background = `rgba(var(--surface-1-rgb), ${effectiveAlpha})`;
+}
+
 function updateCropPreviewBg() {
   const imgData = getBgImageData();
   const preview = document.getElementById('bgCropPreview');
@@ -10014,6 +10029,8 @@ function loadBgSettingsIntoUI() {
   document.getElementById('bgWidgetOpacityOut').textContent = s.widgetOpacity;
   document.getElementById('bgCropWrap').hidden = s.mode !== 'crop';
   updateCropPreviewBg();
+  updateWidgetOpacityPreview();
+  document.getElementById('btnApplyWidgetOpacity').disabled = true;
 }
 
 function initCustomBackground() {
@@ -10071,7 +10088,7 @@ function initCustomBackground() {
     applyCustomBg();
   });
 
-  [['bgBlurSlider', 'blur'], ['bgDimSlider', 'dim'], ['bgTransparencySlider', 'transparency'], ['bgWidgetFillSlider', 'widgetFill'], ['bgWidgetOpacitySlider', 'widgetOpacity']].forEach(([id, key]) => {
+  [['bgBlurSlider', 'blur'], ['bgDimSlider', 'dim'], ['bgTransparencySlider', 'transparency']].forEach(([id, key]) => {
     document.getElementById(id).addEventListener('input', e => {
       const s = getBgSettings();
       s[key] = parseInt(e.target.value, 10);
@@ -10079,6 +10096,30 @@ function initCustomBackground() {
       document.getElementById(id.replace('Slider', 'Out')).textContent = e.target.value;
       applyCustomBg();
     });
+  });
+
+  // Widget Box Fill Transparency / Widget Opacity dragging every step
+  // instantly re-rendered the whole app's widgets, which made the fade feel
+  // like it was snapping straight to fully transparent mid-drag. These two
+  // now only update a small preview swatch (and the settings sliders'
+  // own numeric readout) while dragging — the real app-wide CSS vars only
+  // change once "Apply" is tapped, using whatever the sliders are set to
+  // at that moment.
+  const applyWidgetOpacityBtn = document.getElementById('btnApplyWidgetOpacity');
+  ['bgWidgetFillSlider', 'bgWidgetOpacitySlider'].forEach(id => {
+    document.getElementById(id).addEventListener('input', e => {
+      document.getElementById(id.replace('Slider', 'Out')).textContent = e.target.value;
+      updateWidgetOpacityPreview();
+      applyWidgetOpacityBtn.disabled = false;
+    });
+  });
+  applyWidgetOpacityBtn.addEventListener('click', () => {
+    const s = getBgSettings();
+    s.widgetFill = parseInt(document.getElementById('bgWidgetFillSlider').value, 10);
+    s.widgetOpacity = parseInt(document.getElementById('bgWidgetOpacitySlider').value, 10);
+    saveBgSettings(s);
+    applyCustomBg();
+    applyWidgetOpacityBtn.disabled = true;
   });
 
   // Drag-to-reposition on the crop preview box — only relevant in Crop &
