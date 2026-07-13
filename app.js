@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.5.5';
+const APP_VERSION = 'WF_SYS_V.5.6';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -6479,14 +6479,35 @@ function drawShareGoalTrack(ctx, x, y, w, profile, kgNow, wu, lowestKg7d) {
   ctx.restore();
 }
 
-async function generateWeightJourneyShareCard({ name, digitalId, date, series, wu, profile, kgNow, lowestKg7d }) {
+function drawShareWeightChartCard(ctx, y, width, chartCardH, title, series, wu) {
+  roundRectPath(ctx, 24, y, width - 48, chartCardH, 12);
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 14px sans-serif';
+  ctx.fillText(title, 44, y + 24);
+  ctx.textAlign = 'right'; ctx.fillStyle = '#7e8e95'; ctx.font = '12px monospace';
+  ctx.fillText(`${series.length} entries`, width - 44, y + 24);
+
+  if (series.length) {
+    drawShareWeightChart(ctx, 44, y + 34, width - 88, chartCardH - 60, series, wu);
+    ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = '11px sans-serif';
+    ctx.fillText('— Actual weight', 44, y + chartCardH - 14);
+    ctx.fillStyle = '#7e8e95';
+    ctx.fillText('- - Trend (7-day avg)', 190, y + chartCardH - 14);
+  } else {
+    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px sans-serif';
+    ctx.fillText('No weight entries logged yet.', width / 2, y + chartCardH / 2 + 5);
+  }
+}
+
+async function generateWeightJourneyShareCard({ name, digitalId, date, recentSeries, fullSeries, wu, profile, kgNow, lowestKg7d }) {
   const width = 600;
   const headerH = 116;
-  const chartCardH = series.length ? 300 : 80;
+  const chartCardH = 250;
   const gap = 16;
   const goalCardH = 148;
   const footerH = 46;
-  const height = headerH + chartCardH + gap + goalCardH + footerH;
+  const height = headerH + chartCardH + gap + chartCardH + gap + goalCardH + footerH;
 
   const canvas = document.createElement('canvas');
   canvas.width = width; canvas.height = height;
@@ -6512,23 +6533,12 @@ async function generateWeightJourneyShareCard({ name, digitalId, date, series, w
 
   let y = headerH;
 
-  // Weight journey card
-  roundRectPath(ctx, 24, y, width - 48, chartCardH, 12);
-  ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.textAlign = 'right'; ctx.fillStyle = '#7e8e95'; ctx.font = '12px monospace';
-  ctx.fillText(`${series.length} entries`, width - 44, y + 26);
-
-  if (series.length) {
-    drawShareWeightChart(ctx, 44, y + 36, width - 88, 190, series, wu);
-    ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = '11px sans-serif';
-    ctx.fillText('— Actual weight', 44, y + chartCardH - 14);
-    ctx.fillStyle = '#7e8e95';
-    ctx.fillText('- - Trend (7-day avg)', 190, y + chartCardH - 14);
-  } else {
-    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px sans-serif';
-    ctx.fillText('No weight entries logged yet.', width / 2, y + chartCardH / 2 + 5);
-  }
+  // Two weight journey cards — recent 7 days on top, full journey since
+  // day one below it — instead of just whichever view the in-app widget
+  // happened to be toggled to when Share was tapped.
+  drawShareWeightChartCard(ctx, y, width, chartCardH, 'Recent (7 days)', recentSeries, wu);
+  y += chartCardH + gap;
+  drawShareWeightChartCard(ctx, y, width, chartCardH, 'Full journey', fullSeries, wu);
   y += chartCardH + gap;
 
   // Goal progress card
@@ -6553,14 +6563,15 @@ async function shareWeightJourney() {
   const profile = getProfile();
   const logsArr = sortedLogsArray();
   const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
-  const series = weightChartFullJourney ? computeTrendSeries(logsArr) : computeTrendSeries(logsArr).slice(-7);
+  const fullSeries = computeTrendSeries(logsArr);
+  const recentSeries = fullSeries.slice(-7);
   const kgNow = currentWeightKg(profile);
   const lowestKg7d = minOfLastNDays(logsArr, 'weightKg', 7);
   const blob = await generateWeightJourneyShareCard({
     name: (profile && profile.name) || 'Operator',
     digitalId: getOrCreatePublicId(),
     date: fmtDate(new Date()),
-    series, wu, profile, kgNow, lowestKg7d,
+    recentSeries, fullSeries, wu, profile, kgNow, lowestKg7d,
   });
   shareViaWebShare({ title: 'Winfinity Tracker — Weight Journey', text: '📈 My weight journey & goal progress, tracked with Winfinity Tracker!' }, blob);
 }
@@ -7122,11 +7133,12 @@ async function buildAssessmentBlobs() {
   }
 
   if (document.getElementById('assessChkWeight').checked) {
-    const series = weightChartFullJourney ? computeTrendSeries(logsArr) : computeTrendSeries(logsArr).slice(-7);
+    const fullSeries = computeTrendSeries(logsArr);
+    const recentSeries = fullSeries.slice(-7);
     const kgNow = currentWeightKg(profile);
     const lowestKg7d = minOfLastNDays(logsArr, 'weightKg', 7);
     jobs.push(generateWeightJourneyShareCard({
-      name, digitalId, date: nowDate, series, wu, profile, kgNow, lowestKg7d,
+      name, digitalId, date: nowDate, recentSeries, fullSeries, wu, profile, kgNow, lowestKg7d,
     }).then(blob => ({ name: 'weight-journey.png', blob })));
   }
 
@@ -10005,13 +10017,17 @@ function updateWidgetOpacityPreview() {
   document.getElementById('widgetOpacityPreviewSwatch').style.background = `rgba(var(--surface-1-rgb), ${effectiveAlpha})`;
 }
 
+// Crop position previews via drag before Apply commits it (see
+// initCustomBackground below) — kept at module scope so both the drag
+// handler and loadBgSettingsIntoUI can read/reset the same pending value.
+let pendingCropX = 50, pendingCropY = 50;
+
 function updateCropPreviewBg() {
   const imgData = getBgImageData();
   const preview = document.getElementById('bgCropPreview');
   if (!imgData) return;
-  const s = getBgSettings();
   preview.style.backgroundImage = `url(${imgData.dataUrl})`;
-  preview.style.backgroundPosition = `${s.cropX}% ${s.cropY}%`;
+  preview.style.backgroundPosition = `${pendingCropX}% ${pendingCropY}%`;
 }
 
 function loadBgSettingsIntoUI() {
@@ -10028,9 +10044,12 @@ function loadBgSettingsIntoUI() {
   document.getElementById('bgWidgetOpacitySlider').value = s.widgetOpacity;
   document.getElementById('bgWidgetOpacityOut').textContent = s.widgetOpacity;
   document.getElementById('bgCropWrap').hidden = s.mode !== 'crop';
+  pendingCropX = s.cropX;
+  pendingCropY = s.cropY;
   updateCropPreviewBg();
   updateWidgetOpacityPreview();
   document.getElementById('btnApplyWidgetOpacity').disabled = true;
+  document.getElementById('btnApplyBgSettings').disabled = true;
 }
 
 function initCustomBackground() {
@@ -10079,23 +10098,36 @@ function initCustomBackground() {
     applyCustomBg();
   });
 
+  // Position mode / Crop / Blur / Dim / Transparency all preview locally
+  // (mode + crop box update on screen, slider readouts update) but don't
+  // touch the real background layer or saved settings until Apply is
+  // tapped — same deferred-apply pattern as Widget Fill/Opacity below.
+  const applyBgSettingsBtn = document.getElementById('btnApplyBgSettings');
+
   document.getElementById('bgModeSelect').addEventListener('change', e => {
-    const s = getBgSettings();
-    s.mode = e.target.value;
-    saveBgSettings(s);
-    document.getElementById('bgCropWrap').hidden = s.mode !== 'crop';
-    if (s.mode === 'crop') updateCropPreviewBg();
-    applyCustomBg();
+    document.getElementById('bgCropWrap').hidden = e.target.value !== 'crop';
+    if (e.target.value === 'crop') updateCropPreviewBg();
+    applyBgSettingsBtn.disabled = false;
   });
 
   [['bgBlurSlider', 'blur'], ['bgDimSlider', 'dim'], ['bgTransparencySlider', 'transparency']].forEach(([id, key]) => {
     document.getElementById(id).addEventListener('input', e => {
-      const s = getBgSettings();
-      s[key] = parseInt(e.target.value, 10);
-      saveBgSettings(s);
       document.getElementById(id.replace('Slider', 'Out')).textContent = e.target.value;
-      applyCustomBg();
+      applyBgSettingsBtn.disabled = false;
     });
+  });
+
+  applyBgSettingsBtn.addEventListener('click', () => {
+    const s = getBgSettings();
+    s.mode = document.getElementById('bgModeSelect').value;
+    s.blur = parseInt(document.getElementById('bgBlurSlider').value, 10);
+    s.dim = parseInt(document.getElementById('bgDimSlider').value, 10);
+    s.transparency = parseInt(document.getElementById('bgTransparencySlider').value, 10);
+    s.cropX = pendingCropX;
+    s.cropY = pendingCropY;
+    saveBgSettings(s);
+    applyCustomBg();
+    applyBgSettingsBtn.disabled = true;
   });
 
   // Widget Box Fill Transparency / Widget Opacity dragging every step
@@ -10129,8 +10161,7 @@ function initCustomBackground() {
   cropPreview.addEventListener('pointerdown', e => {
     dragging = true;
     startX = e.clientX; startY = e.clientY;
-    const s = getBgSettings();
-    startCropX = s.cropX; startCropY = s.cropY;
+    startCropX = pendingCropX; startCropY = pendingCropY;
     cropPreview.setPointerCapture(e.pointerId);
   });
   cropPreview.addEventListener('pointermove', e => {
@@ -10138,12 +10169,10 @@ function initCustomBackground() {
     const rect = cropPreview.getBoundingClientRect();
     const dxPct = ((e.clientX - startX) / rect.width) * 100;
     const dyPct = ((e.clientY - startY) / rect.height) * 100;
-    const s = getBgSettings();
-    s.cropX = Math.max(0, Math.min(100, startCropX - dxPct));
-    s.cropY = Math.max(0, Math.min(100, startCropY - dyPct));
-    saveBgSettings(s);
-    cropPreview.style.backgroundPosition = `${s.cropX}% ${s.cropY}%`;
-    applyCustomBg();
+    pendingCropX = Math.max(0, Math.min(100, startCropX - dxPct));
+    pendingCropY = Math.max(0, Math.min(100, startCropY - dyPct));
+    cropPreview.style.backgroundPosition = `${pendingCropX}% ${pendingCropY}%`;
+    applyBgSettingsBtn.disabled = false;
   });
   cropPreview.addEventListener('pointerup', () => { dragging = false; });
   cropPreview.addEventListener('pointercancel', () => { dragging = false; });

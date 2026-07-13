@@ -1491,12 +1491,6 @@
     <div class="sheet-section">
       <p class="field-group-heading">Custom Background</p>
       <p class="hint">Upload a photo to use as the app background — auto-resized to a size that's plenty sharp for a phone screen without eating your storage.</p>
-      <div class="bg-upload-row">
-        <input type="file" id="bgImageInput" accept="image/*" hidden>
-        <button type="button" class="btn" id="btnChooseBgImage">Choose Image</button>
-        <button type="button" class="btn btn--danger" id="btnRemoveBgImage" hidden>Remove</button>
-      </div>
-      <p class="hint" id="bgImageStatus"></p>
 
       <div class="opacity-preview-row">
         <div class="opacity-preview-swatch" id="widgetOpacityPreviewSwatch" aria-hidden="true"><span>Preview</span></div>
@@ -1515,6 +1509,13 @@
       </label>
       <p class="hint hint--sm">Fades the whole widget as one unit — border and content included — instead of just the fill.</p>
       <button type="button" class="btn btn--primary" id="btnApplyWidgetOpacity" disabled>Apply</button>
+
+      <div class="bg-upload-row">
+        <input type="file" id="bgImageInput" accept="image/*" hidden>
+        <button type="button" class="btn" id="btnChooseBgImage">Choose Image</button>
+        <button type="button" class="btn btn--danger" id="btnRemoveBgImage" hidden>Remove</button>
+      </div>
+      <p class="hint" id="bgImageStatus"></p>
 
       <div class="bg-settings-group" id="bgSettingsGroup" hidden>
         <label class="field">
@@ -1548,6 +1549,7 @@
           <input type="range" id="bgTransparencySlider" min="0" max="100" step="1" value="0">
           <output id="bgTransparencyOut">0</output>
         </label>
+        <button type="button" class="btn btn--primary" id="btnApplyBgSettings" disabled>Apply</button>
       </div>
     </div>
 
