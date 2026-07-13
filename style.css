@@ -1516,6 +1516,76 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 }
 .lock-card .btn-row .btn { min-width: 0; }
 
+/* ---------------- Exercise hold timer popup (Dead Hang, etc.) ---------------- */
+.timer-popup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: rgba(2,4,5,0.9);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.timer-popup-overlay[hidden] { display: none; }
+.timer-popup-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  padding: 28px 24px;
+  max-width: 300px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 0 50px rgba(45,226,230,0.18);
+  position: relative;
+}
+.timer-popup-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 6px;
+}
+.timer-popup-label {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cyan);
+  margin: 0 0 16px;
+}
+.timer-popup-display {
+  font-family: var(--font-mono);
+  font-size: 2.6rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 22px;
+  font-variant-numeric: tabular-nums;
+}
+.timer-popup-display.is-counting-in { color: var(--cyan); }
+.timer-popup-display.is-running { color: var(--accent, var(--cyan)); }
+.timer-popup-actions .btn { width: 100%; }
+.ex-set-timer-btn {
+  width: 100%;
+  padding: 8px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.ex-set-timer-btn.is-set {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
 /* ---------------- Terminal module tags ---------------- */
 .mod-tag {
   font-family: var(--font-mono);

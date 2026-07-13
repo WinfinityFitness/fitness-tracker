@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.5.3';
+const APP_VERSION = 'WF_SYS_V.5.4';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -2287,7 +2287,10 @@ function renderWeightChart(fullSeries, wu) {
 
   const displayVals = series.map(p => fromKg(p.actualKg, wu));
   const trendVals = series.map(p => fromKg(p.trendKg, wu));
-  const allVals = displayVals.concat(trendVals);
+  // Default view is trend-only (decluttered) — the raw actual-weight line
+  // only draws in the full-journey view, so the y-axis range shouldn't be
+  // stretched by values that aren't even on screen.
+  const allVals = weightChartFullJourney ? displayVals.concat(trendVals) : trendVals;
   let min = Math.min(...allVals), max = Math.max(...allVals);
   if (min === max) { min -= 1; max += 1; }
   const pad = (max - min) * 0.1;
@@ -2333,13 +2336,28 @@ function renderWeightChart(fullSeries, wu) {
     const tp = document.createElementNS(svgNS, 'path');
     tp.setAttribute('d', trendPath);
     tp.setAttribute('fill', 'none');
-    tp.setAttribute('stroke', 'var(--series-2)');
-    tp.setAttribute('stroke-width', '2');
-    tp.setAttribute('stroke-dasharray', '5 4');
+    tp.setAttribute('stroke-linejoin', 'round');
+    tp.setAttribute('stroke-linecap', 'round');
+    if (weightChartFullJourney) {
+      // Secondary reference line alongside the actual-weight line — dashed
+      // and thinner so it doesn't compete with the primary series.
+      tp.setAttribute('stroke', 'var(--series-2)');
+      tp.setAttribute('stroke-width', '2');
+      tp.setAttribute('stroke-dasharray', '5 4');
+    } else {
+      // The only line on screen in the default view — draw it as the
+      // primary series instead of a secondary dashed reference.
+      tp.setAttribute('stroke', 'var(--series-1)');
+      tp.setAttribute('stroke-width', '2.5');
+      tp.style.filter = 'drop-shadow(0 0 4px var(--cyan-glow))';
+    }
     svg.appendChild(tp);
   }
 
-  if (series.length > 1) {
+  // The raw actual-weight line and per-point markers only draw in the
+  // full-journey view — the default view stays trend-only (7-day avg) so
+  // day-to-day noise doesn't clutter the at-a-glance widget.
+  if (weightChartFullJourney && series.length > 1) {
     const actualPath = displayVals.map((v, i) => `${i === 0 ? 'M' : 'L'} ${xFor(i)} ${yFor(v)}`).join(' ');
     const ap = document.createElementNS(svgNS, 'path');
     ap.setAttribute('d', actualPath);
@@ -2352,16 +2370,18 @@ function renderWeightChart(fullSeries, wu) {
     svg.appendChild(ap);
   }
 
-  const lowestIdx = displayVals.indexOf(Math.min(...displayVals));
-  displayVals.forEach((v, i) => {
-    const isLowest = i === lowestIdx;
-    const c = document.createElementNS(svgNS, 'circle');
-    c.setAttribute('cx', xFor(i)); c.setAttribute('cy', yFor(v));
-    c.setAttribute('r', (isLowest ? 1.4 : 1) * (series.length > 40 ? 2 : 3.5));
-    c.setAttribute('fill', isLowest ? 'var(--warning)' : 'var(--series-1)');
-    if (isLowest) c.style.filter = 'drop-shadow(0 0 4px var(--warning))';
-    svg.appendChild(c);
-  });
+  if (weightChartFullJourney) {
+    const lowestIdx = displayVals.indexOf(Math.min(...displayVals));
+    displayVals.forEach((v, i) => {
+      const isLowest = i === lowestIdx;
+      const c = document.createElementNS(svgNS, 'circle');
+      c.setAttribute('cx', xFor(i)); c.setAttribute('cy', yFor(v));
+      c.setAttribute('r', (isLowest ? 1.4 : 1) * (series.length > 40 ? 2 : 3.5));
+      c.setAttribute('fill', isLowest ? 'var(--warning)' : 'var(--series-1)');
+      if (isLowest) c.style.filter = 'drop-shadow(0 0 4px var(--warning))';
+      svg.appendChild(c);
+    });
+  }
 
   const crosshair = document.createElementNS(svgNS, 'line');
   crosshair.setAttribute('y1', padT); crosshair.setAttribute('y2', H - padB);
@@ -2386,7 +2406,9 @@ function renderWeightChart(fullSeries, wu) {
     crosshair.setAttribute('x1', x); crosshair.setAttribute('x2', x);
     crosshair.setAttribute('visibility', 'visible');
     const pt = series[i];
-    tooltip.innerHTML = `<strong>${fmtDate(pt.dateObj)}</strong><br>Weight: ${round2(fromKg(pt.actualKg, wu))} ${wu}<br>Trend: ${round2(fromKg(pt.trendKg, wu))} ${wu}`;
+    tooltip.innerHTML = weightChartFullJourney
+      ? `<strong>${fmtDate(pt.dateObj)}</strong><br>Weight: ${round2(fromKg(pt.actualKg, wu))} ${wu}<br>Trend: ${round2(fromKg(pt.trendKg, wu))} ${wu}`
+      : `<strong>${fmtDate(pt.dateObj)}</strong><br>Trend: ${round2(fromKg(pt.trendKg, wu))} ${wu}`;
     tooltip.style.display = 'block';
     const containerWidth = container.clientWidth || W;
     const pxX = (x / W) * containerWidth;
@@ -2430,9 +2452,12 @@ function renderWeightChart(fullSeries, wu) {
     svg.addEventListener('pointerleave', () => { if (!pressed) hideTooltip(); });
   }
 
-  legend.innerHTML = `<span><span class="legend-swatch" style="background:var(--series-1)"></span>Actual weight</span>
-    <span><span class="legend-dash"></span>Trend (7-day avg)</span>
-    <button type="button" id="chartFullJourneyToggle" class="chart-toggle-link">${weightChartFullJourney ? 'Show recent' : 'Full journey'}</button>`;
+  legend.innerHTML = weightChartFullJourney
+    ? `<span><span class="legend-swatch" style="background:var(--series-1)"></span>Actual weight</span>
+       <span><span class="legend-dash"></span>Trend (7-day avg)</span>
+       <button type="button" id="chartFullJourneyToggle" class="chart-toggle-link">Show recent</button>`
+    : `<span><span class="legend-dash"></span>Trend (7-day avg)</span>
+       <button type="button" id="chartFullJourneyToggle" class="chart-toggle-link">Full journey</button>`;
 }
 
 function initWeightChartToggle() {
@@ -2603,6 +2628,19 @@ async function loadExerciseDb() {
     exerciseDb = await res.json();
   } catch (e) { exerciseDb = []; /* offline-friendly: suggestions from own history still work */ }
   exerciseDbLoaded = true;
+  // The DB (and its "timed" flags, e.g. Dead Hang) loads async, after the
+  // exercise cards for today may have already rendered with plain rep
+  // inputs — re-render so any timed exercise picks up its timer button.
+  if (currentExercises.length) renderExerciseCards();
+}
+
+// Timed holds (Dead Hang, etc.) log a hold duration instead of a rep count —
+// the duration is still stored in the set's `reps` field to avoid a schema
+// change, just interpreted as seconds instead of reps when rendering/reading.
+function isTimedExercise(name) {
+  if (!name) return false;
+  const entry = exerciseDb.find(e => e.name.trim().toLowerCase() === name.trim().toLowerCase());
+  return !!(entry && entry.timed);
 }
 
 function initExerciseNameAutocomplete() {
@@ -2739,6 +2777,7 @@ function renderExerciseCards() {
   currentExercises.forEach((ex, exIdx) => {
     const exUnit = ex.unit || wu;
     const prevSets = findPreviousSets(ex.name, date);
+    const timed = isTimedExercise(ex.name);
     const card = document.createElement('div');
     card.className = 'ex-card';
     const restMins = Math.round((ex.restSeconds || 180) / 60);
@@ -2746,12 +2785,17 @@ function renderExerciseCards() {
       .map(m => `<option value="${m}"${m === restMins ? ' selected' : ''}>${m}m</option>`).join('');
 
     const rows = ex.sets.map((s, setIdx) => {
-      const prev = prevSets && prevSets[setIdx] ? `${prevSets[setIdx].reps} × ${round2(fromKg(prevSets[setIdx].weightKg, exUnit))}${exUnit}` : '–';
+      const prev = prevSets && prevSets[setIdx]
+        ? (timed ? formatTime(prevSets[setIdx].reps || 0) : `${prevSets[setIdx].reps} × ${round2(fromKg(prevSets[setIdx].weightKg, exUnit))}${exUnit}`)
+        : '–';
       const weightDisplay = s.weightKg != null ? round2(fromKg(s.weightKg, exUnit)) : '';
+      const repsCell = timed
+        ? `<button type="button" class="ex-set-timer-btn${s.reps != null ? ' is-set' : ''}" data-ex="${exIdx}" data-set="${setIdx}">${s.reps != null ? formatTime(s.reps) : '⏱ Timer'}</button>`
+        : `<input type="number" class="ex-set-reps" data-ex="${exIdx}" data-set="${setIdx}" value="${s.reps ?? ''}" min="0">`;
       return `<tr class="${s.completed ? 'is-complete' : ''}">
         <td>${setIdx + 1}</td>
         <td class="ex-set-prev">${prev}</td>
-        <td><input type="number" class="ex-set-reps" data-ex="${exIdx}" data-set="${setIdx}" value="${s.reps ?? ''}" min="0"></td>
+        <td>${repsCell}</td>
         <td><input type="number" class="ex-set-weight" data-ex="${exIdx}" data-set="${setIdx}" value="${weightDisplay}" step="0.5" min="0"></td>
         <td><button type="button" class="ex-set-check${s.completed ? ' is-done' : ''}" data-ex="${exIdx}" data-set="${setIdx}">✓</button></td>
         <td><button type="button" class="ex-set-remove" data-ex="${exIdx}" data-set="${setIdx}">✕</button></td>
@@ -2787,7 +2831,7 @@ function renderExerciseCards() {
       </div>
       <input type="text" class="ex-card-notes" data-ex="${exIdx}" placeholder="Add notes here…" value="${escapeHtml(ex.notes || '')}">
       <table class="ex-sets-table">
-        <thead><tr><th>Set</th><th>Previous</th><th>Reps</th><th>Load (${exUnit})</th><th></th><th></th></tr></thead>
+        <thead><tr><th>Set</th><th>Previous</th><th>${timed ? 'Hold' : 'Reps'}</th><th>Load (${exUnit})</th><th></th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       <button type="button" class="btn btn--sm ex-add-set" data-ex="${exIdx}">+ Append set block</button>
@@ -3686,6 +3730,14 @@ function initTraining() {
       if (set.completed) startExerciseTimer(exIdx, currentExercises[exIdx].restSeconds || 180);
       return;
     }
+
+    const timerBtn = e.target.closest('.ex-set-timer-btn');
+    if (timerBtn) {
+      const exIdx = parseInt(timerBtn.dataset.ex, 10);
+      const setIdx = parseInt(timerBtn.dataset.set, 10);
+      openExerciseTimerPopup(exIdx, setIdx);
+      return;
+    }
   });
 
   cards.addEventListener('change', e => {
@@ -4031,6 +4083,95 @@ function formatTime(sec) {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
   return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/* ---------------------------------------------------------------- */
+/* Exercise hold timer popup (Dead Hang, etc.)                        */
+/* ---------------------------------------------------------------- */
+let exTimerPopupState = null; // { exIdx, setIdx, phase: 'idle'|'countdown'|'running', intervalId, startedAt }
+
+function openExerciseTimerPopup(exIdx, setIdx) {
+  exTimerPopupState = { exIdx, setIdx, phase: 'idle', intervalId: null, startedAt: null };
+  const overlay = document.getElementById('exerciseTimerOverlay');
+  const display = document.getElementById('exerciseTimerDisplay');
+  document.getElementById('exerciseTimerLabel').textContent = (currentExercises[exIdx] || {}).name || 'Timer';
+  display.textContent = 'Ready';
+  display.className = 'timer-popup-display';
+  document.getElementById('btnExerciseTimerStart').hidden = false;
+  document.getElementById('btnExerciseTimerStart').disabled = false;
+  document.getElementById('btnExerciseTimerStop').hidden = true;
+  overlay.hidden = false;
+}
+
+function closeExerciseTimerPopup() {
+  if (exTimerPopupState && exTimerPopupState.intervalId) clearInterval(exTimerPopupState.intervalId);
+  exTimerPopupState = null;
+  document.getElementById('exerciseTimerOverlay').hidden = true;
+}
+
+function startExerciseHoldCountdown() {
+  if (!exTimerPopupState || exTimerPopupState.phase !== 'idle') return;
+  exTimerPopupState.phase = 'countdown';
+  const display = document.getElementById('exerciseTimerDisplay');
+  display.className = 'timer-popup-display is-counting-in';
+  document.getElementById('btnExerciseTimerStart').disabled = true;
+
+  let count = 3;
+  display.textContent = String(count);
+  if (navigator.vibrate) navigator.vibrate(80);
+  playBeep();
+  const countdownId = setInterval(() => {
+    count -= 1;
+    if (count > 0) {
+      display.textContent = String(count);
+      if (navigator.vibrate) navigator.vibrate(80);
+      playBeep();
+      return;
+    }
+    clearInterval(countdownId);
+    if (!exTimerPopupState) return; // popup was closed mid-countdown
+    beginExerciseHoldStopwatch();
+  }, 1000);
+}
+
+function beginExerciseHoldStopwatch() {
+  exTimerPopupState.phase = 'running';
+  exTimerPopupState.startedAt = Date.now();
+  const display = document.getElementById('exerciseTimerDisplay');
+  display.className = 'timer-popup-display is-running';
+  display.textContent = formatTime(0);
+  document.getElementById('btnExerciseTimerStart').hidden = true;
+  document.getElementById('btnExerciseTimerStop').hidden = false;
+  if (navigator.vibrate) navigator.vibrate([80, 60, 80]);
+  playBeep();
+
+  exTimerPopupState.intervalId = setInterval(() => {
+    const elapsed = Math.round((Date.now() - exTimerPopupState.startedAt) / 1000);
+    display.textContent = formatTime(elapsed);
+  }, 250);
+}
+
+function stopExerciseHold() {
+  if (!exTimerPopupState || exTimerPopupState.phase !== 'running') return;
+  clearInterval(exTimerPopupState.intervalId);
+  const elapsedSec = Math.max(0, Math.round((Date.now() - exTimerPopupState.startedAt) / 1000));
+  const { exIdx, setIdx } = exTimerPopupState;
+  if (currentExercises[exIdx] && currentExercises[exIdx].sets[setIdx]) {
+    currentExercises[exIdx].sets[setIdx].reps = elapsedSec;
+    persistExercises();
+    renderExerciseCards();
+  }
+  if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 100]);
+  playBeep();
+  closeExerciseTimerPopup();
+}
+
+function initExerciseTimerPopup() {
+  const overlay = document.getElementById('exerciseTimerOverlay');
+  document.getElementById('btnExerciseTimerStart').addEventListener('click', startExerciseHoldCountdown);
+  document.getElementById('btnExerciseTimerStop').addEventListener('click', stopExerciseHold);
+  document.getElementById('btnCloseExerciseTimer').addEventListener('click', closeExerciseTimerPopup);
+  bindOverlayBackdropClose(overlay, closeExerciseTimerPopup);
 }
 
 function getExTimers() {
@@ -9967,6 +10108,7 @@ safeInit(initCheckin, 'initCheckin');
 safeInit(initQuickLogLaunchers, 'initQuickLogLaunchers');
 safeInit(initMeasurements, 'initMeasurements');
 safeInit(initTraining, 'initTraining');
+safeInit(initExerciseTimerPopup, 'initExerciseTimerPopup');
 safeInit(initCardioTracker, 'initCardioTracker');
 safeInit(initMissionLog, 'initMissionLog');
 safeInit(initDatePicker, 'initDatePicker');

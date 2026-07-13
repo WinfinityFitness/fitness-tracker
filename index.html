@@ -43,6 +43,18 @@
 
 <div class="rest-toast" id="restToast" hidden></div>
 
+<div class="timer-popup-overlay" id="exerciseTimerOverlay" hidden>
+  <div class="timer-popup-card">
+    <button type="button" class="timer-popup-close" id="btnCloseExerciseTimer">✕</button>
+    <p class="timer-popup-label" id="exerciseTimerLabel">Dead Hang</p>
+    <div class="timer-popup-display" id="exerciseTimerDisplay">Ready</div>
+    <div class="timer-popup-actions">
+      <button type="button" class="btn btn--primary" id="btnExerciseTimerStart">Start</button>
+      <button type="button" class="btn btn--danger" id="btnExerciseTimerStop" hidden>Stop</button>
+    </div>
+  </div>
+</div>
+
 <main id="app">
 
   <!-- ============ STATUS ============ -->
