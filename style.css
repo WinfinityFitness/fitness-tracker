@@ -1515,6 +1515,67 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 }
 .lock-card .btn-row .btn { min-width: 0; }
 
+/* ---------------- Fitness Journey mode gate / transition popups ---------------- */
+.lock-card--wide { max-width: 420px; }
+.mode-choice-list { display: flex; flex-direction: column; gap: 10px; text-align: left; }
+.mode-choice-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  color: var(--text-primary);
+}
+.mode-choice-btn:hover, .mode-choice-btn:active { border-color: var(--cyan); }
+.mode-choice-title {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--cyan);
+}
+.mode-choice-desc { font-size: 0.78rem; line-height: 1.45; color: var(--text-secondary); }
+.mode-transition-feature-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mode-transition-feature-list li {
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+  padding-left: 20px;
+  position: relative;
+}
+.mode-transition-feature-list li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: var(--good, var(--cyan));
+  font-weight: 700;
+}
+
+/* Locked-but-visible sections (e.g. Bio measurements before Warrior Mode) —
+   dimmed for a "locked" look, but NOT pointer-events:none: taps still need
+   to reach the gated entry-point buttons inside so they can show the
+   "complete the conditions first" toast instead of doing nothing. */
+.mode-locked-visual { opacity: 0.45; filter: grayscale(0.5); }
+.mode-lock-badge {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-left: 6px;
+}
+
 /* ---------------- Exercise hold timer popup (Dead Hang, etc.) ---------------- */
 .timer-popup-overlay {
   position: fixed;
@@ -1620,6 +1681,7 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 }
 .rank-row.is-top { border-left-color: var(--cyan); background: rgba(45,226,230,0.08); }
 .rank-num { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); width: 20px; }
+.rank-mode-icon { flex: none; width: 22px; height: 22px; display: block; }
 .rank-name { flex: 1; font-weight: 700; font-size: 0.85rem; letter-spacing: 0.02em; }
 .rank-digital-id { font-weight: 400; font-size: 0.68rem; font-family: var(--font-mono); color: var(--text-muted); letter-spacing: normal; margin-left: 4px; }
 .rank-value { font-family: var(--font-mono); font-weight: 700; color: var(--cyan); font-size: 0.85rem; }

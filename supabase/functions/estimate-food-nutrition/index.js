@@ -29,20 +29,28 @@ function jsonResponse(body, status = 200) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
-  let foodName, servingDescription, imageBase64, imageMimeType;
+  let foodName, servingDescription, imageBase64, imageMimeType, barcodeImageBase64, barcodeImageMimeType, labelImageBase64, labelImageMimeType;
   try {
     const body = await req.json();
     foodName = body.foodName;
     servingDescription = body.servingDescription;
     imageBase64 = body.imageBase64;
     imageMimeType = body.imageMimeType;
+    barcodeImageBase64 = body.barcodeImageBase64;
+    barcodeImageMimeType = body.barcodeImageMimeType;
+    labelImageBase64 = body.labelImageBase64;
+    labelImageMimeType = body.labelImageMimeType;
   } catch {
     return jsonResponse({ error: 'Invalid request body' }, 400);
   }
 
   const hasImage = imageBase64 && typeof imageBase64 === 'string';
-  if (!hasImage && (!foodName || typeof foodName !== 'string')) {
-    return jsonResponse({ error: 'foodName or imageBase64 is required' }, 400);
+  // Fallback path for when the live BarcodeDetector camera scan can't read a
+  // damaged/worn/curved barcode at all — the user takes two still photos
+  // instead (barcode + nutrition facts label), which Gemini reads directly.
+  const hasBarcodePair = barcodeImageBase64 && labelImageBase64;
+  if (!hasImage && !hasBarcodePair && (!foodName || typeof foodName !== 'string')) {
+    return jsonResponse({ error: 'foodName, imageBase64, or a barcode/label photo pair is required' }, 400);
   }
 
   const apiKey = Deno.env.get('GEMINI_API_KEY');
@@ -54,7 +62,18 @@ Deno.serve(async (req) => {
   // can pre-fill the food name field) — text-only requests already know
   // the name from what the user typed, so that field is just echoed back.
   const parts = [];
-  if (hasImage) {
+  if (hasBarcodePair) {
+    parts.push({
+      text: `Look at these two photos of a packaged food product. The FIRST photo shows the product's barcode, the SECOND shows its Nutrition Facts label.
+From the first photo, read the barcode's printed numeric code (the digits printed below or beside the bars — digits only, no spaces or dashes). If you can also decode the bar pattern itself, use it to double-check the digits.
+From the second photo, read the product name (if visible) and the nutrition facts.
+Respond with ONLY a JSON object, no markdown, no explanation, in exactly this shape:
+{"code": string, "name": string, "calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "sodium": number}
+Normalize all nutrition values to per 100 grams — the label may show per-serving, so convert using the serving size in grams if one is given. calories in kcal, protein/carbs/fat/fiber in grams, sodium in milligrams. If either photo is unclear, give your best reasonable reading — never refuse.`,
+    });
+    parts.push({ inlineData: { mimeType: barcodeImageMimeType || 'image/jpeg', data: barcodeImageBase64 } });
+    parts.push({ inlineData: { mimeType: labelImageMimeType || 'image/jpeg', data: labelImageBase64 } });
+  } else if (hasImage) {
     parts.push({
       text: `Identify the food shown in this photo and estimate its nutrition facts per 100 grams.
 Respond with ONLY a JSON object, no markdown, no explanation, in exactly this shape:
@@ -103,7 +122,8 @@ All values are per 100g. calories in kcal, protein/carbs/fat/fiber in grams, sod
   }
 
   return jsonResponse({
-    name: hasImage ? (parsed.name || null) : undefined,
+    name: (hasImage || hasBarcodePair) ? (parsed.name || null) : undefined,
+    code: hasBarcodePair ? (parsed.code ? String(parsed.code).replace(/[^0-9]/g, '') : null) : undefined,
     calories: Number(parsed.calories) || 0,
     protein: Number(parsed.protein) || 0,
     carbs: Number(parsed.carbs) || 0,

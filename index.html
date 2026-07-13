@@ -30,6 +30,7 @@
   <div class="brand">
     <img class="brand-logo" src="icons/icon-192.png" alt="" width="28" height="28">
     <h1>WINFINITY</h1>
+    <img class="brand-logo mode-icon" id="headerModeIcon" src="" alt="" width="28" height="28" hidden>
   </div>
   <span class="app-header-sub" id="headerToday"></span>
 </header>
@@ -607,6 +608,7 @@
     <button type="button" class="btn btn--primary" id="btnSaveBio">Initialize sync</button>
     <p class="save-note" id="bioSaveNote"></p>
 
+    <div id="bioMeasurementSection">
     <h2 class="section-title">Body measurement scan</h2>
     <p class="hint">Should ideally be filled once a week, every Sunday morning, fasted.</p>
     <div class="chart-card" style="position:relative;">
@@ -680,6 +682,7 @@
       <button type="button" class="btn btn--primary" id="btnSaveSkinfolds">Save skinfold measurements</button>
       <p class="save-note" id="skinfoldSaveNote"></p>
       </div>
+    </div>
     </div>
 
     <h2 class="section-title">Coach assignment</h2>
@@ -976,6 +979,21 @@
       <div class="rank-list" id="lbFastestRunRanking"></div>
     </div>
 
+    <div class="chart-card">
+      <p class="mod-tag">MOD_CONSCIENTIOUS_06</p>
+      <div class="chart-card-head">
+        <span class="chart-card-title">Conscientious</span>
+        <div class="fuel-status-head-right">
+          <button type="button" class="icon-btn glass-emboss rank-share-btn" data-target="lbConscientiousRanking" data-title="Conscientious" aria-label="Share Conscientious">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
+          </button>
+          <button type="button" class="rank-expand-btn" data-target="lbConscientiousRanking" aria-label="Show top 10" title="Show top 10" hidden>⤢</button>
+        </div>
+      </div>
+      <p class="hint hint--sm">Today's Habit Completion + Life Fuel %, averaged — rewards showing up and logging fully, not just being active.</p>
+      <div class="rank-list" id="lbConscientiousRanking"></div>
+    </div>
+
     <footer class="app-footer">
       <div class="footer-action-row">
         <button type="button" class="footer-share-btn" id="btnFooterDonate" aria-label="Donate">
@@ -1165,9 +1183,18 @@
     <div class="sheet-section sheet-section--compact">
       <p class="mod-tag">Mod_cleardata_16</p>
       <p class="field-group-heading">Clear All Data</p>
+      <label class="field field--checkbox">
+        <input type="checkbox" id="clearDataKeepDigitalId" checked>
+        <span>Keep Digital ID</span>
+      </label>
+      <p class="hint hint--sm">Unchecked, your Digital ID and all its server-side data (leaderboard entry, chat messages, reminders, coach assignment) are permanently deleted from Nexus too, and you're issued a brand-new Digital ID.</p>
       <p class="hint">Wipes all logs, reviews, and history from this device. Your Entity Identity profile is kept — you'll go straight into logging your own data afterward. This cannot be undone unless you've saved a backup.</p>
       <button type="button" class="btn btn--danger" id="btnClearAllData">Clear all data</button>
       <p class="save-note" id="clearAllDataNote"></p>
+
+      <button type="button" class="btn" id="btnRestartJourney" style="margin-top:12px;">Restart Journey</button>
+      <p class="hint hint--sm">This will reset your data and enter the Fitness Journey Mode from Beginner to Warrior to Spartan.</p>
+      <p class="save-note" id="restartJourneyNote"></p>
     </div>
 
     <div class="sheet-section">
@@ -1412,9 +1439,9 @@
         </label>
       </fieldset>
 
-      <fieldset class="field-group field-group--compact">
+      <fieldset class="field-group field-group--compact" id="customHabitProtocolsSection">
         <p class="mod-tag">Mod_ext_05</p>
-        <p class="field-group-heading">Custom Habit Protocols</p>
+        <p class="field-group-heading">Custom Habit Protocols <span class="mode-lock-badge" id="habitProtocolsLockBadge" hidden>🔒 Demi-God Mode</span></p>
         <div class="proto-row">
           <span class="proto-index">PROTO_01</span>
           <input type="text" class="extraHabitInput" data-idx="0" placeholder="e.g. FASTING_16_8">
@@ -2171,6 +2198,27 @@
     </div>
     <p class="hint" id="barcodeScanStatus">Point your camera at a product barcode.</p>
     <video id="barcodeVideo" class="barcode-video" playsinline muted></video>
+
+    <button type="button" class="btn" id="btnBarcodePhotoFallback" style="margin-top:10px;">Can't scan? Take photos instead</button>
+    <div id="barcodePhotoFallbackSection" hidden>
+      <p class="hint hint--sm">For barcodes the camera can't read (worn, curved, or damaged packaging) — take a still photo of the barcode, then one of the Nutrition Facts label, and AI reads both.</p>
+
+      <div class="btn-row">
+        <button type="button" class="btn btn--sm" id="btnTakeBarcodePhoto">1. Photo of barcode</button>
+        <span class="ai-spinner" id="barcodePhotoSpinner" hidden></span>
+      </div>
+      <input type="file" accept="image/*" capture="environment" id="barcodePhotoInput" hidden>
+      <img class="ai-photo-preview" id="barcodePhotoPreview" alt="" hidden>
+
+      <div class="btn-row">
+        <button type="button" class="btn btn--sm" id="btnTakeLabelPhoto" disabled>2. Photo of nutrition facts</button>
+        <span class="ai-spinner" id="labelPhotoSpinner" hidden></span>
+      </div>
+      <input type="file" accept="image/*" capture="environment" id="labelPhotoInput" hidden>
+      <img class="ai-photo-preview" id="labelPhotoPreview" alt="" hidden>
+
+      <p class="hint" id="barcodePhotoStatus"></p>
+    </div>
   </div>
 </div>
 
@@ -2630,6 +2678,43 @@
       <a class="btn btn--primary" href="https://www.facebook.com/winfinityfit/" target="_blank" rel="noopener noreferrer">Open Facebook Page</a>
     </div>
     <button type="button" class="btn" id="btnReviewConfirm" style="margin-top:10px;width:100%;">I've left a review — Continue</button>
+  </div>
+</div>
+
+<!-- ============ FITNESS JOURNEY MODE GATE ============ -->
+<div class="lock-overlay" id="fitnessModeGateOverlay" hidden>
+  <div class="lock-card lock-card--wide">
+    <div class="lock-icon">🎯</div>
+    <h2>Choose Your Journey</h2>
+    <p>Pick where you're starting. Beginner locks most features at first on purpose — it's there to help you build the daily-logging habit before piling on more. You unlock the next tier by logging consistently.</p>
+    <div class="mode-choice-list">
+      <button type="button" class="mode-choice-btn" id="btnChooseModeBeginner">
+        <span class="mode-choice-title">BEGINNER</span>
+        <span class="mode-choice-desc">Start simple: Entity Identity, morning weigh-in, sleep, steps, stress/fatigue/hunger, chat, leaderboard, food diary, and water intake. Everything else stays locked until you've logged consistently for about a week — this is about building the habit before adding more.</span>
+      </button>
+      <button type="button" class="mode-choice-btn" id="btnChooseModeWarrior">
+        <span class="mode-choice-title">WARRIOR</span>
+        <span class="mode-choice-desc">Everything in Beginner, plus Training Log, Outdoor Activity Tracker, and Body Measurements. For someone who already has the daily-logging habit down and is ready to train.</span>
+      </button>
+      <button type="button" class="mode-choice-btn" id="btnChooseModeSpartan">
+        <span class="mode-choice-title">SPARTAN</span>
+        <span class="mode-choice-desc">Everything in Warrior, plus AI food estimates and the barcode scanner — except Body Fat % tracking and Custom Habit Protocols, which stay reserved for Demi-God.</span>
+      </button>
+      <button type="button" class="mode-choice-btn" id="btnChooseModeDemigod">
+        <span class="mode-choice-title">DEMI-GOD</span>
+        <span class="mode-choice-desc">Every single feature unlocked from day one, including Body Fat % tracking and Custom Habit Protocols. For experienced users who don't need any training wheels.</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="lock-overlay" id="modeTransitionOverlay" hidden>
+  <div class="lock-card">
+    <div class="lock-icon" id="modeTransitionIcon">🎉</div>
+    <h2 id="modeTransitionTitle">CONGRATULATIONS!</h2>
+    <p id="modeTransitionMessage"></p>
+    <ul class="mode-transition-feature-list" id="modeTransitionFeatureList"></ul>
+    <button type="button" class="btn btn--primary" id="btnModeTransitionClose" style="width:100%;margin-top:10px;">Continue</button>
   </div>
 </div>
 

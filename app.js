@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.5.6';
+const APP_VERSION = 'WF_SYS_V.5.7';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -5171,6 +5171,111 @@ async function estimateFoodNutritionFromPhoto(imageBase64, mimeType) {
   return data;
 }
 
+// Fallback for barcodes the live camera scanner (BarcodeDetector) can't
+// read at all — worn, curved, or damaged packaging trips it up often.
+// Two still photos (barcode + nutrition facts label) give Gemini a much
+// better shot than a continuous low-res video frame.
+async function estimateFoodFromBarcodePhotos(barcodeImageBase64, barcodeImageMimeType, labelImageBase64, labelImageMimeType) {
+  let res;
+  try {
+    res = await fetch(`${SUPABASE_URL}/functions/v1/smooth-service`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ barcodeImageBase64, barcodeImageMimeType, labelImageBase64, labelImageMimeType }),
+    });
+  } catch (e) {
+    throw new Error('AI barcode reading unavailable — check your connection.');
+  }
+  let data;
+  try { data = await res.json(); } catch (e) { throw new Error('AI barcode reading unavailable — try again later.'); }
+  if (!res.ok) throw new Error(data.error || 'AI barcode reading failed');
+  return data;
+}
+
+let barcodePhotoBase64 = null;
+
+function initBarcodePhotoFallback() {
+  const fallbackBtn = document.getElementById('btnBarcodePhotoFallback');
+  const section = document.getElementById('barcodePhotoFallbackSection');
+  const barcodeBtn = document.getElementById('btnTakeBarcodePhoto');
+  const barcodeInput = document.getElementById('barcodePhotoInput');
+  const barcodePreview = document.getElementById('barcodePhotoPreview');
+  const barcodeSpinner = document.getElementById('barcodePhotoSpinner');
+  const labelBtn = document.getElementById('btnTakeLabelPhoto');
+  const labelInput = document.getElementById('labelPhotoInput');
+  const labelPreview = document.getElementById('labelPhotoPreview');
+  const labelSpinner = document.getElementById('labelPhotoSpinner');
+  const statusEl = document.getElementById('barcodePhotoStatus');
+
+  fallbackBtn.addEventListener('click', () => {
+    stopBarcodeCamera();
+    section.hidden = false;
+    fallbackBtn.hidden = true;
+    barcodePhotoBase64 = null;
+    barcodePreview.hidden = true;
+    labelPreview.hidden = true;
+    labelBtn.disabled = true;
+    statusEl.textContent = '';
+  });
+
+  barcodeBtn.addEventListener('click', () => barcodeInput.click());
+  barcodeInput.addEventListener('change', async () => {
+    const file = barcodeInput.files[0];
+    barcodeInput.value = '';
+    if (!file) return;
+    barcodeSpinner.hidden = false;
+    try {
+      const { dataUrl } = await resizeAndCompressImage(file);
+      barcodePreview.src = dataUrl;
+      barcodePreview.hidden = false;
+      barcodePhotoBase64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+      labelBtn.disabled = false;
+      statusEl.textContent = 'Barcode photo captured — now take a photo of the Nutrition Facts label.';
+    } catch (e) {
+      statusEl.textContent = 'Could not read that photo — try again.';
+    } finally {
+      barcodeSpinner.hidden = true;
+    }
+  });
+
+  labelBtn.addEventListener('click', () => labelInput.click());
+  labelInput.addEventListener('change', async () => {
+    const file = labelInput.files[0];
+    labelInput.value = '';
+    if (!file || !barcodePhotoBase64) return;
+    labelSpinner.hidden = false;
+    statusEl.textContent = 'Reading barcode and nutrition facts with AI…';
+    try {
+      const { dataUrl } = await resizeAndCompressImage(file);
+      labelPreview.src = dataUrl;
+      labelPreview.hidden = false;
+      const labelBase64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+      const est = await estimateFoodFromBarcodePhotos(barcodePhotoBase64, 'image/jpeg', labelBase64, 'image/jpeg');
+
+      document.getElementById('barcodeScanOverlay').hidden = true;
+      section.hidden = true;
+      fallbackBtn.hidden = false;
+
+      openAddFoodPanel();
+      if (est.code) pendingBarcodeCode = est.code;
+      if (est.name) document.getElementById('customFoodName').value = est.name;
+      customFoodAiPer100g = { calories: est.calories || 0, protein: est.protein || 0, carbs: est.carbs || 0, fat: est.fat || 0 };
+      document.getElementById('customFoodGrams').value = 100;
+      document.getElementById('customFoodUnit').value = 'g';
+      document.getElementById('customFoodUnitWarning').hidden = true;
+      recomputeCustomFoodFromAi();
+      // Reuses the existing "will be remembered for the next scan" note —
+      // only relevant if a code was actually captured from the photo.
+      document.getElementById('customFoodTeachNote').hidden = !est.code;
+      document.getElementById('aiPhotoStatus').textContent = '⚠️ AI-read from your photos — review the values below before saving.';
+    } catch (e) {
+      statusEl.textContent = e.message || 'AI reading failed — check your connection or try again.';
+    } finally {
+      labelSpinner.hidden = true;
+    }
+  });
+}
+
 // Shown when a scanned barcode isn't in our Supabase cache or on Open Food
 // Facts — lets the user fill it in once via the existing custom-food form,
 // then contributes it to barcode_products so future scans (by anyone) hit
@@ -5642,10 +5747,23 @@ async function startBarcodeScan() {
   }
 }
 
-function stopBarcodeScan() {
-  document.getElementById('barcodeScanOverlay').hidden = true;
+// Split from stopBarcodeScan() so the photo-fallback flow can stop the
+// live camera without also hiding the overlay it needs to keep showing.
+function stopBarcodeCamera() {
   if (barcodeDetectInterval) { clearInterval(barcodeDetectInterval); barcodeDetectInterval = null; }
   if (barcodeStream) { barcodeStream.getTracks().forEach(t => t.stop()); barcodeStream = null; }
+}
+
+function stopBarcodeScan() {
+  document.getElementById('barcodeScanOverlay').hidden = true;
+  stopBarcodeCamera();
+  // Reset the photo-fallback UI so reopening the scanner starts fresh
+  // instead of resuming mid-flow from a previous abandoned attempt.
+  const fallbackSection = document.getElementById('barcodePhotoFallbackSection');
+  if (fallbackSection) fallbackSection.hidden = true;
+  const fallbackBtn = document.getElementById('btnBarcodePhotoFallback');
+  if (fallbackBtn) fallbackBtn.hidden = false;
+  barcodePhotoBase64 = null;
 }
 
 // Checks our own Supabase-backed cache first (fed by contributeBarcodeProduct
@@ -7956,6 +8074,37 @@ function updateCodeNameHint() {
   hint.textContent = optedIn ? `Sharing as "${effectiveLeaderboardName()}"` : 'Not sharing. Turn on to join the Nexus.';
 }
 
+// Current consecutive-day streak of fully-complete daily logs — the same
+// completeness check the Fitness Journey Mode system uses to gate
+// features, reused here as the "Conscientious" leaderboard metric. Counts
+// backward from today (if today is already complete) or yesterday,
+// stopping at the first incomplete/missing day.
+function computeConscientiousScore() {
+  const profile = getProfile();
+  const today = todayISO();
+  const todayEntry = getLogs()[today];
+
+  const habit = computeHabitCompletion(profile, todayEntry);
+
+  const waterGoal = (profile && profile.waterGoal) || 3000;
+  const waterToday = (todayEntry && todayEntry.water != null) ? todayEntry.water : 0;
+  const waterPct = waterGoal > 0 ? (waterToday / waterGoal) * 100 : 0;
+
+  const calorieTarget = getEffectiveCalorieTarget(profile) || 2000;
+  const caloriesToday = (todayEntry && todayEntry.calories != null) ? todayEntry.calories : 0;
+  const caloriePct = calorieTarget > 0 ? (caloriesToday / calorieTarget) * 100 : 0;
+
+  const kgForFuel = currentWeightKg(profile);
+  const targetsForFuel = (profile && kgForFuel) ? computeTargets(profile, kgForFuel) : null;
+  const proteinTarget = targetsForFuel ? round0((targetsForFuel.protein[0] + targetsForFuel.protein[1]) / 2) : null;
+  const proteinToday = (todayEntry && todayEntry.protein != null) ? todayEntry.protein : 0;
+  const proteinPct = proteinTarget ? (proteinToday / proteinTarget) * 100 : 0;
+
+  const lifeFuelPct = Math.round((Math.min(100, waterPct) + Math.min(100, caloriePct) + Math.min(100, proteinPct)) / 3);
+
+  return Math.round((habit.pct + lifeFuelPct) / 2);
+}
+
 async function pushLeaderboardEntry() {
   const shareKey = localStorage.getItem('wft_lb_share_key');
   const stats = computeLeaderboardStats();
@@ -7980,6 +8129,12 @@ async function pushLeaderboardEntry() {
       p_fastest_run_pace_sec: stats.fastestRunPaceSec,
     });
   } catch (e) { /* best effort — Furthest/Fastest Run rankings just won't update until this succeeds */ }
+  try {
+    await sb.rpc('set_conscientious_score', { p_share_key: shareKey, p_score: computeConscientiousScore() });
+  } catch (e) { /* best effort — Conscientious ranking just won't update until this succeeds */ }
+  try {
+    await sb.rpc('set_fitness_mode', { p_share_key: shareKey, p_mode: getFitnessMode() });
+  } catch (e) { /* best effort — rank badge just won't update on other people's screens until this succeeds */ }
 }
 
 async function autoSyncLeaderboardIfOptedIn() {
@@ -8007,7 +8162,7 @@ const LEADERBOARD_INACTIVE_MS = 7 * 24 * 60 * 60 * 1000;
 
 async function pullLeaderboard() {
   const { data, error } = await sb.from('leaderboard')
-    .select('code_name, public_id, weight, weight_unit, weight_progress, weight_progress_pct, steps, volume_lifted, volume_unit, furthest_run_km, fastest_run_pace_sec, updated_at')
+    .select('code_name, public_id, weight, weight_unit, weight_progress, weight_progress_pct, steps, volume_lifted, volume_unit, furthest_run_km, fastest_run_pace_sec, conscientious_score, fitness_mode, updated_at')
     .order('updated_at', { ascending: false });
   if (error) throw error;
   const cutoff = Date.now() - LEADERBOARD_INACTIVE_MS;
@@ -8064,7 +8219,9 @@ function renderRankList(containerId, rows, opts) {
   visible.forEach((r, i) => {
     const row = document.createElement('div');
     row.className = 'rank-row' + (i === 0 ? ' is-top' : '');
+    const modeIcon = MODE_ICON[r.fitness_mode];
     row.innerHTML = `<span class="rank-num">${String(i + 1).padStart(2, '0')}</span>
+      ${modeIcon ? `<img class="rank-mode-icon" src="${modeIcon}" alt="${escapeHtml(MODE_LABEL[r.fitness_mode] || '')}" title="${escapeHtml(MODE_LABEL[r.fitness_mode] || '')}">` : ''}
       <span class="rank-name">${escapeHtml(r.code_name)}${r.public_id ? `<span class="rank-digital-id">${escapeHtml(r.public_id)}</span>` : ''}</span>
       <span class="rank-value">${opts.formatValue(r)}</span>`;
     container.appendChild(row);
@@ -8102,6 +8259,9 @@ function renderNexusRankings(rows) {
 
   const byFastestRun = dedupeRankRows(rows.filter(r => r.fastest_run_pace_sec != null), (a, b) => a.fastest_run_pace_sec < b.fastest_run_pace_sec).sort((a, b) => a.fastest_run_pace_sec - b.fastest_run_pace_sec);
   renderRankList('lbFastestRunRanking', byFastestRun, { formatValue: r => formatPaceSecPerUnit(r.fastest_run_pace_sec) + ' /km' });
+
+  const byConscientious = dedupeRankRows(rows.filter(r => r.conscientious_score != null), (a, b) => a.conscientious_score > b.conscientious_score).sort((a, b) => b.conscientious_score - a.conscientious_score);
+  renderRankList('lbConscientiousRanking', byConscientious, { formatValue: r => r.conscientious_score + '%' });
 }
 
 let currentChatRoomId = localStorage.getItem('wft_chat_room') || null;
@@ -9710,16 +9870,35 @@ function initWelcomeDemoOverlay() {
 function initClearAllData() {
   const btn = document.getElementById('btnClearAllData');
   const note = document.getElementById('clearAllDataNote');
+  const keepIdCheckbox = document.getElementById('clearDataKeepDigitalId');
   if (!btn) return;
-  btn.addEventListener('click', () => {
+  btn.addEventListener('click', async () => {
+    const keepId = keepIdCheckbox.checked;
     if (!confirm('Clear ALL logs, reviews, and history? Your Entity Identity profile is kept, but every day you\'ve logged will be gone unless you\'ve saved a backup. This cannot be undone.')) return;
+    if (!keepId) {
+      if (!confirm('"Keep Digital ID" is unchecked — this will ALSO permanently delete your leaderboard entry, chat messages, reminders, and coach assignment from the Nexus server, then issue you a brand-new Digital ID. This cannot be undone. Continue?')) return;
+    }
     if (!confirm('Really sure? This is permanent — tap OK only if you have a backup or genuinely want to start over.')) return;
+
+    if (!keepId) {
+      const oldShareKey = localStorage.getItem('wft_lb_share_key');
+      if (oldShareKey && sbConfigured()) {
+        try { await sb.rpc('delete_account_data', { p_share_key: oldShareKey }); }
+        catch (e) { /* best effort — local reset still proceeds even if the server call fails */ }
+      }
+      localStorage.removeItem('wft_lb_share_key');
+      localStorage.removeItem('wft_public_id');
+      localStorage.setItem('wft_lb_optin', '0');
+      getOrCreateShareKey();
+      getOrCreatePublicId();
+    }
+
     saveLogs({});
     saveReviews({});
     saveDailyReviews({});
     localStorage.removeItem('wft_demo_seeded_at');
-    note.textContent = 'All data cleared. Your Entity Identity profile is untouched.';
-    setTimeout(() => { note.textContent = ''; }, 4000);
+    note.textContent = keepId ? 'All data cleared. Your Entity Identity profile is untouched.' : 'All data cleared, including your Nexus server data. You now have a new Digital ID.';
+    setTimeout(() => { note.textContent = ''; }, 6000);
     renderDashboard();
     renderHistory();
     renderMeasureHistory();
@@ -9756,6 +9935,9 @@ function initOnboarding(onComplete) {
       else originalParent.appendChild(form);
       overlay.hidden = true;
       seedNewUserDemoData(getProfile());
+      const freshProfile = getProfile();
+      freshProfile.fitnessModeChoicePending = true;
+      saveProfile(freshProfile);
       if (onComplete) onComplete();
     }, 0);
   });
@@ -9814,6 +9996,331 @@ function initConsentGate() {
     localStorage.setItem('wft_consent_agreed', '1');
     localStorage.setItem('wft_consent_agreed_at', new Date().toISOString());
     overlay.hidden = true;
+  });
+}
+
+/* ---------------------------------------------------------------- */
+/* Fitness Journey Mode (Beginner / Warrior / Spartan)                 */
+/* ---------------------------------------------------------------- */
+const MODE_RANK = { beginner: 0, warrior: 1, spartan: 2, demigod: 3 };
+const MODE_ORDER = ['beginner', 'warrior', 'spartan', 'demigod'];
+const MODE_LABEL = { beginner: 'Beginner Mode', warrior: 'Warrior Mode', spartan: 'Spartan Mode', demigod: 'Demi-God Mode' };
+const MODE_ICON = { beginner: 'icons/mode-beginner.png', warrior: 'icons/mode-warrior.png', spartan: 'icons/mode-spartan.png', demigod: 'icons/mode-demigod.png' };
+
+function updateHeaderModeIcon() {
+  const icon = document.getElementById('headerModeIcon');
+  if (!icon) return;
+  const mode = getFitnessMode();
+  icon.src = MODE_ICON[mode] || MODE_ICON.demigod;
+  icon.alt = MODE_LABEL[mode] || '';
+  icon.title = MODE_LABEL[mode] || '';
+  icon.hidden = false;
+}
+const MODE_UNLOCK_FEATURES = {
+  warrior: ['Training Log (exercises & sets)', 'Outdoor Activity Tracker (GPS)', 'Body Measurements', 'Weekly Review', 'Progress Photo & Measurements reminder'],
+  spartan: ['AI food/photo nutrition estimate', 'Barcode scanner'],
+  demigod: ['Body Fat Percentage (caliper entry)', 'Custom Habit Protocols (Extra Habits)'],
+};
+// Entry points gated behind a mode — gating just the entry point (rather
+// than every downstream field) is enough, since nothing past it is
+// reachable through normal UI flow when it's blocked. Leaderboard/Nexus
+// sync is deliberately NOT in this list — it's available at every tier.
+const MODE_GATED_ELEMENTS = [
+  { id: 'btnOpenTrainingLogQuick', required: 'warrior' },
+  { id: 'btnToggleWeeklyReview', required: 'warrior' },
+  { id: 'progressPhotoReminderEnabled', required: 'warrior' },
+  { id: 'btnOpenMeasureEntry', required: 'warrior' },
+  { id: 'btnEstimateAiNutrition', required: 'spartan' },
+  { id: 'btnEstimateAiPhoto', required: 'spartan' },
+  { id: 'btnScanBarcode', required: 'spartan' },
+  { id: 'btnToggleCaliperEntry', required: 'demigod' },
+];
+
+function getFitnessMode() {
+  const p = getProfile();
+  return (p && p.fitnessMode) || 'demigod';
+}
+function modeRank(mode) { return MODE_RANK[mode] ?? 3; }
+function isModeUnlocked(requiredMode) { return modeRank(getFitnessMode()) >= MODE_RANK[requiredMode]; }
+
+function getModeProgress() {
+  const p = getProfile();
+  return (p && p.modeProgress) || { target: 7, completeCount: 0, consecutiveMissed: 0, demotionWarned: false, lastProcessedDate: null };
+}
+function saveModeProgress(mp) {
+  const p = getProfile();
+  if (!p) return;
+  p.modeProgress = mp;
+  saveProfile(p);
+}
+function freshModeProgress() {
+  return { target: 7, completeCount: 0, consecutiveMissed: 0, demotionWarned: false, lastProcessedDate: todayISO() };
+}
+
+// The one daily-completeness signal driving BOTH promotion progress and
+// demotion risk, regardless of current mode — matches exactly the fields
+// available in Beginner Mode, since those are the actual daily habits this
+// system is built around (a workout or a measurement isn't a daily
+// expectation the way weigh-in/sleep/steps/mood/water/food are).
+function isBeginnerDayComplete(date) {
+  const entry = getLogs()[date];
+  if (!entry) return false;
+  const meals = entry.meals || {};
+  const hasFood = ['breakfast', 'lunch', 'dinner', 'snacks'].some(mt => meals[mt] && meals[mt].length);
+  return entry.weightKg != null && entry.sleep != null && entry.steps != null &&
+    entry.stress != null && entry.fatigue != null && entry.hunger != null &&
+    entry.water != null && entry.water > 0 && hasFood;
+}
+
+function showModeTransitionPopup({ icon, title, message, features }) {
+  document.getElementById('modeTransitionIcon').textContent = icon;
+  document.getElementById('modeTransitionTitle').textContent = title;
+  document.getElementById('modeTransitionMessage').textContent = message;
+  const list = document.getElementById('modeTransitionFeatureList');
+  list.innerHTML = (features || []).map(f => `<li>${escapeHtml(f)}</li>`).join('');
+  document.getElementById('modeTransitionOverlay').hidden = false;
+}
+
+function promoteFitnessMode() {
+  const p = getProfile();
+  if (!p) return;
+  const nextMode = MODE_ORDER[MODE_ORDER.indexOf(p.fitnessMode || 'beginner') + 1];
+  if (!nextMode) return;
+  p.fitnessMode = nextMode;
+  p.modeProgress = freshModeProgress();
+  saveProfile(p);
+  applyModeGating();
+  autoSyncLeaderboardIfOptedIn();
+  showModeTransitionPopup({
+    icon: '🎉',
+    title: 'CONGRATULATIONS!',
+    message: `You leveled up to ${MODE_LABEL[nextMode].toUpperCase()} by logging consistently. New features unlocked:`,
+    features: MODE_UNLOCK_FEATURES[nextMode] || [],
+  });
+}
+
+function demoteFitnessMode() {
+  const p = getProfile();
+  if (!p) return;
+  const prevMode = MODE_ORDER[MODE_ORDER.indexOf(p.fitnessMode || 'beginner') - 1];
+  if (!prevMode) return;
+  p.fitnessMode = prevMode;
+  p.modeProgress = freshModeProgress();
+  saveProfile(p);
+  applyModeGating();
+  autoSyncLeaderboardIfOptedIn();
+  showModeTransitionPopup({
+    icon: '⚠️',
+    title: 'DEMOTED',
+    message: `A few too many missed logs — you've been moved back down to ${MODE_LABEL[prevMode].toUpperCase()}. Log consistently to earn your way back up.`,
+    features: [],
+  });
+}
+
+// Runs once per app open: catches up on every day since the last check
+// (today itself doesn't count yet — it isn't over). A missed day never
+// erases progress already made toward the next mode, it just pushes the
+// target out by 3 days. In Warrior/Spartan, 3 consecutive missed days
+// trigger a warning, and 5 trigger a demotion back down one tier.
+function processDailyModeCheck() {
+  const p = getProfile();
+  if (!p || !p.fitnessMode) return;
+  const progress = getModeProgress();
+  const today = todayISO();
+  if (!progress.lastProcessedDate) { saveModeProgress(Object.assign({}, progress, { lastProcessedDate: today })); return; }
+  if (progress.lastProcessedDate >= today) return;
+
+  const cursor = parseISO(progress.lastProcessedDate);
+  const todayDate = parseISO(today);
+  let guard = 0;
+  while (cursor < todayDate && guard < 60) {
+    guard++;
+    const cursorISO = cursor.getFullYear() + '-' + String(cursor.getMonth() + 1).padStart(2, '0') + '-' + String(cursor.getDate()).padStart(2, '0');
+    const complete = isBeginnerDayComplete(cursorISO);
+    if (complete) {
+      progress.completeCount++;
+      progress.consecutiveMissed = 0;
+      progress.demotionWarned = false;
+      if (p.fitnessMode !== 'demigod' && progress.completeCount >= progress.target) {
+        promoteFitnessMode();
+        return;
+      }
+    } else {
+      if (p.fitnessMode !== 'demigod') progress.target += 3;
+      if (p.fitnessMode !== 'beginner') {
+        progress.consecutiveMissed++;
+        if (progress.consecutiveMissed >= 5) {
+          demoteFitnessMode();
+          return;
+        }
+      }
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  progress.lastProcessedDate = today;
+  saveModeProgress(progress);
+
+  if (p.fitnessMode !== 'beginner' && progress.consecutiveMissed >= 3 && !progress.demotionWarned) {
+    progress.demotionWarned = true;
+    saveModeProgress(progress);
+    const daysLeft = 5 - progress.consecutiveMissed;
+    showRestToast(`⚠️ ${progress.consecutiveMissed} missed log days in a row — ${daysLeft} more and you'll be demoted from ${MODE_LABEL[p.fitnessMode]}.`);
+  }
+}
+
+// A once-a-day nudge (not tied to a precise midnight timer, since a PWA
+// can't reliably wake itself at exact times) showing progress toward the
+// next mode whenever today's log isn't complete yet.
+function checkModeProgressNudge() {
+  const p = getProfile();
+  if (!p || !p.fitnessMode || p.fitnessMode === 'demigod') return;
+  const today = todayISO();
+  if (isBeginnerDayComplete(today)) return;
+  const flagKey = 'wft_mode_nudge_shown_' + today;
+  if (localStorage.getItem(flagKey)) return;
+  localStorage.setItem(flagKey, '1');
+  const progress = getModeProgress();
+  const nextMode = MODE_ORDER[MODE_ORDER.indexOf(p.fitnessMode) + 1];
+  showRestToast(`Progress: ${progress.completeCount}/${progress.target} days logged toward ${MODE_LABEL[nextMode]} — finish today's log to keep climbing.`);
+}
+
+function showLockedFeatureNotice() {
+  showRestToast('You need to complete the conditions first to level up and unlock this feature.');
+}
+
+function applyModeGating() {
+  updateHeaderModeIcon();
+  MODE_GATED_ELEMENTS.forEach(({ id, required }) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const locked = !isModeUnlocked(required);
+    (el.closest('label') || el).classList.toggle('mode-locked-el', locked);
+  });
+
+  const trainingTabBtn = document.querySelector('.tab-btn[data-target="training"]');
+  if (trainingTabBtn) trainingTabBtn.classList.toggle('mode-locked-el', !isModeUnlocked('warrior'));
+
+  const measureSection = document.getElementById('bioMeasurementSection');
+  if (measureSection) measureSection.classList.toggle('mode-locked-visual', !isModeUnlocked('warrior'));
+
+  // Force-close panels that may have been left open from before a demotion.
+  if (!isModeUnlocked('warrior')) {
+    const weeklyReviewPanel = document.getElementById('weeklyReviewPanel');
+    if (weeklyReviewPanel) weeklyReviewPanel.hidden = true;
+  }
+  if (!isModeUnlocked('demigod')) {
+    const caliperPanel = document.getElementById('caliperEntryPanel');
+    if (caliperPanel) caliperPanel.hidden = true;
+  }
+
+  applyHabitProtocolsGating();
+}
+
+// Custom Habit Protocols is a small cluster of inputs/buttons rather than
+// one click target, so it's disabled directly instead of going through the
+// click-guard list — without a defined habit there's nothing for the daily
+// check-in's "Extra habits" checkboxes to show either, so gating just this
+// definition point is enough to lock the whole feature.
+function applyHabitProtocolsGating() {
+  const locked = !isModeUnlocked('demigod');
+  const section = document.getElementById('customHabitProtocolsSection');
+  const badge = document.getElementById('habitProtocolsLockBadge');
+  if (badge) badge.hidden = !locked;
+  if (!section) return;
+  section.classList.toggle('mode-locked-visual', locked);
+  section.querySelectorAll('input, button').forEach(el => { el.disabled = locked; });
+}
+
+// Capture phase so this runs before the real feature's own click handler,
+// regardless of registration order — stopImmediatePropagation blocks that
+// handler from ever firing when the feature is locked.
+function initModeGatedClickGuard() {
+  document.addEventListener('click', e => {
+    const gated = MODE_GATED_ELEMENTS.find(g => e.target.closest && e.target.closest('#' + g.id));
+    if (gated && !isModeUnlocked(gated.required)) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      showLockedFeatureNotice();
+      return;
+    }
+    const trainingTabBtn = e.target.closest && e.target.closest('.tab-btn[data-target="training"]');
+    if (trainingTabBtn && !isModeUnlocked('warrior')) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      showLockedFeatureNotice();
+    }
+  }, true);
+}
+
+/* ---------------------------------------------------------------- */
+/* Fitness Journey Mode gate (initial choice, shown after Review Gate) */
+/* ---------------------------------------------------------------- */
+function initFitnessModeGate(onComplete) {
+  const profile = getProfile();
+  if (!profile) { if (onComplete) onComplete(); return; }
+  if (profile.fitnessMode) { if (onComplete) onComplete(); return; }
+
+  if (!profile.fitnessModeChoicePending) {
+    // Pre-existing profile from before this feature shipped — grandfather
+    // in at full access (Demi-God, the true no-restrictions tier) rather
+    // than retroactively locking someone who was already using the app.
+    profile.fitnessMode = 'demigod';
+    saveProfile(profile);
+    if (onComplete) onComplete();
+    return;
+  }
+
+  const overlay = document.getElementById('fitnessModeGateOverlay');
+  overlay.hidden = false;
+
+  function choose(mode) {
+    const p = getProfile();
+    p.fitnessMode = mode;
+    delete p.fitnessModeChoicePending;
+    p.modeProgress = freshModeProgress();
+    saveProfile(p);
+    overlay.hidden = true;
+    applyModeGating();
+    autoSyncLeaderboardIfOptedIn();
+    if (onComplete) onComplete();
+  }
+  document.getElementById('btnChooseModeBeginner').addEventListener('click', () => choose('beginner'));
+  document.getElementById('btnChooseModeWarrior').addEventListener('click', () => choose('warrior'));
+  document.getElementById('btnChooseModeSpartan').addEventListener('click', () => choose('spartan'));
+  document.getElementById('btnChooseModeDemigod').addEventListener('click', () => choose('demigod'));
+}
+
+function initModeTransitionPopup() {
+  const overlay = document.getElementById('modeTransitionOverlay');
+  document.getElementById('btnModeTransitionClose').addEventListener('click', () => { overlay.hidden = true; });
+  bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
+}
+
+function initRestartJourney() {
+  const btn = document.getElementById('btnRestartJourney');
+  const note = document.getElementById('restartJourneyNote');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    if (!confirm('Restart your Fitness Journey? This clears ALL logs, reviews, and history, and takes you back to Beginner Mode — you\'ll need to re-earn Warrior and Spartan Mode by logging consistently again. This cannot be undone.')) return;
+    if (!confirm('Really sure? This is permanent — tap OK only if you genuinely want to start your journey over from Beginner Mode.')) return;
+    saveLogs({});
+    saveReviews({});
+    saveDailyReviews({});
+    localStorage.removeItem('wft_demo_seeded_at');
+    const p = getProfile();
+    if (p) {
+      p.fitnessMode = 'beginner';
+      p.modeProgress = freshModeProgress();
+      saveProfile(p);
+    }
+    applyModeGating();
+    note.textContent = 'Journey restarted — you\'re back at Beginner Mode.';
+    setTimeout(() => { note.textContent = ''; }, 4000);
+    renderDashboard();
+    renderHistory();
+    renderMeasureHistory();
+    renderBodyFatHistory();
+    updateTabDots();
   });
 }
 
@@ -10252,6 +10759,7 @@ safeInit(initFoodDiary, 'initFoodDiary');
 safeInit(initAddFoodPanel, 'initAddFoodPanel');
 safeInit(initManualIntake, 'initManualIntake');
 safeInit(initBarcodeScanner, 'initBarcodeScanner');
+safeInit(initBarcodePhotoFallback, 'initBarcodePhotoFallback');
 safeInit(initBioLog, 'initBioLog');
 safeInit(initDailyReviewForm, 'initDailyReviewForm');
 safeInit(initReviewForm, 'initReviewForm');
@@ -10276,9 +10784,13 @@ safeInit(updateTabDots, 'updateTabDots');
 safeInit(initBetaLock, 'initBetaLock');
 safeInit(() => {
   if (document.getElementById('lockOverlay').hidden) {
-    initOnboarding(() => initReviewGate(() => initConsentGate()));
+    initOnboarding(() => initReviewGate(() => initFitnessModeGate(() => initConsentGate())));
   }
 }, 'initOnboarding');
+safeInit(initModeTransitionPopup, 'initModeTransitionPopup');
+safeInit(initRestartJourney, 'initRestartJourney');
+safeInit(initModeGatedClickGuard, 'initModeGatedClickGuard');
+safeInit(() => { processDailyModeCheck(); checkModeProgressNudge(); applyModeGating(); }, 'fitnessModeDaily');
 
 if (initFailures.length) {
   setTimeout(() => {

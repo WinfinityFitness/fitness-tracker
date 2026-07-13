@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fittracker-v234';
+const CACHE_NAME = 'fittracker-v235';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -12,6 +12,10 @@ const CORE_ASSETS = [
   './icons/measure-guide-female.jpg',
   './icons/bg-pattern.svg',
   './icons/bg-pattern-light.svg',
+  './icons/mode-beginner.png',
+  './icons/mode-warrior.png',
+  './icons/mode-spartan.png',
+  './icons/mode-demigod.png',
   './data/exercises.json',
   './fonts/archivo-narrow.woff2',
   './fonts/montserrat-heavy.woff2',
