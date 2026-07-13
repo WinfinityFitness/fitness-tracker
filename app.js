@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.5.7';
+const APP_VERSION = 'WF_SYS_V.5.8';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -8512,11 +8512,17 @@ async function initAdSplash() {
     const { data: products } = await sb.from('ad_products').select('*').eq('active', true);
     if (!products || !products.length) return;
 
-    const product = products[Math.floor(Math.random() * products.length)];
+    // Shows up to 8 at once in a 2x4 grid instead of one random pick —
+    // shuffled so a small pool doesn't always lead with the same product
+    // in the same top-left slot every time.
+    const picks = products.slice().sort(() => Math.random() - 0.5).slice(0, 8);
     const overlay = document.getElementById('adSplashOverlay');
-    document.getElementById('adSplashImage').src = product.image_url;
-    document.getElementById('adSplashName').textContent = product.name;
-    document.getElementById('adSplashLink').href = product.link_url;
+    document.getElementById('adSplashGrid').innerHTML = picks.map(p => `
+      <a href="${escapeHtml(p.link_url)}" target="_blank" rel="noopener sponsored" class="ad-splash-grid-item">
+        <img src="${escapeHtml(p.image_url)}" alt="${escapeHtml(p.name)}">
+        <span class="ad-splash-grid-name">${escapeHtml(p.name)}</span>
+      </a>
+    `).join('');
 
     const closeBtn = document.getElementById('btnAdSplashClose');
     const countdownEl = document.getElementById('adSplashCountdown');
