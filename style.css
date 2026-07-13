@@ -965,9 +965,8 @@ button.mission-log-day:hover { border-color: var(--cyan); }
 }
 .ai-photo-preview[hidden] { display: none; }
 
-.quick-log-btn-row { display: flex; gap: 8px; }
+.quick-log-btn-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .quick-log-btn {
-  flex: 1;
   min-width: 0;
   flex-direction: column;
   gap: 5px;

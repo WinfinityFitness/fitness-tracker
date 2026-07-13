@@ -55,6 +55,28 @@
   </div>
 </div>
 
+<div class="sheet-overlay" id="trainingLogQuickOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Training Log</h2>
+      <button class="sheet-close" id="btnCloseTrainingLogQuick">✕</button>
+    </div>
+    <div id="trainingLogQuickMount"></div>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="communityQuickOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Community</h2>
+      <button class="sheet-close" id="btnCloseCommunityQuick">✕</button>
+    </div>
+    <div id="communityQuickMount"></div>
+  </div>
+</div>
+
 <main id="app">
 
   <!-- ============ STATUS ============ -->
@@ -137,6 +159,24 @@
             <line x1="16" y1="2.5" x2="16" y2="6"/>
           </svg>
           <span>Weekend Log</span>
+        </button>
+        <button type="button" class="btn quick-log-btn" id="btnOpenTrainingLogQuick">
+          <svg viewBox="0 0 24 24" width="24" height="24" class="quick-log-icon" fill="none" stroke="var(--cyan)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <g transform="rotate(45 12 12)"><line x1="6.5" y1="12" x2="17.5" y2="12"/><rect x="3.5" y="9" width="3" height="6" rx="1"/><rect x="17.5" y="9" width="3" height="6" rx="1"/><rect x="1.5" y="10.3" width="2" height="3.4" rx="0.6"/><rect x="20.5" y="10.3" width="2" height="3.4" rx="0.6"/></g>
+          </svg>
+          <span>Training Log</span>
+        </button>
+        <button type="button" class="btn quick-log-btn" id="btnOpenFuelLogQuick">
+          <svg viewBox="0 0 24 24" width="24" height="24" class="quick-log-icon" fill="none" stroke="var(--cyan)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7 2v6a1.5 1.5 0 0 0 3 0V2M8.5 8v13"/><path d="M16 2c-1.7 0-3 1.8-3 4.5S14.3 11 16 11v11"/>
+          </svg>
+          <span>Fuel Log</span>
+        </button>
+        <button type="button" class="btn quick-log-btn" id="btnOpenCommunityQuick">
+          <svg viewBox="0 0 24 24" width="24" height="24" class="quick-log-icon" fill="none" stroke="var(--cyan)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 4v-4H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/>
+          </svg>
+          <span>Community</span>
         </button>
       </div>
     </div>
@@ -259,6 +299,8 @@
     </button>
     <input type="date" id="trainDate" hidden>
 
+    <div id="quickTrainingLogAnchor" hidden></div>
+    <div id="quickTrainingLogBlock">
     <fieldset class="field-group field-group--compact">
       <legend>Session templates</legend>
       <label class="field">
@@ -302,6 +344,7 @@
     </div>
 
     <button type="button" class="btn btn--finish" id="btnFinishWorkout">Finish</button>
+    </div>
 
     <button type="button" class="btn btn--primary" id="btnOpenPRBoard">
       <svg viewBox="0 0 24 24" width="16" height="16" class="diet-icon" fill="none" stroke="var(--cyan)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8v4a4 4 0 0 1-8 0V3z"/><path d="M8 4H5a2 2 0 0 0 0 4h1"/><path d="M16 4h3a2 2 0 0 1 0 4h-1"/><path d="M12 11v4"/><path d="M9 21h6"/><path d="M10 17h4l1 4H9l1-4z"/></svg>
@@ -766,6 +809,8 @@
       </div>
     </div>
 
+    <div id="quickCommunityAnchor" hidden></div>
+    <div id="quickCommunityBlock">
     <div class="chart-card" id="chatCard">
       <div class="chart-card-head">
         <p class="mod-tag" style="margin:0;">Comms channel // uplink stable</p>
@@ -859,6 +904,7 @@
     </div>
 
     <div class="chat-reaction-menu" id="chatReactionMenu" hidden></div>
+    </div>
 
     <div class="chart-card">
       <p class="mod-tag">MOD_CHRONOS_01</p>

@@ -2018,6 +2018,88 @@ function initQuickLogLaunchers() {
 }
 
 /* ---------------------------------------------------------------- */
+/* Status: extra Quick Log popups (Training Log, Fuel Log, Community) */
+/* ---------------------------------------------------------------- */
+
+// Training Log reparents the Training tab's own session-template +
+// protocol-queue block into a floating popup instead of duplicating it —
+// same live elements, same IDs, so all existing add/finish/template logic
+// keeps working untouched. Forced to today's date; whatever date the
+// Training tab itself had selected is restored on close.
+let trainingLogQuickPrevDate = null;
+
+function openTrainingLogQuickPopup() {
+  trainingLogQuickPrevDate = document.getElementById('trainDate').value;
+  const today = todayISO();
+  document.getElementById('trainDate').value = today;
+  loadTrainingForDate(today);
+  document.getElementById('trainingLogQuickMount').appendChild(document.getElementById('quickTrainingLogBlock'));
+  document.getElementById('trainingLogQuickOverlay').hidden = false;
+}
+
+function closeTrainingLogQuickPopup() {
+  document.getElementById('trainingLogQuickOverlay').hidden = true;
+  document.getElementById('quickTrainingLogAnchor').after(document.getElementById('quickTrainingLogBlock'));
+  if (trainingLogQuickPrevDate) {
+    document.getElementById('trainDate').value = trainingLogQuickPrevDate;
+    loadTrainingForDate(trainingLogQuickPrevDate);
+  }
+  trainingLogQuickPrevDate = null;
+}
+
+function initTrainingLogQuickPopup() {
+  document.getElementById('btnOpenTrainingLogQuick').addEventListener('click', openTrainingLogQuickPopup);
+  document.getElementById('btnCloseTrainingLogQuick').addEventListener('click', closeTrainingLogQuickPopup);
+  bindOverlayBackdropClose(document.getElementById('trainingLogQuickOverlay'), closeTrainingLogQuickPopup);
+}
+
+// Fuel Log opens the existing Dietary Algorithm overlay directly, locked to
+// today (date nav hidden) since this is a same-day quick shortcut. Opening
+// it the normal way (Fuel tab's own button) still shows the date nav so
+// past days remain reachable there.
+function openFuelLogQuickPopup() {
+  const overlay = document.getElementById('foodDiaryOverlay');
+  const dateInput = document.getElementById('foodDiaryDateInput');
+  const today = todayISO();
+  dateInput.value = today;
+  overlay.querySelector('.food-diary-date-nav').hidden = true;
+  editingMealItem = null;
+  renderFoodDiary(today);
+  overlay.hidden = false;
+}
+
+function initFuelLogQuickPopup() {
+  document.getElementById('btnOpenFuelLogQuick').addEventListener('click', openFuelLogQuickPopup);
+  // Normal Fuel-tab entry point should always show the date nav, even if
+  // the quick popup hid it during a previous use.
+  document.getElementById('btnOpenFoodDiary').addEventListener('click', () => {
+    document.getElementById('foodDiaryOverlay').querySelector('.food-diary-date-nav').hidden = false;
+  });
+}
+
+// Community reparents the chat card (plus its fixed-position user/reaction
+// menus, which would otherwise stay trapped inside the hidden Nexus tab)
+// into a floating popup, expanded via the same button the Nexus tab uses.
+function openCommunityQuickPopup() {
+  document.getElementById('communityQuickMount').appendChild(document.getElementById('quickCommunityBlock'));
+  document.getElementById('communityQuickOverlay').hidden = false;
+  if (!document.getElementById('chatCard').classList.contains('is-expanded')) {
+    document.getElementById('btnChatExpand').click();
+  }
+}
+
+function closeCommunityQuickPopup() {
+  document.getElementById('communityQuickOverlay').hidden = true;
+  document.getElementById('quickCommunityAnchor').after(document.getElementById('quickCommunityBlock'));
+}
+
+function initCommunityQuickPopup() {
+  document.getElementById('btnOpenCommunityQuick').addEventListener('click', openCommunityQuickPopup);
+  document.getElementById('btnCloseCommunityQuick').addEventListener('click', closeCommunityQuickPopup);
+  bindOverlayBackdropClose(document.getElementById('communityQuickOverlay'), closeCommunityQuickPopup);
+}
+
+/* ---------------------------------------------------------------- */
 /* Status: body measurement scan                                       */
 /* ---------------------------------------------------------------- */
 function renderMeasureGuide() {
@@ -2268,7 +2350,11 @@ function renderDashboard() {
 let weightChartFullJourney = false;
 
 function renderWeightChart(fullSeries, wu) {
-  const series = weightChartFullJourney ? fullSeries : fullSeries.slice(-60);
+  // "Show recent" previews just the current day plus the 6 days before it
+  // (7 days total); "Full journey" shows everything since day one. Both
+  // modes plot the same two lines (actual + trend) — axes auto-fit to
+  // whichever window is showing.
+  const series = weightChartFullJourney ? fullSeries : fullSeries.slice(-7);
   const container = document.getElementById('weightChart');
   const legend = document.getElementById('chartLegend');
   const emptyNote = document.getElementById('chartEmptyNote');
@@ -2287,10 +2373,7 @@ function renderWeightChart(fullSeries, wu) {
 
   const displayVals = series.map(p => fromKg(p.actualKg, wu));
   const trendVals = series.map(p => fromKg(p.trendKg, wu));
-  // Default view is trend-only (decluttered) — the raw actual-weight line
-  // only draws in the full-journey view, so the y-axis range shouldn't be
-  // stretched by values that aren't even on screen.
-  const allVals = weightChartFullJourney ? displayVals.concat(trendVals) : trendVals;
+  const allVals = displayVals.concat(trendVals);
   let min = Math.min(...allVals), max = Math.max(...allVals);
   if (min === max) { min -= 1; max += 1; }
   const pad = (max - min) * 0.1;
@@ -2336,28 +2419,13 @@ function renderWeightChart(fullSeries, wu) {
     const tp = document.createElementNS(svgNS, 'path');
     tp.setAttribute('d', trendPath);
     tp.setAttribute('fill', 'none');
-    tp.setAttribute('stroke-linejoin', 'round');
-    tp.setAttribute('stroke-linecap', 'round');
-    if (weightChartFullJourney) {
-      // Secondary reference line alongside the actual-weight line — dashed
-      // and thinner so it doesn't compete with the primary series.
-      tp.setAttribute('stroke', 'var(--series-2)');
-      tp.setAttribute('stroke-width', '2');
-      tp.setAttribute('stroke-dasharray', '5 4');
-    } else {
-      // The only line on screen in the default view — draw it as the
-      // primary series instead of a secondary dashed reference.
-      tp.setAttribute('stroke', 'var(--series-1)');
-      tp.setAttribute('stroke-width', '2.5');
-      tp.style.filter = 'drop-shadow(0 0 4px var(--cyan-glow))';
-    }
+    tp.setAttribute('stroke', 'var(--series-2)');
+    tp.setAttribute('stroke-width', '2');
+    tp.setAttribute('stroke-dasharray', '5 4');
     svg.appendChild(tp);
   }
 
-  // The raw actual-weight line and per-point markers only draw in the
-  // full-journey view — the default view stays trend-only (7-day avg) so
-  // day-to-day noise doesn't clutter the at-a-glance widget.
-  if (weightChartFullJourney && series.length > 1) {
+  if (series.length > 1) {
     const actualPath = displayVals.map((v, i) => `${i === 0 ? 'M' : 'L'} ${xFor(i)} ${yFor(v)}`).join(' ');
     const ap = document.createElementNS(svgNS, 'path');
     ap.setAttribute('d', actualPath);
@@ -2370,18 +2438,16 @@ function renderWeightChart(fullSeries, wu) {
     svg.appendChild(ap);
   }
 
-  if (weightChartFullJourney) {
-    const lowestIdx = displayVals.indexOf(Math.min(...displayVals));
-    displayVals.forEach((v, i) => {
-      const isLowest = i === lowestIdx;
-      const c = document.createElementNS(svgNS, 'circle');
-      c.setAttribute('cx', xFor(i)); c.setAttribute('cy', yFor(v));
-      c.setAttribute('r', (isLowest ? 1.4 : 1) * (series.length > 40 ? 2 : 3.5));
-      c.setAttribute('fill', isLowest ? 'var(--warning)' : 'var(--series-1)');
-      if (isLowest) c.style.filter = 'drop-shadow(0 0 4px var(--warning))';
-      svg.appendChild(c);
-    });
-  }
+  const lowestIdx = displayVals.indexOf(Math.min(...displayVals));
+  displayVals.forEach((v, i) => {
+    const isLowest = i === lowestIdx;
+    const c = document.createElementNS(svgNS, 'circle');
+    c.setAttribute('cx', xFor(i)); c.setAttribute('cy', yFor(v));
+    c.setAttribute('r', (isLowest ? 1.4 : 1) * (series.length > 40 ? 2 : 3.5));
+    c.setAttribute('fill', isLowest ? 'var(--warning)' : 'var(--series-1)');
+    if (isLowest) c.style.filter = 'drop-shadow(0 0 4px var(--warning))';
+    svg.appendChild(c);
+  });
 
   const crosshair = document.createElementNS(svgNS, 'line');
   crosshair.setAttribute('y1', padT); crosshair.setAttribute('y2', H - padB);
@@ -2406,9 +2472,7 @@ function renderWeightChart(fullSeries, wu) {
     crosshair.setAttribute('x1', x); crosshair.setAttribute('x2', x);
     crosshair.setAttribute('visibility', 'visible');
     const pt = series[i];
-    tooltip.innerHTML = weightChartFullJourney
-      ? `<strong>${fmtDate(pt.dateObj)}</strong><br>Weight: ${round2(fromKg(pt.actualKg, wu))} ${wu}<br>Trend: ${round2(fromKg(pt.trendKg, wu))} ${wu}`
-      : `<strong>${fmtDate(pt.dateObj)}</strong><br>Trend: ${round2(fromKg(pt.trendKg, wu))} ${wu}`;
+    tooltip.innerHTML = `<strong>${fmtDate(pt.dateObj)}</strong><br>Weight: ${round2(fromKg(pt.actualKg, wu))} ${wu}<br>Trend: ${round2(fromKg(pt.trendKg, wu))} ${wu}`;
     tooltip.style.display = 'block';
     const containerWidth = container.clientWidth || W;
     const pxX = (x / W) * containerWidth;
@@ -2452,12 +2516,9 @@ function renderWeightChart(fullSeries, wu) {
     svg.addEventListener('pointerleave', () => { if (!pressed) hideTooltip(); });
   }
 
-  legend.innerHTML = weightChartFullJourney
-    ? `<span><span class="legend-swatch" style="background:var(--series-1)"></span>Actual weight</span>
-       <span><span class="legend-dash"></span>Trend (7-day avg)</span>
-       <button type="button" id="chartFullJourneyToggle" class="chart-toggle-link">Show recent</button>`
-    : `<span><span class="legend-dash"></span>Trend (7-day avg)</span>
-       <button type="button" id="chartFullJourneyToggle" class="chart-toggle-link">Full journey</button>`;
+  legend.innerHTML = `<span><span class="legend-swatch" style="background:var(--series-1)"></span>Actual weight</span>
+    <span><span class="legend-dash"></span>Trend (7-day avg)</span>
+    <button type="button" id="chartFullJourneyToggle" class="chart-toggle-link">${weightChartFullJourney ? 'Show recent' : 'Full journey'}</button>`;
 }
 
 function initWeightChartToggle() {
@@ -6492,7 +6553,7 @@ async function shareWeightJourney() {
   const profile = getProfile();
   const logsArr = sortedLogsArray();
   const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
-  const series = weightChartFullJourney ? computeTrendSeries(logsArr) : computeTrendSeries(logsArr).slice(-60);
+  const series = weightChartFullJourney ? computeTrendSeries(logsArr) : computeTrendSeries(logsArr).slice(-7);
   const kgNow = currentWeightKg(profile);
   const lowestKg7d = minOfLastNDays(logsArr, 'weightKg', 7);
   const blob = await generateWeightJourneyShareCard({
@@ -7061,7 +7122,7 @@ async function buildAssessmentBlobs() {
   }
 
   if (document.getElementById('assessChkWeight').checked) {
-    const series = weightChartFullJourney ? computeTrendSeries(logsArr) : computeTrendSeries(logsArr).slice(-60);
+    const series = weightChartFullJourney ? computeTrendSeries(logsArr) : computeTrendSeries(logsArr).slice(-7);
     const kgNow = currentWeightKg(profile);
     const lowestKg7d = minOfLastNDays(logsArr, 'weightKg', 7);
     jobs.push(generateWeightJourneyShareCard({
@@ -10106,6 +10167,9 @@ safeInit(initWeatherLocationPicker, 'initWeatherLocationPicker');
 safeInit(initSetupForm, 'initSetupForm');
 safeInit(initCheckin, 'initCheckin');
 safeInit(initQuickLogLaunchers, 'initQuickLogLaunchers');
+safeInit(initTrainingLogQuickPopup, 'initTrainingLogQuickPopup');
+safeInit(initFuelLogQuickPopup, 'initFuelLogQuickPopup');
+safeInit(initCommunityQuickPopup, 'initCommunityQuickPopup');
 safeInit(initMeasurements, 'initMeasurements');
 safeInit(initTraining, 'initTraining');
 safeInit(initExerciseTimerPopup, 'initExerciseTimerPopup');
