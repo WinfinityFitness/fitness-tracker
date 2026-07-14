@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.8.4';
+const APP_VERSION = 'WF_SYS_V.8.5';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -2951,6 +2951,7 @@ function renderExerciseCards() {
 let cardioWatchId = null;
 let cardioTickId = null;
 let cardioTrack = [];
+let cardioGpsErrorShown = false;
 let cardioDistanceKm = 0;
 let cardioMaxSpeedKmh = 0;
 let cardioStartTime = null;
@@ -3053,6 +3054,12 @@ function isNativeApp() {
 let cardioNativeWatcherId = null;
 function startGpsWatch(onPosition, onError) {
   if (isNativeApp() && window.Capacitor.Plugins.BackgroundGeolocation) {
+    // Android 13+ requires POST_NOTIFICATIONS to be explicitly granted, or
+    // the foreground-service notification the background tracking depends
+    // on can silently fail to post once the app leaves the foreground,
+    // killing tracking along with it. The geolocation plugin only requests
+    // the location permission, never this one — MainActivity.onCreate
+    // requests POST_NOTIFICATIONS natively at app launch instead.
     window.Capacitor.Plugins.BackgroundGeolocation.addWatcher({
       backgroundTitle: 'Winfinity Tracker',
       backgroundMessage: 'Tracking your outdoor activity — tap to return to the app.',
@@ -3062,7 +3069,7 @@ function startGpsWatch(onPosition, onError) {
     }, (location, error) => {
       if (error) { onError(error); return; }
       onPosition({ coords: { latitude: location.latitude, longitude: location.longitude, accuracy: location.accuracy } });
-    }).then(id => { cardioNativeWatcherId = id; });
+    }).then(id => { cardioNativeWatcherId = id; }).catch(err => onError(err));
     return 'native';
   }
   return navigator.geolocation.watchPosition(onPosition, onError, {
@@ -3102,6 +3109,7 @@ function startCardioTracking() {
   document.getElementById('cardioMapView').hidden = true;
   document.getElementById('cardioMapZoomRow').hidden = true;
   renderCardioRouteSketch();
+  cardioGpsErrorShown = false;
 
   cardioWatchId = startGpsWatch(pos => {
     const { latitude, longitude, accuracy } = pos.coords;
@@ -3122,7 +3130,17 @@ function startCardioTracking() {
     } else {
       cardioTrack.push(point);
     }
-  }, () => { /* GPS error: keep timer running, just no new distance */ });
+  }, err => {
+    // Keep the timer running either way — a transient GPS blip shouldn't end
+    // the session — but surface it once so a permission denial or a failed
+    // native watcher (silent otherwise) is actually visible instead of just
+    // quietly producing a flat, un-tracked stretch of the route.
+    if (!cardioGpsErrorShown) {
+      cardioGpsErrorShown = true;
+      const msg = (err && (err.message || err.code)) || 'unknown error';
+      showRestToast(`⚠️ GPS tracking issue: ${msg}. Check location/notification permissions in phone settings.`);
+    }
+  });
 
   cardioTickId = setInterval(updateCardioStats, 1000);
   startCardioHydrationReminders();
