@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.7.4';
+const APP_VERSION = 'WF_SYS_V.7.5';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9501,13 +9501,30 @@ function renderFoodPrepsList() {
 }
 
 // Ingredients are stored one-per-line (see the editor's textarea
-// placeholder) — split on newlines. Procedure is usually pasted/generated
-// as run-on prose, so it's split on sentence-ending periods instead, with
-// the period restored on each bullet.
+// placeholder) — split on newlines.
 function renderBulletedText(listEl, text, splitter) {
   const items = (text || '').split(splitter).map(s => s.trim()).filter(Boolean);
   listEl.innerHTML = items.length
-    ? items.map(i => `<li>${escapeHtml(splitter === '.' ? i + '.' : i)}</li>`).join('')
+    ? items.map(i => `<li>${escapeHtml(i)}</li>`).join('')
+    : '<li>—</li>';
+}
+
+// Procedures are stored one step per line, usually already prefixed
+// "1." "2." etc. — split on newlines and strip that embedded numbering,
+// since the <ol> renders its own (keeping both was double-numbering every
+// step). Splitting on periods is wrong here: a step like "Preheat oven to
+// 400 F. Spray the dish." is one numbered step, and abbreviations like
+// "400 F." would chop it mid-sentence anyway. Pasted run-on prose with no
+// line breaks at all falls back to sentence splitting.
+function renderProcedureList(listEl, text) {
+  let items = (text || '').split('\n').map(s => s.trim()).filter(Boolean);
+  if (items.length <= 1) {
+    items = (text || '').split(/\.\s+/).map(s => s.trim()).filter(Boolean)
+      .map(s => (/[.!?]$/.test(s) ? s : s + '.'));
+  }
+  items = items.map(s => s.replace(/^\d+\s*[.)]\s*/, ''));
+  listEl.innerHTML = items.length
+    ? items.map(i => `<li>${escapeHtml(i)}</li>`).join('')
     : '<li>—</li>';
 }
 
@@ -9553,7 +9570,7 @@ function selectFoodPrepMeal(meal) {
   badge.textContent = meal.author_type === 'admin' ? 'Admin' : `By ${meal.author_name || 'User'}`;
   badge.className = 'prep-meal-author-badge ' + (meal.author_type === 'admin' ? 'is-admin' : (isMine ? 'is-self' : ''));
   renderBulletedText(document.getElementById('foodPrepsDetailIngredients'), meal.ingredients, '\n');
-  renderBulletedText(document.getElementById('foodPrepsDetailProcedure'), meal.procedure, '.');
+  renderProcedureList(document.getElementById('foodPrepsDetailProcedure'), meal.procedure);
   document.getElementById('btnFoodPrepsAdminEdit').hidden = !isAdminLoggedIn();
   document.getElementById('foodPrepsServingSize').value = 100;
   renderFoodPrepsDetail();
