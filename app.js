@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.6.6';
+const APP_VERSION = 'WF_SYS_V.6.7';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9275,6 +9275,8 @@ const PREP_MEAL_DEFAULT_IMAGE = 'data:image/svg+xml,' + encodeURIComponent(
 let prepMealsCache = [];
 let prepMealSelectedCategory = 'breakfast';
 let foodPrepsDetailMeal = null;
+let foodPrepsExpanded = false;
+const FOOD_PREPS_PREVIEW_COUNT = 3;
 
 async function fetchPrepMeals() {
   if (!sbConfigured()) return [];
@@ -9305,22 +9307,42 @@ async function estimatePrepMealFromMenu({ mealMenuText, mealMenuUrl }) {
   return data;
 }
 
+// One screen: a (by default 3-item) list up top, an inline detail panel
+// below it that updates live as different meals are tapped — no
+// list-then-detail navigation. "Expand" grows the list in place to every
+// meal in the current category instead of opening anything new.
 function renderFoodPrepsList() {
   const list = document.getElementById('foodPrepsList');
   const empty = document.getElementById('foodPrepsEmptyNote');
+  const expandBtn = document.getElementById('btnFoodPrepsExpand');
   const myShareKey = localStorage.getItem('wft_lb_share_key');
   const activeMeals = prepMealsCache.filter(m => m.active && m.category === prepMealSelectedCategory);
+  const visibleMeals = foodPrepsExpanded ? activeMeals : activeMeals.slice(0, FOOD_PREPS_PREVIEW_COUNT);
+
+  expandBtn.hidden = activeMeals.length <= FOOD_PREPS_PREVIEW_COUNT;
+  expandBtn.classList.toggle('is-expanded', foodPrepsExpanded);
 
   list.innerHTML = '';
-  if (!activeMeals.length) { empty.hidden = false; return; }
+  if (!activeMeals.length) {
+    empty.hidden = false;
+    document.getElementById('foodPrepsDetailPanel').hidden = true;
+    foodPrepsDetailMeal = null;
+    return;
+  }
   empty.hidden = true;
-  activeMeals.forEach(m => {
+
+  if (!foodPrepsDetailMeal || !activeMeals.some(m => m.id === foodPrepsDetailMeal.id)) {
+    selectFoodPrepMeal(activeMeals[0]);
+  }
+
+  visibleMeals.forEach(m => {
     const isMine = m.author_type === 'user' && !!myShareKey && m.author_share_key === myShareKey;
     const badgeClass = m.author_type === 'admin' ? 'is-admin' : (isMine ? 'is-self' : '');
     const badgeLabel = m.author_type === 'admin' ? 'Admin' : `By ${m.author_name || 'User'}`;
     const firstIngredientLine = (m.ingredients || '').split('\n')[0];
     const row = document.createElement('div');
-    row.className = 'prep-meal-row';
+    row.className = 'prep-meal-row' + (foodPrepsDetailMeal && m.id === foodPrepsDetailMeal.id ? ' is-selected' : '');
+    row.dataset.mealId = m.id;
     row.innerHTML = `
       <img class="prep-meal-thumb" src="${escapeHtml(m.image_url || PREP_MEAL_DEFAULT_IMAGE)}" alt="" loading="lazy">
       <div class="prep-meal-info">
@@ -9331,16 +9353,9 @@ function renderFoodPrepsList() {
         <div class="prep-meal-ingredients">${escapeHtml(firstIngredientLine)}</div>
       </div>
       <span class="prep-meal-cal-badge">${Math.round(m.cal_per_100g || 0)} kcal/100g</span>`;
-    row.addEventListener('click', () => showFoodPrepsDetailScreen(m));
+    row.addEventListener('click', () => selectFoodPrepMeal(m));
     list.appendChild(row);
   });
-}
-
-function showFoodPrepsListScreen() {
-  document.getElementById('foodPrepsListScreen').hidden = false;
-  document.getElementById('foodPrepsDetailScreen').hidden = true;
-  document.getElementById('foodPrepsTitle').textContent = 'Food Preps';
-  renderFoodPrepsList();
 }
 
 // grams needed to hit the picked calorie target = target / cal_per_100g *
@@ -9365,11 +9380,15 @@ function renderFoodPrepsDetail(calorieTarget) {
   document.getElementById('foodPrepsDetailFatBar').style.width = (totalKcal > 0 ? (fatKcal / totalKcal) * 100 : 0) + '%';
 }
 
-function showFoodPrepsDetailScreen(meal) {
+// Highlights the tapped row and refreshes the detail panel below the list
+// in place — this is the "live update" the list drives, not a navigation.
+function selectFoodPrepMeal(meal) {
   foodPrepsDetailMeal = meal;
-  document.getElementById('foodPrepsListScreen').hidden = true;
-  document.getElementById('foodPrepsDetailScreen').hidden = false;
-  document.getElementById('foodPrepsTitle').textContent = meal.name;
+  document.querySelectorAll('#foodPrepsList .prep-meal-row').forEach(row => {
+    row.classList.toggle('is-selected', row.dataset.mealId === String(meal.id));
+  });
+  const panel = document.getElementById('foodPrepsDetailPanel');
+  panel.hidden = false;
   document.getElementById('foodPrepsDetailImage').src = meal.image_url || PREP_MEAL_DEFAULT_IMAGE;
   document.getElementById('foodPrepsDetailName').textContent = meal.name;
   const myShareKey = localStorage.getItem('wft_lb_share_key');
@@ -9385,7 +9404,9 @@ function showFoodPrepsDetailScreen(meal) {
 
 async function openFoodPrepsOverlay() {
   prepMealsCache = await fetchPrepMeals();
-  showFoodPrepsListScreen();
+  foodPrepsExpanded = false;
+  foodPrepsDetailMeal = null;
+  renderFoodPrepsList();
   document.getElementById('foodPrepsOverlay').hidden = false;
 }
 
@@ -9393,18 +9414,54 @@ function closeFoodPrepsOverlay() {
   document.getElementById('foodPrepsOverlay').hidden = true;
 }
 
-// Refreshes whichever Food Preps screen (if any) is currently open after a
-// save/delete in the shared editor — a no-op when the overlay isn't open.
+// Refreshes the Food Preps list/detail (if the overlay is open) after a
+// save/delete in the editor — a no-op when the overlay isn't open.
 function refreshOpenFoodPrepsScreen(savedId) {
   const overlay = document.getElementById('foodPrepsOverlay');
   if (!overlay || overlay.hidden) return;
-  if (document.getElementById('foodPrepsDetailScreen').hidden) {
-    renderFoodPrepsList();
-    return;
+  if (savedId) {
+    const updated = prepMealsCache.find(x => String(x.id) === String(savedId));
+    if (updated) foodPrepsDetailMeal = updated;
   }
-  const stillId = savedId || (foodPrepsDetailMeal && foodPrepsDetailMeal.id);
-  const updated = stillId != null ? prepMealsCache.find(x => String(x.id) === String(stillId)) : null;
-  if (updated) showFoodPrepsDetailScreen(updated); else showFoodPrepsListScreen();
+  renderFoodPrepsList();
+}
+
+// Shows a larger floating preview of a food thumbnail while it's pressed
+// (mouse or touch), positioned centered on the thumbnail and scaling up
+// from it — auto-hides the moment the press is released, wherever that
+// happens, via one-shot document-level listeners.
+function showFoodPrepsThumbPreview(thumbEl) {
+  const preview = document.getElementById('foodPrepsThumbPreview');
+  const img = document.getElementById('foodPrepsThumbPreviewImg');
+  img.src = thumbEl.src;
+  const rect = thumbEl.getBoundingClientRect();
+  preview.style.left = Math.round(rect.left + rect.width / 2) + 'px';
+  preview.style.top = Math.round(rect.top + rect.height / 2) + 'px';
+  preview.hidden = false;
+  requestAnimationFrame(() => preview.classList.add('is-open'));
+}
+
+function hideFoodPrepsThumbPreview() {
+  const preview = document.getElementById('foodPrepsThumbPreview');
+  preview.classList.remove('is-open');
+  setTimeout(() => { preview.hidden = true; }, 150);
+}
+
+function initFoodPrepsThumbPreview() {
+  const list = document.getElementById('foodPrepsList');
+  if (!list) return;
+  list.addEventListener('pointerdown', e => {
+    const thumb = e.target.closest('.prep-meal-thumb');
+    if (!thumb) return;
+    showFoodPrepsThumbPreview(thumb);
+    const end = () => {
+      hideFoodPrepsThumbPreview();
+      document.removeEventListener('pointerup', end);
+      document.removeEventListener('pointercancel', end);
+    };
+    document.addEventListener('pointerup', end);
+    document.addEventListener('pointercancel', end);
+  });
 }
 
 function initFoodPrepsOverlay() {
@@ -9415,12 +9472,18 @@ function initFoodPrepsOverlay() {
   document.querySelectorAll('#foodPrepsCategoryTabs .prep-meal-category-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       prepMealSelectedCategory = tab.dataset.category;
+      foodPrepsExpanded = false;
+      foodPrepsDetailMeal = null;
       document.querySelectorAll('#foodPrepsCategoryTabs .prep-meal-category-tab').forEach(t => t.classList.toggle('is-selected', t === tab));
       renderFoodPrepsList();
     });
   });
-  document.getElementById('btnFoodPrepsBack').addEventListener('click', showFoodPrepsListScreen);
+  document.getElementById('btnFoodPrepsExpand').addEventListener('click', () => {
+    foodPrepsExpanded = !foodPrepsExpanded;
+    renderFoodPrepsList();
+  });
   document.getElementById('foodPrepsDetailCalorieSelect').addEventListener('change', e => renderFoodPrepsDetail(Number(e.target.value) || 2000));
+  initFoodPrepsThumbPreview();
 }
 
 // Admin-only widget on the Nutrition tab: every prep meal (Admin- and
@@ -9578,7 +9641,8 @@ async function deletePrepMealEditor() {
   try {
     await sb.rpc('admin_delete_prep_meal', { p_digital_id: adminSession.digitalId, p_password: adminSession.password, p_id: Number(idVal) });
     prepMealsCache = await fetchPrepMeals();
-    showFoodPrepsListScreen();
+    foodPrepsDetailMeal = null;
+    refreshOpenFoodPrepsScreen();
     renderPrepMealManager();
     closePrepMealEditor();
   } catch (e) { note.textContent = 'Could not delete.'; }

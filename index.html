@@ -2764,18 +2764,22 @@
       <button class="sheet-close" id="btnCloseFoodPreps">✕</button>
     </div>
 
-    <div id="foodPrepsListScreen">
-      <div class="prep-meal-category-tabs" id="foodPrepsCategoryTabs">
-        <button type="button" class="prep-meal-category-tab is-selected" data-category="breakfast">Breakfast</button>
-        <button type="button" class="prep-meal-category-tab" data-category="full_meal">Full Meal</button>
-        <button type="button" class="prep-meal-category-tab" data-category="snack">Snacks</button>
-      </div>
-      <div id="foodPrepsList"></div>
-      <p class="empty-note" id="foodPrepsEmptyNote" hidden>No prep meals in this category yet.</p>
+    <div class="prep-meal-category-tabs" id="foodPrepsCategoryTabs">
+      <button type="button" class="prep-meal-category-tab is-selected" data-category="breakfast">Breakfast</button>
+      <button type="button" class="prep-meal-category-tab" data-category="full_meal">Full Meal</button>
+      <button type="button" class="prep-meal-category-tab" data-category="snack">Snacks</button>
     </div>
 
-    <div id="foodPrepsDetailScreen" hidden>
-      <button type="button" class="link-btn" id="btnFoodPrepsBack" style="display:block;margin-bottom:8px;">&larr; Back to list</button>
+    <div class="section-title-row">
+      <p class="field-group-heading" style="margin:0;">Meals</p>
+      <button type="button" class="icon-btn glass-emboss" id="btnFoodPrepsExpand" aria-label="Show all meals in this category" hidden>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+    </div>
+    <div id="foodPrepsList"></div>
+    <p class="empty-note" id="foodPrepsEmptyNote" hidden>No prep meals in this category yet.</p>
+
+    <div id="foodPrepsDetailPanel" hidden>
       <img class="prep-meal-detail-image" id="foodPrepsDetailImage" src="" alt="">
       <div class="prep-meal-name-row" style="margin-top:10px;">
         <span class="prep-meal-name" id="foodPrepsDetailName" style="font-size:1.05rem;"></span>
@@ -2817,6 +2821,7 @@
         <span id="foodPrepsDetailGrams">0G</span>
         <span class="prep-meal-detail-amount-sub">serving size</span>
       </div>
+      <div class="prep-meal-macros-head"><span class="prep-meal-macros-head-bar"></span><span>Estimated Macros</span></div>
       <div class="gradient-stat-row">
         <div class="gradient-stat-row-head"><span>Protein</span><span><strong id="foodPrepsDetailProtein">0g</strong></span></div>
         <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="foodPrepsDetailProteinBar" style="width:0%"><span class="gradient-bar-dot"></span></div></div>
@@ -2835,6 +2840,10 @@
       <p class="prep-meal-detail-text" id="foodPrepsDetailProcedure"></p>
     </div>
   </div>
+</div>
+
+<div class="prep-meal-thumb-preview" id="foodPrepsThumbPreview" hidden>
+  <img id="foodPrepsThumbPreviewImg" src="" alt="">
 </div>
 
 <div class="sheet-overlay" id="prepMealEditorOverlay" hidden>
