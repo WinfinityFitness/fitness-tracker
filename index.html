@@ -2786,7 +2786,7 @@
     <p class="empty-note" id="foodPrepsEmptyNote" hidden>No prep meals in this category yet.</p>
 
     <div id="foodPrepsDetailPanel" hidden>
-      <img class="prep-meal-detail-image" id="foodPrepsDetailImage" src="" alt="">
+      <div class="prep-meal-detail-image"><img id="foodPrepsDetailImage" src="" alt=""></div>
       <div class="prep-meal-name-row" style="margin-top:10px;">
         <span class="prep-meal-name" id="foodPrepsDetailName" style="font-size:1.05rem;"></span>
         <span class="prep-meal-author-badge" id="foodPrepsDetailBadge"></span>
@@ -2900,6 +2900,19 @@
       <span>Image URL <span class="hint hint--sm" style="display:inline;margin:0;">(admin only — also auto-added to the Food Prep Options slideshow)</span></span>
       <input type="text" id="prepMealFormImageUrl" placeholder="https://...">
     </label>
+    <div id="prepMealImageCropSection" hidden>
+      <p class="field-group-heading" style="font-size:0.8rem;">Image framing</p>
+      <div class="prep-meal-crop-frame" id="prepMealCropFrame">
+        <img id="prepMealCropImg" src="" alt="" draggable="false">
+      </div>
+      <div class="media-timing-row">
+        <span>1x</span>
+        <span class="media-timing-value" id="prepMealZoomValue">1.0x</span>
+        <span>3x</span>
+      </div>
+      <input type="range" id="prepMealZoomSlider" min="100" max="300" step="5" value="100">
+      <p class="hint hint--sm">Drag the preview to reposition the focal point; slide to zoom. This framing is how the image appears on the meal's thumbnail and detail view.</p>
+    </div>
     <label class="field field--checkbox" id="prepMealFormActiveRow"><input type="checkbox" id="prepMealFormActive" checked><span>Active (visible to everyone)</span></label>
 
     <div class="btn-row">

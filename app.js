@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.7.2';
+const APP_VERSION = 'WF_SYS_V.7.3';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9403,6 +9403,23 @@ let foodPrepsDetailMeal = null;
 let foodPrepsExpanded = false;
 const FOOD_PREPS_PREVIEW_COUNT = 3;
 
+// Admin-set image framing (zoom + focal point) is display-only — the app
+// can't re-host a cropped copy of a remote image, so the "crop" is applied
+// as object-position (pan) + scale (zoom) around the same focal point,
+// clipped by the image's wrapper box.
+function prepMealImageStyle(meal) {
+  const z = Number(meal.image_zoom) || 1;
+  const x = meal.image_pos_x != null ? Number(meal.image_pos_x) : 50;
+  const y = meal.image_pos_y != null ? Number(meal.image_pos_y) : 50;
+  if (z <= 1 && x === 50 && y === 50) return '';
+  return `object-position:${x}% ${y}%;transform:scale(${z});transform-origin:${x}% ${y}%`;
+}
+
+function applyPrepMealImage(imgEl, meal) {
+  imgEl.src = meal.image_url || PREP_MEAL_DEFAULT_IMAGE;
+  imgEl.style.cssText = prepMealImageStyle(meal);
+}
+
 async function fetchPrepMeals() {
   if (!sbConfigured()) return [];
   try {
@@ -9469,7 +9486,7 @@ function renderFoodPrepsList() {
     row.className = 'prep-meal-row' + (foodPrepsDetailMeal && m.id === foodPrepsDetailMeal.id ? ' is-selected' : '');
     row.dataset.mealId = m.id;
     row.innerHTML = `
-      <img class="prep-meal-thumb" src="${escapeHtml(m.image_url || PREP_MEAL_DEFAULT_IMAGE)}" alt="" loading="lazy">
+      <span class="prep-meal-thumb"><img src="${escapeHtml(m.image_url || PREP_MEAL_DEFAULT_IMAGE)}" alt="" loading="lazy" style="${prepMealImageStyle(m)}"></span>
       <div class="prep-meal-info">
         <div class="prep-meal-name-row">
           <span class="prep-meal-name">${escapeHtml(m.name)}</span>
@@ -9528,7 +9545,7 @@ function selectFoodPrepMeal(meal) {
   });
   const panel = document.getElementById('foodPrepsDetailPanel');
   panel.hidden = false;
-  document.getElementById('foodPrepsDetailImage').src = meal.image_url || PREP_MEAL_DEFAULT_IMAGE;
+  applyPrepMealImage(document.getElementById('foodPrepsDetailImage'), meal);
   document.getElementById('foodPrepsDetailName').textContent = meal.name;
   const myShareKey = localStorage.getItem('wft_lb_share_key');
   const isMine = meal.author_type === 'user' && !!myShareKey && meal.author_share_key === myShareKey;
@@ -9573,7 +9590,9 @@ function refreshOpenFoodPrepsScreen(savedId) {
 function showFoodPrepsThumbPreview(thumbEl) {
   const preview = document.getElementById('foodPrepsThumbPreview');
   const img = document.getElementById('foodPrepsThumbPreviewImg');
-  img.src = thumbEl.src;
+  const thumbImg = thumbEl.querySelector('img');
+  img.src = thumbImg ? thumbImg.src : '';
+  img.style.cssText = thumbImg ? thumbImg.style.cssText : '';
   const rect = thumbEl.getBoundingClientRect();
   preview.style.left = Math.round(rect.left + rect.width / 2) + 'px';
   preview.style.top = Math.round(rect.top + rect.height / 2) + 'px';
@@ -9712,6 +9731,12 @@ function fillPrepMealEditorForm(m) {
   document.getElementById('prepMealAiUrl').value = '';
   document.getElementById('prepMealAiNote').textContent = '';
   document.getElementById('prepMealFormNote').textContent = '';
+  prepMealCropState = {
+    zoom: (m && Number(m.image_zoom)) || 1,
+    x: (m && m.image_pos_x != null) ? Number(m.image_pos_x) : 50,
+    y: (m && m.image_pos_y != null) ? Number(m.image_pos_y) : 50,
+  };
+  refreshPrepMealCropSection();
 }
 
 function openPrepMealEditor(existingMeal) {
@@ -9792,6 +9817,7 @@ async function savePrepMealEditor() {
       p_cal_per_100g: calPer100g, p_protein_per_100g: proteinPer100g, p_carbs_per_100g: carbsPer100g, p_fat_per_100g: fatPer100g,
       p_fiber_per_100g: fiberPer100g, p_sodium_per_100g: sodiumPer100g,
       p_active: active, p_image_url: imageUrl,
+      p_image_zoom: prepMealCropState.zoom, p_image_pos_x: Math.round(prepMealCropState.x), p_image_pos_y: Math.round(prepMealCropState.y),
     });
     if (error) throw error;
     note.textContent = 'Saved.';
@@ -9821,6 +9847,62 @@ async function deletePrepMealEditor() {
   } catch (e) { note.textContent = 'Could not delete.'; }
 }
 
+/* Image framing controls in the editor — a live 16:9 preview the admin
+   drags to move the focal point and zooms with a slider. Saved as
+   image_zoom/image_pos_x/image_pos_y and applied wherever the meal's
+   image renders (see prepMealImageStyle above). */
+let prepMealCropState = { zoom: 1, x: 50, y: 50 };
+
+function applyPrepMealCropPreview() {
+  const img = document.getElementById('prepMealCropImg');
+  const s = prepMealCropState;
+  img.style.objectPosition = `${s.x}% ${s.y}%`;
+  img.style.transform = `scale(${s.zoom})`;
+  img.style.transformOrigin = `${s.x}% ${s.y}%`;
+  document.getElementById('prepMealZoomValue').textContent = s.zoom.toFixed(1) + 'x';
+  document.getElementById('prepMealZoomSlider').value = Math.round(s.zoom * 100);
+}
+
+function refreshPrepMealCropSection() {
+  const url = document.getElementById('prepMealFormImageUrl').value.trim();
+  const section = document.getElementById('prepMealImageCropSection');
+  section.hidden = !url;
+  if (url) {
+    document.getElementById('prepMealCropImg').src = url;
+    applyPrepMealCropPreview();
+  }
+}
+
+function initPrepMealCropControls() {
+  const frame = document.getElementById('prepMealCropFrame');
+  document.getElementById('prepMealFormImageUrl').addEventListener('input', refreshPrepMealCropSection);
+  document.getElementById('prepMealZoomSlider').addEventListener('input', e => {
+    prepMealCropState.zoom = Number(e.target.value) / 100;
+    applyPrepMealCropPreview();
+  });
+
+  let dragging = null;
+  frame.addEventListener('pointerdown', e => {
+    dragging = { startX: e.clientX, startY: e.clientY, x: prepMealCropState.x, y: prepMealCropState.y };
+    frame.setPointerCapture(e.pointerId);
+  });
+  frame.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const rect = frame.getBoundingClientRect();
+    // Dragging the picture right should reveal more of its left side, i.e.
+    // move the focal point left — hence the inverted deltas. Dividing by
+    // zoom keeps the drag feeling 1:1 with the on-screen picture.
+    const dx = ((e.clientX - dragging.startX) / rect.width) * 100 / prepMealCropState.zoom;
+    const dy = ((e.clientY - dragging.startY) / rect.height) * 100 / prepMealCropState.zoom;
+    prepMealCropState.x = Math.max(0, Math.min(100, dragging.x - dx));
+    prepMealCropState.y = Math.max(0, Math.min(100, dragging.y - dy));
+    applyPrepMealCropPreview();
+  });
+  const endDrag = () => { dragging = null; };
+  frame.addEventListener('pointerup', endDrag);
+  frame.addEventListener('pointercancel', endDrag);
+}
+
 function initPrepMealEditor() {
   const overlay = document.getElementById('prepMealEditorOverlay');
   if (!overlay) return;
@@ -9829,6 +9911,7 @@ function initPrepMealEditor() {
   document.getElementById('btnPrepMealAiFill').addEventListener('click', fillPrepMealFromAi);
   document.getElementById('btnSavePrepMeal').addEventListener('click', savePrepMealEditor);
   document.getElementById('btnDeletePrepMeal').addEventListener('click', deletePrepMealEditor);
+  initPrepMealCropControls();
 }
 
 let chatRoomMeta = {}; // roomId -> { name, isDm, createdByKey, otherName }
