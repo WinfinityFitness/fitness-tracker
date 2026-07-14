@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Matches the old TWA's splash: a solid background with the logo shown
+     at its own clean size, centered — not stretched to fill the screen
+     (which is what Capacitor's default-generated full-bleed splash.png did,
+     and why it looked blurry: a 512x512 source stretched across an entire
+     device screen). splash_logo.png is density-bucketed under drawable-*dpi
+     so Android picks the right resolution automatically. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/splashBackground"/>
+    <item android:drawable="@drawable/splash_logo" android:gravity="center"/>
+</layer-list>

@@ -1,14 +1,13 @@
-// Copies tracked custom native source (native-src/) over the generated
-// android/ project. Needed because android/ is gitignored (regenerable
-// build output) and `npx cap add android` / `capacitor update` overwrite
-// generated files like MainActivity.java with fresh boilerplate — this is
-// what puts the real, hand-written logic (e.g. the POST_NOTIFICATIONS
-// permission request) back in place afterward.
+// Copies tracked custom native source/resources over the generated android/
+// project. Needed because android/ is gitignored (regenerable build output)
+// and `npx cap add android` / `capacitor update` overwrite generated files
+// (MainActivity.java, styles.xml, etc.) with fresh boilerplate — this is
+// what puts the real, hand-written pieces back in place afterward:
+//   native-src/ -> android/app/src/main/java/   (POST_NOTIFICATIONS request)
+//   native-res/ -> android/app/src/main/res/    (clean centered splash, not
+//                                                 Capacitor's default stretched one)
 const fs = require('fs');
 const path = require('path');
-
-const srcRoot = path.join(__dirname, 'native-src');
-const destRoot = path.join(__dirname, 'android', 'app', 'src', 'main', 'java');
 
 function copyRecursive(src, dest) {
   for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
@@ -24,4 +23,5 @@ function copyRecursive(src, dest) {
   }
 }
 
-copyRecursive(srcRoot, destRoot);
+copyRecursive(path.join(__dirname, 'native-src'), path.join(__dirname, 'android', 'app', 'src', 'main', 'java'));
+copyRecursive(path.join(__dirname, 'native-res'), path.join(__dirname, 'android', 'app', 'src', 'main', 'res'));
