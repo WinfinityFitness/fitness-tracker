@@ -3,6 +3,9 @@
 -- every table keyed by share_key, so clearing data genuinely resets them
 -- to a blank slate on the Nexus too, not just locally. The client then
 -- generates a brand-new share_key/Digital ID afterward.
+--
+-- Re-run after supabase_account_sync_log_migration.sql ships, so this also
+-- purges the synced Google email/gender/location row (see that migration).
 
 create or replace function delete_account_data(p_share_key uuid) returns void
 language plpgsql
@@ -16,6 +19,7 @@ begin
   delete from push_subscriptions where share_key = p_share_key;
   delete from reminder_settings where share_key = p_share_key;
   delete from assigned_targets where share_key = p_share_key;
+  delete from account_sync_log where share_key = p_share_key;
 end;
 $$;
 

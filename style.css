@@ -2514,6 +2514,37 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .ad-manager-actions { display: flex; gap: 4px; flex: none; }
 .ad-manager-actions .btn { padding: 6px 10px; font-size: 0.75rem; }
 
+.sync-log-summary {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 4px 0 10px;
+}
+.sync-log-header, .sync-log-row {
+  display: grid;
+  grid-template-columns: 1.1fr 0.8fr 1.6fr 1.3fr;
+  gap: 8px;
+  padding: 7px 8px;
+  align-items: center;
+}
+.sync-log-header {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border-soft);
+}
+.sync-log-row {
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-soft);
+}
+.sync-log-row:nth-child(even) { background: var(--surface-2); }
+.sync-log-row > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sync-log-row .sync-log-id { font-weight: 700; color: var(--cyan); font-family: monospace; }
+.sync-log-row .sync-log-muted { color: var(--text-muted); }
+
 .donation-qr-message {
   font-size: 0.88rem;
   font-weight: 700;

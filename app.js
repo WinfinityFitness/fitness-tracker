@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.6.0';
+const APP_VERSION = 'WF_SYS_V.6.1';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -8174,7 +8174,7 @@ function initDrive() {
     }
     driveTokenClient = google.accounts.oauth2.initTokenClient({
       client_id: GOOGLE_CLIENT_ID,
-      scope: 'https://www.googleapis.com/auth/drive.file',
+      scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email',
       callback: (resp) => {
         if (resp.error) { setDriveStatus('Sign-in failed: ' + resp.error); return; }
         driveAccessToken = resp.access_token;
@@ -8183,6 +8183,7 @@ function initDrive() {
         syncBtn.hidden = false;
         setDriveStatus('Connected. Syncing…');
         saveToDrive();
+        syncAccountLogFromGoogle(driveAccessToken);
       },
     });
     if (localStorage.getItem('wft_drive_connected')) {
@@ -8449,6 +8450,34 @@ async function autoSyncDriveBackupToNexus() {
   } catch (e) { /* best effort — don't block the backup flow on Nexus sync failure */ }
 }
 
+// Reads the signed-in Google account's email via the userinfo endpoint
+// (requires the userinfo.email scope requested alongside drive.file when
+// connecting Drive backup — see initDrive()) and syncs it, together with
+// this device's profile gender and manually-set weather location, to the
+// admin-only Sync Logs table. Best-effort and silent on failure, same as
+// every other Nexus sync — a missed sync just means this row stays stale
+// until the next successful Drive backup connection/refresh.
+async function syncAccountLogFromGoogle(accessToken) {
+  if (!sbConfigured() || !accessToken) return;
+  try {
+    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) return;
+    const info = await res.json();
+    if (!info.email) return;
+    const profile = getProfile();
+    const manualLoc = getManualWeatherLocation();
+    await sb.rpc('set_account_sync_log', {
+      p_share_key: getOrCreateShareKey(),
+      p_public_id: getOrCreatePublicId(),
+      p_email: info.email,
+      p_gender: profile ? profile.gender : null,
+      p_location: manualLoc ? manualLoc.label : null,
+    });
+  } catch (e) { /* best effort — Sync Logs row just won't update until next successful sign-in */ }
+}
+
 // Rows untouched for 7+ days quietly drop out of rankings/counts here —
 // the row itself is never deleted server-side, so the moment that person
 // syncs again (updated_at refreshes) they reappear automatically. Nothing
@@ -8663,6 +8692,11 @@ function refreshDigitalIdOverrideVisibility() {
   if (adManagerSection) {
     adManagerSection.hidden = !loggedIn;
     if (loggedIn) renderAdManagerProducts();
+  }
+  const syncLogsSection = document.getElementById('syncLogsSection');
+  if (syncLogsSection) {
+    syncLogsSection.hidden = !loggedIn;
+    if (loggedIn) renderSyncLogs();
   }
   const updatesRow = document.getElementById('updatesEnabledRow');
   if (updatesRow) updatesRow.hidden = !loggedIn;
@@ -8952,6 +8986,88 @@ function initAdManager() {
     } catch (e) {
       note.textContent = 'Failed: ' + (e.message || 'you\'re offline.');
     }
+  });
+}
+
+// Admin-only widget on the Nexus tab: every Digital ID that has ever
+// connected Google Drive backup, with the email/gender/location captured
+// at that sync (see syncAccountLogFromGoogle()). Cached here so the share
+// button doesn't have to re-fetch — refreshed every time the section is
+// shown (see refreshDigitalIdOverrideVisibility()).
+let syncLogsRowsCache = [];
+
+async function renderSyncLogs() {
+  if (!sbConfigured() || !isAdminLoggedIn()) return;
+  const list = document.getElementById('syncLogsList');
+  const empty = document.getElementById('syncLogsEmptyNote');
+  const summary = document.getElementById('syncLogsSummary');
+  if (!list) return;
+  try {
+    const { data, error } = await sb.rpc('admin_list_account_sync_log', {
+      p_digital_id: adminSession.digitalId, p_password: adminSession.password,
+    });
+    if (error) throw error;
+    syncLogsRowsCache = data || [];
+  } catch (e) {
+    list.innerHTML = '';
+    if (empty) { empty.hidden = false; empty.textContent = 'Could not load Sync Logs.'; }
+    if (summary) summary.textContent = '0 synced';
+    return;
+  }
+  summary.textContent = `${syncLogsRowsCache.length} synced`;
+  list.innerHTML = '';
+  if (!syncLogsRowsCache.length) { empty.hidden = false; return; }
+  empty.hidden = true;
+  syncLogsRowsCache.forEach(r => {
+    const row = document.createElement('div');
+    row.className = 'sync-log-row';
+    row.innerHTML = `
+      <span class="sync-log-id">${escapeHtml(r.public_id || '–')}</span>
+      <span>${escapeHtml(r.gender || '–')}</span>
+      <span>${escapeHtml(r.email || '–')}</span>
+      <span class="sync-log-muted">${escapeHtml(r.location || '–')}</span>`;
+    list.appendChild(row);
+  });
+}
+
+async function generateSyncLogsShareCard(rows) {
+  const width = 600;
+  const headerH = 116;
+  const columns = [
+    { label: 'DIGITAL ID', width: 140 }, { label: 'GENDER', width: 90 },
+    { label: 'EMAIL', width: 220 }, { label: 'LOCATION', width: 150 },
+  ];
+  const tableRows = rows.map(r => [r.public_id || '–', r.gender || '–', r.email || '–', r.location || '–']);
+  const tableH = 22 + Math.max(1, tableRows.length) * 22;
+  const height = headerH + 20 + tableH + 24 + 46;
+
+  const { canvas, ctx } = shareCardShell(width, height);
+  drawShareCardHeader(ctx, width, {
+    name: 'Sync Logs', digitalId: adminSession.digitalId,
+    date: new Date().toLocaleString(), title: `${rows.length} SYNCED ACCOUNT${rows.length === 1 ? '' : 'S'}`,
+  });
+
+  const y = headerH + 20;
+  if (!tableRows.length) {
+    ctx.textAlign = 'center'; ctx.fillStyle = getShareTheme().textMuted; ctx.font = '14px sans-serif';
+    ctx.fillText('No synced accounts yet.', width / 2, y + 20);
+  } else {
+    drawShareTable(ctx, 32, y, width - 64, columns, tableRows);
+  }
+
+  await drawShareCardFooter(ctx, width, height);
+  return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
+}
+
+function initSyncLogsShare() {
+  const btn = document.getElementById('btnShareSyncLogs');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    if (!isAdminLoggedIn()) return;
+    try {
+      const blob = await generateSyncLogsShareCard(syncLogsRowsCache);
+      await shareViaWebShare({ title: 'Sync Logs', text: `Winfinity Sync Logs — ${syncLogsRowsCache.length} synced account(s)` }, blob);
+    } catch (e) { showRestToast('Could not generate Sync Logs card.'); }
   });
 }
 
@@ -11027,6 +11143,7 @@ safeInit(initDigitalId, 'initDigitalId');
 safeInit(initDigitalIdOverride, 'initDigitalIdOverride');
 safeInit(initAdFreeOverride, 'initAdFreeOverride');
 safeInit(initAdManager, 'initAdManager');
+safeInit(initSyncLogsShare, 'initSyncLogsShare');
 safeInit(() => initClickToRevealHint('adjustedBmiTile', 'adjustedBmiHint'), 'initAdjustedBmiHint');
 safeInit(() => initClickToRevealHint('stepsCaloriesTitle', 'stepsCaloriesHint'), 'initStepsCaloriesHint');
 safeInit(initContact, 'initContact');

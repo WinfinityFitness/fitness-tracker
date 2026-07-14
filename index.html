@@ -796,6 +796,21 @@
       <p class="save-note" id="adManagerNote"></p>
     </div>
 
+    <div class="chart-card" id="syncLogsSection" hidden>
+      <p class="mod-tag">Admin_sync_01</p>
+      <div class="chart-card-head">
+        <span class="chart-card-title">Sync Logs</span>
+        <button type="button" class="icon-btn glass-emboss" id="btnShareSyncLogs" aria-label="Share Sync Logs">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="2"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.6l7.4-4.2M8.3 13.4l7.4 4.2"/></svg>
+        </button>
+      </div>
+      <p class="hint hint--sm">Digital IDs that have connected Google Drive backup, with the email, gender, and location synced at that time. Admin-only — never visible to other users.</p>
+      <p class="sync-log-summary" id="syncLogsSummary">0 synced</p>
+      <div class="sync-log-header"><span>Digital ID</span><span>Gender</span><span>Email</span><span>Location</span></div>
+      <div id="syncLogsList"></div>
+      <p class="empty-note" id="syncLogsEmptyNote" hidden>No synced accounts yet.</p>
+    </div>
+
     <div class="chart-card announcement-card" id="announcementCard">
       <div class="chart-card-head">
         <p class="mod-tag" style="margin:0;">Nexus Announcement</p>
@@ -1807,13 +1822,13 @@
       <button class="sheet-close" id="btnClosePrivacy">✕</button>
     </div>
     <div class="legal-doc">
-      <p class="legal-updated">Last Updated: July 13, 2026</p>
+      <p class="legal-updated">Last Updated: July 14, 2026</p>
 
       <h3>1. Introduction</h3>
       <p>Winfinity Fitness Tracker ("we," "our," or "us") is a self-tracking fitness app. This Privacy Policy explains what data the app stores, what is optional, and what we do with it.</p>
 
       <h3>2. No Account Required</h3>
-      <p>The app does not use email/password accounts. Your identity is a self-chosen Digital ID plus a private key generated on your device. We never ask for your real name, email address, or phone number.</p>
+      <p>The app does not use email/password accounts. Your identity is a self-chosen Digital ID plus a private key generated on your device. We never ask for your real name or phone number, and we do not collect your email address unless you choose to connect Google Drive backup (see "Google Drive Backup" below).</p>
 
       <h3>3. Data Stored on Your Device</h3>
       <p>Your profile, body measurements, food and workout logs, and daily reviews are stored locally on your device. This data stays on your device and is never sent to us unless you turn on one of the optional cloud features below.</p>
@@ -1824,6 +1839,7 @@
         <li><strong>Group chat &amp; direct messages:</strong> messages you send are stored on our server. Group chat is readable by any user of the app; there is no moderation team reviewing messages.</li>
         <li><strong>Push notifications:</strong> if enabled, we store a push subscription token tied to your device (not your real identity) solely to deliver reminders and message alerts.</li>
         <li><strong>AI food estimate:</strong> if you use the "Estimate with AI" feature (text or photo), the description or photo you submit is sent to our server and forwarded to Google's Gemini API to generate a nutrition estimate. We do not retain the photo or text beyond generating that estimate.</li>
+        <li><strong>Google Drive backup:</strong> if you connect Google Drive backup, the app requests permission to read your Google account's email address (in addition to app-only Drive file access to store your backup file). That email address, together with your profile's gender and the location you've manually set for the weather widget (if any), is stored on our server, tied to your Digital ID, so the app owner can identify and support real users. This data is visible only to the app admin and is never shown to other users. It is only collected going forward from when you first connect Drive backup after this policy was updated — connecting Drive before this update does not retroactively collect it.</li>
       </ul>
 
       <h3>5. What We Don't Do</h3>
@@ -1833,7 +1849,7 @@
       <p>This app is a tracking tool, not a medical device or coaching service. Consult a physician or healthcare professional before beginning any new exercise or nutrition program, especially if you have a pre-existing health condition. You assume all risk of injury resulting from activities you log or perform using information from this app.</p>
 
       <h3>7. Your Control Over Your Data</h3>
-      <p>You can clear all local data at any time from Settings. You can request deletion of any data you've synced (leaderboard entry, chat history, push subscription) by contacting us at aldwincruzulangca@gmail.com.</p>
+      <p>You can clear all local data at any time from Settings. You can request deletion of any data you've synced (leaderboard entry, chat history, push subscription, Google Drive backup email/gender/location) by contacting us at aldwincruzulangca@gmail.com.</p>
 
       <h3>8. Third-Party Processors</h3>
       <p>Supabase (database hosting) and Google's Gemini API (AI food estimate only) process data on our behalf under their own security practices.</p>
