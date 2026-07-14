@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.6.5';
+const APP_VERSION = 'WF_SYS_V.6.6';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9252,13 +9252,12 @@ function initMediaSyncWidget() {
 
 /* ---------------------------------------------------------------- */
 /* Food Preps (opened from the Media Synchronizer's Browse button,      */
-/* Warrior-tier gated — see MODE_GATED_ELEMENTS) — a community list of  */
-/* suggested meals (Admin- or user-authored) with true per-100g macros, */
-/* same convention as the Add Food AI estimate flow. Picking a calorie  */
-/* target in a meal's detail view computes that meal's serving size:    */
-/* grams = target / cal_per_100g * 100, macros scale with grams. One    */
-/* shared editor overlay backs both admin management (any meal) and a   */
-/* regular user's own submissions (their meals only).                   */
+/* Warrior-tier gated — see MODE_GATED_ELEMENTS) — an admin-curated list */
+/* of meals with true per-100g macros, same convention as the Add Food  */
+/* AI estimate flow. Picking a calorie target in a meal's detail view   */
+/* computes that meal's serving size: grams = target / cal_per_100g *   */
+/* 100, macros scale with grams. Regular users can browse but only an   */
+/* admin (password-gated) can add/edit/delete via the editor overlay.   */
 /* ---------------------------------------------------------------- */
 const PREP_MEAL_CATEGORY_LABELS = { breakfast: 'Breakfast', full_meal: 'Full Meal', snack: 'Snack' };
 // Generated inline (no network dependency, works offline) as the thumbnail
@@ -9275,7 +9274,6 @@ const PREP_MEAL_DEFAULT_IMAGE = 'data:image/svg+xml,' + encodeURIComponent(
 );
 let prepMealsCache = [];
 let prepMealSelectedCategory = 'breakfast';
-let prepMealEditorContext = { mode: 'user', id: null };
 let foodPrepsDetailMeal = null;
 
 async function fetchPrepMeals() {
@@ -9381,7 +9379,6 @@ function showFoodPrepsDetailScreen(meal) {
   badge.className = 'prep-meal-author-badge ' + (meal.author_type === 'admin' ? 'is-admin' : (isMine ? 'is-self' : ''));
   document.getElementById('foodPrepsDetailIngredients').textContent = meal.ingredients || '';
   document.getElementById('foodPrepsDetailProcedure').textContent = meal.procedure || '';
-  document.getElementById('btnFoodPrepsEditOwn').hidden = !isMine;
   const select = document.getElementById('foodPrepsDetailCalorieSelect');
   renderFoodPrepsDetail(Number(select.value) || 2000);
 }
@@ -9422,12 +9419,8 @@ function initFoodPrepsOverlay() {
       renderFoodPrepsList();
     });
   });
-  document.getElementById('btnFoodPrepsAddOwn').addEventListener('click', () => openPrepMealEditor('user', null));
   document.getElementById('btnFoodPrepsBack').addEventListener('click', showFoodPrepsListScreen);
   document.getElementById('foodPrepsDetailCalorieSelect').addEventListener('change', e => renderFoodPrepsDetail(Number(e.target.value) || 2000));
-  document.getElementById('btnFoodPrepsEditOwn').addEventListener('click', () => {
-    if (foodPrepsDetailMeal) openPrepMealEditor('user', foodPrepsDetailMeal);
-  });
 }
 
 // Admin-only widget on the Nutrition tab: every prep meal (Admin- and
@@ -9464,7 +9457,7 @@ async function renderPrepMealManager() {
   list.querySelectorAll('[data-edit-meal]').forEach(btn => {
     btn.addEventListener('click', () => {
       const m = prepMealsCache.find(x => String(x.id) === btn.dataset.editMeal);
-      if (m) openPrepMealEditor('admin', m);
+      if (m) openPrepMealEditor(m);
     });
   });
   list.querySelectorAll('[data-delete-meal]').forEach(btn => {
@@ -9485,15 +9478,13 @@ async function renderPrepMealManager() {
 function initPrepMealManager() {
   const addBtn = document.getElementById('btnAdminAddPrepMeal');
   if (!addBtn) return;
-  addBtn.addEventListener('click', () => openPrepMealEditor('admin', null));
+  addBtn.addEventListener('click', () => openPrepMealEditor(null));
 }
 
-/* Shared Prep Meal editor overlay — used both by the Food Preps overlay's */
-/* "+ Add your own" / "Edit your meal" buttons (mode 'user': can only     */
-/* create/edit/delete the current device's own meals, ownership enforced  */
-/* server-side by user_upsert_prep_meal/user_delete_prep_meal) and the    */
-/* admin manager's Add/Edit buttons (mode 'admin': any meal, password-    */
-/* gated). All macro fields are per-100g, same as the Add Food AI flow.   */
+/* Prep Meal editor overlay — admin-only (view and edit). Opened from the  */
+/* admin manager's Add/Edit buttons; every save/delete goes through the    */
+/* password-gated admin_upsert_prep_meal/admin_delete_prep_meal RPCs. All  */
+/* macro fields are per-100g, same convention as the Add Food AI flow.     */
 function fillPrepMealEditorForm(m) {
   document.getElementById('prepMealFormId').value = m ? m.id : '';
   document.getElementById('prepMealFormCategory').value = m ? m.category : prepMealSelectedCategory;
@@ -9512,12 +9503,9 @@ function fillPrepMealEditorForm(m) {
   document.getElementById('prepMealFormNote').textContent = '';
 }
 
-function openPrepMealEditor(mode, existingMeal) {
-  prepMealEditorContext = { mode, id: existingMeal ? existingMeal.id : null };
+function openPrepMealEditor(existingMeal) {
   fillPrepMealEditorForm(existingMeal);
   document.getElementById('prepMealEditorTitle').textContent = existingMeal ? 'Edit Prep Meal' : 'Add Prep Meal';
-  document.getElementById('prepMealFormActiveRow').hidden = mode !== 'admin';
-  document.getElementById('prepMealFormImageRow').hidden = mode !== 'admin';
   document.getElementById('btnDeletePrepMeal').hidden = !existingMeal;
   document.getElementById('prepMealEditorOverlay').hidden = false;
 }
@@ -9549,6 +9537,7 @@ async function fillPrepMealFromAi() {
 
 async function savePrepMealEditor() {
   const note = document.getElementById('prepMealFormNote');
+  if (!isAdminLoggedIn()) { note.textContent = 'Admin login required.'; return; }
   const idVal = document.getElementById('prepMealFormId').value;
   const category = document.getElementById('prepMealFormCategory').value;
   const name = document.getElementById('prepMealFormName').value.trim();
@@ -9561,29 +9550,19 @@ async function savePrepMealEditor() {
   if (!name || !ingredients || !calPer100g) { note.textContent = 'Fill in at least name, ingredients, and calories per 100g.'; return; }
   note.textContent = 'Saving…';
   try {
-    if (prepMealEditorContext.mode === 'admin') {
-      if (!isAdminLoggedIn()) { note.textContent = 'Admin login required.'; return; }
-      const active = document.getElementById('prepMealFormActive').checked;
-      const imageUrl = document.getElementById('prepMealFormImageUrl').value.trim();
-      const { error } = await sb.rpc('admin_upsert_prep_meal', {
-        p_digital_id: adminSession.digitalId, p_password: adminSession.password,
-        p_id: idVal ? Number(idVal) : null, p_category: category, p_name: name, p_ingredients: ingredients, p_procedure: procedure,
-        p_cal_per_100g: calPer100g, p_protein_per_100g: proteinPer100g, p_carbs_per_100g: carbsPer100g, p_fat_per_100g: fatPer100g,
-        p_active: active, p_image_url: imageUrl,
-      });
-      if (error) throw error;
-    } else {
-      const { error } = await sb.rpc('user_upsert_prep_meal', {
-        p_share_key: getOrCreateShareKey(), p_author_name: effectiveLeaderboardName(),
-        p_id: idVal ? Number(idVal) : null, p_category: category, p_name: name, p_ingredients: ingredients, p_procedure: procedure,
-        p_cal_per_100g: calPer100g, p_protein_per_100g: proteinPer100g, p_carbs_per_100g: carbsPer100g, p_fat_per_100g: fatPer100g,
-      });
-      if (error) throw error;
-    }
+    const active = document.getElementById('prepMealFormActive').checked;
+    const imageUrl = document.getElementById('prepMealFormImageUrl').value.trim();
+    const { error } = await sb.rpc('admin_upsert_prep_meal', {
+      p_digital_id: adminSession.digitalId, p_password: adminSession.password,
+      p_id: idVal ? Number(idVal) : null, p_category: category, p_name: name, p_ingredients: ingredients, p_procedure: procedure,
+      p_cal_per_100g: calPer100g, p_protein_per_100g: proteinPer100g, p_carbs_per_100g: carbsPer100g, p_fat_per_100g: fatPer100g,
+      p_active: active, p_image_url: imageUrl,
+    });
+    if (error) throw error;
     note.textContent = 'Saved.';
     prepMealsCache = await fetchPrepMeals();
     refreshOpenFoodPrepsScreen(idVal);
-    if (isAdminLoggedIn()) renderPrepMealManager();
+    renderPrepMealManager();
     setTimeout(closePrepMealEditor, 700);
   } catch (e) {
     note.textContent = 'Failed: ' + (e.message || 'you\'re offline.');
@@ -9592,19 +9571,15 @@ async function savePrepMealEditor() {
 
 async function deletePrepMealEditor() {
   const note = document.getElementById('prepMealFormNote');
+  if (!isAdminLoggedIn()) { note.textContent = 'Admin login required.'; return; }
   const idVal = document.getElementById('prepMealFormId').value;
   if (!idVal) return;
   if (!confirm('Delete this prep meal?')) return;
   try {
-    if (prepMealEditorContext.mode === 'admin') {
-      if (!isAdminLoggedIn()) { note.textContent = 'Admin login required.'; return; }
-      await sb.rpc('admin_delete_prep_meal', { p_digital_id: adminSession.digitalId, p_password: adminSession.password, p_id: Number(idVal) });
-    } else {
-      await sb.rpc('user_delete_prep_meal', { p_share_key: getOrCreateShareKey(), p_id: Number(idVal) });
-    }
+    await sb.rpc('admin_delete_prep_meal', { p_digital_id: adminSession.digitalId, p_password: adminSession.password, p_id: Number(idVal) });
     prepMealsCache = await fetchPrepMeals();
     showFoodPrepsListScreen();
-    if (isAdminLoggedIn()) renderPrepMealManager();
+    renderPrepMealManager();
     closePrepMealEditor();
   } catch (e) { note.textContent = 'Could not delete.'; }
 }
