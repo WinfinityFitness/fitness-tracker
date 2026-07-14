@@ -2694,6 +2694,7 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 }
 .prep-meal-author-badge.is-admin { color: var(--warning); border-color: var(--warning); }
 .prep-meal-author-badge.is-self { color: var(--cyan); border-color: var(--cyan); }
+.prep-meal-author-badge.is-pending { color: var(--critical); border-color: var(--critical); }
 .prep-meal-ingredients { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .prep-meal-amount-col { flex: none; display: flex; align-items: center; gap: 6px; }
 .prep-meal-amount { font-family: var(--font-mono); font-weight: 700; font-size: 0.86rem; color: var(--text-primary); }

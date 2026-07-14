@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.7.7';
+const APP_VERSION = 'WF_SYS_V.7.8';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9489,7 +9489,11 @@ function renderFoodPrepsList() {
   const empty = document.getElementById('foodPrepsEmptyNote');
   const expandBtn = document.getElementById('btnFoodPrepsExpand');
   const myShareKey = localStorage.getItem('wft_lb_share_key');
-  const activeMeals = prepMealsCache.filter(m => m.active && m.category === prepMealSelectedCategory);
+  // Unapproved submissions stay hidden from the public list, but their own
+  // author sees them immediately (badged "Pending") — and admins see
+  // everything so nothing awaiting review is invisible to them.
+  const activeMeals = prepMealsCache.filter(m => m.active && m.category === prepMealSelectedCategory &&
+    (m.approved !== false || isAdminLoggedIn() || (m.author_type === 'user' && !!myShareKey && m.author_share_key === myShareKey)));
   const visibleMeals = foodPrepsExpanded ? activeMeals : activeMeals.slice(0, FOOD_PREPS_PREVIEW_COUNT);
 
   expandBtn.hidden = activeMeals.length <= FOOD_PREPS_PREVIEW_COUNT;
@@ -9512,6 +9516,7 @@ function renderFoodPrepsList() {
     const isMine = m.author_type === 'user' && !!myShareKey && m.author_share_key === myShareKey;
     const badgeClass = m.author_type === 'admin' ? 'is-admin' : (isMine ? 'is-self' : '');
     const badgeLabel = m.author_type === 'admin' ? 'Admin' : `By ${m.author_name || 'User'}`;
+    const pendingBadge = m.approved === false ? '<span class="prep-meal-author-badge is-pending">Pending review</span>' : '';
     const firstIngredientLine = (m.ingredients || '').split('\n')[0];
     const row = document.createElement('div');
     row.className = 'prep-meal-row' + (foodPrepsDetailMeal && m.id === foodPrepsDetailMeal.id ? ' is-selected' : '');
@@ -9521,7 +9526,7 @@ function renderFoodPrepsList() {
       <div class="prep-meal-info">
         <div class="prep-meal-name-row">
           <span class="prep-meal-name">${escapeHtml(m.name)}</span>
-          <span class="prep-meal-author-badge ${badgeClass}">${escapeHtml(badgeLabel)}</span>
+          <span class="prep-meal-author-badge ${badgeClass}">${escapeHtml(badgeLabel)}</span>${pendingBadge}
         </div>
         <div class="prep-meal-ingredients">${escapeHtml(firstIngredientLine)}</div>
       </div>
@@ -9602,7 +9607,9 @@ function selectFoodPrepMeal(meal) {
   badge.className = 'prep-meal-author-badge ' + (meal.author_type === 'admin' ? 'is-admin' : (isMine ? 'is-self' : ''));
   renderBulletedText(document.getElementById('foodPrepsDetailIngredients'), meal.ingredients, '\n');
   renderProcedureList(document.getElementById('foodPrepsDetailProcedure'), meal.procedure);
-  document.getElementById('btnFoodPrepsAdminEdit').hidden = !isAdminLoggedIn();
+  const editBtn = document.getElementById('btnFoodPrepsAdminEdit');
+  editBtn.hidden = !(isAdminLoggedIn() || isMine);
+  editBtn.textContent = isAdminLoggedIn() ? 'Edit this meal (Admin)' : 'Edit your meal';
   document.getElementById('foodPrepsServingSize').value = 100;
   renderFoodPrepsDetail();
 }
@@ -9690,20 +9697,26 @@ function initFoodPrepsOverlay() {
     renderFoodPrepsList();
   });
   document.getElementById('foodPrepsServingSize').addEventListener('input', renderFoodPrepsDetail);
-  // Admin shortcut: edit the currently-viewed meal (every field, including
-  // image URL) without leaving the browser for the separate manager list.
+  // Edit the currently-viewed meal: admins can edit anything; a regular
+  // user only sees this button on their own submissions (server-side
+  // ownership check backs it up either way).
   document.getElementById('btnFoodPrepsAdminEdit').addEventListener('click', () => {
-    if (!isAdminLoggedIn() || !foodPrepsDetailMeal) return;
+    if (!foodPrepsDetailMeal) return;
+    const myShareKey = localStorage.getItem('wft_lb_share_key');
+    const isMine = foodPrepsDetailMeal.author_type === 'user' && !!myShareKey && foodPrepsDetailMeal.author_share_key === myShareKey;
+    if (!isAdminLoggedIn() && !isMine) return;
     openPrepMealEditor(foodPrepsDetailMeal);
   });
+  document.getElementById('btnFoodPrepsAddOwn').addEventListener('click', () => openPrepMealEditor(null));
   initFoodPrepsThumbPreview();
 }
 
 // Admin-only widget on the Nutrition tab: every prep meal (Admin- and
-// user-authored alike) with Edit/Delete. Edit opens the same shared
+// user-authored alike) with Approve/Edit/Delete. Edit opens the same shared
 // editor overlay the Food Preps "+" button uses, just in 'admin' mode.
 // Independent of the Warrior-tier gate on Browse — admins manage the
 // catalog here regardless of their own fitness mode.
+let lastToastedPendingCount = 0;
 async function renderPrepMealManager() {
   if (!sbConfigured() || !isAdminLoggedIn()) return;
   prepMealsCache = await fetchPrepMeals();
@@ -9714,21 +9727,47 @@ async function renderPrepMealManager() {
   if (!prepMealsCache.length) { empty.hidden = false; return; }
   empty.hidden = true;
 
-  prepMealsCache.forEach(m => {
+  // Pending submissions float to the top of the list and get a one-tap
+  // Approve button; the count doubles as the admin's review notification —
+  // toasted only when it changes, not on every re-render.
+  const sorted = [...prepMealsCache].sort((a, b) => (a.approved === false ? 0 : 1) - (b.approved === false ? 0 : 1));
+  const pendingCount = prepMealsCache.filter(m => m.approved === false).length;
+  if (pendingCount > 0 && pendingCount !== lastToastedPendingCount) {
+    showRestToast(`🔔 ${pendingCount} prep meal submission${pendingCount === 1 ? '' : 's'} pending your review.`);
+  }
+  lastToastedPendingCount = pendingCount;
+
+  sorted.forEach(m => {
     const row = document.createElement('div');
     row.className = 'ad-manager-row prep-meal-manager-row' + (m.active ? '' : ' ad-manager-inactive');
     const authorLabel = m.author_type === 'admin' ? 'Admin' : `User: ${m.author_name || 'Unknown'}`;
+    const pendingTag = m.approved === false ? ' <span class="prep-meal-author-badge is-pending">Pending review</span>' : '';
     row.innerHTML = `
       <img class="ad-manager-thumb" src="${escapeHtml(m.image_url || PREP_MEAL_DEFAULT_IMAGE)}" alt="" loading="lazy">
       <div class="ad-manager-info">
-        <div class="ad-manager-name">${escapeHtml(m.name)}${m.active ? '' : ' (inactive)'}</div>
+        <div class="ad-manager-name">${escapeHtml(m.name)}${m.active ? '' : ' (inactive)'}${pendingTag}</div>
         <span class="ad-manager-link">${PREP_MEAL_CATEGORY_LABELS[m.category] || m.category} · ${escapeHtml(authorLabel)} · ${m.cal_per_100g} kcal/100g (P${m.protein_per_100g}/C${m.carbs_per_100g}/F${m.fat_per_100g}/Fbr${m.fiber_per_100g}/Na${m.sodium_per_100g}mg)</span>
       </div>
       <div class="ad-manager-actions">
+        ${m.approved === false ? `<button type="button" class="btn btn--primary btn--sm" data-approve-meal="${m.id}">Approve</button>` : ''}
         <button type="button" class="btn btn--sm" data-edit-meal="${m.id}">Edit</button>
         <button type="button" class="btn btn--danger btn--sm" data-delete-meal="${m.id}">Delete</button>
       </div>`;
     list.appendChild(row);
+  });
+  list.querySelectorAll('[data-approve-meal]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try {
+        const { error } = await sb.rpc('admin_approve_prep_meal', {
+          p_digital_id: adminSession.digitalId, p_password: adminSession.password, p_id: Number(btn.dataset.approveMeal),
+        });
+        if (error) throw error;
+        showRestToast('Approved — now visible to everyone.');
+        prepMealsCache = await fetchPrepMeals();
+        renderPrepMealManager();
+        refreshOpenFoodPrepsScreen();
+      } catch (e) { showRestToast('Could not approve.'); }
+    });
   });
   list.querySelectorAll('[data-edit-meal]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -9795,8 +9834,15 @@ function fillPrepMealEditorForm(m) {
 }
 
 function openPrepMealEditor(existingMeal) {
+  const admin = isAdminLoggedIn();
   fillPrepMealEditorForm(existingMeal);
   document.getElementById('prepMealEditorTitle').textContent = existingMeal ? 'Edit Prep Meal' : 'Add Prep Meal';
+  // Image URL/framing and the Active toggle stay admin-only — a user
+  // submission can't inject an arbitrary image, and visibility moderation
+  // belongs to the admin. Everything else is open to the submitting user.
+  document.getElementById('prepMealFormImageRow').hidden = !admin;
+  document.getElementById('prepMealFormActiveRow').hidden = !admin;
+  if (!admin) document.getElementById('prepMealImageCropSection').hidden = true;
   document.getElementById('btnDeletePrepMeal').hidden = !existingMeal;
   document.getElementById('prepMealEditorOverlay').hidden = false;
 }
@@ -9876,7 +9922,6 @@ async function addImageToMediaSyncSlideshow(imageUrl) {
 
 async function savePrepMealEditor() {
   const note = document.getElementById('prepMealFormNote');
-  if (!isAdminLoggedIn()) { note.textContent = 'Admin login required.'; return; }
   const idVal = document.getElementById('prepMealFormId').value;
   const category = document.getElementById('prepMealFormCategory').value;
   const name = document.getElementById('prepMealFormName').value.trim();
@@ -9895,23 +9940,37 @@ async function savePrepMealEditor() {
   if (!name || !ingredients || !calPer100g) { note.textContent = 'Fill in at least name, ingredients, and calories.'; return; }
   note.textContent = 'Saving…';
   try {
-    const active = document.getElementById('prepMealFormActive').checked;
-    const imageUrl = document.getElementById('prepMealFormImageUrl').value.trim();
-    const { error } = await sb.rpc('admin_upsert_prep_meal', {
-      p_digital_id: adminSession.digitalId, p_password: adminSession.password,
-      p_id: idVal ? Number(idVal) : null, p_category: category, p_name: name, p_ingredients: ingredients, p_procedure: procedure,
-      p_cal_per_100g: calPer100g, p_protein_per_100g: proteinPer100g, p_carbs_per_100g: carbsPer100g, p_fat_per_100g: fatPer100g,
-      p_fiber_per_100g: fiberPer100g, p_sodium_per_100g: sodiumPer100g,
-      p_active: active, p_image_url: imageUrl,
-      p_image_zoom: prepMealCropState.zoom, p_image_pos_x: Math.round(prepMealCropState.x), p_image_pos_y: Math.round(prepMealCropState.y),
-    });
-    if (error) throw error;
-    note.textContent = 'Saved.';
-    if (imageUrl) await addImageToMediaSyncSlideshow(imageUrl);
+    if (isAdminLoggedIn()) {
+      const active = document.getElementById('prepMealFormActive').checked;
+      const imageUrl = document.getElementById('prepMealFormImageUrl').value.trim();
+      const { error } = await sb.rpc('admin_upsert_prep_meal', {
+        p_digital_id: adminSession.digitalId, p_password: adminSession.password,
+        p_id: idVal ? Number(idVal) : null, p_category: category, p_name: name, p_ingredients: ingredients, p_procedure: procedure,
+        p_cal_per_100g: calPer100g, p_protein_per_100g: proteinPer100g, p_carbs_per_100g: carbsPer100g, p_fat_per_100g: fatPer100g,
+        p_fiber_per_100g: fiberPer100g, p_sodium_per_100g: sodiumPer100g,
+        p_active: active, p_image_url: imageUrl,
+        p_image_zoom: prepMealCropState.zoom, p_image_pos_x: Math.round(prepMealCropState.x), p_image_pos_y: Math.round(prepMealCropState.y),
+      });
+      if (error) throw error;
+      note.textContent = 'Saved.';
+      if (imageUrl) await addImageToMediaSyncSlideshow(imageUrl);
+    } else {
+      // Self-service submission: saves immediately, visible to this user
+      // right away, public only once the admin approves (ownership and
+      // the pending flag are enforced server-side).
+      const { error } = await sb.rpc('user_upsert_prep_meal', {
+        p_share_key: getOrCreateShareKey(), p_author_name: effectiveLeaderboardName(),
+        p_id: idVal ? Number(idVal) : null, p_category: category, p_name: name, p_ingredients: ingredients, p_procedure: procedure,
+        p_cal_per_100g: calPer100g, p_protein_per_100g: proteinPer100g, p_carbs_per_100g: carbsPer100g, p_fat_per_100g: fatPer100g,
+        p_fiber_per_100g: fiberPer100g, p_sodium_per_100g: sodiumPer100g,
+      });
+      if (error) throw error;
+      note.textContent = 'Saved — visible to you now; it goes public once the admin approves it.';
+    }
     prepMealsCache = await fetchPrepMeals();
     refreshOpenFoodPrepsScreen(idVal);
-    renderPrepMealManager();
-    setTimeout(closePrepMealEditor, 700);
+    if (isAdminLoggedIn()) renderPrepMealManager();
+    setTimeout(closePrepMealEditor, isAdminLoggedIn() ? 700 : 1600);
   } catch (e) {
     note.textContent = 'Failed: ' + (e.message || 'you\'re offline.');
   }
@@ -9919,16 +9978,19 @@ async function savePrepMealEditor() {
 
 async function deletePrepMealEditor() {
   const note = document.getElementById('prepMealFormNote');
-  if (!isAdminLoggedIn()) { note.textContent = 'Admin login required.'; return; }
   const idVal = document.getElementById('prepMealFormId').value;
   if (!idVal) return;
   if (!confirm('Delete this prep meal?')) return;
   try {
-    await sb.rpc('admin_delete_prep_meal', { p_digital_id: adminSession.digitalId, p_password: adminSession.password, p_id: Number(idVal) });
+    if (isAdminLoggedIn()) {
+      await sb.rpc('admin_delete_prep_meal', { p_digital_id: adminSession.digitalId, p_password: adminSession.password, p_id: Number(idVal) });
+    } else {
+      await sb.rpc('user_delete_prep_meal', { p_share_key: getOrCreateShareKey(), p_id: Number(idVal) });
+    }
     prepMealsCache = await fetchPrepMeals();
     foodPrepsDetailMeal = null;
     refreshOpenFoodPrepsScreen();
-    renderPrepMealManager();
+    if (isAdminLoggedIn()) renderPrepMealManager();
     closePrepMealEditor();
   } catch (e) { note.textContent = 'Could not delete.'; }
 }
