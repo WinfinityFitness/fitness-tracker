@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.7.6';
+const APP_VERSION = 'WF_SYS_V.7.7';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -11377,11 +11377,14 @@ function initConsentGate() {
 }
 
 /* ---------------------------------------------------------------- */
-/* Fitness Journey Mode (Beginner / Warrior / Spartan)                 */
+/* Fitness Journey Mode (Novice / Warrior / Spartan / Demi-God)        */
 /* ---------------------------------------------------------------- */
 const MODE_RANK = { beginner: 0, warrior: 1, spartan: 2, demigod: 3 };
 const MODE_ORDER = ['beginner', 'warrior', 'spartan', 'demigod'];
-const MODE_LABEL = { beginner: 'Beginner Mode', warrior: 'Warrior Mode', spartan: 'Spartan Mode', demigod: 'Demi-God Mode' };
+// 'beginner' stays as the internal key (stored in profiles and synced to
+// the leaderboard's fitness_mode column) — only the display label says
+// Novice, so existing users' saved modes keep working.
+const MODE_LABEL = { beginner: 'Novice Mode', warrior: 'Warrior Mode', spartan: 'Spartan Mode', demigod: 'Demi-God Mode' };
 const MODE_ICON = { beginner: 'icons/mode-beginner.png', warrior: 'icons/mode-warrior.png', spartan: 'icons/mode-spartan.png', demigod: 'icons/mode-demigod.png' };
 
 function updateHeaderModeIcon() {
@@ -11679,8 +11682,8 @@ function initRestartJourney() {
   const note = document.getElementById('restartJourneyNote');
   if (!btn) return;
   btn.addEventListener('click', () => {
-    if (!confirm('Restart your Fitness Journey? This clears ALL logs, reviews, and history, and takes you back to Beginner Mode — you\'ll need to re-earn Warrior and Spartan Mode by logging consistently again. This cannot be undone.')) return;
-    if (!confirm('Really sure? This is permanent — tap OK only if you genuinely want to start your journey over from Beginner Mode.')) return;
+    if (!confirm('Restart your Fitness Journey? This clears ALL logs, reviews, and history, and takes you back to Novice Mode — you\'ll need to re-earn Warrior and Spartan Mode by logging consistently again. This cannot be undone.')) return;
+    if (!confirm('Really sure? This is permanent — tap OK only if you genuinely want to start your journey over from Novice Mode.')) return;
     saveLogs({});
     saveReviews({});
     saveDailyReviews({});
@@ -11692,7 +11695,7 @@ function initRestartJourney() {
       saveProfile(p);
     }
     applyModeGating();
-    note.textContent = 'Journey restarted — you\'re back at Beginner Mode.';
+    note.textContent = 'Journey restarted — you\'re back at Novice Mode.';
     setTimeout(() => { note.textContent = ''; }, 4000);
     renderDashboard();
     renderHistory();
