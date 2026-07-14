@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.8.1';
+const APP_VERSION = 'WF_SYS_V.8.2';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -923,7 +923,12 @@ async function shareMultipleViaWebShare(shareData, namedBlobs) {
 }
 
 function initFooterShare() {
-  const shareUrl = 'https://winfinityfitness.github.io/fitness-tracker';
+  // On a clean-variant install, shares carry the ?variant=clean flag forward
+  // so whoever the link is shared with also lands on the Facebook/Instagram-free
+  // experience — not just the person the link was originally sent to.
+  const shareUrl = isCleanShareVariant()
+    ? 'https://winfinityfitness.github.io/fitness-tracker?variant=clean'
+    : 'https://winfinityfitness.github.io/fitness-tracker';
   document.getElementById('btnFooterShare').addEventListener('click', () => {
     shareViaWebShare({
       title: 'Winfinity Tracker',
