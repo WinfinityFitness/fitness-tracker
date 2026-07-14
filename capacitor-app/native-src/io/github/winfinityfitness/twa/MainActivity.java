@@ -18,7 +18,7 @@ public class MainActivity extends BridgeActivity {
     // off to the web app's own smaller logo+text loading screen (stage 2) —
     // fixed, not "however long the WebView happens to take to load", which is
     // all the plain windowBackground splash alone would give us.
-    private static final long SPLASH_HOLD_MS = 2000;
+    private static final long SPLASH_HOLD_MS = 1500;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
