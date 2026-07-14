@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.7.3';
+const APP_VERSION = 'WF_SYS_V.7.4';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9717,6 +9717,11 @@ function fillPrepMealEditorForm(m) {
   document.getElementById('prepMealFormId').value = m ? m.id : '';
   document.getElementById('prepMealFormCategory').value = m ? m.category : prepMealSelectedCategory;
   document.getElementById('prepMealFormName').value = m ? m.name : '';
+  // Serving always opens at 100g, so the stored per-100g rates ARE the
+  // per-serving numbers shown — the admin can then change the serving to
+  // whatever their label/source states and the fields rescale to match.
+  document.getElementById('prepMealFormServing').value = 100;
+  prepMealEditorServing = 100;
   document.getElementById('prepMealFormCalories').value = m ? m.cal_per_100g : '';
   document.getElementById('prepMealFormProtein').value = m ? m.protein_per_100g : '';
   document.getElementById('prepMealFormCarbs').value = m ? m.carbs_per_100g : '';
@@ -9758,6 +9763,10 @@ async function fillPrepMealFromAi() {
   note.textContent = 'Reading…';
   try {
     const data = await estimatePrepMealFromMenu({ mealMenuText: text || undefined, mealMenuUrl: !text ? url : undefined });
+    // AI returns per-100g rates, so pin the serving declaration back to
+    // 100g to match before dropping the values in.
+    document.getElementById('prepMealFormServing').value = 100;
+    prepMealEditorServing = 100;
     if (data.name) document.getElementById('prepMealFormName').value = data.name;
     if (data.calories) document.getElementById('prepMealFormCalories').value = Math.round(data.calories);
     if (data.protein) document.getElementById('prepMealFormProtein').value = Math.round(data.protein);
@@ -9798,15 +9807,19 @@ async function savePrepMealEditor() {
   const idVal = document.getElementById('prepMealFormId').value;
   const category = document.getElementById('prepMealFormCategory').value;
   const name = document.getElementById('prepMealFormName').value.trim();
-  const calPer100g = Number(document.getElementById('prepMealFormCalories').value) || 0;
-  const proteinPer100g = Number(document.getElementById('prepMealFormProtein').value) || 0;
-  const carbsPer100g = Number(document.getElementById('prepMealFormCarbs').value) || 0;
-  const fatPer100g = Number(document.getElementById('prepMealFormFat').value) || 0;
-  const fiberPer100g = Number(document.getElementById('prepMealFormFiber').value) || 0;
-  const sodiumPer100g = Number(document.getElementById('prepMealFormSodium').value) || 0;
+  // Fields hold nutrition for the declared serving — convert to per-100g
+  // rates for storage (grams is the multiplier: perServing / grams * 100).
+  const servingGrams = Number(document.getElementById('prepMealFormServing').value) || 100;
+  const toPer100 = v => Math.round((v / servingGrams) * 100 * 10) / 10;
+  const calPer100g = toPer100(Number(document.getElementById('prepMealFormCalories').value) || 0);
+  const proteinPer100g = toPer100(Number(document.getElementById('prepMealFormProtein').value) || 0);
+  const carbsPer100g = toPer100(Number(document.getElementById('prepMealFormCarbs').value) || 0);
+  const fatPer100g = toPer100(Number(document.getElementById('prepMealFormFat').value) || 0);
+  const fiberPer100g = toPer100(Number(document.getElementById('prepMealFormFiber').value) || 0);
+  const sodiumPer100g = toPer100(Number(document.getElementById('prepMealFormSodium').value) || 0);
   const ingredients = document.getElementById('prepMealFormIngredients').value.trim();
   const procedure = document.getElementById('prepMealFormProcedure').value.trim();
-  if (!name || !ingredients || !calPer100g) { note.textContent = 'Fill in at least name, ingredients, and calories per 100g.'; return; }
+  if (!name || !ingredients || !calPer100g) { note.textContent = 'Fill in at least name, ingredients, and calories.'; return; }
   note.textContent = 'Saving…';
   try {
     const active = document.getElementById('prepMealFormActive').checked;
@@ -9845,6 +9858,25 @@ async function deletePrepMealEditor() {
     renderPrepMealManager();
     closePrepMealEditor();
   } catch (e) { note.textContent = 'Could not delete.'; }
+}
+
+// Last-applied serving grams in the editor — the anchor the nutrition
+// fields rescale from when the admin changes the serving size (fields
+// always represent nutrition for the serving currently declared).
+let prepMealEditorServing = 100;
+const PREP_MEAL_NUTRITION_FIELD_IDS = ['prepMealFormCalories', 'prepMealFormProtein', 'prepMealFormCarbs', 'prepMealFormFat', 'prepMealFormFiber', 'prepMealFormSodium'];
+
+function rescalePrepMealNutritionFields(newGrams) {
+  if (!newGrams || newGrams <= 0 || newGrams === prepMealEditorServing) return;
+  const ratio = newGrams / prepMealEditorServing;
+  PREP_MEAL_NUTRITION_FIELD_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el.value === '') return;
+    const v = Number(el.value);
+    if (!isFinite(v)) return;
+    el.value = Math.round(v * ratio * 10) / 10;
+  });
+  prepMealEditorServing = newGrams;
 }
 
 /* Image framing controls in the editor — a live 16:9 preview the admin
@@ -9911,6 +9943,11 @@ function initPrepMealEditor() {
   document.getElementById('btnPrepMealAiFill').addEventListener('click', fillPrepMealFromAi);
   document.getElementById('btnSavePrepMeal').addEventListener('click', savePrepMealEditor);
   document.getElementById('btnDeletePrepMeal').addEventListener('click', deletePrepMealEditor);
+  // change (not input) so half-typed serving numbers (e.g. the "2" while
+  // typing "250") don't trigger intermediate rescales of the fields.
+  document.getElementById('prepMealFormServing').addEventListener('change', e => {
+    rescalePrepMealNutritionFields(Number(e.target.value));
+  });
   initPrepMealCropControls();
 }
 

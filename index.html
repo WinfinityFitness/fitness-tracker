@@ -2857,34 +2857,38 @@
       <span>Name of meal</span>
       <input type="text" id="prepMealFormName" placeholder="e.g. Iron Breath Omelette">
     </label>
-    <p class="hint hint--sm">Enter macros the same way a nutrition label does — per 100 grams. The Food Preps browser computes the actual serving size from whichever calorie target the viewer picks.</p>
+    <p class="hint hint--sm">Declare the serving size in grams (default 100g), then enter nutrition for that serving — the app converts everything to a per-100g rate on save. Changing the serving size rescales the values below automatically.</p>
+    <label class="field">
+      <span>Serving size (g)</span>
+      <input type="number" id="prepMealFormServing" min="1" value="100">
+    </label>
     <div class="field-row">
       <label class="field">
-        <span>Calories / 100g</span>
+        <span>Calories / serving</span>
         <input type="number" id="prepMealFormCalories" min="0" placeholder="e.g. 155">
       </label>
       <label class="field">
-        <span>Protein / 100g</span>
+        <span>Protein (g) / serving</span>
         <input type="number" id="prepMealFormProtein" min="0" placeholder="e.g. 12">
       </label>
     </div>
     <div class="field-row">
       <label class="field">
-        <span>Carbs / 100g</span>
+        <span>Carbs (g) / serving</span>
         <input type="number" id="prepMealFormCarbs" min="0" placeholder="e.g. 4">
       </label>
       <label class="field">
-        <span>Fat / 100g</span>
+        <span>Fat (g) / serving</span>
         <input type="number" id="prepMealFormFat" min="0" placeholder="e.g. 10">
       </label>
     </div>
     <div class="field-row">
       <label class="field">
-        <span>Fiber / 100g</span>
+        <span>Fiber (g) / serving</span>
         <input type="number" id="prepMealFormFiber" min="0" placeholder="e.g. 2">
       </label>
       <label class="field">
-        <span>Sodium (mg) / 100g</span>
+        <span>Sodium (mg) / serving</span>
         <input type="number" id="prepMealFormSodium" min="0" placeholder="e.g. 380">
       </label>
     </div>
