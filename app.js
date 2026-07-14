@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.5.9';
+const APP_VERSION = 'WF_SYS_V.6.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -790,23 +790,24 @@ function initContact() {
 }
 
 async function generateShareCardBlob({ emoji, title, stats }) {
+  const theme = getShareTheme();
   const canvas = document.createElement('canvas');
   canvas.width = 600; canvas.height = 600;
   const ctx = canvas.getContext('2d');
 
   const bg = ctx.createLinearGradient(0, 0, 600, 600);
-  bg.addColorStop(0, '#171f24');
-  bg.addColorStop(1, '#0a0e12');
+  bg.addColorStop(0, theme.bgFrom);
+  bg.addColorStop(1, theme.bgTo);
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, 600, 600);
-  ctx.strokeStyle = 'rgba(51,200,204,0.4)';
+  ctx.strokeStyle = theme.border;
   ctx.lineWidth = 2;
   ctx.strokeRect(8, 8, 584, 584);
 
   ctx.textAlign = 'center';
   ctx.font = '76px sans-serif';
   ctx.fillText(emoji, 300, 140);
-  ctx.fillStyle = '#33c8cc';
+  ctx.fillStyle = theme.accent;
   ctx.font = 'bold 32px sans-serif';
   ctx.fillText(title, 300, 205);
 
@@ -816,10 +817,10 @@ async function generateShareCardBlob({ emoji, title, stats }) {
   stats.forEach((s, i) => {
     const x = startX + (i % 2) * colW;
     if (i % 2 === 0 && i > 0) y += 110;
-    ctx.fillStyle = '#7e8e95';
+    ctx.fillStyle = theme.textMuted;
     ctx.font = '15px monospace';
     ctx.fillText(s.label.toUpperCase(), x, y);
-    ctx.fillStyle = '#dde3e5';
+    ctx.fillStyle = theme.textPrimary;
     ctx.font = 'bold 30px sans-serif';
     ctx.fillText(s.value, x, y + 36);
   });
@@ -2244,12 +2245,30 @@ function renderStepsCaloriesChart() {
 
 
 
+// Only shrinks when the name would actually overflow its line (short names
+// stay at the normal 90%-scaled size) — text width scales linearly with
+// font-size for a given string, so one measurement is enough to compute
+// the exact ratio needed, no iterative loop required.
+function fitHeroNameToWidth() {
+  const el = document.getElementById('heroName');
+  const container = el.closest('.hero-title');
+  if (!el || !container) return;
+  el.style.fontSize = '';
+  const maxWidth = container.clientWidth;
+  const naturalWidth = el.scrollWidth;
+  if (maxWidth > 0 && naturalWidth > maxWidth) {
+    const currentSize = parseFloat(getComputedStyle(el).fontSize);
+    el.style.fontSize = (currentSize * (maxWidth / naturalWidth) * 0.96) + 'px';
+  }
+}
+
 function renderDashboard() {
   const profile = getProfile();
   const logsArr = sortedLogsArray();
   const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
 
   document.getElementById('heroName').textContent = (profile && profile.name) ? profile.name : 'Operator';
+  fitHeroNameToWidth();
 
   if (profile && profile.startDate) {
     const start = parseISO(profile.startDate);
@@ -4810,6 +4829,12 @@ function refreshFuelViewsForDate(date) {
 }
 
 let editingMealItem = null; // { meal, idx } while a meal-item row is in edit mode
+// Per-100g rate captured once when edit mode opens (mirrors
+// customFoodAiPer100g in the Add Food flow) — used to scale calories/macros
+// as the serving qty/unit change, without needing a re-render on every
+// keystroke. Calories skip this scaling while locked via the chain toggle.
+let mealEditPer100g = null;
+let mealEditCaloriesLocked = false;
 
 function renderFoodDiary(date) {
   const meals = getMealsForDate(date);
@@ -4819,6 +4844,8 @@ function renderFoodDiary(date) {
     const items = meals[mt];
     container.innerHTML = items.length ? items.map((item, idx) => {
       if (editingMealItem && editingMealItem.meal === mt && editingMealItem.idx === idx) {
+        const qty = item.qty != null ? item.qty : (item.grams != null ? item.grams : '');
+        const unit = item.unit || 'g';
         return `
       <div class="meal-item-row meal-item-row--edit">
         <div class="meal-item-edit-form">
@@ -4827,11 +4854,26 @@ function renderFoodDiary(date) {
             <input type="text" class="meal-edit-name" value="${escapeHtml(item.name)}">
           </div>
           <div class="field-row">
-            <div><span class="field-label">Grams</span><input type="number" class="meal-edit-grams" value="${item.grams != null ? item.grams : ''}"></div>
-            <div><span class="field-label">Calories</span><input type="number" class="meal-edit-calories" value="${round0(item.calories)}"></div>
+            <div><span class="field-label">Serving</span><input type="number" class="meal-edit-qty" value="${qty}"></div>
+            <div><span class="field-label">Unit</span>
+              <select class="meal-edit-unit">
+                ${Object.keys(SERVING_UNITS).map(u => `<option value="${u}"${u === unit ? ' selected' : ''}>${SERVING_UNITS[u].label}</option>`).join('')}
+              </select>
+            </div>
           </div>
           <div class="field-row">
+            <div>
+              <span class="field-label meal-edit-calories-label">
+                Calories
+                <button type="button" class="meal-edit-chain-btn" aria-label="Lock calories to this serving" aria-pressed="false" title="Lock calories so they don't change with serving size">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="7" cy="12" r="3.5"/><circle cx="17" cy="12" r="3.5"/><line class="chain-link-line" x1="10.2" y1="12" x2="13.8" y2="12"/></svg>
+                </button>
+              </span>
+              <input type="number" class="meal-edit-calories" value="${round0(item.calories)}">
+            </div>
             <div><span class="field-label">Protein g</span><input type="number" class="meal-edit-protein" value="${round0(item.protein)}"></div>
+          </div>
+          <div class="field-row">
             <div><span class="field-label">Carbs g</span><input type="number" class="meal-edit-carbs" value="${round0(item.carbs)}"></div>
             <div><span class="field-label">Fat g</span><input type="number" class="meal-edit-fat" value="${round0(item.fat)}"></div>
           </div>
@@ -4859,6 +4901,56 @@ function renderFoodDiary(date) {
     }).join('') : '<p class="empty-note">No items yet.</p>';
     const mealTotalKcal = items.reduce((s, i) => s + (i.calories || 0), 0);
     totalEl.textContent = round0(mealTotalKcal) + ' kcal';
+  });
+  if (editingMealItem) wireMealItemEditForm(meals);
+}
+
+// Live-scales calories/protein/carbs/fat as the serving qty/unit change,
+// same math as recomputeCustomFoodFromAi() in the Add Food flow — computed
+// once per edit session (not re-run on every keystroke) so typing doesn't
+// fight a re-render or lose cursor position.
+function wireMealItemEditForm(meals) {
+  const form = document.querySelector('.meal-item-edit-form');
+  if (!form) return;
+  const item = meals[editingMealItem.meal][editingMealItem.idx];
+
+  const baseGrams = (item.grams != null ? item.grams : (item.qty != null ? servingUnitToGrams(item.qty, item.unit || 'g') : 100)) || 100;
+  mealEditPer100g = {
+    calories: (item.calories || 0) / baseGrams * 100,
+    protein: (item.protein || 0) / baseGrams * 100,
+    carbs: (item.carbs || 0) / baseGrams * 100,
+    fat: (item.fat || 0) / baseGrams * 100,
+  };
+  mealEditCaloriesLocked = false;
+
+  const qtyInput = form.querySelector('.meal-edit-qty');
+  const unitSelect = form.querySelector('.meal-edit-unit');
+  const caloriesInput = form.querySelector('.meal-edit-calories');
+  const proteinInput = form.querySelector('.meal-edit-protein');
+  const carbsInput = form.querySelector('.meal-edit-carbs');
+  const fatInput = form.querySelector('.meal-edit-fat');
+  const chainBtn = form.querySelector('.meal-edit-chain-btn');
+
+  function applyServingScale() {
+    const qty = parseFloat(qtyInput.value) || 0;
+    const grams = servingUnitToGrams(qty, unitSelect.value);
+    const scale = grams / 100;
+    if (!mealEditCaloriesLocked) caloriesInput.value = round0(mealEditPer100g.calories * scale);
+    proteinInput.value = round0(mealEditPer100g.protein * scale);
+    carbsInput.value = round0(mealEditPer100g.carbs * scale);
+    fatInput.value = round0(mealEditPer100g.fat * scale);
+  }
+
+  qtyInput.addEventListener('input', applyServingScale);
+  unitSelect.addEventListener('change', applyServingScale);
+
+  chainBtn.addEventListener('click', () => {
+    mealEditCaloriesLocked = !mealEditCaloriesLocked;
+    chainBtn.classList.toggle('is-locked', mealEditCaloriesLocked);
+    chainBtn.setAttribute('aria-pressed', String(mealEditCaloriesLocked));
+    chainBtn.title = mealEditCaloriesLocked
+      ? 'Calories locked — won\'t change with serving size'
+      : 'Lock calories so they don\'t change with serving size';
   });
 }
 
@@ -4985,6 +5077,8 @@ function initFoodDiary() {
     const cancelEditBtn = e.target.closest('.meal-item-cancel-edit');
     if (cancelEditBtn) {
       editingMealItem = null;
+      mealEditPer100g = null;
+      mealEditCaloriesLocked = false;
       renderFoodDiary(document.getElementById('nutDate').value);
       return;
     }
@@ -4998,13 +5092,18 @@ function initFoodDiary() {
       const item = meals[mt][idx];
       const newName = form.querySelector('.meal-edit-name').value.trim();
       item.name = newName || item.name;
-      const gramsVal = form.querySelector('.meal-edit-grams').value;
-      item.grams = gramsVal === '' ? null : (parseFloat(gramsVal) || 0);
+      const qtyVal = form.querySelector('.meal-edit-qty').value;
+      const unit = form.querySelector('.meal-edit-unit').value;
+      item.qty = qtyVal === '' ? null : (parseFloat(qtyVal) || 0);
+      item.unit = unit;
+      item.grams = item.qty != null ? servingUnitToGrams(item.qty, unit) : null;
       item.calories = parseFloat(form.querySelector('.meal-edit-calories').value) || 0;
       item.protein = parseFloat(form.querySelector('.meal-edit-protein').value) || 0;
       item.carbs = parseFloat(form.querySelector('.meal-edit-carbs').value) || 0;
       item.fat = parseFloat(form.querySelector('.meal-edit-fat').value) || 0;
       editingMealItem = null;
+      mealEditPer100g = null;
+      mealEditCaloriesLocked = false;
       saveMealsForDate(date, meals);
       renderFoodDiary(date);
       refreshFuelViewsForDate(date);
@@ -5841,11 +5940,54 @@ function initFuelWaterOrb() {
 
 // Draws a ring/arc identical in spirit to renderRing() (gradient stroke,
 // rounded cap) directly onto a canvas 2D context, for the share-card export.
+// Every share card reads this once per draw call to stay in sync with
+// whichever theme (light/dark) the app is currently in — canvas can't
+// resolve CSS custom properties directly, so this is a small hand-picked
+// palette mirroring style.css's --surface/--text/--cyan tokens, tuned so
+// light mode keeps real contrast instead of just inverting hex codes.
+function getShareTheme() {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  return isLight ? {
+    bgFrom: '#f4f6f7', bgTo: '#e3e8ea',
+    border: 'rgba(10,140,145,0.45)',
+    textPrimary: '#14191c',
+    textSecondary: '#3f4d52',
+    textMuted: '#66757a',
+    accent: '#0a8c91',
+    accentViolet: '#6b4fc7',
+    accentBlue: '#2f6fd0',
+    warning: '#a5730a',
+    critical: '#c23a3a',
+    good: '#1f8f5a',
+    gridLine: 'rgba(0,0,0,0.12)',
+    trackLine: 'rgba(0,0,0,0.1)',
+    rowAlt: 'rgba(0,0,0,0.04)',
+    emptySlice: '#d7dcde',
+  } : {
+    bgFrom: '#171f24', bgTo: '#0a0e12',
+    border: 'rgba(51,200,204,0.4)',
+    textPrimary: '#dde3e5',
+    textSecondary: '#b7c1c4',
+    textMuted: '#7e8e95',
+    accent: '#33c8cc',
+    accentViolet: '#8069d6',
+    accentBlue: '#3f8ff0',
+    warning: '#dba52c',
+    critical: '#ff6b6b',
+    good: '#2de26c',
+    gridLine: 'rgba(255,255,255,0.08)',
+    trackLine: 'rgba(255,255,255,0.08)',
+    rowAlt: 'rgba(255,255,255,0.03)',
+    emptySlice: '#2a3238',
+  };
+}
+
 function drawShareRing(ctx, cx, cy, r, stroke, pct, gradientColors) {
+  const theme = getShareTheme();
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineWidth = stroke;
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.strokeStyle = theme.trackLine;
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.stroke();
@@ -5866,10 +6008,11 @@ function drawShareRing(ctx, cx, cy, r, stroke, pct, gradientColors) {
 
 // Draws the multi-slice macro pie matching the in-app conic-gradient pie.
 function drawSharePie(ctx, cx, cy, r, slices) {
+  const theme = getShareTheme();
   ctx.save();
   const total = slices.reduce((s, m) => s + m.value, 0);
   if (total <= 0) {
-    ctx.fillStyle = '#2a3238';
+    ctx.fillStyle = theme.emptySlice;
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
@@ -5894,10 +6037,11 @@ function drawSharePie(ctx, cx, cy, r, slices) {
 // Draws the vertical water-fill pill from the in-app Daily Fuel Status
 // widget (see .water-pill in style.css) directly onto a canvas 2D context.
 function drawShareWaterPill(ctx, x, y, w, h, pct) {
+  const theme = getShareTheme();
   ctx.save();
-  ctx.strokeStyle = 'rgba(51,200,204,0.5)'; ctx.lineWidth = 2;
+  ctx.strokeStyle = theme.border; ctx.lineWidth = 2;
   roundRectPath(ctx, x, y, w, h, w / 2);
-  ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fill();
+  ctx.fillStyle = theme.rowAlt; ctx.fill();
   ctx.stroke();
 
   const clamped = Math.max(0, Math.min(100, pct));
@@ -5914,38 +6058,39 @@ function drawShareWaterPill(ctx, x, y, w, h, pct) {
 }
 
 async function generateFuelStatusShareCard({ name, digitalId, date, caloriesNow, calorieTarget, macros, waterNow, waterTarget }) {
+  const theme = getShareTheme();
   const canvas = document.createElement('canvas');
   canvas.width = 600; canvas.height = 760;
   const ctx = canvas.getContext('2d');
 
   const bg = ctx.createLinearGradient(0, 0, 600, 760);
-  bg.addColorStop(0, '#171f24');
-  bg.addColorStop(1, '#0a0e12');
+  bg.addColorStop(0, theme.bgFrom);
+  bg.addColorStop(1, theme.bgTo);
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, 600, 760);
-  ctx.strokeStyle = 'rgba(51,200,204,0.4)';
+  ctx.strokeStyle = theme.border;
   ctx.lineWidth = 2;
   ctx.strokeRect(8, 8, 584, 744);
 
   // Header: name upper-left, Digital ID upper-right.
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'left';
-  ctx.fillStyle = '#dde3e5';
+  ctx.fillStyle = theme.textPrimary;
   ctx.font = 'bold 22px sans-serif';
   ctx.fillText(name || 'Operator', 40, 58);
   ctx.textAlign = 'right';
-  ctx.fillStyle = '#33c8cc';
+  ctx.fillStyle = theme.accent;
   ctx.font = 'bold 16px monospace';
   ctx.fillText(digitalId || '', 560, 56);
 
   // Date, centered.
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#7e8e95';
+  ctx.fillStyle = theme.textMuted;
   ctx.font = '15px monospace';
   ctx.fillText(date, 300, 92);
 
   // Title.
-  ctx.fillStyle = '#33c8cc';
+  ctx.fillStyle = theme.accent;
   ctx.font = 'bold 30px sans-serif';
   ctx.fillText('Daily Fuel Status', 300, 138);
 
@@ -5955,13 +6100,13 @@ async function generateFuelStatusShareCard({ name, digitalId, date, caloriesNow,
   const ringCx = 220, ringCy = 290, ringR = 95;
   drawShareRing(ctx, ringCx, ringCy, ringR, 18, caloriePct, ['#8b6bf2', '#3f8ff0', '#2de2e6']);
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#dde3e5';
+  ctx.fillStyle = theme.textPrimary;
   ctx.font = 'bold 46px monospace';
   ctx.fillText(Math.round(Math.min(100, caloriePct)) + '%', ringCx, ringCy + 10);
-  ctx.fillStyle = '#7e8e95';
+  ctx.fillStyle = theme.textMuted;
   ctx.font = '14px monospace';
   ctx.fillText('CALORIES', ringCx, ringCy + ringR + 34);
-  ctx.fillStyle = '#dde3e5';
+  ctx.fillStyle = theme.textPrimary;
   ctx.font = 'bold 20px sans-serif';
   ctx.fillText(`${caloriesNow} / ${calorieTarget} kcal`, ringCx, ringCy + ringR + 62);
 
@@ -5970,16 +6115,16 @@ async function generateFuelStatusShareCard({ name, digitalId, date, caloriesNow,
     const waterPct = waterTarget > 0 ? (waterNow / waterTarget) * 100 : 0;
     drawShareWaterPill(ctx, pillX, pillY, pillW, pillH, waterPct);
     const pillCx = pillX + pillW / 2;
-    ctx.fillStyle = '#7e8e95'; ctx.font = '14px monospace';
+    ctx.fillStyle = theme.textMuted; ctx.font = '14px monospace';
     ctx.fillText('WATER', pillCx, ringCy + ringR + 34);
-    ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 18px sans-serif';
+    ctx.fillStyle = theme.textPrimary; ctx.font = 'bold 18px sans-serif';
     ctx.fillText(`${waterNow} / ${waterTarget} mL`, pillCx, ringCy + ringR + 62);
   }
 
   // Macro pie (left) + legend (right of the pie), matching the in-app row.
   const pieCx = 210, pieCy = 590, pieR = 58;
   drawSharePie(ctx, pieCx, pieCy, pieR, macros.map(m => ({ value: m.kcal, color: m.color })));
-  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.strokeStyle = theme.gridLine;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.arc(pieCx, pieCy, pieR, 0, Math.PI * 2);
@@ -5993,7 +6138,7 @@ async function generateFuelStatusShareCard({ name, digitalId, date, caloriesNow,
     ctx.beginPath();
     ctx.arc(legendX, legendY - 6, 6, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#dde3e5';
+    ctx.fillStyle = theme.textPrimary;
     ctx.font = '17px sans-serif';
     ctx.fillText(`${m.label}  ${m.pct}% of intake`, legendX + 16, legendY);
     legendY += 34;
@@ -6004,6 +6149,133 @@ async function generateFuelStatusShareCard({ name, digitalId, date, caloriesNow,
   await drawShareWatermark(ctx, 600, 760);
 
   return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
+}
+
+// Shared by the standalone share button and the Request Assessment bundle —
+// gathers exactly what the Fuel Snapshot ring row + Computed Targets card
+// show in-app (renderNutritionAverages / renderComputedTargets), so the
+// share card always matches what's on screen.
+function computeFuelSnapshotShareData() {
+  const profile = getProfile();
+  const today = todayISO();
+  const todayEntry = getLogs()[today] || {};
+  const logsArr = sortedLogsArray();
+
+  const avgCalories = avgOfLastNDays(logsArr, 'calories', 7);
+  const calorieTarget = profile ? getEffectiveCalorieTarget(profile, today) : null;
+
+  const kg = profile ? currentWeightKg(profile) : null;
+  const targets = (profile && kg) ? computeTargets(profile, kg) : null;
+  const proteinTarget = targets ? round0((targets.protein[0] + targets.protein[1]) / 2) : null;
+  const waterTarget = effectiveWaterTargetML(today);
+
+  const bmi = (profile && kg) ? computeBMI(kg, profile.heightCm) : null;
+  const computedRows = [];
+  if (bmi) computedRows.push(['BMI', bmi.toFixed(1)]);
+  if (targets) {
+    computedRows.push(['Suggested calories (cutting)', `${round0(targets.cutting[0])}–${round0(targets.cutting[1])} kcal/day`]);
+    computedRows.push(['Suggested calories (bulking)', `${round0(targets.bulking[0])}–${round0(targets.bulking[1])} kcal/day`]);
+    computedRows.push(['Suggested protein', `${round0(targets.protein[0])}–${round0(targets.protein[1])} g/day`]);
+  }
+
+  return {
+    avgCalories: avgCalories != null ? round0(avgCalories) : null,
+    calorieTarget,
+    proteinToday: round0(todayEntry.protein ?? 0),
+    proteinTarget,
+    waterToday: round0(todayEntry.water ?? 0),
+    waterTarget,
+    computedRows,
+  };
+}
+
+async function generateFuelSnapshotShareCard({ name, digitalId, date, avgCalories, calorieTarget, proteinToday, proteinTarget, waterToday, waterTarget, computedRows }) {
+  const theme = getShareTheme();
+  const width = 600;
+  const rowH = 30;
+  const height = 170 + 260 + 60 + computedRows.length * rowH + 70;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext('2d');
+
+  const bg = ctx.createLinearGradient(0, 0, width, height);
+  bg.addColorStop(0, theme.bgFrom); bg.addColorStop(1, theme.bgTo);
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, width, height);
+  ctx.strokeStyle = theme.border; ctx.lineWidth = 2;
+  ctx.strokeRect(8, 8, width - 16, height - 16);
+  ctx.textBaseline = 'alphabetic';
+
+  ctx.textAlign = 'left'; ctx.fillStyle = theme.textPrimary; ctx.font = 'bold 22px sans-serif';
+  ctx.fillText(name || 'Operator', 40, 58);
+  ctx.textAlign = 'right'; ctx.fillStyle = theme.accent; ctx.font = 'bold 16px monospace';
+  ctx.fillText(digitalId || '', width - 40, 56);
+
+  ctx.textAlign = 'center'; ctx.fillStyle = theme.textMuted; ctx.font = '15px monospace';
+  ctx.fillText(date, width / 2, 92);
+
+  ctx.fillStyle = theme.accent; ctx.font = 'bold 28px sans-serif';
+  ctx.fillText('Fuel Snapshot', width / 2, 138);
+
+  // Three rings matching the in-app Fuel Snapshot row: Calories (7-day
+  // avg, since day-to-day intake is noisy), Protein and Water (today's
+  // values — things you act on today, not a trailing average).
+  const ringY = 250, ringR = 62, ringStroke = 9;
+  const ringXs = [width * 0.2, width * 0.5, width * 0.8];
+  const ringDefs = [
+    { label: 'CALORIES', sub: '7-day avg', now: avgCalories, target: calorieTarget, unit: '', colors: ['#8b6bf2', '#3f8ff0', '#2de2e6'] },
+    { label: 'PROTEIN', sub: 'Today', now: proteinToday, target: proteinTarget, unit: 'g', colors: ['#33c8cc', '#2de2e6'] },
+    { label: 'WATER', sub: 'Today', now: waterToday, target: waterTarget, unit: 'mL', colors: ['#3f8ff0', '#2de2e6'] },
+  ];
+  ringDefs.forEach((r, i) => {
+    const cx = ringXs[i];
+    const pct = r.target ? Math.min(100, (r.now / r.target) * 100) : 0;
+    drawShareRing(ctx, cx, ringY, ringR, ringStroke, r.now != null ? pct : 0, r.colors);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = theme.textPrimary; ctx.font = 'bold 20px monospace';
+    ctx.fillText(r.now != null ? round0(r.now) + r.unit : '–', cx, ringY + 6);
+    ctx.fillStyle = theme.textMuted; ctx.font = '11px monospace';
+    ctx.fillText(r.target != null ? '/ ' + round0(r.target) + r.unit : '', cx, ringY + 22);
+    ctx.fillStyle = theme.textMuted; ctx.font = '13px monospace';
+    ctx.fillText(r.label, cx, ringY + ringR + 28);
+    ctx.fillStyle = theme.textPrimary; ctx.font = '12px sans-serif';
+    ctx.fillText(r.sub, cx, ringY + ringR + 46);
+  });
+
+  let y = ringY + ringR + 90;
+  ctx.textAlign = 'left'; ctx.fillStyle = theme.accent; ctx.font = 'bold 18px sans-serif';
+  ctx.fillText('Computed Targets', 40, y);
+  y += 30;
+  if (!computedRows.length) {
+    ctx.fillStyle = theme.textMuted; ctx.font = '14px sans-serif';
+    ctx.fillText('Set your weights in Bio to see computed targets.', 40, y);
+  } else {
+    computedRows.forEach(([label, value]) => {
+      ctx.textAlign = 'left'; ctx.fillStyle = theme.textMuted; ctx.font = '14px sans-serif';
+      ctx.fillText(label, 40, y);
+      ctx.textAlign = 'right'; ctx.fillStyle = theme.textPrimary; ctx.font = 'bold 14px monospace';
+      ctx.fillText(value, width - 40, y);
+      y += rowH;
+    });
+  }
+
+  ctx.textAlign = 'center';
+  await drawShareWatermark(ctx, width, height);
+
+  return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
+}
+
+async function shareFuelSnapshot() {
+  const profile = getProfile();
+  const data = computeFuelSnapshotShareData();
+  const text = '📊 My Fuel Snapshot & Computed Targets, tracked with Winfinity Tracker!';
+  const blob = await generateFuelSnapshotShareCard({
+    name: (profile && profile.name) || 'Operator',
+    digitalId: getOrCreatePublicId(),
+    date: fmtDate(new Date()),
+    ...data,
+  });
+  shareViaWebShare({ title: 'Winfinity Tracker — Fuel Snapshot', text }, blob);
 }
 
 async function shareDailyFuelStatus() {
@@ -6050,6 +6322,7 @@ function roundRectPath(ctx, x, y, w, h, r) {
 }
 
 async function generateWorkoutSummaryShareCard({ name, digitalId, dateTime, summary, volumeTrend }) {
+  const theme = getShareTheme();
   const wu = summary.wu;
   const prCount = summary.exercises.filter(e => e.isPR).length;
   const width = 600;
@@ -6069,21 +6342,21 @@ async function generateWorkoutSummaryShareCard({ name, digitalId, dateTime, summ
   const ctx = canvas.getContext('2d');
 
   const bg = ctx.createLinearGradient(0, 0, width, height);
-  bg.addColorStop(0, '#171f24'); bg.addColorStop(1, '#0a0e12');
+  bg.addColorStop(0, theme.bgFrom); bg.addColorStop(1, theme.bgTo);
   ctx.fillStyle = bg; ctx.fillRect(0, 0, width, height);
-  ctx.strokeStyle = 'rgba(51,200,204,0.4)'; ctx.lineWidth = 2;
+  ctx.strokeStyle = theme.border; ctx.lineWidth = 2;
   ctx.strokeRect(8, 8, width - 16, height - 16);
   ctx.textBaseline = 'alphabetic';
 
-  ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 20px sans-serif';
+  ctx.textAlign = 'left'; ctx.fillStyle = theme.textPrimary; ctx.font = 'bold 20px sans-serif';
   ctx.fillText(name || 'Operator', 32, 46);
-  ctx.textAlign = 'right'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 15px monospace';
+  ctx.textAlign = 'right'; ctx.fillStyle = theme.accent; ctx.font = 'bold 15px monospace';
   ctx.fillText(digitalId || '', width - 32, 44);
 
-  ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px monospace';
+  ctx.textAlign = 'center'; ctx.fillStyle = theme.textMuted; ctx.font = '14px monospace';
   ctx.fillText(dateTime, width / 2, 74);
 
-  ctx.textAlign = 'left'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 26px sans-serif';
+  ctx.textAlign = 'left'; ctx.fillStyle = theme.accent; ctx.font = 'bold 26px sans-serif';
   ctx.fillText('WORKOUT SUMMARY', 32, 116);
 
   let y = headerH;
@@ -6097,20 +6370,20 @@ async function generateWorkoutSummaryShareCard({ name, digitalId, dateTime, summ
   ];
   tiles.forEach((t, i) => {
     const x = 32 + i * (tileW + tileGap);
-    ctx.strokeStyle = 'rgba(51,200,204,0.35)'; ctx.lineWidth = 1;
+    ctx.strokeStyle = theme.border; ctx.lineWidth = 1;
     roundRectPath(ctx, x, y, tileW, 92, 10);
     ctx.stroke();
-    ctx.textAlign = 'center'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 32px sans-serif';
+    ctx.textAlign = 'center'; ctx.fillStyle = theme.textPrimary; ctx.font = 'bold 32px sans-serif';
     ctx.fillText(t.value, x + tileW / 2, y + 48);
-    ctx.fillStyle = '#7e8e95'; ctx.font = '11px monospace';
+    ctx.fillStyle = theme.textMuted; ctx.font = '11px monospace';
     ctx.fillText(t.label, x + tileW / 2, y + 74);
   });
   y += 92 + 26;
 
   if (trendH) {
-    ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 15px sans-serif';
+    ctx.textAlign = 'left'; ctx.fillStyle = theme.textPrimary; ctx.font = 'bold 15px sans-serif';
     ctx.fillText('Total Lift Volume (Last 8 Gym Days)', 32, y + 4);
-    ctx.textAlign = 'right'; ctx.fillStyle = '#7e8e95'; ctx.font = '13px monospace';
+    ctx.textAlign = 'right'; ctx.fillStyle = theme.textMuted; ctx.font = '13px monospace';
     ctx.fillText(`${volumeTrend.total.toLocaleString()} ${volumeTrend.wu} total`, width - 32, y + 4);
 
     const plotX = 32, plotW = width - 64, plotH = 100, plotY = y + 20;
@@ -6127,47 +6400,47 @@ async function generateWorkoutSummaryShareCard({ name, digitalId, dateTime, summ
     points.forEach(p => ctx.lineTo(p.x, p.y));
     ctx.lineTo(points[points.length - 1].x, plotY + plotH);
     ctx.closePath();
-    ctx.fillStyle = 'rgba(51,200,204,0.12)';
+    ctx.fillStyle = theme.trackLine;
     ctx.fill();
 
     ctx.beginPath();
     points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-    ctx.strokeStyle = '#33c8cc'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.strokeStyle = theme.accent; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     ctx.stroke();
 
-    ctx.fillStyle = '#33c8cc';
+    ctx.fillStyle = theme.accent;
     points.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill(); });
 
-    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '10px monospace';
+    ctx.textAlign = 'center'; ctx.fillStyle = theme.textMuted; ctx.font = '10px monospace';
     points.forEach((p, i) => ctx.fillText(labels[i], p.x, plotY + plotH + 18));
 
     y += trendH;
   }
 
   if (prCount > 0) {
-    ctx.textAlign = 'center'; ctx.fillStyle = '#dba52c'; ctx.font = 'bold 18px monospace';
+    ctx.textAlign = 'center'; ctx.fillStyle = theme.warning; ctx.font = 'bold 18px monospace';
     ctx.fillText(`🏆 ${prCount} new personal record${prCount > 1 ? 's' : ''}!`, width / 2, y + 10);
     y += prBannerH;
   }
 
   if (!summary.exercises.length) {
-    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '15px sans-serif';
+    ctx.textAlign = 'center'; ctx.fillStyle = theme.textMuted; ctx.font = '15px sans-serif';
     ctx.fillText('No exercises logged for this date.', width / 2, y + 28);
     y += exercisesH;
   }
   summary.exercises.forEach(ex => {
     const rh = rowH - 14;
-    ctx.fillStyle = 'rgba(255,255,255,0.03)';
-    ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1;
+    ctx.fillStyle = theme.rowAlt;
+    ctx.strokeStyle = theme.gridLine; ctx.lineWidth = 1;
     roundRectPath(ctx, 32, y, width - 64, rh, 10);
     ctx.fill(); ctx.stroke();
 
-    ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 20px sans-serif';
+    ctx.textAlign = 'left'; ctx.fillStyle = theme.textPrimary; ctx.font = 'bold 20px sans-serif';
     ctx.fillText(ex.name, 52, y + 28);
-    ctx.fillStyle = '#8a9aa0'; ctx.font = '15px monospace';
+    ctx.fillStyle = theme.textSecondary; ctx.font = '15px monospace';
     ctx.fillText(`${ex.completedSets} sets · ${round0(fromKg(ex.volumeKg, wu))} ${wu} volume`, 52, y + 50);
     if (ex.topWeightKg != null) {
-      ctx.fillStyle = '#7e8e95'; ctx.font = '14px monospace';
+      ctx.fillStyle = theme.textMuted; ctx.font = '14px monospace';
       ctx.fillText(`Top set: ${round0(fromKg(ex.topWeightKg, wu))} ${wu} × ${ex.topReps} reps`, 52, y + 72);
     }
 
@@ -6178,10 +6451,10 @@ async function generateWorkoutSummaryShareCard({ name, digitalId, dateTime, summ
       const badgeW = textW + 26;
       const badgeX = width - 52 - badgeW;
       const badgeY = y + rh / 2 - 16;
-      ctx.strokeStyle = '#dba52c'; ctx.lineWidth = 1.5;
+      ctx.strokeStyle = theme.warning; ctx.lineWidth = 1.5;
       roundRectPath(ctx, badgeX, badgeY, badgeW, 32, 8);
       ctx.stroke();
-      ctx.textAlign = 'center'; ctx.fillStyle = '#dba52c'; ctx.font = 'bold 15px sans-serif';
+      ctx.textAlign = 'center'; ctx.fillStyle = theme.warning; ctx.font = 'bold 15px sans-serif';
       ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + 21);
     }
     y += rowH;
@@ -6202,7 +6475,7 @@ function drawMealIcon(ctx, mealType, cx, cy, size) {
   ctx.save();
   ctx.translate(cx - size / 2, cy - size / 2);
   ctx.scale(s, s);
-  ctx.strokeStyle = '#33c8cc';
+  ctx.strokeStyle = getShareTheme().accent;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
@@ -6244,6 +6517,7 @@ function drawMealIcon(ctx, mealType, cx, cy, size) {
 }
 
 async function generateFoodDiaryShareCard({ name, digitalId, date, meals }) {
+  const theme = getShareTheme();
   const activeMeals = MEAL_TYPES.filter(mt => meals[mt] && meals[mt].length);
   const width = 600;
   const headerH = 116;
@@ -6261,27 +6535,27 @@ async function generateFoodDiaryShareCard({ name, digitalId, date, meals }) {
   const ctx = canvas.getContext('2d');
 
   const bg = ctx.createLinearGradient(0, 0, width, height);
-  bg.addColorStop(0, '#171f24'); bg.addColorStop(1, '#0a0e12');
+  bg.addColorStop(0, theme.bgFrom); bg.addColorStop(1, theme.bgTo);
   ctx.fillStyle = bg; ctx.fillRect(0, 0, width, height);
-  ctx.strokeStyle = 'rgba(51,200,204,0.4)'; ctx.lineWidth = 2;
+  ctx.strokeStyle = theme.border; ctx.lineWidth = 2;
   ctx.strokeRect(8, 8, width - 16, height - 16);
   ctx.textBaseline = 'alphabetic';
 
-  ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 20px sans-serif';
+  ctx.textAlign = 'left'; ctx.fillStyle = theme.textPrimary; ctx.font = 'bold 20px sans-serif';
   ctx.fillText(name || 'Operator', 32, 46);
-  ctx.textAlign = 'right'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 15px monospace';
+  ctx.textAlign = 'right'; ctx.fillStyle = theme.accent; ctx.font = 'bold 15px monospace';
   ctx.fillText(digitalId || '', width - 32, 44);
 
-  ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px monospace';
+  ctx.textAlign = 'center'; ctx.fillStyle = theme.textMuted; ctx.font = '14px monospace';
   ctx.fillText(date, width / 2, 74);
 
-  ctx.textAlign = 'left'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 24px sans-serif';
+  ctx.textAlign = 'left'; ctx.fillStyle = theme.accent; ctx.font = 'bold 24px sans-serif';
   ctx.fillText('DIETARY LOG', 32, 106);
 
   let y = headerH;
 
   if (!activeMeals.length) {
-    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '15px sans-serif';
+    ctx.textAlign = 'center'; ctx.fillStyle = theme.textMuted; ctx.font = '15px sans-serif';
     ctx.fillText('No food logged for this date.', width / 2, y + 30);
     y += contentH;
   }
@@ -6291,24 +6565,24 @@ async function generateFoodDiaryShareCard({ name, digitalId, date, meals }) {
     const mealKcal = items.reduce((s, i) => s + (i.calories || 0), 0);
 
     drawMealIcon(ctx, mt, 42, y + 16, 22);
-    ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 19px sans-serif';
+    ctx.textAlign = 'left'; ctx.fillStyle = theme.textPrimary; ctx.font = 'bold 19px sans-serif';
     ctx.fillText(FOOD_DIARY_MEAL_LABELS[mt], 60, y + 22);
-    ctx.textAlign = 'right'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 17px monospace';
+    ctx.textAlign = 'right'; ctx.fillStyle = theme.accent; ctx.font = 'bold 17px monospace';
     ctx.fillText(`${round0(mealKcal)} kcal`, width - 32, y + 22);
     y += mealHeaderH;
 
     items.forEach(item => {
       const rh = itemRowH - 12;
-      ctx.fillStyle = 'rgba(255,255,255,0.03)';
-      ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1;
+      ctx.fillStyle = theme.rowAlt;
+      ctx.strokeStyle = theme.gridLine; ctx.lineWidth = 1;
       roundRectPath(ctx, 32, y, width - 64, rh, 8);
       ctx.fill(); ctx.stroke();
 
-      ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 17px sans-serif';
+      ctx.textAlign = 'left'; ctx.fillStyle = theme.textPrimary; ctx.font = 'bold 17px sans-serif';
       ctx.fillText(item.name, 48, y + 24);
       const qtyStr = item.qty != null ? formatServingQty(item.qty, item.unit) : (item.grams ? round0(item.grams) + 'g' : '');
       const metaStr = `${qtyStr ? qtyStr + ' · ' : ''}${round0(item.calories)} kcal · P${round0(item.protein)}g C${round0(item.carbs)}g F${round0(item.fat)}g`;
-      ctx.fillStyle = '#8a9aa0'; ctx.font = '13px monospace';
+      ctx.fillStyle = theme.textSecondary; ctx.font = '13px monospace';
       ctx.fillText(metaStr, 48, y + 44);
       y += itemRowH;
     });
@@ -6392,6 +6666,7 @@ function clearMealData(mealType) {
 }
 
 async function generateLeaderboardShareCard({ name, digitalId, dateTime, title, rows, formatValue }) {
+  const theme = getShareTheme();
   const width = 600;
   const headerH = 158;
   const rowH = 52;
@@ -6405,52 +6680,52 @@ async function generateLeaderboardShareCard({ name, digitalId, dateTime, title, 
   const ctx = canvas.getContext('2d');
 
   const bg = ctx.createLinearGradient(0, 0, width, height);
-  bg.addColorStop(0, '#171f24'); bg.addColorStop(1, '#0a0e12');
+  bg.addColorStop(0, theme.bgFrom); bg.addColorStop(1, theme.bgTo);
   ctx.fillStyle = bg; ctx.fillRect(0, 0, width, height);
-  ctx.strokeStyle = 'rgba(51,200,204,0.4)'; ctx.lineWidth = 2;
+  ctx.strokeStyle = theme.border; ctx.lineWidth = 2;
   ctx.strokeRect(8, 8, width - 16, height - 16);
   ctx.textBaseline = 'alphabetic';
 
-  ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 20px sans-serif';
+  ctx.textAlign = 'left'; ctx.fillStyle = theme.textPrimary; ctx.font = 'bold 20px sans-serif';
   ctx.fillText(name || 'Operator', 32, 46);
-  ctx.textAlign = 'right'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 15px monospace';
+  ctx.textAlign = 'right'; ctx.fillStyle = theme.accent; ctx.font = 'bold 15px monospace';
   ctx.fillText(digitalId || '', width - 32, 44);
 
-  ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px monospace';
+  ctx.textAlign = 'center'; ctx.fillStyle = theme.textMuted; ctx.font = '14px monospace';
   ctx.fillText(dateTime, width / 2, 74);
 
-  ctx.textAlign = 'left'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 24px sans-serif';
+  ctx.textAlign = 'left'; ctx.fillStyle = theme.accent; ctx.font = 'bold 24px sans-serif';
   ctx.fillText(title.toUpperCase(), 32, 116);
 
   let y = headerH;
 
   if (!listRows.length) {
-    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '15px sans-serif';
+    ctx.textAlign = 'center'; ctx.fillStyle = theme.textMuted; ctx.font = '15px sans-serif';
     ctx.fillText('No data yet.', width / 2, y + 30);
     y += contentH;
   }
 
   listRows.forEach((r, i) => {
     const rh = rowH - 10;
-    ctx.fillStyle = i === 0 ? 'rgba(219,165,44,0.08)' : 'rgba(255,255,255,0.03)';
-    ctx.strokeStyle = i === 0 ? 'rgba(219,165,44,0.4)' : 'rgba(255,255,255,0.1)';
+    ctx.fillStyle = i === 0 ? 'rgba(219,165,44,0.08)' : theme.rowAlt;
+    ctx.strokeStyle = i === 0 ? 'rgba(219,165,44,0.4)' : theme.gridLine;
     ctx.lineWidth = 1;
     roundRectPath(ctx, 32, y, width - 64, rh, 8);
     ctx.fill(); ctx.stroke();
 
     const midY = y + rh / 2 + 5;
-    ctx.textAlign = 'left'; ctx.fillStyle = i === 0 ? '#dba52c' : '#7e8e95'; ctx.font = 'bold 14px monospace';
+    ctx.textAlign = 'left'; ctx.fillStyle = i === 0 ? theme.warning : theme.textMuted; ctx.font = 'bold 14px monospace';
     ctx.fillText(String(i + 1).padStart(2, '0'), 48, midY);
 
-    ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 16px sans-serif';
+    ctx.fillStyle = theme.textPrimary; ctx.font = 'bold 16px sans-serif';
     ctx.fillText(r.code_name, 88, midY);
     if (r.public_id) {
       const nameW = ctx.measureText(r.code_name).width;
-      ctx.fillStyle = '#7e8e95'; ctx.font = '11px monospace';
+      ctx.fillStyle = theme.textMuted; ctx.font = '11px monospace';
       ctx.fillText(r.public_id, 88 + nameW + 8, midY);
     }
 
-    ctx.textAlign = 'right'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 16px monospace';
+    ctx.textAlign = 'right'; ctx.fillStyle = theme.accent; ctx.font = 'bold 16px monospace';
     ctx.fillText(formatValue(r), width - 48, midY);
     y += rowH;
   });
@@ -6479,6 +6754,7 @@ async function shareLeaderboardCard(containerId, title) {
 }
 
 function drawShareWeightChart(ctx, x, y, w, h, series, wu) {
+  const theme = getShareTheme();
   const padL = 34, padR = 8, padT = 6, padB = 18;
   const plotW = w - padL - padR, plotH = h - padT - padB;
   const displayVals = series.map(p => fromKg(p.actualKg, wu));
@@ -6498,22 +6774,22 @@ function drawShareWeightChart(ctx, x, y, w, h, series, wu) {
   for (let g = 0; g <= gridCount; g++) {
     const v = min + (g / gridCount) * (max - min);
     const gy = yFor(v);
-    ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1;
+    ctx.strokeStyle = theme.gridLine; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(x + padL, gy); ctx.lineTo(x + w - padR, gy); ctx.stroke();
-    ctx.textAlign = 'left'; ctx.fillStyle = '#7e8e95'; ctx.font = '9px monospace';
+    ctx.textAlign = 'left'; ctx.fillStyle = theme.textMuted; ctx.font = '9px monospace';
     ctx.fillText(String(round2(v)), x, gy + 3);
   }
 
   [0, Math.floor((series.length - 1) / 2), series.length - 1].forEach(i => {
     ctx.textAlign = i === 0 ? 'left' : i === series.length - 1 ? 'right' : 'center';
-    ctx.fillStyle = '#7e8e95'; ctx.font = '9px monospace';
+    ctx.fillStyle = theme.textMuted; ctx.font = '9px monospace';
     ctx.fillText(fmtDate(series[i].dateObj), xFor(i), y + h - 4);
   });
 
   if (series.length > 1) {
     ctx.beginPath();
     trendVals.forEach((v, i) => { const px = xFor(i), py = yFor(v); if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); });
-    ctx.strokeStyle = '#8069d6'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = theme.accentViolet; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
     ctx.stroke();
     ctx.setLineDash([]);
   }
@@ -6521,8 +6797,8 @@ function drawShareWeightChart(ctx, x, y, w, h, series, wu) {
   if (series.length > 1) {
     ctx.beginPath();
     displayVals.forEach((v, i) => { const px = xFor(i), py = yFor(v); if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); });
-    ctx.strokeStyle = '#2de2e6'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-    ctx.shadowColor = '#2de2e6'; ctx.shadowBlur = 6;
+    ctx.strokeStyle = theme.accent; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.shadowColor = theme.accent; ctx.shadowBlur = 6;
     ctx.stroke();
     ctx.shadowBlur = 0;
   }
@@ -6532,8 +6808,8 @@ function drawShareWeightChart(ctx, x, y, w, h, series, wu) {
     const isLowest = i === lowestIdx;
     ctx.beginPath();
     ctx.arc(xFor(i), yFor(v), (isLowest ? 1.4 : 1) * (series.length > 40 ? 2 : 3.5), 0, Math.PI * 2);
-    ctx.fillStyle = isLowest ? '#dba52c' : '#2de2e6';
-    if (isLowest) { ctx.shadowColor = '#dba52c'; ctx.shadowBlur = 6; }
+    ctx.fillStyle = isLowest ? theme.warning : theme.accent;
+    if (isLowest) { ctx.shadowColor = theme.warning; ctx.shadowBlur = 6; }
     ctx.fill();
     ctx.shadowBlur = 0;
   });
@@ -6541,6 +6817,7 @@ function drawShareWeightChart(ctx, x, y, w, h, series, wu) {
 }
 
 function drawShareGoalTrack(ctx, x, y, w, profile, kgNow, wu, lowestKg7d) {
+  const theme = getShareTheme();
   const points = [
     { label: 'Start', kg: profile.startWeightKg },
     { label: 'Min goal', kg: profile.goalMinKg },
@@ -6564,14 +6841,14 @@ function drawShareGoalTrack(ctx, x, y, w, profile, kgNow, wu, lowestKg7d) {
 
   points.forEach(p => {
     const px = x + pctFor(p.kg) * w;
-    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '11px monospace';
+    ctx.textAlign = 'center'; ctx.fillStyle = theme.textMuted; ctx.font = '11px monospace';
     ctx.fillText(`${p.label}: ${round2(fromKg(p.kg, wu))}${wu}`, Math.min(Math.max(px, x + 40), x + w - 40), trackY - 12);
-    ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 2;
+    ctx.strokeStyle = theme.gridLine; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(px, trackY + trackH + 2); ctx.lineTo(px, trackY + trackH + 10); ctx.stroke();
   });
 
   roundRectPath(ctx, x, trackY, w, trackH, trackH / 2);
-  ctx.fillStyle = 'rgba(255,255,255,0.1)';
+  ctx.fillStyle = theme.trackLine;
   ctx.fill();
 
   const fillX = x + Math.min(startPct, nowPct) * w;
@@ -6587,38 +6864,40 @@ function drawShareGoalTrack(ctx, x, y, w, profile, kgNow, wu, lowestKg7d) {
 
   if (lowestKg7d != null) {
     const lowestX = x + pctFor(lowestKg7d) * w;
-    ctx.textAlign = 'center'; ctx.fillStyle = '#dba52c'; ctx.font = 'bold 13px monospace';
+    ctx.textAlign = 'center'; ctx.fillStyle = theme.warning; ctx.font = 'bold 13px monospace';
     ctx.fillText(`Lowest (7d): ${round2(fromKg(lowestKg7d, wu))}${wu}`, Math.min(Math.max(lowestX, x + 55), x + w - 55), trackY + 34);
   }
 
   const nowX = x + nowPct * w;
-  ctx.textAlign = 'center'; ctx.fillStyle = '#2de2e6'; ctx.font = 'bold 13px monospace';
+  ctx.textAlign = 'center'; ctx.fillStyle = theme.accent; ctx.font = 'bold 13px monospace';
   ctx.fillText(`Now: ${round2(fromKg(kgNow, wu))}${wu}`, Math.min(Math.max(nowX, x + 40), x + w - 40), trackY + 52);
   ctx.restore();
 }
 
 function drawShareWeightChartCard(ctx, y, width, chartCardH, title, series, wu) {
+  const theme = getShareTheme();
   roundRectPath(ctx, 24, y, width - 48, chartCardH, 12);
-  ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1;
+  ctx.strokeStyle = theme.gridLine; ctx.lineWidth = 1;
   ctx.stroke();
-  ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 14px sans-serif';
+  ctx.textAlign = 'left'; ctx.fillStyle = theme.textPrimary; ctx.font = 'bold 14px sans-serif';
   ctx.fillText(title, 44, y + 24);
-  ctx.textAlign = 'right'; ctx.fillStyle = '#7e8e95'; ctx.font = '12px monospace';
+  ctx.textAlign = 'right'; ctx.fillStyle = theme.textMuted; ctx.font = '12px monospace';
   ctx.fillText(`${series.length} entries`, width - 44, y + 24);
 
   if (series.length) {
     drawShareWeightChart(ctx, 44, y + 34, width - 88, chartCardH - 60, series, wu);
-    ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = '11px sans-serif';
+    ctx.textAlign = 'left'; ctx.fillStyle = theme.textPrimary; ctx.font = '11px sans-serif';
     ctx.fillText('— Actual weight', 44, y + chartCardH - 14);
-    ctx.fillStyle = '#7e8e95';
+    ctx.fillStyle = theme.textMuted;
     ctx.fillText('- - Trend (7-day avg)', 190, y + chartCardH - 14);
   } else {
-    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center'; ctx.fillStyle = theme.textMuted; ctx.font = '14px sans-serif';
     ctx.fillText('No weight entries logged yet.', width / 2, y + chartCardH / 2 + 5);
   }
 }
 
 async function generateWeightJourneyShareCard({ name, digitalId, date, recentSeries, fullSeries, wu, profile, kgNow, lowestKg7d }) {
+  const theme = getShareTheme();
   const width = 600;
   const headerH = 116;
   const chartCardH = 250;
@@ -6632,21 +6911,21 @@ async function generateWeightJourneyShareCard({ name, digitalId, date, recentSer
   const ctx = canvas.getContext('2d');
 
   const bg = ctx.createLinearGradient(0, 0, width, height);
-  bg.addColorStop(0, '#171f24'); bg.addColorStop(1, '#0a0e12');
+  bg.addColorStop(0, theme.bgFrom); bg.addColorStop(1, theme.bgTo);
   ctx.fillStyle = bg; ctx.fillRect(0, 0, width, height);
-  ctx.strokeStyle = 'rgba(51,200,204,0.4)'; ctx.lineWidth = 2;
+  ctx.strokeStyle = theme.border; ctx.lineWidth = 2;
   ctx.strokeRect(8, 8, width - 16, height - 16);
   ctx.textBaseline = 'alphabetic';
 
-  ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 20px sans-serif';
+  ctx.textAlign = 'left'; ctx.fillStyle = theme.textPrimary; ctx.font = 'bold 20px sans-serif';
   ctx.fillText(name || 'Operator', 32, 46);
-  ctx.textAlign = 'right'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 15px monospace';
+  ctx.textAlign = 'right'; ctx.fillStyle = theme.accent; ctx.font = 'bold 15px monospace';
   ctx.fillText(digitalId || '', width - 32, 44);
 
-  ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px monospace';
+  ctx.textAlign = 'center'; ctx.fillStyle = theme.textMuted; ctx.font = '14px monospace';
   ctx.fillText(date, width / 2, 74);
 
-  ctx.textAlign = 'left'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 22px sans-serif';
+  ctx.textAlign = 'left'; ctx.fillStyle = theme.accent; ctx.font = 'bold 22px sans-serif';
   ctx.fillText('ENTITY WEIGHT JOURNEY', 32, 106);
 
   let y = headerH;
@@ -6661,14 +6940,15 @@ async function generateWeightJourneyShareCard({ name, digitalId, date, recentSer
 
   // Goal progress card
   roundRectPath(ctx, 24, y, width - 48, goalCardH, 12);
+  ctx.strokeStyle = theme.gridLine;
   ctx.stroke();
-  ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 16px sans-serif';
+  ctx.textAlign = 'left'; ctx.fillStyle = theme.textPrimary; ctx.font = 'bold 16px sans-serif';
   ctx.fillText('Goal progress', 44, y + 30);
 
   if (profile && kgNow != null && profile.goalTargetKg != null) {
     drawShareGoalTrack(ctx, 64, y + 44, width - 176, profile, kgNow, wu, lowestKg7d);
   } else {
-    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '13px sans-serif';
+    ctx.textAlign = 'center'; ctx.fillStyle = theme.textMuted; ctx.font = '13px sans-serif';
     ctx.fillText('Set your weights in Bio to see progress.', width / 2, y + goalCardH / 2 + 10);
   }
 
@@ -6695,26 +6975,28 @@ async function shareWeightJourney() {
 }
 
 function shareCardShell(width, height) {
+  const theme = getShareTheme();
   const canvas = document.createElement('canvas');
   canvas.width = width; canvas.height = height;
   const ctx = canvas.getContext('2d');
   const bg = ctx.createLinearGradient(0, 0, width, height);
-  bg.addColorStop(0, '#171f24'); bg.addColorStop(1, '#0a0e12');
+  bg.addColorStop(0, theme.bgFrom); bg.addColorStop(1, theme.bgTo);
   ctx.fillStyle = bg; ctx.fillRect(0, 0, width, height);
-  ctx.strokeStyle = 'rgba(51,200,204,0.4)'; ctx.lineWidth = 2;
+  ctx.strokeStyle = theme.border; ctx.lineWidth = 2;
   ctx.strokeRect(8, 8, width - 16, height - 16);
   return { canvas, ctx };
 }
 
 function drawShareCardHeader(ctx, width, { name, digitalId, date, title }) {
+  const theme = getShareTheme();
   ctx.textBaseline = 'alphabetic';
-  ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 20px sans-serif';
+  ctx.textAlign = 'left'; ctx.fillStyle = theme.textPrimary; ctx.font = 'bold 20px sans-serif';
   ctx.fillText(name || 'Operator', 32, 46);
-  ctx.textAlign = 'right'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 15px monospace';
+  ctx.textAlign = 'right'; ctx.fillStyle = theme.accent; ctx.font = 'bold 15px monospace';
   ctx.fillText(digitalId || '', width - 32, 44);
-  ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px monospace';
+  ctx.textAlign = 'center'; ctx.fillStyle = theme.textMuted; ctx.font = '14px monospace';
   ctx.fillText(date, width / 2, 74);
-  ctx.textAlign = 'left'; ctx.fillStyle = '#33c8cc'; ctx.font = 'bold 22px sans-serif';
+  ctx.textAlign = 'left'; ctx.fillStyle = theme.accent; ctx.font = 'bold 22px sans-serif';
   ctx.fillText(title, 32, 106);
 }
 
@@ -6735,6 +7017,7 @@ function loadShareLogoImage() {
 // icon + "WINFINITY", each sized to 70% of how they appear in the app's own
 // header (28px logo / 1.1rem≈17.6px text there).
 async function drawShareWatermark(ctx, width, height) {
+  const theme = getShareTheme();
   const logoSize = Math.round(28 * 0.7);
   const fontSize = Math.round(17.6 * 0.7);
   const pad = 18;
@@ -6742,7 +7025,7 @@ async function drawShareWatermark(ctx, width, height) {
   ctx.save();
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'right';
-  ctx.fillStyle = '#33c8cc';
+  ctx.fillStyle = theme.accent;
   ctx.font = `800 ${fontSize}px "Courier New", monospace`;
   const centerY = height - pad - logoSize / 2;
   ctx.fillText('WINFINITY', width - pad, centerY);
@@ -6750,7 +7033,7 @@ async function drawShareWatermark(ctx, width, height) {
     const textW = ctx.measureText('WINFINITY').width;
     const iconX = width - pad - textW - 8 - logoSize;
     const iconY = height - pad - logoSize;
-    ctx.shadowColor = '#33c8cc';
+    ctx.shadowColor = theme.accent;
     ctx.shadowBlur = 4;
     ctx.drawImage(img, iconX, iconY, logoSize, logoSize);
   }
@@ -6762,19 +7045,20 @@ async function drawShareCardFooter(ctx, width, height) {
 }
 
 function drawShareTable(ctx, x, y, w, columns, rows) {
+  const theme = getShareTheme();
   const headerH = 22;
   const rowH = 22;
   ctx.textBaseline = 'alphabetic';
-  ctx.font = 'bold 10px monospace'; ctx.fillStyle = '#33c8cc'; ctx.textAlign = 'left';
+  ctx.font = 'bold 10px monospace'; ctx.fillStyle = theme.accent; ctx.textAlign = 'left';
   let cx = x;
   columns.forEach(col => { ctx.fillText(col.label, cx + 4, y + 15); cx += col.width; });
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1;
+  ctx.strokeStyle = theme.gridLine; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(x, y + headerH); ctx.lineTo(x + w, y + headerH); ctx.stroke();
   ctx.font = '10px monospace';
   rows.forEach((row, ri) => {
     const ry = y + headerH + ri * rowH;
-    if (ri % 2 === 1) { ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fillRect(x, ry, w, rowH); }
-    ctx.fillStyle = '#dde3e5';
+    if (ri % 2 === 1) { ctx.fillStyle = theme.rowAlt; ctx.fillRect(x, ry, w, rowH); }
+    ctx.fillStyle = theme.textPrimary;
     let ccx = x;
     row.forEach((cell, ci) => {
       ctx.fillText(String(cell), ccx + 4, ry + 15);
@@ -6809,7 +7093,7 @@ async function generateHistoryLogShareCard({ name, digitalId, date, wu, rows }) 
 
   const y = headerH + 20;
   if (!tableRows.length) {
-    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center'; ctx.fillStyle = getShareTheme().textMuted; ctx.font = '14px sans-serif';
     ctx.fillText('No logs yet.', width / 2, y + 20);
   } else {
     drawShareTable(ctx, 32, y, width - 64, columns, tableRows);
@@ -6854,12 +7138,13 @@ async function generateMeasurementHistoryShareCard({ name, digitalId, date, rows
   drawShareCardHeader(ctx, width, { name, digitalId, date, title: 'MEASUREMENT HISTORY' });
 
   const y = headerH + 20;
+  const measureTheme = getShareTheme();
   if (!rows.length || !tableRows.length) {
-    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center'; ctx.fillStyle = measureTheme.textMuted; ctx.font = '14px sans-serif';
     ctx.fillText('No measurements logged yet.', width / 2, y + 20);
   } else {
     drawShareTable(ctx, 32, y, width - 64, columns, tableRows);
-    ctx.textAlign = 'left'; ctx.fillStyle = '#5a686e'; ctx.font = '10px monospace';
+    ctx.textAlign = 'left'; ctx.fillStyle = measureTheme.textMuted; ctx.font = '10px monospace';
     ctx.fillText('Values in cm · left = most recent', 32, y + tableH + 16);
   }
 
@@ -6879,22 +7164,23 @@ async function generateBodyFatHistoryShareCard({ name, digitalId, date, rows }) 
   const height = headerH + orbH + 20 + tableH + 24 + footerH;
 
   const { canvas, ctx } = shareCardShell(width, height);
+  const bodyFatTheme = getShareTheme();
   drawShareCardHeader(ctx, width, { name, digitalId, date, title: 'BODY FAT % LOG' });
 
   // Orb matches the in-app Body Fat ring: latest reading, cyan stroke,
   // percentage centered inside — same shape used across the app's tabs.
   const latestPct = rows.length ? rows[0].pct : null;
   const orbCx = width / 2, orbCy = headerH + orbR + 8;
-  drawShareRing(ctx, orbCx, orbCy, orbR, orbStroke, latestPct != null ? Math.min(100, Math.max(0, latestPct)) : 0, ['#33c8cc', '#33c8cc']);
+  drawShareRing(ctx, orbCx, orbCy, orbR, orbStroke, latestPct != null ? Math.min(100, Math.max(0, latestPct)) : 0, [bodyFatTheme.accent, bodyFatTheme.accent]);
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 30px monospace';
+  ctx.fillStyle = bodyFatTheme.textPrimary; ctx.font = 'bold 30px monospace';
   ctx.fillText(latestPct != null ? round2(latestPct) + '%' : '–', orbCx, orbCy + 11);
-  ctx.fillStyle = '#7e8e95'; ctx.font = '13px monospace';
+  ctx.fillStyle = bodyFatTheme.textMuted; ctx.font = '13px monospace';
   ctx.fillText('BODY FAT', orbCx, orbCy + orbR + 34);
 
   const y = headerH + orbH + 20;
   if (!tableRows.length) {
-    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center'; ctx.fillStyle = bodyFatTheme.textMuted; ctx.font = '14px sans-serif';
     ctx.fillText('No body fat measurements logged yet.', width / 2, y + 20);
   } else {
     drawShareTable(ctx, 32, y, width - 64, columns, tableRows);
@@ -6930,6 +7216,7 @@ async function generateOutdoorActivityShareCard({ name, digitalId, date, summary
   const height = headerH + 92 + 26 + 20 + tableH + 24 + footerH;
 
   const { canvas, ctx } = shareCardShell(width, height);
+  const outdoorTheme = getShareTheme();
   drawShareCardHeader(ctx, width, { name, digitalId, date, title: 'OUTDOOR ACTIVITY SUMMARY' });
 
   let y = headerH;
@@ -6943,18 +7230,18 @@ async function generateOutdoorActivityShareCard({ name, digitalId, date, summary
   ];
   tiles.forEach((t, i) => {
     const x = 32 + i * (tileW + tileGap);
-    ctx.strokeStyle = 'rgba(51,200,204,0.35)'; ctx.lineWidth = 1;
+    ctx.strokeStyle = outdoorTheme.border; ctx.lineWidth = 1;
     roundRectPath(ctx, x, y, tileW, 92, 10);
     ctx.stroke();
-    ctx.textAlign = 'center'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 26px sans-serif';
+    ctx.textAlign = 'center'; ctx.fillStyle = outdoorTheme.textPrimary; ctx.font = 'bold 26px sans-serif';
     ctx.fillText(t.value, x + tileW / 2, y + 50);
-    ctx.fillStyle = '#7e8e95'; ctx.font = '11px monospace';
+    ctx.fillStyle = outdoorTheme.textMuted; ctx.font = '11px monospace';
     ctx.fillText(t.label, x + tileW / 2, y + 74);
   });
   y += 92 + 26 + 20;
 
   if (!tableRows.length) {
-    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center'; ctx.fillStyle = outdoorTheme.textMuted; ctx.font = '14px sans-serif';
     ctx.fillText('No outdoor activity logged yet.', width / 2, y + 15);
   } else {
     drawShareTable(ctx, 32, y, width - 64, columns, tableRows);
@@ -6968,9 +7255,10 @@ async function generateRecentPerformanceShareCard({ name, digitalId, date, perfI
   const width = 600;
   const height = 560;
   const { canvas, ctx } = shareCardShell(width, height);
+  const perfTheme = getShareTheme();
   drawShareCardHeader(ctx, width, { name, digitalId, date, title: 'RECENT PERFORMANCE (7D AVG)' });
 
-  const STATUS_COLORS = { good: '#34bd7c', warning: '#dba52c', serious: '#e6824b', critical: '#e6516a', muted: '#5a686e' };
+  const STATUS_COLORS = { good: '#34bd7c', warning: '#dba52c', serious: '#e6824b', critical: '#e6516a', muted: perfTheme.textMuted };
 
   const tileRowH = 84;
   const tileGap = 12;
@@ -6981,10 +7269,10 @@ async function generateRecentPerformanceShareCard({ name, digitalId, date, perfI
     const x = 32 + col * (tileW + tileGap);
     const ty = tilesTop + row * (tileRowH + tileGap);
     roundRectPath(ctx, x, ty, tileW, tileRowH, 10);
-    ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1;
+    ctx.strokeStyle = perfTheme.gridLine; ctx.lineWidth = 1;
     ctx.stroke();
 
-    ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'left'; ctx.fillStyle = perfTheme.textPrimary; ctx.font = 'bold 14px sans-serif';
     ctx.fillText(p.label, x + 14, ty + 24);
 
     const dotColor = STATUS_COLORS[p.status] || STATUS_COLORS.muted;
@@ -7002,13 +7290,13 @@ async function generateRecentPerformanceShareCard({ name, digitalId, date, perfI
       const h = v != null ? Math.max(4, (v / 5) * barMaxH) : 3;
       const bx = x + 14 + bi * (barW + barGap);
       const isToday = bi === barCount - 1;
-      ctx.fillStyle = isToday ? dotColor : 'rgba(255,255,255,0.15)';
+      ctx.fillStyle = isToday ? dotColor : perfTheme.trackLine;
       ctx.fillRect(bx, barBaseY - h, barW, h);
     });
   });
 
   const chartTop = tilesTop + tileRowH * 2 + tileGap + 24;
-  ctx.textAlign = 'left'; ctx.fillStyle = '#dde3e5'; ctx.font = 'bold 15px sans-serif';
+  ctx.textAlign = 'left'; ctx.fillStyle = perfTheme.textPrimary; ctx.font = 'bold 15px sans-serif';
   ctx.fillText('Steps vs Calories (7D)', 32, chartTop);
 
   const plotY = chartTop + 16;
@@ -7025,26 +7313,26 @@ async function generateRecentPerformanceShareCard({ name, digitalId, date, perfI
     ctx.fillRect(x, baseY - baseH, barPairW, baseH);
     if (pct > 100) {
       const overH = (Math.min(130, pct) - 100) / 130 * chartPlotH;
-      ctx.fillStyle = '#dba52c';
+      ctx.fillStyle = perfTheme.warning;
       ctx.fillRect(x, baseY - baseH - overH, barPairW, overH);
     }
   };
   days.forEach((d, i) => {
     const cx = chartX + i * dayW + dayW / 2;
-    drawGoalBar(cx - barPairW - 2, d.stepsPct, '#2de2e6');
-    drawGoalBar(cx + 2, d.calPct, '#8069d6');
-    ctx.textAlign = 'center'; ctx.fillStyle = '#7e8e95'; ctx.font = '10px monospace';
+    drawGoalBar(cx - barPairW - 2, d.stepsPct, perfTheme.accent);
+    drawGoalBar(cx + 2, d.calPct, perfTheme.accentViolet);
+    ctx.textAlign = 'center'; ctx.fillStyle = perfTheme.textMuted; ctx.font = '10px monospace';
     ctx.fillText(d.weekday, cx, plotY + chartPlotH + 16);
   });
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1;
+  ctx.strokeStyle = perfTheme.gridLine; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(chartX, plotY + chartPlotH); ctx.lineTo(chartX + chartW, plotY + chartPlotH); ctx.stroke();
 
   const legendY = plotY + chartPlotH + 36;
   ctx.textAlign = 'left'; ctx.font = '11px sans-serif';
-  ctx.fillStyle = '#2de2e6'; ctx.fillRect(32, legendY - 9, 10, 10);
-  ctx.fillStyle = '#dde3e5'; ctx.fillText('Steps', 48, legendY);
-  ctx.fillStyle = '#8069d6'; ctx.fillRect(120, legendY - 9, 10, 10);
-  ctx.fillStyle = '#dde3e5'; ctx.fillText('Calories', 136, legendY);
+  ctx.fillStyle = perfTheme.accent; ctx.fillRect(32, legendY - 9, 10, 10);
+  ctx.fillStyle = perfTheme.textPrimary; ctx.fillText('Steps', 48, legendY);
+  ctx.fillStyle = perfTheme.accentViolet; ctx.fillRect(120, legendY - 9, 10, 10);
+  ctx.fillStyle = perfTheme.textPrimary; ctx.fillText('Calories', 136, legendY);
 
   await drawShareCardFooter(ctx, width, height);
   return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
@@ -7102,6 +7390,7 @@ function initNutrition() {
     document.querySelector('.tab-btn[data-target="bio"]').click();
   });
   document.getElementById('btnShareFuelStatus').addEventListener('click', shareDailyFuelStatus);
+  document.getElementById('btnShareFuelSnapshot').addEventListener('click', shareFuelSnapshot);
   const carryoverMenuBtn = document.getElementById('btnCarryoverMenu');
   const carryoverMenu = document.getElementById('carryoverMenu');
   carryoverMenuBtn.addEventListener('click', () => {
@@ -7318,6 +7607,12 @@ async function buildAssessmentBlobs() {
       waterNow: entry.water || 0,
       waterTarget: effectiveWaterTargetML(date),
     }).then(blob => ({ name: 'daily-fuel-status.png', blob })));
+  }
+
+  if (document.getElementById('assessChkFuelSnapshot').checked) {
+    jobs.push(generateFuelSnapshotShareCard({
+      name, digitalId, date: nowDate, ...computeFuelSnapshotShareData(),
+    }).then(blob => ({ name: 'fuel-snapshot.png', blob })));
   }
 
   return Promise.all(jobs);

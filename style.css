@@ -264,6 +264,20 @@ body.has-custom-bg { background-color: transparent; }
   color: transparent;
 }
 .hero-title-shrink { font-size: 70%; }
+/* Welcome-back greeting: stacked on two lines instead of inline, both
+   scaled down another 90% from their previous sizes. The name line stays
+   nowrap/hidden-overflow as a safety net — fitHeroNameToWidth() in app.js
+   shrinks its font-size with JS when a long name would otherwise overflow,
+   only kicking in when needed so short names stay at full size. */
+.hero-welcome-line { display: block; font-size: 63%; font-weight: 700; }
+.hero-name-line {
+  display: block;
+  font-size: 90%;
+  margin-top: 1px;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
 .chip {
   display: flex;
   flex-wrap: wrap;
@@ -2618,6 +2632,20 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 }
 .meal-item-edit-form .field-row input { flex: 1; }
 .meal-item-edit-form .field-label { font-family: var(--font-mono); font-size: 0.62rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-bottom: 2px; }
+.meal-edit-calories-label { display: flex !important; align-items: center; gap: 4px; margin-bottom: 2px; }
+.meal-edit-chain-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+.meal-edit-chain-btn .chain-link-line { transition: stroke-dasharray 0.15s; }
+.meal-edit-chain-btn.is-locked { color: var(--warning); }
+.meal-edit-chain-btn.is-locked .chain-link-line { stroke-dasharray: 1.6 1.6; }
 
 /* Frosted-glass / embossed-thin surface — used where neon line icons need a
    subtle, translucent seat rather than a flat solid block. No backdrop-filter

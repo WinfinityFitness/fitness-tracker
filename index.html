@@ -87,7 +87,7 @@
     <div class="hero-card">
       <p class="sys-version" id="sysVersion"></p>
       <p class="hero-eyebrow">System check-in</p>
-      <h2 class="hero-title"><span class="hero-title-shrink">Welcome back, </span><span class="accent" id="heroName">Operator</span><span class="hero-title-shrink">.</span></h2>
+      <h2 class="hero-title"><span class="hero-title-shrink hero-welcome-line">Welcome back,</span><span class="accent hero-name-line" id="heroName">Operator</span></h2>
       <div class="chip-row">
         <div class="chip">
           <span class="chip-label">Challenge_day</span>
@@ -527,7 +527,12 @@
     </button>
     <p class="hint">For users using other calorie tracking, calculator and counting apps like MyFitnessPal etc., transfer data here.</p>
 
-    <h2 class="section-title">Fuel Snapshot</h2>
+    <div class="section-title-row">
+      <h2 class="section-title" style="margin:0;">Fuel Snapshot</h2>
+      <button type="button" class="icon-btn glass-emboss" id="btnShareFuelSnapshot" aria-label="Share Fuel Snapshot and Computed Targets">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
+      </button>
+    </div>
     <div class="ring-row ring-row--3">
       <div class="ring-card" id="avgCaloriesRing"></div>
       <div class="ring-card" id="avgProteinRing"></div>
@@ -2493,6 +2498,7 @@
       <label class="field field--checkbox"><input type="checkbox" id="assessChkWorkout" checked><span>Workout Summary</span></label>
       <label class="field field--checkbox"><input type="checkbox" id="assessChkOutdoor" checked><span>Outdoor Activity Summary</span></label>
       <label class="field field--checkbox"><input type="checkbox" id="assessChkFuel" checked><span>Daily Fuel Status</span></label>
+      <label class="field field--checkbox"><input type="checkbox" id="assessChkFuelSnapshot" checked><span>Fuel Snapshot &amp; Computed Targets</span></label>
     </div>
     <button type="button" class="btn btn--primary" id="btnAssessmentShareSubmit" style="width:100%;margin-top:10px;">Share</button>
     <p class="save-note" id="assessmentShareNote"></p>
