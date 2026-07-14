@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "description": "Capacitor native Android shell for Winfinity Fitness Tracker. Loads the live GitHub Pages site remotely (same as the old TWA), but adds real native plugins — specifically background GPS tracking with a persistent notification, which a bare TWA cannot do.",
   "scripts": {
-    "sync": "npx cap sync android && node apply-native-src.js"
+    "sync": "npx cap sync android && node apply-native-src.js",
+    "icons": "npx @capacitor/assets generate --android --iconBackgroundColor \"#060A0D\" --iconBackgroundColorDark \"#000000\""
   },
   "dependencies": {
     "@capacitor-community/background-geolocation": "^1.2.24",
@@ -12,6 +13,7 @@
     "@capacitor/core": "^7.0.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^7.0.0"
   }
 }
