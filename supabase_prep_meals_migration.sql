@@ -19,25 +19,35 @@
 
 create table if not exists prep_meals (
   id bigint generated always as identity primary key,
-  category text not null default 'full_meal',
-  name text not null,
-  ingredients text not null,
-  procedure text not null default '',
-  ref_grams numeric not null default 0,
-  ref_calories numeric not null default 0,
-  ref_protein numeric not null default 0,
-  ref_carbs numeric not null default 0,
-  ref_fat numeric not null default 0,
-  image_url text,
-  active boolean not null default true,
-  author_type text not null default 'admin',
-  author_share_key uuid,
-  author_name text,
-  created_at timestamptz not null default now(),
-  constraint prep_meals_category_check check (category in ('breakfast', 'full_meal', 'snack')),
-  constraint prep_meals_author_type_check check (author_type in ('admin', 'user'))
+  created_at timestamptz not null default now()
 );
+-- One alter per column instead of relying only on "create table if not
+-- exists" — safe to re-run even if an earlier partial run of this script
+-- already created the table with an older/incomplete column set.
+alter table prep_meals add column if not exists category text not null default 'full_meal';
+alter table prep_meals add column if not exists name text not null default '';
+alter table prep_meals add column if not exists ingredients text not null default '';
+alter table prep_meals add column if not exists procedure text not null default '';
+alter table prep_meals add column if not exists ref_grams numeric not null default 0;
+alter table prep_meals add column if not exists ref_calories numeric not null default 0;
+alter table prep_meals add column if not exists ref_protein numeric not null default 0;
+alter table prep_meals add column if not exists ref_carbs numeric not null default 0;
+alter table prep_meals add column if not exists ref_fat numeric not null default 0;
+alter table prep_meals add column if not exists image_url text;
+alter table prep_meals add column if not exists active boolean not null default true;
+alter table prep_meals add column if not exists author_type text not null default 'admin';
+alter table prep_meals add column if not exists author_share_key uuid;
+alter table prep_meals add column if not exists author_name text;
+do $$ begin
+  alter table prep_meals add constraint prep_meals_category_check check (category in ('breakfast', 'full_meal', 'snack'));
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  alter table prep_meals add constraint prep_meals_author_type_check check (author_type in ('admin', 'user'));
+exception when duplicate_object then null;
+end $$;
 alter table prep_meals enable row level security;
+drop policy if exists "anon read prep_meals" on prep_meals;
 create policy "anon read prep_meals" on prep_meals for select using (true);
 -- No anon write policy — every insert/update/delete goes through the
 -- SECURITY DEFINER functions below, admin-gated or ownership-gated.
