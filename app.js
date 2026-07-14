@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.8.3';
+const APP_VERSION = 'WF_SYS_V.8.4';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9780,27 +9780,40 @@ function initFoodPrepsOverlay() {
 // Independent of the Warrior-tier gate on Browse — admins manage the
 // catalog here regardless of their own fitness mode.
 let lastToastedPendingCount = 0;
+let prepMealManagerExpanded = false;
+const PREP_MEAL_MANAGER_PREVIEW_COUNT = 3;
+
 async function renderPrepMealManager() {
   if (!sbConfigured() || !isAdminLoggedIn()) return;
   prepMealsCache = await fetchPrepMeals();
   const list = document.getElementById('prepMealManagerList');
   const empty = document.getElementById('prepMealManagerEmptyNote');
+  const expandBtn = document.getElementById('btnPrepMealManagerExpand');
   if (!list) return;
   list.innerHTML = '';
-  if (!prepMealsCache.length) { empty.hidden = false; return; }
+  if (!prepMealsCache.length) { empty.hidden = false; if (expandBtn) expandBtn.hidden = true; return; }
   empty.hidden = true;
 
   // Pending submissions float to the top of the list and get a one-tap
   // Approve button; the count doubles as the admin's review notification —
-  // toasted only when it changes, not on every re-render.
-  const sorted = [...prepMealsCache].sort((a, b) => (a.approved === false ? 0 : 1) - (b.approved === false ? 0 : 1));
+  // toasted only when it changes, not on every re-render. Everything else
+  // is alphabetical so a specific meal is easy to find in a long menu.
+  const sorted = [...prepMealsCache].sort((a, b) => {
+    const pendingDiff = (a.approved === false ? 0 : 1) - (b.approved === false ? 0 : 1);
+    return pendingDiff !== 0 ? pendingDiff : a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+  });
   const pendingCount = prepMealsCache.filter(m => m.approved === false).length;
   if (pendingCount > 0 && pendingCount !== lastToastedPendingCount) {
     showRestToast(`🔔 ${pendingCount} prep meal submission${pendingCount === 1 ? '' : 's'} pending your review.`);
   }
   lastToastedPendingCount = pendingCount;
 
-  sorted.forEach(m => {
+  if (expandBtn) expandBtn.hidden = sorted.length <= PREP_MEAL_MANAGER_PREVIEW_COUNT;
+  list.classList.toggle('prep-meal-manager-list--expanded', prepMealManagerExpanded);
+  if (expandBtn) expandBtn.classList.toggle('is-expanded', prepMealManagerExpanded);
+  const visible = prepMealManagerExpanded ? sorted : sorted.slice(0, PREP_MEAL_MANAGER_PREVIEW_COUNT);
+
+  visible.forEach(m => {
     const row = document.createElement('div');
     row.className = 'ad-manager-row prep-meal-manager-row' + (m.active ? '' : ' ad-manager-inactive');
     const authorLabel = m.author_type === 'admin' ? 'Admin' : `User: ${m.author_name || 'Unknown'}`;
@@ -9857,6 +9870,8 @@ function initPrepMealManager() {
   const addBtn = document.getElementById('btnAdminAddPrepMeal');
   if (!addBtn) return;
   addBtn.addEventListener('click', () => openPrepMealEditor(null));
+  const expandBtn = document.getElementById('btnPrepMealManagerExpand');
+  if (expandBtn) expandBtn.addEventListener('click', () => { prepMealManagerExpanded = !prepMealManagerExpanded; renderPrepMealManager(); });
 }
 
 /* Prep Meal editor overlay — admin-only (view and edit). Opened from the  */
@@ -9881,6 +9896,7 @@ function fillPrepMealEditorForm(m) {
   document.getElementById('prepMealFormIngredients').value = m ? m.ingredients : '';
   document.getElementById('prepMealFormProcedure').value = m ? m.procedure : '';
   document.getElementById('prepMealFormImageUrl').value = (m && m.image_url) || '';
+  prepMealEditorOriginalImageUrl = (m && m.image_url) || '';
   document.getElementById('prepMealFormActive').checked = m ? m.active : true;
   document.getElementById('prepMealAiText').value = '';
   document.getElementById('prepMealAiUrl').value = '';
@@ -9968,16 +9984,23 @@ async function fillPrepMealFromAiPhoto(file) {
 // meal photos automatically — every prep meal image an admin sets gets
 // folded into media_sync_settings.image_urls (deduped), switching the
 // widget to slideshow mode once there's more than one image to cycle.
-async function addImageToMediaSyncSlideshow(imageUrl) {
+async function addImageToMediaSyncSlideshow(imageUrl, oldImageUrl) {
   try {
     const settings = await fetchMediaSyncSettings();
     const current = settings || { mode: 'still', image_urls: [], duration_sec: 10, randomize: false };
-    if (current.image_urls.includes(imageUrl)) return;
-    const newUrls = [...current.image_urls, imageUrl];
-    const newMode = newUrls.length > 1 ? 'slideshow' : current.mode;
+    // If this meal's photo changed, drop the old URL first — otherwise the
+    // replaced photo lingers in the slideshow forever with no meal to match
+    // its name tag against.
+    let urls = (oldImageUrl && oldImageUrl !== imageUrl) ? current.image_urls.filter(u => u !== oldImageUrl) : current.image_urls;
+    if (urls.includes(imageUrl)) {
+      if (urls.length === current.image_urls.length) return; // nothing actually changed
+    } else {
+      urls = [...urls, imageUrl];
+    }
+    const newMode = urls.length > 1 ? 'slideshow' : current.mode;
     await sb.rpc('admin_set_media_sync', {
       p_digital_id: adminSession.digitalId, p_password: adminSession.password,
-      p_mode: newMode, p_image_urls: newUrls, p_duration_sec: current.duration_sec, p_randomize: current.randomize,
+      p_mode: newMode, p_image_urls: urls, p_duration_sec: current.duration_sec, p_randomize: current.randomize,
     });
     await renderMediaSyncWidget();
   } catch (e) { /* best effort — slideshow just won't pick up this image until the next successful save */ }
@@ -10016,7 +10039,7 @@ async function savePrepMealEditor() {
       });
       if (error) throw error;
       note.textContent = 'Saved.';
-      if (imageUrl) await addImageToMediaSyncSlideshow(imageUrl);
+      if (imageUrl) await addImageToMediaSyncSlideshow(imageUrl, prepMealEditorOriginalImageUrl);
     } else {
       // Self-service submission: saves immediately, visible to this user
       // right away, public only once the admin approves (ownership and
@@ -10062,6 +10085,11 @@ async function deletePrepMealEditor() {
 // fields rescale from when the admin changes the serving size (fields
 // always represent nutrition for the serving currently declared).
 let prepMealEditorServing = 100;
+// The meal's image_url as the editor opened it — lets savePrepMealEditor
+// tell the slideshow to swap the old photo for the new one instead of just
+// appending, so an edited image doesn't leave a stale, unnamed orphan
+// cycling in the slideshow alongside the replacement.
+let prepMealEditorOriginalImageUrl = '';
 const PREP_MEAL_NUTRITION_FIELD_IDS = ['prepMealFormCalories', 'prepMealFormProtein', 'prepMealFormCarbs', 'prepMealFormFat', 'prepMealFormFiber', 'prepMealFormSodium'];
 
 function rescalePrepMealNutritionFields(newGrams) {

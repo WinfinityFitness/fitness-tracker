@@ -2695,6 +2695,11 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .prep-meal-thumb img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
 #btnFoodPrepsExpand svg { transition: transform 0.15s ease; }
 #btnFoodPrepsExpand.is-expanded svg { transform: rotate(180deg); }
+#btnPrepMealManagerExpand.is-expanded svg { transform: rotate(180deg); }
+/* Collapsed: just the first 3 rows, no scrolling. Expanded: a viewport
+   sized for ~8 rows, with a normal scrollbar for anything beyond that —
+   the manager list can run well past 8 meals. */
+#prepMealManagerList.prep-meal-manager-list--expanded { max-height: 600px; overflow-y: auto; padding-right: 4px; }
 .prep-meal-info { min-width: 0; flex: 1; border-left: 2px solid var(--cyan); padding-left: 10px; }
 .prep-meal-name-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .prep-meal-name { font-weight: 700; font-size: 0.86rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
