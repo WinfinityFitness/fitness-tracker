@@ -14,6 +14,7 @@ create table if not exists media_sync_settings (
 );
 insert into media_sync_settings (id, mode, image_urls, duration_sec) values (1, 'still', '[]'::jsonb, 10) on conflict (id) do nothing;
 alter table media_sync_settings enable row level security;
+drop policy if exists "anon read media_sync_settings" on media_sync_settings;
 create policy "anon read media_sync_settings" on media_sync_settings for select using (true);
 -- No anon write policy — only admin_set_media_sync() below can change it.
 
