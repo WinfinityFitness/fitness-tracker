@@ -1514,6 +1514,14 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   margin-bottom: 12px;
   filter: drop-shadow(0 0 12px var(--cyan-glow));
 }
+.lock-icon--logo {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  margin-left: auto;
+  margin-right: auto;
+  display: block;
+}
 .lock-card h2 {
   font-family: var(--font-mono);
   font-size: 1.05rem;
