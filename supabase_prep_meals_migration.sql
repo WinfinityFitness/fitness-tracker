@@ -10,6 +10,12 @@
 -- in this app. author_type/author_share_key/author_name exist purely for
 -- the "prepared by Admin / by <name>" label and to let a regular user
 -- edit or delete only their own submissions (admins can moderate any row).
+--
+-- image_url is null until an admin sets one — the client renders a
+-- generated placeholder icon for any row without one. Deliberately only
+-- settable via admin_upsert_prep_meal (not user_upsert_prep_meal), so an
+-- anonymous, unauthenticated user submission can never inject an
+-- arbitrary/inappropriate image URL that shows up for everyone.
 
 create table if not exists prep_meals (
   id bigint generated always as identity primary key,
@@ -22,6 +28,7 @@ create table if not exists prep_meals (
   ref_protein numeric not null default 0,
   ref_carbs numeric not null default 0,
   ref_fat numeric not null default 0,
+  image_url text,
   active boolean not null default true,
   author_type text not null default 'admin',
   author_share_key uuid,
@@ -39,7 +46,7 @@ create or replace function admin_upsert_prep_meal(
   p_digital_id text, p_password text,
   p_id bigint, p_category text, p_name text, p_ingredients text, p_procedure text,
   p_ref_grams numeric, p_ref_calories numeric, p_ref_protein numeric, p_ref_carbs numeric, p_ref_fat numeric,
-  p_active boolean
+  p_active boolean, p_image_url text
 ) returns void
 language plpgsql
 security definer
@@ -49,8 +56,8 @@ begin
     raise exception 'Not authorized';
   end if;
   if p_id is null then
-    insert into prep_meals (category, name, ingredients, procedure, ref_grams, ref_calories, ref_protein, ref_carbs, ref_fat, active, author_type, author_share_key, author_name)
-    values (p_category, p_name, p_ingredients, p_procedure, p_ref_grams, p_ref_calories, p_ref_protein, p_ref_carbs, p_ref_fat, p_active, 'admin', null, null);
+    insert into prep_meals (category, name, ingredients, procedure, ref_grams, ref_calories, ref_protein, ref_carbs, ref_fat, active, image_url, author_type, author_share_key, author_name)
+    values (p_category, p_name, p_ingredients, p_procedure, p_ref_grams, p_ref_calories, p_ref_protein, p_ref_carbs, p_ref_fat, p_active, nullif(p_image_url, ''), 'admin', null, null);
   else
     -- Deliberately leaves author_type/author_share_key/author_name untouched
     -- on update, so an admin correcting a user-submitted meal doesn't
@@ -59,12 +66,12 @@ begin
     set category = p_category, name = p_name, ingredients = p_ingredients, procedure = p_procedure,
         ref_grams = p_ref_grams, ref_calories = p_ref_calories,
         ref_protein = p_ref_protein, ref_carbs = p_ref_carbs, ref_fat = p_ref_fat,
-        active = p_active
+        active = p_active, image_url = nullif(p_image_url, '')
     where id = p_id;
   end if;
 end;
 $$;
-grant execute on function admin_upsert_prep_meal(text, text, bigint, text, text, text, text, numeric, numeric, numeric, numeric, numeric, boolean) to anon;
+grant execute on function admin_upsert_prep_meal(text, text, bigint, text, text, text, text, numeric, numeric, numeric, numeric, numeric, boolean, text) to anon;
 
 create or replace function admin_delete_prep_meal(p_digital_id text, p_password text, p_id bigint) returns void
 language plpgsql

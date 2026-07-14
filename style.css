@@ -2660,6 +2660,7 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   padding: 10px 0; border-bottom: 1px solid var(--border-soft);
 }
 .prep-meal-row:last-child { border-bottom: none; }
+.prep-meal-thumb { flex: none; width: 42px; height: 42px; border-radius: 7px; object-fit: cover; background: var(--surface-2); border: 1px solid var(--border-soft); }
 .prep-meal-info { min-width: 0; flex: 1; border-left: 2px solid var(--cyan); padding-left: 10px; }
 .prep-meal-name-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .prep-meal-name { font-weight: 700; font-size: 0.86rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

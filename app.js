@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.6.2';
+const APP_VERSION = 'WF_SYS_V.6.3';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9284,6 +9284,18 @@ function initMediaSyncWidget() {
 /* ---------------------------------------------------------------- */
 const PREP_MEAL_REF_KCAL = 2000;
 const PREP_MEAL_CATEGORY_LABELS = { breakfast: 'Breakfast', full_meal: 'Full Meal', snack: 'Snack' };
+// Generated inline (no network dependency, works offline) as the thumbnail
+// for any prep_meals row without an admin-set image_url — a plate/utensils
+// icon in the app's own dark/cyan palette rather than a broken-image icon.
+const PREP_MEAL_DEFAULT_IMAGE = 'data:image/svg+xml,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
+  '<rect width="100" height="100" rx="14" fill="#171f24"/>' +
+  '<circle cx="50" cy="52" r="26" fill="none" stroke="#33c8cc" stroke-width="3"/>' +
+  '<circle cx="50" cy="52" r="13" fill="none" stroke="#33c8cc" stroke-width="2" opacity="0.5"/>' +
+  '<path d="M28 24v18M24 24v10c0 3 2 5 4 5s4-2 4-5V24M32 24v10c0 3-2 5-4 5" stroke="#33c8cc" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>' +
+  '<path d="M74 24c-4 1-6 5-6 10s2 8 6 9v19" stroke="#33c8cc" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>' +
+  '</svg>'
+);
 let prepMealsCache = [];
 let prepMealSelectedCategory = 'breakfast';
 let prepMealEditorContext = { mode: 'user', id: null };
@@ -9337,6 +9349,7 @@ function renderPrepMealList(calorieTarget) {
       const row = document.createElement('div');
       row.className = 'prep-meal-row';
       row.innerHTML = `
+        <img class="prep-meal-thumb" src="${escapeHtml(m.image_url || PREP_MEAL_DEFAULT_IMAGE)}" alt="" loading="lazy">
         <div class="prep-meal-info">
           <div class="prep-meal-name-row">
             <span class="prep-meal-name">${escapeHtml(m.name)}</span>
@@ -9419,6 +9432,7 @@ async function renderPrepMealManager() {
     row.className = 'ad-manager-row prep-meal-manager-row' + (m.active ? '' : ' ad-manager-inactive');
     const authorLabel = m.author_type === 'admin' ? 'Admin' : `User: ${m.author_name || 'Unknown'}`;
     row.innerHTML = `
+      <img class="ad-manager-thumb" src="${escapeHtml(m.image_url || PREP_MEAL_DEFAULT_IMAGE)}" alt="" loading="lazy">
       <div class="ad-manager-info">
         <div class="ad-manager-name">${escapeHtml(m.name)}${m.active ? '' : ' (inactive)'}</div>
         <span class="ad-manager-link">${PREP_MEAL_CATEGORY_LABELS[m.category] || m.category} · ${escapeHtml(authorLabel)} · ${m.ref_grams}g / ${m.ref_calories}kcal @ 2000kcal</span>
@@ -9471,6 +9485,7 @@ function fillPrepMealEditorForm(m) {
   document.getElementById('prepMealFormFat').value = m ? m.ref_fat : '';
   document.getElementById('prepMealFormIngredients').value = m ? m.ingredients : '';
   document.getElementById('prepMealFormProcedure').value = m ? m.procedure : '';
+  document.getElementById('prepMealFormImageUrl').value = (m && m.image_url) || '';
   document.getElementById('prepMealFormActive').checked = m ? m.active : true;
   document.getElementById('prepMealAiText').value = '';
   document.getElementById('prepMealAiUrl').value = '';
@@ -9483,6 +9498,7 @@ function openPrepMealEditor(mode, existingMeal) {
   fillPrepMealEditorForm(existingMeal);
   document.getElementById('prepMealEditorTitle').textContent = existingMeal ? 'Edit Prep Meal' : 'Add Prep Meal';
   document.getElementById('prepMealFormActiveRow').hidden = mode !== 'admin';
+  document.getElementById('prepMealFormImageRow').hidden = mode !== 'admin';
   document.getElementById('btnDeletePrepMeal').hidden = !existingMeal;
   document.getElementById('prepMealEditorOverlay').hidden = false;
 }
@@ -9531,10 +9547,12 @@ async function savePrepMealEditor() {
     if (prepMealEditorContext.mode === 'admin') {
       if (!isAdminLoggedIn()) { note.textContent = 'Admin login required.'; return; }
       const active = document.getElementById('prepMealFormActive').checked;
+      const imageUrl = document.getElementById('prepMealFormImageUrl').value.trim();
       const { error } = await sb.rpc('admin_upsert_prep_meal', {
         p_digital_id: adminSession.digitalId, p_password: adminSession.password,
         p_id: idVal ? Number(idVal) : null, p_category: category, p_name: name, p_ingredients: ingredients, p_procedure: procedure,
         p_ref_grams: grams, p_ref_calories: calories, p_ref_protein: protein, p_ref_carbs: carbs, p_ref_fat: fat, p_active: active,
+        p_image_url: imageUrl,
       });
       if (error) throw error;
     } else {
