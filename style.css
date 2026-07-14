@@ -2643,7 +2643,6 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 }
 .prep-meal-category-tab.is-selected { border-color: var(--cyan); color: var(--cyan); background: var(--surface-3, var(--surface-2)); }
 
-.prep-meal-select-row { margin-bottom: 10px; }
 .prep-meal-row {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 10px 0; border-bottom: 1px solid var(--border-soft);

@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.6.7';
+const APP_VERSION = 'WF_SYS_V.6.8';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9358,12 +9358,15 @@ function renderFoodPrepsList() {
   });
 }
 
-// grams needed to hit the picked calorie target = target / cal_per_100g *
-// 100, then every macro scales off that same grams figure — true per-100g
-// serving math, same convention as the Add Food AI estimate flow.
-function renderFoodPrepsDetail(calorieTarget) {
+// grams needed to hit the viewer's own calorie target (their profile's
+// computed daily target, same as the Fuel tab — falls back to 2000 if no
+// profile yet) = target / cal_per_100g * 100, then every macro scales off
+// that same grams figure — true per-100g serving math, same convention as
+// the Add Food AI estimate flow.
+function renderFoodPrepsDetail() {
   const m = foodPrepsDetailMeal;
   if (!m) return;
+  const calorieTarget = getEffectiveCalorieTarget(getProfile()) || 2000;
   const calPer100g = m.cal_per_100g || 0;
   const grams = calPer100g > 0 ? Math.round((calorieTarget / calPer100g) * 100) : 0;
   const protein = (m.protein_per_100g || 0) * grams / 100;
@@ -9398,8 +9401,7 @@ function selectFoodPrepMeal(meal) {
   badge.className = 'prep-meal-author-badge ' + (meal.author_type === 'admin' ? 'is-admin' : (isMine ? 'is-self' : ''));
   document.getElementById('foodPrepsDetailIngredients').textContent = meal.ingredients || '';
   document.getElementById('foodPrepsDetailProcedure').textContent = meal.procedure || '';
-  const select = document.getElementById('foodPrepsDetailCalorieSelect');
-  renderFoodPrepsDetail(Number(select.value) || 2000);
+  renderFoodPrepsDetail();
 }
 
 async function openFoodPrepsOverlay() {
@@ -9482,7 +9484,6 @@ function initFoodPrepsOverlay() {
     foodPrepsExpanded = !foodPrepsExpanded;
     renderFoodPrepsList();
   });
-  document.getElementById('foodPrepsDetailCalorieSelect').addEventListener('change', e => renderFoodPrepsDetail(Number(e.target.value) || 2000));
   initFoodPrepsThumbPreview();
 }
 
