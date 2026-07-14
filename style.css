@@ -2369,6 +2369,17 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 }
 .sheet-overlay[hidden] { display: none; }
 .sheet-overlay--stacked { z-index: 160; }
+/* Full-screen variant — same solid background as the app's own full-page
+   sections (Settings/System Menu), not a translucent-backdrop bottom
+   sheet, so there's no dim gap around the panel and everything reads
+   clearly against one continuous surface. */
+.sheet-overlay--fullscreen { align-items: stretch; background: var(--bg); }
+.sheet-overlay--fullscreen .sheet {
+  height: 100%; max-height: none;
+  border-radius: 0; border-top: none;
+  padding-top: calc(16px + env(safe-area-inset-top));
+}
+.sheet-overlay--fullscreen .sheet-handle { display: none; }
 #datePickerOverlay { z-index: 170; padding-left: 18px; padding-right: 18px; }
 
 .donation-overlay {
