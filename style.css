@@ -2628,17 +2628,6 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   box-shadow: 0 0 9px var(--cyan-glow), 0 0 3px var(--cyan); cursor: pointer;
 }
 
-.media-sync-lightbox {
-  position: fixed; inset: 0; z-index: 400;
-  background: rgba(0,0,0,0.94);
-  display: flex; align-items: center; justify-content: center;
-}
-.media-sync-lightbox-image { max-width: 92vw; max-height: 88vh; object-fit: contain; border-radius: 6px; }
-.media-sync-lightbox-close {
-  position: absolute; top: 18px; right: 18px; background: none; border: none;
-  color: #fff; font-size: 1.4rem; cursor: pointer; line-height: 1; padding: 6px;
-}
-
 .prep-meal-category-tabs { display: flex; gap: 6px; margin: 8px 0 12px; }
 .prep-meal-category-tab {
   flex: 1;
@@ -2680,6 +2669,12 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .prep-meal-macros-head-bar { width: 3px; height: 14px; background: var(--cyan); border-radius: 2px; }
 
 .ad-manager-row.prep-meal-manager-row { align-items: flex-start; }
+
+.prep-meal-detail-image { width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; object-fit: cover; background: var(--surface-2); border: 1px solid var(--border-soft); }
+.prep-meal-detail-amount { display: flex; align-items: baseline; gap: 8px; margin: 10px 0; }
+.prep-meal-detail-amount span:first-child { font-family: var(--font-mono); font-weight: 700; font-size: 1.3rem; color: var(--cyan); }
+.prep-meal-detail-amount-sub { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.prep-meal-detail-text { white-space: pre-line; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin: 4px 0 0; }
 
 .donation-qr-message {
   font-size: 0.88rem;

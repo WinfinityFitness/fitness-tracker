@@ -463,72 +463,10 @@
           <span class="media-sync-title">Media Synchronizer</span>
           <span class="media-sync-sub" id="mediaSyncSub">Active core link est.</span>
         </div>
-        <button type="button" class="btn glass-emboss media-sync-browse-btn" id="btnMediaSyncBrowse" hidden>
+        <button type="button" class="btn glass-emboss media-sync-browse-btn" id="btnMediaSyncBrowse">
           Browse
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
         </button>
-      </div>
-    </div>
-
-    <div class="chart-card" id="prepMealCard" hidden>
-      <p class="mod-tag">MOD_FUEL_04</p>
-      <div class="chart-card-head">
-        <span class="chart-card-title">Nutritional Synchronical</span>
-        <button type="button" class="icon-btn glass-emboss" id="btnAddOwnPrepMeal" aria-label="Add your own prep meal">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        </button>
-      </div>
-      <div class="prep-meal-category-tabs" id="prepMealCategoryTabs">
-        <button type="button" class="prep-meal-category-tab is-selected" data-category="breakfast">Breakfast</button>
-        <button type="button" class="prep-meal-category-tab" data-category="full_meal">Full Meal</button>
-        <button type="button" class="prep-meal-category-tab" data-category="snack">Snacks</button>
-      </div>
-      <label class="field prep-meal-select-row">
-        <span>Energy quota (kcal)</span>
-        <select id="prepMealCalorieSelect">
-          <option value="400">400 kcal</option>
-          <option value="500">500 kcal</option>
-          <option value="600">600 kcal</option>
-          <option value="700">700 kcal</option>
-          <option value="800">800 kcal</option>
-          <option value="900">900 kcal</option>
-          <option value="1000">1000 kcal</option>
-          <option value="1100">1100 kcal</option>
-          <option value="1200">1200 kcal</option>
-          <option value="1300">1300 kcal</option>
-          <option value="1400">1400 kcal</option>
-          <option value="1500">1500 kcal</option>
-          <option value="1600">1600 kcal</option>
-          <option value="1700">1700 kcal</option>
-          <option value="1800">1800 kcal</option>
-          <option value="1900">1900 kcal</option>
-          <option value="2000" selected>2000 kcal</option>
-          <option value="2100">2100 kcal</option>
-          <option value="2200">2200 kcal</option>
-          <option value="2300">2300 kcal</option>
-          <option value="2400">2400 kcal</option>
-          <option value="2500">2500 kcal</option>
-          <option value="2600">2600 kcal</option>
-          <option value="2700">2700 kcal</option>
-          <option value="2800">2800 kcal</option>
-          <option value="2900">2900 kcal</option>
-          <option value="3000">3000 kcal</option>
-        </select>
-      </label>
-      <div id="prepMealList"></div>
-      <p class="empty-note" id="prepMealEmptyNote" hidden>No prep meals in this category yet.</p>
-      <div class="prep-meal-macros-head"><span class="prep-meal-macros-head-bar"></span><span>Estimated Macros</span></div>
-      <div class="gradient-stat-row">
-        <div class="gradient-stat-row-head"><span>Protein</span><span><strong id="prepMealProteinNow">0g</strong></span></div>
-        <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="prepMealProteinBar" style="width:0%"><span class="gradient-bar-dot"></span></div></div>
-      </div>
-      <div class="gradient-stat-row">
-        <div class="gradient-stat-row-head"><span>Carbs</span><span><strong id="prepMealCarbsNow">0g</strong></span></div>
-        <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="prepMealCarbsBar" style="width:0%"><span class="gradient-bar-dot"></span></div></div>
-      </div>
-      <div class="gradient-stat-row">
-        <div class="gradient-stat-row-head"><span>Fat</span><span><strong id="prepMealFatNow">0g</strong></span></div>
-        <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="prepMealFatBar" style="width:0%"><span class="gradient-bar-dot"></span></div></div>
       </div>
     </div>
 
@@ -2818,6 +2756,89 @@
   </div>
 </div>
 
+<div class="sheet-overlay" id="foodPrepsOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2 id="foodPrepsTitle">Food Preps</h2>
+      <button class="sheet-close" id="btnCloseFoodPreps">✕</button>
+    </div>
+
+    <div id="foodPrepsListScreen">
+      <div class="prep-meal-category-tabs" id="foodPrepsCategoryTabs">
+        <button type="button" class="prep-meal-category-tab is-selected" data-category="breakfast">Breakfast</button>
+        <button type="button" class="prep-meal-category-tab" data-category="full_meal">Full Meal</button>
+        <button type="button" class="prep-meal-category-tab" data-category="snack">Snacks</button>
+      </div>
+      <div id="foodPrepsList"></div>
+      <p class="empty-note" id="foodPrepsEmptyNote" hidden>No prep meals in this category yet.</p>
+      <button type="button" class="btn glass-emboss" id="btnFoodPrepsAddOwn" style="width:100%;margin-top:10px;">+ Add your own prep meal</button>
+    </div>
+
+    <div id="foodPrepsDetailScreen" hidden>
+      <button type="button" class="link-btn" id="btnFoodPrepsBack" style="display:block;margin-bottom:8px;">&larr; Back to list</button>
+      <img class="prep-meal-detail-image" id="foodPrepsDetailImage" src="" alt="">
+      <div class="prep-meal-name-row" style="margin-top:10px;">
+        <span class="prep-meal-name" id="foodPrepsDetailName" style="font-size:1.05rem;"></span>
+        <span class="prep-meal-author-badge" id="foodPrepsDetailBadge"></span>
+      </div>
+      <label class="field prep-meal-select-row">
+        <span>Energy quota (kcal)</span>
+        <select id="foodPrepsDetailCalorieSelect">
+          <option value="400">400 kcal</option>
+          <option value="500">500 kcal</option>
+          <option value="600">600 kcal</option>
+          <option value="700">700 kcal</option>
+          <option value="800">800 kcal</option>
+          <option value="900">900 kcal</option>
+          <option value="1000">1000 kcal</option>
+          <option value="1100">1100 kcal</option>
+          <option value="1200">1200 kcal</option>
+          <option value="1300">1300 kcal</option>
+          <option value="1400">1400 kcal</option>
+          <option value="1500">1500 kcal</option>
+          <option value="1600">1600 kcal</option>
+          <option value="1700">1700 kcal</option>
+          <option value="1800">1800 kcal</option>
+          <option value="1900">1900 kcal</option>
+          <option value="2000" selected>2000 kcal</option>
+          <option value="2100">2100 kcal</option>
+          <option value="2200">2200 kcal</option>
+          <option value="2300">2300 kcal</option>
+          <option value="2400">2400 kcal</option>
+          <option value="2500">2500 kcal</option>
+          <option value="2600">2600 kcal</option>
+          <option value="2700">2700 kcal</option>
+          <option value="2800">2800 kcal</option>
+          <option value="2900">2900 kcal</option>
+          <option value="3000">3000 kcal</option>
+        </select>
+      </label>
+      <div class="prep-meal-detail-amount">
+        <span id="foodPrepsDetailGrams">0G</span>
+        <span class="prep-meal-detail-amount-sub">serving size</span>
+      </div>
+      <div class="gradient-stat-row">
+        <div class="gradient-stat-row-head"><span>Protein</span><span><strong id="foodPrepsDetailProtein">0g</strong></span></div>
+        <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="foodPrepsDetailProteinBar" style="width:0%"><span class="gradient-bar-dot"></span></div></div>
+      </div>
+      <div class="gradient-stat-row">
+        <div class="gradient-stat-row-head"><span>Carbs</span><span><strong id="foodPrepsDetailCarbs">0g</strong></span></div>
+        <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="foodPrepsDetailCarbsBar" style="width:0%"><span class="gradient-bar-dot"></span></div></div>
+      </div>
+      <div class="gradient-stat-row">
+        <div class="gradient-stat-row-head"><span>Fat</span><span><strong id="foodPrepsDetailFat">0g</strong></span></div>
+        <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="foodPrepsDetailFatBar" style="width:0%"><span class="gradient-bar-dot"></span></div></div>
+      </div>
+      <p class="field-group-heading" style="margin-top:16px;">Ingredients</p>
+      <p class="prep-meal-detail-text" id="foodPrepsDetailIngredients"></p>
+      <p class="field-group-heading">Preparation procedure</p>
+      <p class="prep-meal-detail-text" id="foodPrepsDetailProcedure"></p>
+      <button type="button" class="btn" id="btnFoodPrepsEditOwn" hidden style="width:100%;margin-top:10px;">Edit your meal</button>
+    </div>
+  </div>
+</div>
+
 <div class="sheet-overlay" id="prepMealEditorOverlay" hidden>
   <div class="sheet">
     <div class="sheet-handle"></div>
@@ -2852,30 +2873,27 @@
       <span>Name of meal</span>
       <input type="text" id="prepMealFormName" placeholder="e.g. Iron Breath Omelette">
     </label>
+    <p class="hint hint--sm">Enter macros the same way a nutrition label does — per 100 grams. The Food Preps browser computes the actual serving size from whichever calorie target the viewer picks.</p>
     <div class="field-row">
       <label class="field">
-        <span>Default total calories</span>
-        <input type="number" id="prepMealFormCalories" min="0" placeholder="e.g. 420">
+        <span>Calories / 100g</span>
+        <input type="number" id="prepMealFormCalories" min="0" placeholder="e.g. 155">
       </label>
       <label class="field">
-        <span>Total amount (g)</span>
-        <input type="number" id="prepMealFormGrams" min="0" placeholder="e.g. 340">
+        <span>Protein / 100g</span>
+        <input type="number" id="prepMealFormProtein" min="0" placeholder="e.g. 12">
       </label>
     </div>
     <div class="field-row">
       <label class="field">
-        <span>Protein (g)</span>
-        <input type="number" id="prepMealFormProtein" min="0" placeholder="e.g. 32">
+        <span>Carbs / 100g</span>
+        <input type="number" id="prepMealFormCarbs" min="0" placeholder="e.g. 4">
       </label>
       <label class="field">
-        <span>Carbs (g)</span>
-        <input type="number" id="prepMealFormCarbs" min="0" placeholder="e.g. 18">
+        <span>Fat / 100g</span>
+        <input type="number" id="prepMealFormFat" min="0" placeholder="e.g. 10">
       </label>
     </div>
-    <label class="field">
-      <span>Fat (g)</span>
-      <input type="number" id="prepMealFormFat" min="0" placeholder="e.g. 14">
-    </label>
     <label class="field">
       <span>Ingredients list</span>
       <textarea id="prepMealFormIngredients" rows="4" placeholder="One per line, e.g.&#10;3 egg whites&#10;1 cup spinach&#10;4 shiitake mushrooms"></textarea>
@@ -2896,11 +2914,6 @@
     </div>
     <p class="save-note" id="prepMealFormNote"></p>
   </div>
-</div>
-
-<div class="media-sync-lightbox" id="mediaSyncLightbox" hidden>
-  <button type="button" class="media-sync-lightbox-close" id="btnCloseMediaSyncLightbox" aria-label="Close">✕</button>
-  <img class="media-sync-lightbox-image" id="mediaSyncLightboxImage" src="" alt="">
 </div>
 
 <div class="sheet-overlay" id="weatherLocationOverlay" hidden>

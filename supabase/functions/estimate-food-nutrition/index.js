@@ -98,8 +98,8 @@ Deno.serve(async (req) => {
     parts.push({
       text: `Read the following meal/recipe description (pasted text or webpage content) and extract structured prep-meal data for a fitness tracking app.
 Respond with ONLY a JSON object, no markdown, no explanation, in exactly this shape:
-{"name": string, "calories": number, "grams": number, "protein": number, "carbs": number, "fat": number, "ingredients": string, "procedure": string}
-"calories"/"protein"/"carbs"/"fat" are your best nutrition estimate (kcal / grams) for the WHOLE prepared dish as described, not per-100g. "grams" is the total prepared weight in grams. "ingredients" is a newline-separated list of ingredients (with quantities if given). "procedure" is the numbered preparation steps as plain newline-separated text. If a field can't be determined, give your best reasonable estimate — never refuse.
+{"name": string, "calories": number, "protein": number, "carbs": number, "fat": number, "ingredients": string, "procedure": string}
+"calories"/"protein"/"carbs"/"fat" are your best nutrition estimate PER 100 GRAMS of the prepared dish as described (like a nutrition facts label) — if the source gives a total-dish or per-serving amount and a total/serving weight, convert to per-100g yourself. "ingredients" is a newline-separated list of ingredients (with quantities if given). "procedure" is the numbered preparation steps as plain newline-separated text. If a field can't be determined, give your best reasonable estimate — never refuse.
 
 SOURCE:
 """
@@ -169,7 +169,6 @@ All values are per 100g. calories in kcal, protein/carbs/fat/fiber in grams, sod
     return jsonResponse({
       name: parsed.name || null,
       calories: Number(parsed.calories) || 0,
-      grams: Number(parsed.grams) || 0,
       protein: Number(parsed.protein) || 0,
       carbs: Number(parsed.carbs) || 0,
       fat: Number(parsed.fat) || 0,
