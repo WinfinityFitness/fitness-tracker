@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.6.9';
+const APP_VERSION = 'WF_SYS_V.7.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -3923,16 +3923,27 @@ function computeDayVolumeKg(entry) {
       .reduce((s2, s) => s2 + s.weightKg * s.reps, 0), 0);
 }
 
+function allGymDays(logsArr) {
+  return logsArr.filter(l => l.exercises && l.exercises.some(ex => ex.sets.some(s => s.completed)));
+}
+
+// "Show recent" = the last 7 gym days; "Full journey" = every gym day
+// ever logged — same recent/full-journey framing as the Entity Weight
+// Journey chart, just toggled independently.
+let volumeChartFullJourney = false;
+
 function renderVolumeTrendChart() {
   const profile = getProfile();
   const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
   const logsArr = sortedLogsArray();
-  const gymDays = logsArr.filter(l => l.exercises && l.exercises.some(ex => ex.sets.some(s => s.completed))).slice(-8);
+  const full = allGymDays(logsArr);
+  const gymDays = volumeChartFullJourney ? full : full.slice(-7);
   const chart = document.getElementById('volumeTrendChart');
   const labels = document.getElementById('volumeTrendLabels');
   const emptyNote = document.getElementById('volumeTrendEmptyNote');
   const totalLabel = document.getElementById('volumeTrendTotal');
-  chart.innerHTML = ''; labels.innerHTML = '';
+  const legend = document.getElementById('volumeTrendLegend');
+  chart.innerHTML = ''; labels.innerHTML = ''; legend.innerHTML = '';
   if (!gymDays.length) {
     emptyNote.hidden = false;
     totalLabel.textContent = '';
@@ -3967,6 +3978,17 @@ function renderVolumeTrendChart() {
     lbl.textContent = `${d.getMonth() + 1}/${d.getDate()}`;
     labels.appendChild(lbl);
   });
+  legend.innerHTML = `<button type="button" id="volumeTrendFullJourneyToggle" class="chart-toggle-link">${volumeChartFullJourney ? 'Show recent' : 'Full journey'}</button>`;
+}
+
+function initVolumeTrendToggle() {
+  document.getElementById('volumeTrendLegend').addEventListener('click', e => {
+    if (e.target.closest('#volumeTrendFullJourneyToggle')) {
+      volumeChartFullJourney = !volumeChartFullJourney;
+      renderVolumeTrendChart();
+    }
+  });
+  document.getElementById('btnShareVolumeTrend').addEventListener('click', shareVolumeJourney);
 }
 
 /* ---- Session templates ---- */
@@ -6973,6 +6995,109 @@ async function shareWeightJourney() {
     recentSeries, fullSeries, wu, profile, kgNow, lowestKg7d,
   });
   shareViaWebShare({ title: 'Winfinity Tracker — Weight Journey', text: '📈 My weight journey & goal progress, tracked with Winfinity Tracker!' }, blob);
+}
+
+function drawShareVolumeChart(ctx, x, y, w, h, gymDays, volumes, wu) {
+  const theme = getShareTheme();
+  const padL = 34, padR = 8, padT = 6, padB = 18;
+  const plotW = w - padL - padR, plotH = h - padT - padB;
+  const max = Math.max(...volumes, 1);
+
+  const xFor = i => x + padL + (gymDays.length === 1 ? plotW / 2 : (i / (gymDays.length - 1)) * plotW);
+  const yFor = v => y + padT + plotH - (v / max) * plotH;
+
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  const gridCount = 3;
+  for (let g = 0; g <= gridCount; g++) {
+    const v = (g / gridCount) * max;
+    const gy = yFor(v);
+    ctx.strokeStyle = theme.gridLine; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x + padL, gy); ctx.lineTo(x + w - padR, gy); ctx.stroke();
+    ctx.textAlign = 'left'; ctx.fillStyle = theme.textMuted; ctx.font = '9px monospace';
+    ctx.fillText(String(round0(v)), x, gy + 3);
+  }
+
+  [0, Math.floor((gymDays.length - 1) / 2), gymDays.length - 1].forEach(i => {
+    ctx.textAlign = i === 0 ? 'left' : i === gymDays.length - 1 ? 'right' : 'center';
+    ctx.fillStyle = theme.textMuted; ctx.font = '9px monospace';
+    ctx.fillText(fmtDate(parseISO(gymDays[i].date)), xFor(i), y + h - 4);
+  });
+
+  if (gymDays.length > 1) {
+    ctx.beginPath();
+    volumes.forEach((v, i) => { const px = xFor(i), py = yFor(v); if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); });
+    ctx.strokeStyle = theme.accent; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.shadowColor = theme.accent; ctx.shadowBlur = 6;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  volumes.forEach((v, i) => {
+    ctx.beginPath();
+    ctx.arc(xFor(i), yFor(v), 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = theme.accent;
+    ctx.fill();
+  });
+  ctx.restore();
+}
+
+function drawShareVolumeChartCard(ctx, y, width, chartCardH, title, gymDays, wu) {
+  const theme = getShareTheme();
+  roundRectPath(ctx, 24, y, width - 48, chartCardH, 12);
+  ctx.strokeStyle = theme.gridLine; ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.textAlign = 'left'; ctx.fillStyle = theme.textPrimary; ctx.font = 'bold 14px sans-serif';
+  ctx.fillText(title, 44, y + 24);
+
+  const volumes = gymDays.map(l => fromKg(computeDayVolumeKg(l), wu));
+  ctx.textAlign = 'right'; ctx.fillStyle = theme.textMuted; ctx.font = '12px monospace';
+  ctx.fillText(`${round0(volumes.reduce((s, v) => s + v, 0)).toLocaleString()} ${wu} total`, width - 44, y + 24);
+
+  if (gymDays.length) {
+    drawShareVolumeChart(ctx, 44, y + 34, width - 88, chartCardH - 60, gymDays, volumes, wu);
+  } else {
+    ctx.textAlign = 'center'; ctx.fillStyle = theme.textMuted; ctx.font = '14px sans-serif';
+    ctx.fillText('No gym days logged yet.', width / 2, y + chartCardH / 2 + 5);
+  }
+}
+
+// Same "two stacked cards" pattern as generateWeightJourneyShareCard —
+// recent 7 gym days on top, every gym day ever logged below it — instead
+// of whichever view the in-app widget happened to be toggled to.
+async function generateVolumeJourneyShareCard({ name, digitalId, date, recentGymDays, fullGymDays, wu }) {
+  const width = 600;
+  const headerH = 116;
+  const chartCardH = 220;
+  const gap = 16;
+  const footerH = 46;
+  const height = headerH + 10 + chartCardH + gap + chartCardH + footerH;
+
+  const { canvas, ctx } = shareCardShell(width, height);
+  drawShareCardHeader(ctx, width, { name, digitalId, date, title: 'TOTAL LIFT VOLUME' });
+
+  let y = headerH + 10;
+  drawShareVolumeChartCard(ctx, y, width, chartCardH, 'Recent (7 days)', recentGymDays, wu);
+  y += chartCardH + gap;
+  drawShareVolumeChartCard(ctx, y, width, chartCardH, 'Full journey', fullGymDays, wu);
+
+  await drawShareCardFooter(ctx, width, height);
+  return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
+}
+
+async function shareVolumeJourney() {
+  const profile = getProfile();
+  const wu = profile ? (profile.weightUnit || 'kg') : 'kg';
+  const logsArr = sortedLogsArray();
+  const full = allGymDays(logsArr);
+  const recentGymDays = full.slice(-7);
+  const blob = await generateVolumeJourneyShareCard({
+    name: (profile && profile.name) || 'Operator',
+    digitalId: getOrCreatePublicId(),
+    date: fmtDate(new Date()),
+    recentGymDays, fullGymDays: full, wu,
+  });
+  shareViaWebShare({ title: 'Winfinity Tracker — Total Lift Volume', text: '🏋️ My lift volume trend, tracked with Winfinity Tracker!' }, blob);
 }
 
 function shareCardShell(width, height) {
@@ -11805,6 +11930,7 @@ safeInit(initCardioTracker, 'initCardioTracker');
 safeInit(initMissionLog, 'initMissionLog');
 safeInit(initDatePicker, 'initDatePicker');
 safeInit(initWeightChartToggle, 'initWeightChartToggle');
+safeInit(initVolumeTrendToggle, 'initVolumeTrendToggle');
 safeInit(initNutrition, 'initNutrition');
 safeInit(initFoodDiary, 'initFoodDiary');
 safeInit(initAddFoodPanel, 'initAddFoodPanel');

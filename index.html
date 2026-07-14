@@ -283,11 +283,17 @@
     <div class="chart-card">
       <p class="mod-tag">MOD_VOLUME_TREND_08</p>
       <div class="chart-card-head">
-        <span class="chart-card-title">Total Lift Volume (Last 8 Gym Days)</span>
-        <span class="chart-card-sub" id="volumeTrendTotal"></span>
+        <span class="chart-card-title">Total Lift Volume</span>
+        <div class="fuel-status-head-right">
+          <span class="chart-card-sub" id="volumeTrendTotal"></span>
+          <button type="button" class="icon-btn glass-emboss" id="btnShareVolumeTrend" aria-label="Share lift volume trend">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
+          </button>
+        </div>
       </div>
       <svg class="volume-linechart" id="volumeTrendChart" viewBox="0 0 280 90" preserveAspectRatio="none"></svg>
       <div class="bar-chart-labels" id="volumeTrendLabels"></div>
+      <div class="chart-legend" id="volumeTrendLegend"></div>
       <p class="empty-note" id="volumeTrendEmptyNote" hidden>Log and complete sets across a few workouts to see your volume trend.</p>
     </div>
 
