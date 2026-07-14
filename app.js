@@ -2,12 +2,30 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.7.8';
+const APP_VERSION = 'WF_SYS_V.7.9';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
 /* ---------------------------------------------------------------- */
 const KEYS = { profile: 'wft_profile', logs: 'wft_logs', reviews: 'wft_reviews', dailyReviews: 'wft_daily_reviews' };
+
+// A one-time ?variant=clean on the URL permanently flags this install (via
+// localStorage, since the query string itself won't survive a re-open from
+// the home screen) so the Facebook/Instagram footer links and the "leave a
+// review on Facebook" popup never show for this device again — used for
+// sharing the app with someone specific without those links attached, distinct
+// from the per-Digital-ID admin toggle (applyFooterSocialLinksVisibility),
+// which needs an existing account and only touches the footer, not the popup.
+const CLEAN_VARIANT_KEY = 'wft_variant_clean';
+function isCleanShareVariant() {
+  return localStorage.getItem(CLEAN_VARIANT_KEY) === '1';
+}
+function initCleanVariantFlag() {
+  if (new URLSearchParams(location.search).get('variant') === 'clean') {
+    localStorage.setItem(CLEAN_VARIANT_KEY, '1');
+  }
+}
+initCleanVariantFlag();
 
 function getProfile() {
   try { return JSON.parse(localStorage.getItem(KEYS.profile)) || null; }
@@ -954,8 +972,9 @@ function initFooterTagline() {
 function applyFooterSocialLinksVisibility(visible) {
   const fb = document.getElementById('footerFacebookLink');
   const ig = document.getElementById('footerInstagramLink');
-  if (fb) fb.hidden = !visible;
-  if (ig) ig.hidden = !visible;
+  const show = visible && !isCleanShareVariant();
+  if (fb) fb.hidden = !show;
+  if (ig) ig.hidden = !show;
 }
 
 function initFooterSocialLinks() {
@@ -11401,7 +11420,7 @@ function initBetaLock() {
 function initReviewGate(onComplete) {
   if (!document.getElementById('lockOverlay').hidden) return; // beta already ended, skip
 
-  if (localStorage.getItem('wft_review_confirmed')) {
+  if (isCleanShareVariant() || localStorage.getItem('wft_review_confirmed')) {
     if (onComplete) onComplete();
     return;
   }
