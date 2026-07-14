@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.6.1';
+const APP_VERSION = 'WF_SYS_V.6.2';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -695,6 +695,8 @@ function initTabs() {
         // the Coach Assignment <-> Computed Targets tab swap).
         const pForTargets = getProfile();
         if (pForTargets) renderComputedTargets(pForTargets);
+        renderMediaSyncWidget();
+        renderPrepMealWidget();
       }
       if (target === 'bio') {
         loadBioForDate(document.getElementById('bioDate').value);
@@ -8698,6 +8700,13 @@ function refreshDigitalIdOverrideVisibility() {
     syncLogsSection.hidden = !loggedIn;
     if (loggedIn) renderSyncLogs();
   }
+  const prepMealManagerSection = document.getElementById('prepMealManagerSection');
+  if (prepMealManagerSection) {
+    prepMealManagerSection.hidden = !loggedIn;
+    if (loggedIn) renderPrepMealManager();
+  }
+  renderMediaSyncWidget();
+  renderPrepMealWidget();
   const updatesRow = document.getElementById('updatesEnabledRow');
   if (updatesRow) updatesRow.hidden = !loggedIn;
   const updatesHint = document.getElementById('updatesEnabledHint');
@@ -9069,6 +9078,508 @@ function initSyncLogsShare() {
       await shareViaWebShare({ title: 'Sync Logs', text: `Winfinity Sync Logs — ${syncLogsRowsCache.length} synced account(s)` }, blob);
     } catch (e) { showRestToast('Could not generate Sync Logs card.'); }
   });
+}
+
+/* ---------------------------------------------------------------- */
+/* Media Synchronizer (Nutrition tab) — admin-configurable still image  */
+/* or auto-cycling slideshow, one global row, visible to every user.    */
+/* ---------------------------------------------------------------- */
+let mediaSyncSettings = { mode: 'still', image_urls: [], duration_sec: 10 };
+let mediaSyncFormState = { mode: 'still', urls: [''] };
+let mediaSyncSlideshowTimer = null;
+let mediaSyncLightboxTimer = null;
+
+async function fetchMediaSyncSettings() {
+  if (!sbConfigured()) return null;
+  try {
+    const { data, error } = await sb.from('media_sync_settings').select('mode, image_urls, duration_sec').eq('id', 1).maybeSingle();
+    if (error || !data) return null;
+    return {
+      mode: data.mode === 'slideshow' ? 'slideshow' : 'still',
+      image_urls: Array.isArray(data.image_urls) ? data.image_urls : [],
+      duration_sec: data.duration_sec || 10,
+    };
+  } catch (e) { return null; }
+}
+
+function stopMediaSyncSlideshow() {
+  if (mediaSyncSlideshowTimer) { clearInterval(mediaSyncSlideshowTimer); mediaSyncSlideshowTimer = null; }
+}
+
+// Advances the widget's own <img> — a separate timer from the lightbox's
+// (see openMediaSyncLightbox) since either can be open independently.
+function startMediaSyncSlideshow(imgEl, urls, durationSec) {
+  stopMediaSyncSlideshow();
+  if (urls.length < 2) return;
+  let idx = 0;
+  mediaSyncSlideshowTimer = setInterval(() => {
+    idx = (idx + 1) % urls.length;
+    imgEl.src = urls[idx];
+  }, Math.max(3, durationSec) * 1000);
+}
+
+async function renderMediaSyncWidget() {
+  const card = document.getElementById('mediaSyncCard');
+  if (!card) return;
+  if (!sbConfigured()) { card.hidden = true; return; }
+  const settings = await fetchMediaSyncSettings();
+  mediaSyncSettings = settings || { mode: 'still', image_urls: [], duration_sec: 10 };
+  const img = document.getElementById('mediaSyncImage');
+  const empty = document.getElementById('mediaSyncEmpty');
+  const browseBtn = document.getElementById('btnMediaSyncBrowse');
+  const menuWrap = document.getElementById('mediaSyncMenuWrap');
+  const admin = isAdminLoggedIn();
+  const urls = mediaSyncSettings.image_urls.filter(Boolean);
+
+  menuWrap.hidden = !admin;
+
+  if (!urls.length) {
+    if (!admin) { card.hidden = true; return; }
+    card.hidden = false;
+    img.hidden = true;
+    empty.hidden = false;
+    browseBtn.hidden = true;
+    stopMediaSyncSlideshow();
+    return;
+  }
+
+  card.hidden = false;
+  img.hidden = false;
+  empty.hidden = true;
+  browseBtn.hidden = false;
+  img.src = urls[0];
+  if (mediaSyncSettings.mode === 'slideshow' && urls.length > 1) {
+    startMediaSyncSlideshow(img, urls, mediaSyncSettings.duration_sec);
+  } else {
+    stopMediaSyncSlideshow();
+  }
+}
+
+function openMediaSyncLightbox() {
+  const urls = (mediaSyncSettings.image_urls || []).filter(Boolean);
+  if (!urls.length) return;
+  const overlay = document.getElementById('mediaSyncLightbox');
+  const img = document.getElementById('mediaSyncLightboxImage');
+  let idx = 0;
+  img.src = urls[0];
+  overlay.hidden = false;
+  if (mediaSyncLightboxTimer) { clearInterval(mediaSyncLightboxTimer); mediaSyncLightboxTimer = null; }
+  if (mediaSyncSettings.mode === 'slideshow' && urls.length > 1) {
+    mediaSyncLightboxTimer = setInterval(() => {
+      idx = (idx + 1) % urls.length;
+      img.src = urls[idx];
+    }, Math.max(3, mediaSyncSettings.duration_sec) * 1000);
+  }
+}
+
+function closeMediaSyncLightbox() {
+  document.getElementById('mediaSyncLightbox').hidden = true;
+  if (mediaSyncLightboxTimer) { clearInterval(mediaSyncLightboxTimer); mediaSyncLightboxTimer = null; }
+}
+
+// Renders the Source Configuration URL rows for whichever mode is
+// currently selected in the (unsaved) form state — Still Image shows one
+// field with no delete/add controls, Slideshow shows every field with
+// per-row delete once there's more than one.
+function renderMediaSyncUrlRows() {
+  const list = document.getElementById('mediaSyncUrlList');
+  const addBtn = document.getElementById('btnAddMediaSyncUrl');
+  const isSlideshow = mediaSyncFormState.mode === 'slideshow';
+  addBtn.hidden = !isSlideshow;
+  if (!mediaSyncFormState.urls.length) mediaSyncFormState.urls.push('');
+  const urls = isSlideshow ? mediaSyncFormState.urls : mediaSyncFormState.urls.slice(0, 1);
+  list.innerHTML = '';
+  urls.forEach((url, i) => {
+    const row = document.createElement('div');
+    row.className = 'media-sync-url-row';
+    const canDelete = isSlideshow && urls.length > 1;
+    row.innerHTML = `
+      <span class="media-sync-url-index">${String(i + 1).padStart(2, '0')}</span>
+      <input type="text" class="media-sync-url-input" placeholder="Enter system URL..." value="${escapeHtml(url)}">
+      <button type="button" class="icon-btn media-sync-url-delete" aria-label="Remove field" ${canDelete ? '' : 'hidden'}>
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+      </button>`;
+    row.querySelector('.media-sync-url-input').addEventListener('input', e => { mediaSyncFormState.urls[i] = e.target.value; });
+    const delBtn = row.querySelector('.media-sync-url-delete');
+    if (canDelete) delBtn.addEventListener('click', () => { mediaSyncFormState.urls.splice(i, 1); renderMediaSyncUrlRows(); });
+    list.appendChild(row);
+  });
+}
+
+function setMediaSyncMode(mode) {
+  mediaSyncFormState.mode = mode;
+  document.getElementById('mediaModeStillBtn').classList.toggle('is-selected', mode === 'still');
+  document.getElementById('mediaModeSlideshowBtn').classList.toggle('is-selected', mode === 'slideshow');
+  document.getElementById('mediaSyncTimingSection').hidden = mode !== 'slideshow';
+  renderMediaSyncUrlRows();
+}
+
+function openMediaSyncCalibration() {
+  mediaSyncFormState = {
+    mode: mediaSyncSettings.mode || 'still',
+    urls: (mediaSyncSettings.image_urls && mediaSyncSettings.image_urls.length) ? [...mediaSyncSettings.image_urls] : [''],
+  };
+  const duration = mediaSyncSettings.duration_sec || 10;
+  document.getElementById('mediaSyncTimingSlider').value = duration;
+  document.getElementById('mediaSyncTimingValue').textContent = duration + 's';
+  setMediaSyncMode(mediaSyncFormState.mode);
+  document.getElementById('mediaSyncConfigNote').textContent = '';
+  document.getElementById('mediaSyncCalibrationOverlay').hidden = false;
+}
+
+function resetMediaSyncForm() {
+  mediaSyncFormState = { mode: 'still', urls: [''] };
+  document.getElementById('mediaSyncTimingSlider').value = 10;
+  document.getElementById('mediaSyncTimingValue').textContent = '10s';
+  setMediaSyncMode('still');
+  document.getElementById('mediaSyncConfigNote').textContent = 'Reset — tap Save configuration to apply.';
+}
+
+async function saveMediaSyncConfig() {
+  const note = document.getElementById('mediaSyncConfigNote');
+  if (!isAdminLoggedIn()) { note.textContent = 'Admin login required.'; return; }
+  const rawUrls = mediaSyncFormState.mode === 'still' ? mediaSyncFormState.urls.slice(0, 1) : mediaSyncFormState.urls;
+  const urls = rawUrls.map(u => (u || '').trim()).filter(Boolean);
+  const duration = Number(document.getElementById('mediaSyncTimingSlider').value) || 10;
+  note.textContent = 'Saving…';
+  try {
+    const { error } = await sb.rpc('admin_set_media_sync', {
+      p_digital_id: adminSession.digitalId, p_password: adminSession.password,
+      p_mode: mediaSyncFormState.mode, p_image_urls: urls, p_duration_sec: duration,
+    });
+    if (error) throw error;
+    note.textContent = 'Saved.';
+    await renderMediaSyncWidget();
+    setTimeout(() => { document.getElementById('mediaSyncCalibrationOverlay').hidden = true; }, 700);
+  } catch (e) {
+    note.textContent = 'Failed: ' + (e.message || 'you\'re offline.');
+  }
+}
+
+function initMediaSyncWidget() {
+  const settingsBtn = document.getElementById('btnMediaSyncSettings');
+  if (!settingsBtn) return;
+  settingsBtn.addEventListener('click', openMediaSyncCalibration);
+  const overlay = document.getElementById('mediaSyncCalibrationOverlay');
+  document.getElementById('btnCloseMediaSyncCalibration').addEventListener('click', () => { overlay.hidden = true; });
+  bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
+  document.getElementById('mediaModeStillBtn').addEventListener('click', () => setMediaSyncMode('still'));
+  document.getElementById('mediaModeSlideshowBtn').addEventListener('click', () => setMediaSyncMode('slideshow'));
+  document.getElementById('btnAddMediaSyncUrl').addEventListener('click', () => { mediaSyncFormState.urls.push(''); renderMediaSyncUrlRows(); });
+  document.getElementById('mediaSyncTimingSlider').addEventListener('input', e => {
+    document.getElementById('mediaSyncTimingValue').textContent = e.target.value + 's';
+  });
+  document.getElementById('btnSaveMediaSyncConfig').addEventListener('click', saveMediaSyncConfig);
+  document.getElementById('btnResetMediaSyncDefaults').addEventListener('click', resetMediaSyncForm);
+  document.getElementById('btnMediaSyncBrowse').addEventListener('click', openMediaSyncLightbox);
+  document.getElementById('btnCloseMediaSyncLightbox').addEventListener('click', closeMediaSyncLightbox);
+}
+
+/* ---------------------------------------------------------------- */
+/* Prep Meal menu (Nutrition tab) — a community list of suggested meals */
+/* (Admin- or user-authored), entered once at a 2000 kcal reference and */
+/* scaled proportionally for whichever calorie target the viewing user  */
+/* picks. One shared editor overlay backs both admin management (any    */
+/* meal) and a regular user's own submissions (their meals only).       */
+/* ---------------------------------------------------------------- */
+const PREP_MEAL_REF_KCAL = 2000;
+const PREP_MEAL_CATEGORY_LABELS = { breakfast: 'Breakfast', full_meal: 'Full Meal', snack: 'Snack' };
+let prepMealsCache = [];
+let prepMealSelectedCategory = 'breakfast';
+let prepMealEditorContext = { mode: 'user', id: null };
+
+async function fetchPrepMeals() {
+  if (!sbConfigured()) return [];
+  try {
+    const { data, error } = await sb.from('prep_meals').select('*').order('created_at', { ascending: true });
+    if (error) return [];
+    return data || [];
+  } catch (e) { return []; }
+}
+
+// Same Edge Function as the food-estimate AI calls above, extended server-side
+// to also accept a pasted recipe/menu or a URL to fetch one from (see
+// supabase/functions/estimate-food-nutrition/index.js's hasMealMenu branch).
+async function estimatePrepMealFromMenu({ mealMenuText, mealMenuUrl }) {
+  let res;
+  try {
+    res = await fetch(`${SUPABASE_URL}/functions/v1/smooth-service`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ mealMenuText, mealMenuUrl }),
+    });
+  } catch (e) {
+    throw new Error('AI auto-fill unavailable — check your connection.');
+  }
+  let data;
+  try { data = await res.json(); } catch (e) { throw new Error('AI auto-fill unavailable — try again later.'); }
+  if (!res.ok) throw new Error(data.error || 'AI auto-fill failed');
+  return data;
+}
+
+function renderPrepMealList(calorieTarget) {
+  const list = document.getElementById('prepMealList');
+  const empty = document.getElementById('prepMealEmptyNote');
+  const myShareKey = localStorage.getItem('wft_lb_share_key');
+  const activeMeals = prepMealsCache.filter(m => m.active && m.category === prepMealSelectedCategory);
+  const ratio = calorieTarget / PREP_MEAL_REF_KCAL;
+
+  list.innerHTML = '';
+  if (!activeMeals.length) {
+    empty.hidden = false;
+  } else {
+    empty.hidden = true;
+    activeMeals.forEach(m => {
+      const isMine = m.author_type === 'user' && !!myShareKey && m.author_share_key === myShareKey;
+      const badgeClass = m.author_type === 'admin' ? 'is-admin' : (isMine ? 'is-self' : '');
+      const badgeLabel = m.author_type === 'admin' ? 'Admin' : `By ${m.author_name || 'User'}`;
+      const firstIngredientLine = (m.ingredients || '').split('\n')[0];
+      const row = document.createElement('div');
+      row.className = 'prep-meal-row';
+      row.innerHTML = `
+        <div class="prep-meal-info">
+          <div class="prep-meal-name-row">
+            <span class="prep-meal-name">${escapeHtml(m.name)}</span>
+            <span class="prep-meal-author-badge ${badgeClass}">${escapeHtml(badgeLabel)}</span>
+          </div>
+          <div class="prep-meal-ingredients">${escapeHtml(firstIngredientLine)}</div>
+        </div>
+        <div class="prep-meal-amount-col">
+          <div>
+            <span class="prep-meal-amount">${Math.round((m.ref_grams || 0) * ratio)}G</span>
+            <span class="prep-meal-amount-cal">${Math.round((m.ref_calories || 0) * ratio)}kcal</span>
+          </div>
+          ${isMine ? `<button type="button" class="icon-btn prep-meal-edit-btn" data-edit-own-meal="${m.id}" aria-label="Edit your meal"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>` : ''}
+        </div>`;
+      list.appendChild(row);
+    });
+    list.querySelectorAll('[data-edit-own-meal]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const m = prepMealsCache.find(x => String(x.id) === btn.dataset.editOwnMeal);
+        if (m) openPrepMealEditor('user', m);
+      });
+    });
+  }
+
+  const totals = activeMeals.reduce((acc, m) => ({
+    protein: acc.protein + (m.ref_protein || 0) * ratio,
+    carbs: acc.carbs + (m.ref_carbs || 0) * ratio,
+    fat: acc.fat + (m.ref_fat || 0) * ratio,
+  }), { protein: 0, carbs: 0, fat: 0 });
+
+  const proteinKcal = totals.protein * 4, carbsKcal = totals.carbs * 4, fatKcal = totals.fat * 9;
+  const totalKcal = proteinKcal + carbsKcal + fatKcal;
+  document.getElementById('prepMealProteinNow').textContent = Math.round(totals.protein) + 'g';
+  document.getElementById('prepMealCarbsNow').textContent = Math.round(totals.carbs) + 'g';
+  document.getElementById('prepMealFatNow').textContent = Math.round(totals.fat) + 'g';
+  document.getElementById('prepMealProteinBar').style.width = (totalKcal > 0 ? (proteinKcal / totalKcal) * 100 : 0) + '%';
+  document.getElementById('prepMealCarbsBar').style.width = (totalKcal > 0 ? (carbsKcal / totalKcal) * 100 : 0) + '%';
+  document.getElementById('prepMealFatBar').style.width = (totalKcal > 0 ? (fatKcal / totalKcal) * 100 : 0) + '%';
+}
+
+async function renderPrepMealWidget() {
+  const card = document.getElementById('prepMealCard');
+  if (!card) return;
+  if (!sbConfigured()) { card.hidden = true; return; }
+  prepMealsCache = await fetchPrepMeals();
+  card.hidden = false;
+  const select = document.getElementById('prepMealCalorieSelect');
+  renderPrepMealList(Number(select.value) || PREP_MEAL_REF_KCAL);
+}
+
+function initPrepMealWidget() {
+  const select = document.getElementById('prepMealCalorieSelect');
+  if (!select) return;
+  select.addEventListener('change', () => renderPrepMealList(Number(select.value) || PREP_MEAL_REF_KCAL));
+  document.querySelectorAll('.prep-meal-category-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      prepMealSelectedCategory = tab.dataset.category;
+      document.querySelectorAll('.prep-meal-category-tab').forEach(t => t.classList.toggle('is-selected', t === tab));
+      renderPrepMealList(Number(select.value) || PREP_MEAL_REF_KCAL);
+    });
+  });
+  document.getElementById('btnAddOwnPrepMeal').addEventListener('click', () => openPrepMealEditor('user', null));
+}
+
+// Admin-only widget on the Nutrition tab: every prep meal (Admin- and
+// user-authored alike) with Edit/Delete. Edit opens the same shared
+// editor overlay the public "+" button uses, just in 'admin' mode.
+async function renderPrepMealManager() {
+  if (!sbConfigured() || !isAdminLoggedIn()) return;
+  prepMealsCache = await fetchPrepMeals();
+  const list = document.getElementById('prepMealManagerList');
+  const empty = document.getElementById('prepMealManagerEmptyNote');
+  if (!list) return;
+  list.innerHTML = '';
+  if (!prepMealsCache.length) { empty.hidden = false; return; }
+  empty.hidden = true;
+
+  prepMealsCache.forEach(m => {
+    const row = document.createElement('div');
+    row.className = 'ad-manager-row prep-meal-manager-row' + (m.active ? '' : ' ad-manager-inactive');
+    const authorLabel = m.author_type === 'admin' ? 'Admin' : `User: ${m.author_name || 'Unknown'}`;
+    row.innerHTML = `
+      <div class="ad-manager-info">
+        <div class="ad-manager-name">${escapeHtml(m.name)}${m.active ? '' : ' (inactive)'}</div>
+        <span class="ad-manager-link">${PREP_MEAL_CATEGORY_LABELS[m.category] || m.category} · ${escapeHtml(authorLabel)} · ${m.ref_grams}g / ${m.ref_calories}kcal @ 2000kcal</span>
+      </div>
+      <div class="ad-manager-actions">
+        <button type="button" class="btn btn--sm" data-edit-meal="${m.id}">Edit</button>
+        <button type="button" class="btn btn--danger btn--sm" data-delete-meal="${m.id}">Delete</button>
+      </div>`;
+    list.appendChild(row);
+  });
+  list.querySelectorAll('[data-edit-meal]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const m = prepMealsCache.find(x => String(x.id) === btn.dataset.editMeal);
+      if (m) openPrepMealEditor('admin', m);
+    });
+  });
+  list.querySelectorAll('[data-delete-meal]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Delete this prep meal?')) return;
+      try {
+        await sb.rpc('admin_delete_prep_meal', {
+          p_digital_id: adminSession.digitalId, p_password: adminSession.password, p_id: Number(btn.dataset.deleteMeal),
+        });
+        renderPrepMealManager();
+        renderPrepMealWidget();
+      } catch (e) { showRestToast('Could not delete meal.'); }
+    });
+  });
+}
+
+function initPrepMealManager() {
+  const addBtn = document.getElementById('btnAdminAddPrepMeal');
+  if (!addBtn) return;
+  addBtn.addEventListener('click', () => openPrepMealEditor('admin', null));
+}
+
+/* Shared Prep Meal editor overlay — used both by the public "+" button    */
+/* (mode 'user': can only create/edit/delete the current device's own     */
+/* meals, ownership enforced server-side by user_upsert_prep_meal /       */
+/* user_delete_prep_meal) and the admin manager's Add/Edit buttons        */
+/* (mode 'admin': any meal, password-gated).                              */
+function fillPrepMealEditorForm(m) {
+  document.getElementById('prepMealFormId').value = m ? m.id : '';
+  document.getElementById('prepMealFormCategory').value = m ? m.category : prepMealSelectedCategory;
+  document.getElementById('prepMealFormName').value = m ? m.name : '';
+  document.getElementById('prepMealFormCalories').value = m ? m.ref_calories : '';
+  document.getElementById('prepMealFormGrams').value = m ? m.ref_grams : '';
+  document.getElementById('prepMealFormProtein').value = m ? m.ref_protein : '';
+  document.getElementById('prepMealFormCarbs').value = m ? m.ref_carbs : '';
+  document.getElementById('prepMealFormFat').value = m ? m.ref_fat : '';
+  document.getElementById('prepMealFormIngredients').value = m ? m.ingredients : '';
+  document.getElementById('prepMealFormProcedure').value = m ? m.procedure : '';
+  document.getElementById('prepMealFormActive').checked = m ? m.active : true;
+  document.getElementById('prepMealAiText').value = '';
+  document.getElementById('prepMealAiUrl').value = '';
+  document.getElementById('prepMealAiNote').textContent = '';
+  document.getElementById('prepMealFormNote').textContent = '';
+}
+
+function openPrepMealEditor(mode, existingMeal) {
+  prepMealEditorContext = { mode, id: existingMeal ? existingMeal.id : null };
+  fillPrepMealEditorForm(existingMeal);
+  document.getElementById('prepMealEditorTitle').textContent = existingMeal ? 'Edit Prep Meal' : 'Add Prep Meal';
+  document.getElementById('prepMealFormActiveRow').hidden = mode !== 'admin';
+  document.getElementById('btnDeletePrepMeal').hidden = !existingMeal;
+  document.getElementById('prepMealEditorOverlay').hidden = false;
+}
+
+function closePrepMealEditor() {
+  document.getElementById('prepMealEditorOverlay').hidden = true;
+}
+
+async function fillPrepMealFromAi() {
+  const note = document.getElementById('prepMealAiNote');
+  const text = document.getElementById('prepMealAiText').value.trim();
+  const url = document.getElementById('prepMealAiUrl').value.trim();
+  if (!text && !url) { note.textContent = 'Paste a menu/recipe or enter a URL first.'; return; }
+  note.textContent = 'Reading…';
+  try {
+    const data = await estimatePrepMealFromMenu({ mealMenuText: text || undefined, mealMenuUrl: !text ? url : undefined });
+    if (data.name) document.getElementById('prepMealFormName').value = data.name;
+    if (data.calories) document.getElementById('prepMealFormCalories').value = Math.round(data.calories);
+    if (data.grams) document.getElementById('prepMealFormGrams').value = Math.round(data.grams);
+    if (data.protein) document.getElementById('prepMealFormProtein').value = Math.round(data.protein);
+    if (data.carbs) document.getElementById('prepMealFormCarbs').value = Math.round(data.carbs);
+    if (data.fat) document.getElementById('prepMealFormFat').value = Math.round(data.fat);
+    if (data.ingredients) document.getElementById('prepMealFormIngredients').value = data.ingredients;
+    if (data.procedure) document.getElementById('prepMealFormProcedure').value = data.procedure;
+    note.textContent = 'Filled in — review before saving.';
+  } catch (e) {
+    note.textContent = e.message || 'Auto-fill failed.';
+  }
+}
+
+async function savePrepMealEditor() {
+  const note = document.getElementById('prepMealFormNote');
+  const idVal = document.getElementById('prepMealFormId').value;
+  const category = document.getElementById('prepMealFormCategory').value;
+  const name = document.getElementById('prepMealFormName').value.trim();
+  const calories = Number(document.getElementById('prepMealFormCalories').value) || 0;
+  const grams = Number(document.getElementById('prepMealFormGrams').value) || 0;
+  const protein = Number(document.getElementById('prepMealFormProtein').value) || 0;
+  const carbs = Number(document.getElementById('prepMealFormCarbs').value) || 0;
+  const fat = Number(document.getElementById('prepMealFormFat').value) || 0;
+  const ingredients = document.getElementById('prepMealFormIngredients').value.trim();
+  const procedure = document.getElementById('prepMealFormProcedure').value.trim();
+  if (!name || !ingredients || !grams) { note.textContent = 'Fill in at least name, ingredients, and amount.'; return; }
+  note.textContent = 'Saving…';
+  try {
+    if (prepMealEditorContext.mode === 'admin') {
+      if (!isAdminLoggedIn()) { note.textContent = 'Admin login required.'; return; }
+      const active = document.getElementById('prepMealFormActive').checked;
+      const { error } = await sb.rpc('admin_upsert_prep_meal', {
+        p_digital_id: adminSession.digitalId, p_password: adminSession.password,
+        p_id: idVal ? Number(idVal) : null, p_category: category, p_name: name, p_ingredients: ingredients, p_procedure: procedure,
+        p_ref_grams: grams, p_ref_calories: calories, p_ref_protein: protein, p_ref_carbs: carbs, p_ref_fat: fat, p_active: active,
+      });
+      if (error) throw error;
+    } else {
+      const { error } = await sb.rpc('user_upsert_prep_meal', {
+        p_share_key: getOrCreateShareKey(), p_author_name: effectiveLeaderboardName(),
+        p_id: idVal ? Number(idVal) : null, p_category: category, p_name: name, p_ingredients: ingredients, p_procedure: procedure,
+        p_ref_grams: grams, p_ref_calories: calories, p_ref_protein: protein, p_ref_carbs: carbs, p_ref_fat: fat,
+      });
+      if (error) throw error;
+    }
+    note.textContent = 'Saved.';
+    await renderPrepMealWidget();
+    if (isAdminLoggedIn()) renderPrepMealManager();
+    setTimeout(closePrepMealEditor, 700);
+  } catch (e) {
+    note.textContent = 'Failed: ' + (e.message || 'you\'re offline.');
+  }
+}
+
+async function deletePrepMealEditor() {
+  const note = document.getElementById('prepMealFormNote');
+  const idVal = document.getElementById('prepMealFormId').value;
+  if (!idVal) return;
+  if (!confirm('Delete this prep meal?')) return;
+  try {
+    if (prepMealEditorContext.mode === 'admin') {
+      if (!isAdminLoggedIn()) { note.textContent = 'Admin login required.'; return; }
+      await sb.rpc('admin_delete_prep_meal', { p_digital_id: adminSession.digitalId, p_password: adminSession.password, p_id: Number(idVal) });
+    } else {
+      await sb.rpc('user_delete_prep_meal', { p_share_key: getOrCreateShareKey(), p_id: Number(idVal) });
+    }
+    await renderPrepMealWidget();
+    if (isAdminLoggedIn()) renderPrepMealManager();
+    closePrepMealEditor();
+  } catch (e) { note.textContent = 'Could not delete.'; }
+}
+
+function initPrepMealEditor() {
+  const overlay = document.getElementById('prepMealEditorOverlay');
+  if (!overlay) return;
+  document.getElementById('btnClosePrepMealEditor').addEventListener('click', closePrepMealEditor);
+  bindOverlayBackdropClose(overlay, closePrepMealEditor);
+  document.getElementById('btnPrepMealAiFill').addEventListener('click', fillPrepMealFromAi);
+  document.getElementById('btnSavePrepMeal').addEventListener('click', savePrepMealEditor);
+  document.getElementById('btnDeletePrepMeal').addEventListener('click', deletePrepMealEditor);
 }
 
 let chatRoomMeta = {}; // roomId -> { name, isDm, createdByKey, otherName }
@@ -11144,6 +11655,10 @@ safeInit(initDigitalIdOverride, 'initDigitalIdOverride');
 safeInit(initAdFreeOverride, 'initAdFreeOverride');
 safeInit(initAdManager, 'initAdManager');
 safeInit(initSyncLogsShare, 'initSyncLogsShare');
+safeInit(initMediaSyncWidget, 'initMediaSyncWidget');
+safeInit(initPrepMealWidget, 'initPrepMealWidget');
+safeInit(initPrepMealManager, 'initPrepMealManager');
+safeInit(initPrepMealEditor, 'initPrepMealEditor');
 safeInit(() => initClickToRevealHint('adjustedBmiTile', 'adjustedBmiHint'), 'initAdjustedBmiHint');
 safeInit(() => initClickToRevealHint('stepsCaloriesTitle', 'stepsCaloriesHint'), 'initStepsCaloriesHint');
 safeInit(initContact, 'initContact');

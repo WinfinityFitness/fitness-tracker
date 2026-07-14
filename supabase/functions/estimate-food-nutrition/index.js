@@ -26,10 +26,29 @@ function jsonResponse(body, status = 200) {
   });
 }
 
+// Used only by the admin Prep Meal "auto-fill from URL" path — strips tags
+// server-side (Deno has no DOM) so the page's actual text, not its markup,
+// is what fills the Gemini prompt's token budget. Truncated well below
+// Gemini's context limit; recipe pages rarely need more than this to
+// extract name/ingredients/procedure/macros.
+async function fetchUrlAsText(url) {
+  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WinfinityBot/1.0)' } });
+  if (!res.ok) throw new Error('fetch failed: ' + res.status);
+  const html = await res.text();
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 12000);
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
-  let foodName, servingDescription, imageBase64, imageMimeType, barcodeImageBase64, barcodeImageMimeType, labelImageBase64, labelImageMimeType;
+  let foodName, servingDescription, imageBase64, imageMimeType, barcodeImageBase64, barcodeImageMimeType, labelImageBase64, labelImageMimeType, mealMenuText, mealMenuUrl;
   try {
     const body = await req.json();
     foodName = body.foodName;
@@ -40,6 +59,8 @@ Deno.serve(async (req) => {
     barcodeImageMimeType = body.barcodeImageMimeType;
     labelImageBase64 = body.labelImageBase64;
     labelImageMimeType = body.labelImageMimeType;
+    mealMenuText = body.mealMenuText;
+    mealMenuUrl = body.mealMenuUrl;
   } catch {
     return jsonResponse({ error: 'Invalid request body' }, 400);
   }
@@ -49,8 +70,10 @@ Deno.serve(async (req) => {
   // damaged/worn/curved barcode at all — the user takes two still photos
   // instead (barcode + nutrition facts label), which Gemini reads directly.
   const hasBarcodePair = barcodeImageBase64 && labelImageBase64;
-  if (!hasImage && !hasBarcodePair && (!foodName || typeof foodName !== 'string')) {
-    return jsonResponse({ error: 'foodName, imageBase64, or a barcode/label photo pair is required' }, 400);
+  // Admin Prep Meal auto-fill: a pasted recipe/menu, or a URL to fetch one from.
+  const hasMealMenu = (typeof mealMenuText === 'string' && mealMenuText.trim()) || (typeof mealMenuUrl === 'string' && mealMenuUrl.trim());
+  if (!hasImage && !hasBarcodePair && !hasMealMenu && (!foodName || typeof foodName !== 'string')) {
+    return jsonResponse({ error: 'foodName, imageBase64, a barcode/label photo pair, or a meal menu text/URL is required' }, 400);
   }
 
   const apiKey = Deno.env.get('GEMINI_API_KEY');
@@ -62,7 +85,28 @@ Deno.serve(async (req) => {
   // can pre-fill the food name field) — text-only requests already know
   // the name from what the user typed, so that field is just echoed back.
   const parts = [];
-  if (hasBarcodePair) {
+  if (hasMealMenu) {
+    let sourceText = typeof mealMenuText === 'string' ? mealMenuText.trim() : '';
+    if (!sourceText && mealMenuUrl) {
+      try {
+        sourceText = await fetchUrlAsText(mealMenuUrl.trim());
+      } catch (e) {
+        return jsonResponse({ error: 'Could not read that URL', detail: String(e) }, 502);
+      }
+    }
+    if (!sourceText) return jsonResponse({ error: 'No meal menu text or URL content to read' }, 400);
+    parts.push({
+      text: `Read the following meal/recipe description (pasted text or webpage content) and extract structured prep-meal data for a fitness tracking app.
+Respond with ONLY a JSON object, no markdown, no explanation, in exactly this shape:
+{"name": string, "calories": number, "grams": number, "protein": number, "carbs": number, "fat": number, "ingredients": string, "procedure": string}
+"calories"/"protein"/"carbs"/"fat" are your best nutrition estimate (kcal / grams) for the WHOLE prepared dish as described, not per-100g. "grams" is the total prepared weight in grams. "ingredients" is a newline-separated list of ingredients (with quantities if given). "procedure" is the numbered preparation steps as plain newline-separated text. If a field can't be determined, give your best reasonable estimate — never refuse.
+
+SOURCE:
+"""
+${sourceText}
+"""`,
+    });
+  } else if (hasBarcodePair) {
     parts.push({
       text: `Look at these two photos of a packaged food product. The FIRST photo shows the product's barcode, the SECOND shows its Nutrition Facts label.
 From the first photo, read the barcode's printed numeric code (the digits printed below or beside the bars — digits only, no spaces or dashes). If you can also decode the bar pattern itself, use it to double-check the digits.
@@ -119,6 +163,19 @@ All values are per 100g. calories in kcal, protein/carbs/fat/fiber in grams, sod
     parsed = JSON.parse(text);
   } catch {
     return jsonResponse({ error: 'Could not parse AI response' }, 502);
+  }
+
+  if (hasMealMenu) {
+    return jsonResponse({
+      name: parsed.name || null,
+      calories: Number(parsed.calories) || 0,
+      grams: Number(parsed.grams) || 0,
+      protein: Number(parsed.protein) || 0,
+      carbs: Number(parsed.carbs) || 0,
+      fat: Number(parsed.fat) || 0,
+      ingredients: parsed.ingredients || '',
+      procedure: parsed.procedure || '',
+    });
   }
 
   return jsonResponse({
