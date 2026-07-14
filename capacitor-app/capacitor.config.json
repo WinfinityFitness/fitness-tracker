@@ -1,0 +1,12 @@
+{
+  "appId": "io.github.winfinityfitness.twa",
+  "appName": "Winfinity Fitness Tracker",
+  "webDir": "www",
+  "server": {
+    "url": "https://winfinityfitness.github.io/fitness-tracker/",
+    "cleartext": false
+  },
+  "android": {
+    "useLegacyBridge": true
+  }
+}

@@ -1,3 +1,11 @@
 # Local-only Android TWA build project (Gradle caches, signing keystore,
 # compiled APKs) — not part of the deployed web app, stays local.
 android-twa/
+
+# Local-only Capacitor native Android shell (loads the live site remotely,
+# adds real background GPS tracking via a native plugin the bare TWA above
+# can't do). node_modules and the generated Gradle project are regenerable
+# via `npm install` + `npx cap add android` — not part of the deployed web
+# app, stays local. package.json/capacitor.config.json are tracked.
+capacitor-app/node_modules/
+capacitor-app/android/

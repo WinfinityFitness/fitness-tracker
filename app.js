@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.8.2';
+const APP_VERSION = 'WF_SYS_V.8.3';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -3039,8 +3039,49 @@ function updateCardioStats() {
   if (steps != null) document.getElementById('cardioSteps').textContent = steps.toLocaleString();
 }
 
+// In the plain browser / installed PWA, GPS tracking is regular
+// navigator.geolocation.watchPosition — the OS suspends it once the tab is
+// backgrounded, same as any web page. In the Capacitor-wrapped Android APK
+// (window.Capacitor present), BackgroundGeolocation instead runs a native
+// foreground service with a persistent notification, so tracking keeps
+// running while the app is backgrounded or the screen is off. Both paths
+// feed the exact same per-point callback, so the rest of the cardio
+// tracking logic below doesn't need to know which one is active.
+function isNativeApp() {
+  return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+}
+let cardioNativeWatcherId = null;
+function startGpsWatch(onPosition, onError) {
+  if (isNativeApp() && window.Capacitor.Plugins.BackgroundGeolocation) {
+    window.Capacitor.Plugins.BackgroundGeolocation.addWatcher({
+      backgroundTitle: 'Winfinity Tracker',
+      backgroundMessage: 'Tracking your outdoor activity — tap to return to the app.',
+      requestPermissions: true,
+      stale: false,
+      distanceFilter: 3,
+    }, (location, error) => {
+      if (error) { onError(error); return; }
+      onPosition({ coords: { latitude: location.latitude, longitude: location.longitude, accuracy: location.accuracy } });
+    }).then(id => { cardioNativeWatcherId = id; });
+    return 'native';
+  }
+  return navigator.geolocation.watchPosition(onPosition, onError, {
+    enableHighAccuracy: true, maximumAge: 2000, timeout: 10000,
+  });
+}
+function stopGpsWatch(watchId) {
+  if (watchId === 'native') {
+    if (cardioNativeWatcherId != null && isNativeApp() && window.Capacitor.Plugins.BackgroundGeolocation) {
+      window.Capacitor.Plugins.BackgroundGeolocation.removeWatcher({ id: cardioNativeWatcherId });
+    }
+    cardioNativeWatcherId = null;
+    return;
+  }
+  if (watchId != null) navigator.geolocation.clearWatch(watchId);
+}
+
 function startCardioTracking() {
-  if (!navigator.geolocation) { alert('Geolocation is not available on this device/browser.'); return; }
+  if (!isNativeApp() && !navigator.geolocation) { alert('Geolocation is not available on this device/browser.'); return; }
   cardioTrack = [];
   cardioDistanceKm = 0;
   cardioMaxSpeedKmh = 0;
@@ -3062,7 +3103,7 @@ function startCardioTracking() {
   document.getElementById('cardioMapZoomRow').hidden = true;
   renderCardioRouteSketch();
 
-  cardioWatchId = navigator.geolocation.watchPosition(pos => {
+  cardioWatchId = startGpsWatch(pos => {
     const { latitude, longitude, accuracy } = pos.coords;
     if (accuracy != null && accuracy > 50) return;
     const point = { lat: latitude, lon: longitude, t: Date.now() };
@@ -3081,9 +3122,7 @@ function startCardioTracking() {
     } else {
       cardioTrack.push(point);
     }
-  }, () => { /* GPS error: keep timer running, just no new distance */ }, {
-    enableHighAccuracy: true, maximumAge: 2000, timeout: 10000,
-  });
+  }, () => { /* GPS error: keep timer running, just no new distance */ });
 
   cardioTickId = setInterval(updateCardioStats, 1000);
   startCardioHydrationReminders();
@@ -3092,7 +3131,7 @@ function startCardioTracking() {
 let lastCardioSession = null;
 
 function stopCardioTracking() {
-  if (cardioWatchId != null) navigator.geolocation.clearWatch(cardioWatchId);
+  stopGpsWatch(cardioWatchId);
   if (cardioTickId) clearInterval(cardioTickId);
   cardioWatchId = null;
   cardioTickId = null;
