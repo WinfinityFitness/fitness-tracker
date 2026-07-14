@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.7.1';
+const APP_VERSION = 'WF_SYS_V.7.2';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9537,6 +9537,7 @@ function selectFoodPrepMeal(meal) {
   badge.className = 'prep-meal-author-badge ' + (meal.author_type === 'admin' ? 'is-admin' : (isMine ? 'is-self' : ''));
   renderBulletedText(document.getElementById('foodPrepsDetailIngredients'), meal.ingredients, '\n');
   renderBulletedText(document.getElementById('foodPrepsDetailProcedure'), meal.procedure, '.');
+  document.getElementById('btnFoodPrepsAdminEdit').hidden = !isAdminLoggedIn();
   document.getElementById('foodPrepsServingSize').value = 100;
   renderFoodPrepsDetail();
 }
@@ -9622,6 +9623,12 @@ function initFoodPrepsOverlay() {
     renderFoodPrepsList();
   });
   document.getElementById('foodPrepsServingSize').addEventListener('input', renderFoodPrepsDetail);
+  // Admin shortcut: edit the currently-viewed meal (every field, including
+  // image URL) without leaving the browser for the separate manager list.
+  document.getElementById('btnFoodPrepsAdminEdit').addEventListener('click', () => {
+    if (!isAdminLoggedIn() || !foodPrepsDetailMeal) return;
+    openPrepMealEditor(foodPrepsDetailMeal);
+  });
   initFoodPrepsThumbPreview();
 }
 
