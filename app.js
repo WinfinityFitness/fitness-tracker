@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.8.5';
+const APP_VERSION = 'WF_SYS_V.8.6';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -26,6 +26,12 @@ function initCleanVariantFlag() {
   }
 }
 initCleanVariantFlag();
+
+// Deferred via setTimeout (not called directly) so it runs after the rest of
+// this script finishes its first synchronous pass — sbConfigured() reads the
+// module-level `let sb`, declared much further down, which would otherwise
+// throw (temporal dead zone) if reached this early in the file.
+setTimeout(applyCustomSplashLogo, 0);
 
 function getProfile() {
   try { return JSON.parse(localStorage.getItem(KEYS.profile)) || null; }
@@ -8900,6 +8906,11 @@ function refreshDigitalIdOverrideVisibility() {
     adManagerSection.hidden = !loggedIn;
     if (loggedIn) renderAdManagerProducts();
   }
+  const splashLogoManagerSection = document.getElementById('splashLogoManagerSection');
+  if (splashLogoManagerSection) {
+    splashLogoManagerSection.hidden = !loggedIn;
+    if (loggedIn) renderSplashLogoManager();
+  }
   const syncLogsSection = document.getElementById('syncLogsSection');
   if (syncLogsSection) {
     syncLogsSection.hidden = !loggedIn;
@@ -9197,6 +9208,131 @@ function initAdManager() {
       note.textContent = 'Saved.';
       resetAdForm();
       renderAdManagerProducts();
+    } catch (e) {
+      note.textContent = 'Failed: ' + (e.message || 'you\'re offline.');
+    }
+  });
+}
+
+/* ---------------------------------------------------------------- */
+/* App boot logo ("stage 2" splash — the web app's own smaller         */
+/* logo+text loading screen, admin-editable with no rebuild needed;    */
+/* the big native logo flash before it is bundled into the APK and     */
+/* can only change on rebuild).                                        */
+/* ---------------------------------------------------------------- */
+async function fetchSplashSettings() {
+  if (!sbConfigured()) return null;
+  try {
+    const { data, error } = await sb.from('app_splash_settings')
+      .select('splash_image_url, splash_image_zoom, splash_image_pos_x, splash_image_pos_y').eq('id', 1).maybeSingle();
+    if (error || !data) return null;
+    return data;
+  } catch (e) { return null; }
+}
+
+function splashImageStyle(s) {
+  const z = Number(s && s.splash_image_zoom) || 1;
+  const x = (s && s.splash_image_pos_x != null) ? Number(s.splash_image_pos_x) : 50;
+  const y = (s && s.splash_image_pos_y != null) ? Number(s.splash_image_pos_y) : 50;
+  if (z <= 1 && x === 50 && y === 50) return '';
+  return `object-position:${x}% ${y}%;transform:scale(${z});transform-origin:${x}% ${y}%`;
+}
+
+// Kicked off via setTimeout near the top of this file so it runs once sb is
+// actually initialized — applies before the splash's flat 2000ms display
+// timer elapses in the common case, swapping in the admin's custom logo (if
+// any) in place of the bundled default before the user has reason to look
+// away from it.
+async function applyCustomSplashLogo() {
+  const settings = await fetchSplashSettings();
+  if (!settings || !settings.splash_image_url) return;
+  const img = document.getElementById('splashLogo');
+  if (!img) return;
+  img.src = settings.splash_image_url;
+  img.style.cssText = splashImageStyle(settings);
+}
+
+let splashLogoCropState = { zoom: 1, x: 50, y: 50 };
+
+function applySplashLogoCropPreview() {
+  const img = document.getElementById('splashLogoCropImg');
+  const s = splashLogoCropState;
+  img.style.objectPosition = `${s.x}% ${s.y}%`;
+  img.style.transform = `scale(${s.zoom})`;
+  img.style.transformOrigin = `${s.x}% ${s.y}%`;
+  document.getElementById('splashLogoZoomValue').textContent = s.zoom.toFixed(1) + 'x';
+  document.getElementById('splashLogoZoomSlider').value = Math.round(s.zoom * 100);
+}
+
+function refreshSplashLogoCropSection() {
+  const url = document.getElementById('splashLogoManagerUrl').value.trim();
+  const section = document.getElementById('splashLogoCropSection');
+  section.hidden = !url;
+  if (url) {
+    document.getElementById('splashLogoCropImg').src = url;
+    applySplashLogoCropPreview();
+  }
+}
+
+function initSplashLogoCropControls() {
+  const frame = document.getElementById('splashLogoCropFrame');
+  if (!frame) return;
+  document.getElementById('splashLogoManagerUrl').addEventListener('input', refreshSplashLogoCropSection);
+  document.getElementById('splashLogoZoomSlider').addEventListener('input', e => {
+    splashLogoCropState.zoom = Number(e.target.value) / 100;
+    applySplashLogoCropPreview();
+  });
+
+  let dragging = null;
+  frame.addEventListener('pointerdown', e => {
+    dragging = { startX: e.clientX, startY: e.clientY, x: splashLogoCropState.x, y: splashLogoCropState.y };
+    frame.setPointerCapture(e.pointerId);
+  });
+  frame.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const rect = frame.getBoundingClientRect();
+    const dx = ((e.clientX - dragging.startX) / rect.width) * 100 / splashLogoCropState.zoom;
+    const dy = ((e.clientY - dragging.startY) / rect.height) * 100 / splashLogoCropState.zoom;
+    splashLogoCropState.x = Math.max(0, Math.min(100, dragging.x - dx));
+    splashLogoCropState.y = Math.max(0, Math.min(100, dragging.y - dy));
+    applySplashLogoCropPreview();
+  });
+  const endDrag = () => { dragging = null; };
+  frame.addEventListener('pointerup', endDrag);
+  frame.addEventListener('pointercancel', endDrag);
+}
+
+async function renderSplashLogoManager() {
+  if (!sbConfigured() || !isAdminLoggedIn()) return;
+  const settings = await fetchSplashSettings();
+  const urlInput = document.getElementById('splashLogoManagerUrl');
+  if (!urlInput) return;
+  urlInput.value = (settings && settings.splash_image_url) || '';
+  splashLogoCropState = {
+    zoom: (settings && Number(settings.splash_image_zoom)) || 1,
+    x: (settings && settings.splash_image_pos_x != null) ? Number(settings.splash_image_pos_x) : 50,
+    y: (settings && settings.splash_image_pos_y != null) ? Number(settings.splash_image_pos_y) : 50,
+  };
+  refreshSplashLogoCropSection();
+}
+
+function initSplashLogoManager() {
+  const saveBtn = document.getElementById('btnSplashLogoManagerSave');
+  if (!saveBtn) return;
+  initSplashLogoCropControls();
+  saveBtn.addEventListener('click', async () => {
+    const note = document.getElementById('splashLogoManagerNote');
+    if (!isAdminLoggedIn()) { note.textContent = 'Admin login required.'; return; }
+    const url = document.getElementById('splashLogoManagerUrl').value.trim();
+    note.textContent = 'Saving…';
+    try {
+      const { error } = await sb.rpc('admin_set_splash_image', {
+        p_digital_id: adminSession.digitalId, p_password: adminSession.password, p_image_url: url,
+        p_image_zoom: splashLogoCropState.zoom, p_image_pos_x: Math.round(splashLogoCropState.x), p_image_pos_y: Math.round(splashLogoCropState.y),
+      });
+      if (error) throw error;
+      note.textContent = 'Saved — live for everyone now.';
+      applyCustomSplashLogo();
     } catch (e) {
       note.textContent = 'Failed: ' + (e.message || 'you\'re offline.');
     }
@@ -12278,6 +12414,7 @@ safeInit(initDigitalId, 'initDigitalId');
 safeInit(initDigitalIdOverride, 'initDigitalIdOverride');
 safeInit(initAdFreeOverride, 'initAdFreeOverride');
 safeInit(initAdManager, 'initAdManager');
+safeInit(initSplashLogoManager, 'initSplashLogoManager');
 safeInit(initSyncLogsShare, 'initSyncLogsShare');
 safeInit(initMediaSyncWidget, 'initMediaSyncWidget');
 safeInit(initFoodPrepsOverlay, 'initFoodPrepsOverlay');
