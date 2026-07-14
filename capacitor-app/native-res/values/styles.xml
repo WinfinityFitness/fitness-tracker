@@ -17,8 +17,24 @@
 
     <!-- Centered logo on a solid background (see drawable/splash_bg.xml),
          matching the old TWA splash instead of Capacitor's default
-         full-screen-stretched drawable/splash.png. -->
+         full-screen-stretched drawable/splash.png.
+
+         On Android 12+, "android:background" alone is NOT enough: the
+         platform's own SplashScreen system takes over regardless and shows
+         its own auto-generated splash first — a small circular crop of the
+         launcher icon in a colored ring — for at least one frame before
+         MainActivity.onCreate() runs and our own logo overlay can appear.
+         That's the "wrong splash flashes first" bug. Explicitly setting
+         windowSplashScreenAnimatedIcon to a blank/transparent drawable
+         suppresses the system's auto-icon (so that unavoidable first frame
+         is just the plain matching background, not a mismatched icon),
+         and windowSplashScreenBackground sets that frame's background to
+         the same color used everywhere else, so the handoff into our own
+         overlay is seamless instead of a visible flash. -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash_bg</item>
+        <item name="windowSplashScreenBackground">@color/splashBackground</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_transparent</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
 </resources>
