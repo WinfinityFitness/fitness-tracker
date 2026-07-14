@@ -26,16 +26,29 @@ function jsonResponse(body, status = 200) {
   });
 }
 
-// Used only by the admin Prep Meal "auto-fill from URL" path — strips tags
-// server-side (Deno has no DOM) so the page's actual text, not its markup,
-// is what fills the Gemini prompt's token budget. Truncated well below
-// Gemini's context limit; recipe pages rarely need more than this to
-// extract name/ingredients/procedure/macros.
-async function fetchUrlAsText(url) {
+// Used only by the admin Prep Meal "auto-fill from URL" path. The URL may
+// point at a webpage OR directly at an image (a photographed recipe card,
+// a dish photo) — content-type decides which. Fetched server-side because
+// the client can't (CORS), and Deno has no DOM so tags are stripped by
+// regex for the text case. Text truncated well below Gemini's context
+// limit; images capped at ~4MB.
+async function fetchUrlAsSource(url) {
   const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WinfinityBot/1.0)' } });
   if (!res.ok) throw new Error('fetch failed: ' + res.status);
+  const contentType = (res.headers.get('content-type') || '').toLowerCase();
+  if (contentType.startsWith('image/')) {
+    const buf = new Uint8Array(await res.arrayBuffer());
+    if (buf.length > 4 * 1024 * 1024) throw new Error('image too large (max 4MB)');
+    // btoa(String.fromCharCode(...buf)) overflows the arg limit on big
+    // arrays — build the binary string in chunks instead.
+    let bin = '';
+    for (let i = 0; i < buf.length; i += 8192) {
+      bin += String.fromCharCode.apply(null, buf.subarray(i, i + 8192));
+    }
+    return { imageBase64: btoa(bin), imageMimeType: contentType.split(';')[0] };
+  }
   const html = await res.text();
-  return html
+  const text = html
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
@@ -43,12 +56,13 @@ async function fetchUrlAsText(url) {
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 12000);
+  return { text };
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
-  let foodName, servingDescription, imageBase64, imageMimeType, barcodeImageBase64, barcodeImageMimeType, labelImageBase64, labelImageMimeType, mealMenuText, mealMenuUrl;
+  let foodName, servingDescription, imageBase64, imageMimeType, barcodeImageBase64, barcodeImageMimeType, labelImageBase64, labelImageMimeType, mealMenuText, mealMenuUrl, mealMenuImageBase64, mealMenuImageMimeType;
   try {
     const body = await req.json();
     foodName = body.foodName;
@@ -61,6 +75,8 @@ Deno.serve(async (req) => {
     labelImageMimeType = body.labelImageMimeType;
     mealMenuText = body.mealMenuText;
     mealMenuUrl = body.mealMenuUrl;
+    mealMenuImageBase64 = body.mealMenuImageBase64;
+    mealMenuImageMimeType = body.mealMenuImageMimeType;
   } catch {
     return jsonResponse({ error: 'Invalid request body' }, 400);
   }
@@ -70,8 +86,10 @@ Deno.serve(async (req) => {
   // damaged/worn/curved barcode at all — the user takes two still photos
   // instead (barcode + nutrition facts label), which Gemini reads directly.
   const hasBarcodePair = barcodeImageBase64 && labelImageBase64;
-  // Admin Prep Meal auto-fill: a pasted recipe/menu, or a URL to fetch one from.
-  const hasMealMenu = (typeof mealMenuText === 'string' && mealMenuText.trim()) || (typeof mealMenuUrl === 'string' && mealMenuUrl.trim());
+  // Admin Prep Meal auto-fill: a pasted recipe/menu, a URL to fetch one
+  // from, or a photo (of the dish itself or of a printed recipe page).
+  const hasMealMenuImage = mealMenuImageBase64 && typeof mealMenuImageBase64 === 'string';
+  const hasMealMenu = (typeof mealMenuText === 'string' && mealMenuText.trim()) || (typeof mealMenuUrl === 'string' && mealMenuUrl.trim()) || hasMealMenuImage;
   if (!hasImage && !hasBarcodePair && !hasMealMenu && (!foodName || typeof foodName !== 'string')) {
     return jsonResponse({ error: 'foodName, imageBase64, a barcode/label photo pair, or a meal menu text/URL is required' }, 400);
   }
@@ -86,26 +104,41 @@ Deno.serve(async (req) => {
   // the name from what the user typed, so that field is just echoed back.
   const parts = [];
   if (hasMealMenu) {
+    // Resolve the source: an uploaded photo, a URL (which may itself be a
+    // webpage or a direct image link — content-type decides), or pasted text.
+    let menuImage = hasMealMenuImage ? { imageBase64: mealMenuImageBase64, imageMimeType: mealMenuImageMimeType || 'image/jpeg' } : null;
     let sourceText = typeof mealMenuText === 'string' ? mealMenuText.trim() : '';
-    if (!sourceText && mealMenuUrl) {
+    if (!menuImage && !sourceText && mealMenuUrl) {
       try {
-        sourceText = await fetchUrlAsText(mealMenuUrl.trim());
+        const fetched = await fetchUrlAsSource(mealMenuUrl.trim());
+        if (fetched.imageBase64) menuImage = fetched;
+        else sourceText = fetched.text;
       } catch (e) {
         return jsonResponse({ error: 'Could not read that URL', detail: String(e) }, 502);
       }
     }
-    if (!sourceText) return jsonResponse({ error: 'No meal menu text or URL content to read' }, 400);
-    parts.push({
-      text: `Read the following meal/recipe description (pasted text or webpage content) and extract structured prep-meal data for a fitness tracking app.
-Respond with ONLY a JSON object, no markdown, no explanation, in exactly this shape:
+    const mealMenuJsonShape = `Respond with ONLY a JSON object, no markdown, no explanation, in exactly this shape:
 {"name": string, "calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "sodium": number, "ingredients": string, "procedure": string}
-"calories"/"protein"/"carbs"/"fat"/"fiber"/"sodium" are your best nutrition estimate PER 100 GRAMS of the prepared dish as described (like a nutrition facts label) — if the source gives a total-dish or per-serving amount and a total/serving weight, convert to per-100g yourself. calories in kcal, protein/carbs/fat/fiber in grams, sodium in milligrams. "ingredients" is a newline-separated list of ingredients (with quantities if given). "procedure" is the numbered preparation steps as plain newline-separated text. If a field can't be determined, give your best reasonable estimate — never refuse.
+"calories"/"protein"/"carbs"/"fat"/"fiber"/"sodium" are your best nutrition estimate PER 100 GRAMS of the prepared dish (like a nutrition facts label) — if the source gives a total-dish or per-serving amount and a total/serving weight, convert to per-100g yourself. calories in kcal, protein/carbs/fat/fiber in grams, sodium in milligrams. "ingredients" is a newline-separated list of ingredients (with quantities if given). "procedure" is the numbered preparation steps as plain newline-separated text. If a field can't be determined, give your best reasonable estimate — never refuse.`;
+    if (menuImage) {
+      parts.push({
+        text: `Look at this photo for a fitness tracking app's prep-meal catalog. It may show a prepared dish, a printed/handwritten recipe, a cookbook page, or a food label.
+If the photo contains recipe text (ingredients and/or instructions), transcribe them faithfully. If it only shows a dish, identify it and provide a typical home recipe for it.
+${mealMenuJsonShape}`,
+      });
+      parts.push({ inlineData: { mimeType: menuImage.imageMimeType, data: menuImage.imageBase64 } });
+    } else {
+      if (!sourceText) return jsonResponse({ error: 'No meal menu text, URL content, or photo to read' }, 400);
+      parts.push({
+        text: `Read the following meal/recipe description (pasted text or webpage content) and extract structured prep-meal data for a fitness tracking app.
+${mealMenuJsonShape}
 
 SOURCE:
 """
 ${sourceText}
 """`,
-    });
+      });
+    }
   } else if (hasBarcodePair) {
     parts.push({
       text: `Look at these two photos of a packaged food product. The FIRST photo shows the product's barcode, the SECOND shows its Nutrition Facts label.

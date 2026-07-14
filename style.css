@@ -2572,6 +2572,18 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 }
 .media-sync-empty svg { opacity: 0.6; }
 .media-sync-menu-wrap { position: absolute; top: 8px; right: 8px; }
+.media-sync-name-tag {
+  position: absolute; top: 8px; left: 8px;
+  max-width: 70%;
+  padding: 3px 9px;
+  border-radius: 5px;
+  background: rgba(0,0,0,0.62);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none;
+}
 .media-sync-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
 .media-sync-foot-text { display: flex; flex-direction: column; min-width: 0; }
 .media-sync-title { font-weight: 700; font-size: 0.9rem; color: var(--text-primary); }

@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.7.5';
+const APP_VERSION = 'WF_SYS_V.7.6';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9215,12 +9215,13 @@ let mediaSyncSlideshowTimer = null;
 async function fetchMediaSyncSettings() {
   if (!sbConfigured()) return null;
   try {
-    const { data, error } = await sb.from('media_sync_settings').select('mode, image_urls, duration_sec').eq('id', 1).maybeSingle();
+    const { data, error } = await sb.from('media_sync_settings').select('mode, image_urls, duration_sec, randomize').eq('id', 1).maybeSingle();
     if (error || !data) return null;
     return {
       mode: data.mode === 'slideshow' ? 'slideshow' : 'still',
       image_urls: Array.isArray(data.image_urls) ? data.image_urls : [],
       duration_sec: data.duration_sec || 10,
+      randomize: !!data.randomize,
     };
   } catch (e) { return null; }
 }
@@ -9229,13 +9230,31 @@ function stopMediaSyncSlideshow() {
   if (mediaSyncSlideshowTimer) { clearInterval(mediaSyncSlideshowTimer); mediaSyncSlideshowTimer = null; }
 }
 
-function startMediaSyncSlideshow(imgEl, urls, durationSec) {
+// Overlays the matching meal's name (upper-left tag) on whichever image is
+// currently showing — slideshow URLs are matched back to prep_meals rows
+// by image_url; images with no matching meal just show no tag.
+function setMediaSyncImageName(url, nameByUrl) {
+  const tag = document.getElementById('mediaSyncImageName');
+  const name = nameByUrl && nameByUrl[url];
+  tag.textContent = name || '';
+  tag.hidden = !name;
+}
+
+function startMediaSyncSlideshow(imgEl, urls, durationSec, randomize, nameByUrl) {
   stopMediaSyncSlideshow();
   if (urls.length < 2) return;
   let idx = 0;
   mediaSyncSlideshowTimer = setInterval(() => {
-    idx = (idx + 1) % urls.length;
+    if (randomize) {
+      // Random, but never the same image twice in a row.
+      let next;
+      do { next = Math.floor(Math.random() * urls.length); } while (next === idx);
+      idx = next;
+    } else {
+      idx = (idx + 1) % urls.length;
+    }
     imgEl.src = urls[idx];
+    setMediaSyncImageName(urls[idx], nameByUrl);
   }, Math.max(3, durationSec) * 1000);
 }
 
@@ -9248,7 +9267,7 @@ async function renderMediaSyncWidget() {
   if (!card) return;
   if (!sbConfigured()) { card.hidden = true; return; }
   const settings = await fetchMediaSyncSettings();
-  mediaSyncSettings = settings || { mode: 'still', image_urls: [], duration_sec: 10 };
+  mediaSyncSettings = settings || { mode: 'still', image_urls: [], duration_sec: 10, randomize: false };
   const img = document.getElementById('mediaSyncImage');
   const empty = document.getElementById('mediaSyncEmpty');
   const menuWrap = document.getElementById('mediaSyncMenuWrap');
@@ -9261,15 +9280,23 @@ async function renderMediaSyncWidget() {
   if (!urls.length) {
     img.hidden = true;
     empty.hidden = false;
+    setMediaSyncImageName(null, null);
     stopMediaSyncSlideshow();
     return;
   }
 
+  // Meal names for the image tag overlay — reuse the cache when it's warm,
+  // otherwise fetch (cheap select; runs on Nutrition tab open).
+  if (!prepMealsCache.length) prepMealsCache = await fetchPrepMeals();
+  const nameByUrl = {};
+  prepMealsCache.forEach(m => { if (m.image_url) nameByUrl[m.image_url] = m.name; });
+
   img.hidden = false;
   empty.hidden = true;
   img.src = urls[0];
+  setMediaSyncImageName(urls[0], nameByUrl);
   if (mediaSyncSettings.mode === 'slideshow' && urls.length > 1) {
-    startMediaSyncSlideshow(img, urls, mediaSyncSettings.duration_sec);
+    startMediaSyncSlideshow(img, urls, mediaSyncSettings.duration_sec, mediaSyncSettings.randomize, nameByUrl);
   } else {
     stopMediaSyncSlideshow();
   }
@@ -9320,6 +9347,7 @@ function openMediaSyncCalibration() {
   const duration = mediaSyncSettings.duration_sec || 10;
   document.getElementById('mediaSyncTimingSlider').value = duration;
   document.getElementById('mediaSyncTimingValue').textContent = duration + 's';
+  document.getElementById('mediaSyncRandomize').checked = !!mediaSyncSettings.randomize;
   setMediaSyncMode(mediaSyncFormState.mode);
   document.getElementById('mediaSyncConfigNote').textContent = '';
   document.getElementById('mediaSyncCalibrationOverlay').hidden = false;
@@ -9329,6 +9357,7 @@ function resetMediaSyncForm() {
   mediaSyncFormState = { mode: 'still', urls: [''] };
   document.getElementById('mediaSyncTimingSlider').value = 10;
   document.getElementById('mediaSyncTimingValue').textContent = '10s';
+  document.getElementById('mediaSyncRandomize').checked = false;
   setMediaSyncMode('still');
   document.getElementById('mediaSyncConfigNote').textContent = 'Reset — tap Save configuration to apply.';
 }
@@ -9339,11 +9368,12 @@ async function saveMediaSyncConfig() {
   const rawUrls = mediaSyncFormState.mode === 'still' ? mediaSyncFormState.urls.slice(0, 1) : mediaSyncFormState.urls;
   const urls = rawUrls.map(u => (u || '').trim()).filter(Boolean);
   const duration = Number(document.getElementById('mediaSyncTimingSlider').value) || 10;
+  const randomize = document.getElementById('mediaSyncRandomize').checked;
   note.textContent = 'Saving…';
   try {
     const { error } = await sb.rpc('admin_set_media_sync', {
       p_digital_id: adminSession.digitalId, p_password: adminSession.password,
-      p_mode: mediaSyncFormState.mode, p_image_urls: urls, p_duration_sec: duration,
+      p_mode: mediaSyncFormState.mode, p_image_urls: urls, p_duration_sec: duration, p_randomize: randomize,
     });
     if (error) throw error;
     note.textContent = 'Saved.';
@@ -9430,15 +9460,16 @@ async function fetchPrepMeals() {
 }
 
 // Same Edge Function as the food-estimate AI calls above, extended server-side
-// to also accept a pasted recipe/menu or a URL to fetch one from (see
+// to also accept a pasted recipe/menu, a URL (webpage or direct image link),
+// or an uploaded photo of a dish/recipe page (see
 // supabase/functions/estimate-food-nutrition/index.js's hasMealMenu branch).
-async function estimatePrepMealFromMenu({ mealMenuText, mealMenuUrl }) {
+async function estimatePrepMealFromMenu({ mealMenuText, mealMenuUrl, mealMenuImageBase64, mealMenuImageMimeType }) {
   let res;
   try {
     res = await fetch(`${SUPABASE_URL}/functions/v1/smooth-service`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-      body: JSON.stringify({ mealMenuText, mealMenuUrl }),
+      body: JSON.stringify({ mealMenuText, mealMenuUrl, mealMenuImageBase64, mealMenuImageMimeType }),
     });
   } catch (e) {
     throw new Error('AI auto-fill unavailable — check your connection.');
@@ -9751,6 +9782,8 @@ function fillPrepMealEditorForm(m) {
   document.getElementById('prepMealFormActive').checked = m ? m.active : true;
   document.getElementById('prepMealAiText').value = '';
   document.getElementById('prepMealAiUrl').value = '';
+  document.getElementById('prepMealAiPhotoPreview').hidden = true;
+  document.getElementById('prepMealAiPhotoPreview').src = '';
   document.getElementById('prepMealAiNote').textContent = '';
   document.getElementById('prepMealFormNote').textContent = '';
   prepMealCropState = {
@@ -9772,30 +9805,53 @@ function closePrepMealEditor() {
   document.getElementById('prepMealEditorOverlay').hidden = true;
 }
 
+// Drops an AI meal-menu result into the editor form. AI returns per-100g
+// rates, so the serving declaration is pinned back to 100g to match.
+function applyPrepMealAiResult(data) {
+  document.getElementById('prepMealFormServing').value = 100;
+  prepMealEditorServing = 100;
+  if (data.name) document.getElementById('prepMealFormName').value = data.name;
+  if (data.calories) document.getElementById('prepMealFormCalories').value = Math.round(data.calories);
+  if (data.protein) document.getElementById('prepMealFormProtein').value = Math.round(data.protein);
+  if (data.carbs) document.getElementById('prepMealFormCarbs').value = Math.round(data.carbs);
+  if (data.fat) document.getElementById('prepMealFormFat').value = Math.round(data.fat);
+  if (data.fiber) document.getElementById('prepMealFormFiber').value = Math.round(data.fiber);
+  if (data.sodium) document.getElementById('prepMealFormSodium').value = Math.round(data.sodium);
+  if (data.ingredients) document.getElementById('prepMealFormIngredients').value = data.ingredients;
+  if (data.procedure) document.getElementById('prepMealFormProcedure').value = data.procedure;
+}
+
 async function fillPrepMealFromAi() {
   const note = document.getElementById('prepMealAiNote');
   const text = document.getElementById('prepMealAiText').value.trim();
   const url = document.getElementById('prepMealAiUrl').value.trim();
-  if (!text && !url) { note.textContent = 'Paste a menu/recipe or enter a URL first.'; return; }
+  if (!text && !url) { note.textContent = 'Paste a menu/recipe, enter a URL, or upload a photo first.'; return; }
   note.textContent = 'Reading…';
   try {
     const data = await estimatePrepMealFromMenu({ mealMenuText: text || undefined, mealMenuUrl: !text ? url : undefined });
-    // AI returns per-100g rates, so pin the serving declaration back to
-    // 100g to match before dropping the values in.
-    document.getElementById('prepMealFormServing').value = 100;
-    prepMealEditorServing = 100;
-    if (data.name) document.getElementById('prepMealFormName').value = data.name;
-    if (data.calories) document.getElementById('prepMealFormCalories').value = Math.round(data.calories);
-    if (data.protein) document.getElementById('prepMealFormProtein').value = Math.round(data.protein);
-    if (data.carbs) document.getElementById('prepMealFormCarbs').value = Math.round(data.carbs);
-    if (data.fat) document.getElementById('prepMealFormFat').value = Math.round(data.fat);
-    if (data.fiber) document.getElementById('prepMealFormFiber').value = Math.round(data.fiber);
-    if (data.sodium) document.getElementById('prepMealFormSodium').value = Math.round(data.sodium);
-    if (data.ingredients) document.getElementById('prepMealFormIngredients').value = data.ingredients;
-    if (data.procedure) document.getElementById('prepMealFormProcedure').value = data.procedure;
+    applyPrepMealAiResult(data);
     note.textContent = 'Filled in (per 100g) — review before saving.';
   } catch (e) {
     note.textContent = e.message || 'Auto-fill failed.';
+  }
+}
+
+async function fillPrepMealFromAiPhoto(file) {
+  const note = document.getElementById('prepMealAiNote');
+  const preview = document.getElementById('prepMealAiPhotoPreview');
+  note.textContent = 'Reading photo…';
+  try {
+    const { dataUrl } = await resizeAndCompressImage(file);
+    preview.src = dataUrl;
+    preview.hidden = false;
+    note.textContent = 'Analyzing photo with AI…';
+    // dataUrl is "data:image/jpeg;base64,<bytes>" — Gemini wants just the bytes.
+    const rawBase64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+    const data = await estimatePrepMealFromMenu({ mealMenuImageBase64: rawBase64, mealMenuImageMimeType: 'image/jpeg' });
+    applyPrepMealAiResult(data);
+    note.textContent = 'Filled in from photo (per 100g) — review before saving.';
+  } catch (e) {
+    note.textContent = e.message || 'Photo auto-fill failed.';
   }
 }
 
@@ -9806,13 +9862,13 @@ async function fillPrepMealFromAi() {
 async function addImageToMediaSyncSlideshow(imageUrl) {
   try {
     const settings = await fetchMediaSyncSettings();
-    const current = settings || { mode: 'still', image_urls: [], duration_sec: 10 };
+    const current = settings || { mode: 'still', image_urls: [], duration_sec: 10, randomize: false };
     if (current.image_urls.includes(imageUrl)) return;
     const newUrls = [...current.image_urls, imageUrl];
     const newMode = newUrls.length > 1 ? 'slideshow' : current.mode;
     await sb.rpc('admin_set_media_sync', {
       p_digital_id: adminSession.digitalId, p_password: adminSession.password,
-      p_mode: newMode, p_image_urls: newUrls, p_duration_sec: current.duration_sec,
+      p_mode: newMode, p_image_urls: newUrls, p_duration_sec: current.duration_sec, p_randomize: current.randomize,
     });
     await renderMediaSyncWidget();
   } catch (e) { /* best effort — slideshow just won't pick up this image until the next successful save */ }
@@ -9958,6 +10014,13 @@ function initPrepMealEditor() {
   document.getElementById('btnClosePrepMealEditor').addEventListener('click', closePrepMealEditor);
   bindOverlayBackdropClose(overlay, closePrepMealEditor);
   document.getElementById('btnPrepMealAiFill').addEventListener('click', fillPrepMealFromAi);
+  const aiPhotoInput = document.getElementById('prepMealAiPhotoInput');
+  document.getElementById('btnPrepMealAiPhoto').addEventListener('click', () => aiPhotoInput.click());
+  aiPhotoInput.addEventListener('change', () => {
+    const file = aiPhotoInput.files[0];
+    aiPhotoInput.value = '';
+    if (file) fillPrepMealFromAiPhoto(file);
+  });
   document.getElementById('btnSavePrepMeal').addEventListener('click', savePrepMealEditor);
   document.getElementById('btnDeletePrepMeal').addEventListener('click', deletePrepMealEditor);
   // change (not input) so half-typed serving numbers (e.g. the "2" while
