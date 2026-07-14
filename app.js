@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.6.8';
+const APP_VERSION = 'WF_SYS_V.6.9';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9358,24 +9358,35 @@ function renderFoodPrepsList() {
   });
 }
 
-// grams needed to hit the viewer's own calorie target (their profile's
-// computed daily target, same as the Fuel tab — falls back to 2000 if no
-// profile yet) = target / cal_per_100g * 100, then every macro scales off
-// that same grams figure — true per-100g serving math, same convention as
+// Ingredients are stored one-per-line (see the editor's textarea
+// placeholder) — split on newlines. Procedure is usually pasted/generated
+// as run-on prose, so it's split on sentence-ending periods instead, with
+// the period restored on each bullet.
+function renderBulletedText(listEl, text, splitter) {
+  const items = (text || '').split(splitter).map(s => s.trim()).filter(Boolean);
+  listEl.innerHTML = items.length
+    ? items.map(i => `<li>${escapeHtml(splitter === '.' ? i + '.' : i)}</li>`).join('')
+    : '<li>—</li>';
+}
+
+// Macros scale directly off the typed serving size (grams) against each
+// meal's per-100g rates — true per-100g serving math, same convention as
 // the Add Food AI estimate flow.
 function renderFoodPrepsDetail() {
   const m = foodPrepsDetailMeal;
   if (!m) return;
-  const calorieTarget = getEffectiveCalorieTarget(getProfile()) || 2000;
-  const calPer100g = m.cal_per_100g || 0;
-  const grams = calPer100g > 0 ? Math.round((calorieTarget / calPer100g) * 100) : 0;
-  const protein = (m.protein_per_100g || 0) * grams / 100;
-  const carbs = (m.carbs_per_100g || 0) * grams / 100;
-  const fat = (m.fat_per_100g || 0) * grams / 100;
-  document.getElementById('foodPrepsDetailGrams').textContent = grams + 'G';
+  const grams = Number(document.getElementById('foodPrepsServingSize').value) || 0;
+  const ratio = grams / 100;
+  const protein = (m.protein_per_100g || 0) * ratio;
+  const carbs = (m.carbs_per_100g || 0) * ratio;
+  const fat = (m.fat_per_100g || 0) * ratio;
+  const fiber = (m.fiber_per_100g || 0) * ratio;
+  const sodium = (m.sodium_per_100g || 0) * ratio;
   document.getElementById('foodPrepsDetailProtein').textContent = Math.round(protein) + 'g';
   document.getElementById('foodPrepsDetailCarbs').textContent = Math.round(carbs) + 'g';
   document.getElementById('foodPrepsDetailFat').textContent = Math.round(fat) + 'g';
+  document.getElementById('foodPrepsDetailFiber').textContent = Math.round(fiber) + 'g';
+  document.getElementById('foodPrepsDetailSodium').textContent = Math.round(sodium) + 'mg';
   const proteinKcal = protein * 4, carbsKcal = carbs * 4, fatKcal = fat * 9;
   const totalKcal = proteinKcal + carbsKcal + fatKcal;
   document.getElementById('foodPrepsDetailProteinBar').style.width = (totalKcal > 0 ? (proteinKcal / totalKcal) * 100 : 0) + '%';
@@ -9399,8 +9410,9 @@ function selectFoodPrepMeal(meal) {
   const badge = document.getElementById('foodPrepsDetailBadge');
   badge.textContent = meal.author_type === 'admin' ? 'Admin' : `By ${meal.author_name || 'User'}`;
   badge.className = 'prep-meal-author-badge ' + (meal.author_type === 'admin' ? 'is-admin' : (isMine ? 'is-self' : ''));
-  document.getElementById('foodPrepsDetailIngredients').textContent = meal.ingredients || '';
-  document.getElementById('foodPrepsDetailProcedure').textContent = meal.procedure || '';
+  renderBulletedText(document.getElementById('foodPrepsDetailIngredients'), meal.ingredients, '\n');
+  renderBulletedText(document.getElementById('foodPrepsDetailProcedure'), meal.procedure, '.');
+  document.getElementById('foodPrepsServingSize').value = 100;
   renderFoodPrepsDetail();
 }
 
@@ -9484,6 +9496,7 @@ function initFoodPrepsOverlay() {
     foodPrepsExpanded = !foodPrepsExpanded;
     renderFoodPrepsList();
   });
+  document.getElementById('foodPrepsServingSize').addEventListener('input', renderFoodPrepsDetail);
   initFoodPrepsThumbPreview();
 }
 
@@ -9510,7 +9523,7 @@ async function renderPrepMealManager() {
       <img class="ad-manager-thumb" src="${escapeHtml(m.image_url || PREP_MEAL_DEFAULT_IMAGE)}" alt="" loading="lazy">
       <div class="ad-manager-info">
         <div class="ad-manager-name">${escapeHtml(m.name)}${m.active ? '' : ' (inactive)'}</div>
-        <span class="ad-manager-link">${PREP_MEAL_CATEGORY_LABELS[m.category] || m.category} · ${escapeHtml(authorLabel)} · ${m.cal_per_100g} kcal/100g (P${m.protein_per_100g}/C${m.carbs_per_100g}/F${m.fat_per_100g})</span>
+        <span class="ad-manager-link">${PREP_MEAL_CATEGORY_LABELS[m.category] || m.category} · ${escapeHtml(authorLabel)} · ${m.cal_per_100g} kcal/100g (P${m.protein_per_100g}/C${m.carbs_per_100g}/F${m.fat_per_100g}/Fbr${m.fiber_per_100g}/Na${m.sodium_per_100g}mg)</span>
       </div>
       <div class="ad-manager-actions">
         <button type="button" class="btn btn--sm" data-edit-meal="${m.id}">Edit</button>
@@ -9557,6 +9570,8 @@ function fillPrepMealEditorForm(m) {
   document.getElementById('prepMealFormProtein').value = m ? m.protein_per_100g : '';
   document.getElementById('prepMealFormCarbs').value = m ? m.carbs_per_100g : '';
   document.getElementById('prepMealFormFat').value = m ? m.fat_per_100g : '';
+  document.getElementById('prepMealFormFiber').value = m ? m.fiber_per_100g : '';
+  document.getElementById('prepMealFormSodium').value = m ? m.sodium_per_100g : '';
   document.getElementById('prepMealFormIngredients').value = m ? m.ingredients : '';
   document.getElementById('prepMealFormProcedure').value = m ? m.procedure : '';
   document.getElementById('prepMealFormImageUrl').value = (m && m.image_url) || '';
@@ -9591,12 +9606,33 @@ async function fillPrepMealFromAi() {
     if (data.protein) document.getElementById('prepMealFormProtein').value = Math.round(data.protein);
     if (data.carbs) document.getElementById('prepMealFormCarbs').value = Math.round(data.carbs);
     if (data.fat) document.getElementById('prepMealFormFat').value = Math.round(data.fat);
+    if (data.fiber) document.getElementById('prepMealFormFiber').value = Math.round(data.fiber);
+    if (data.sodium) document.getElementById('prepMealFormSodium').value = Math.round(data.sodium);
     if (data.ingredients) document.getElementById('prepMealFormIngredients').value = data.ingredients;
     if (data.procedure) document.getElementById('prepMealFormProcedure').value = data.procedure;
     note.textContent = 'Filled in (per 100g) — review before saving.';
   } catch (e) {
     note.textContent = e.message || 'Auto-fill failed.';
   }
+}
+
+// Keeps the Food Prep Options widget's slideshow stocked with admin-set
+// meal photos automatically — every prep meal image an admin sets gets
+// folded into media_sync_settings.image_urls (deduped), switching the
+// widget to slideshow mode once there's more than one image to cycle.
+async function addImageToMediaSyncSlideshow(imageUrl) {
+  try {
+    const settings = await fetchMediaSyncSettings();
+    const current = settings || { mode: 'still', image_urls: [], duration_sec: 10 };
+    if (current.image_urls.includes(imageUrl)) return;
+    const newUrls = [...current.image_urls, imageUrl];
+    const newMode = newUrls.length > 1 ? 'slideshow' : current.mode;
+    await sb.rpc('admin_set_media_sync', {
+      p_digital_id: adminSession.digitalId, p_password: adminSession.password,
+      p_mode: newMode, p_image_urls: newUrls, p_duration_sec: current.duration_sec,
+    });
+    await renderMediaSyncWidget();
+  } catch (e) { /* best effort — slideshow just won't pick up this image until the next successful save */ }
 }
 
 async function savePrepMealEditor() {
@@ -9609,6 +9645,8 @@ async function savePrepMealEditor() {
   const proteinPer100g = Number(document.getElementById('prepMealFormProtein').value) || 0;
   const carbsPer100g = Number(document.getElementById('prepMealFormCarbs').value) || 0;
   const fatPer100g = Number(document.getElementById('prepMealFormFat').value) || 0;
+  const fiberPer100g = Number(document.getElementById('prepMealFormFiber').value) || 0;
+  const sodiumPer100g = Number(document.getElementById('prepMealFormSodium').value) || 0;
   const ingredients = document.getElementById('prepMealFormIngredients').value.trim();
   const procedure = document.getElementById('prepMealFormProcedure').value.trim();
   if (!name || !ingredients || !calPer100g) { note.textContent = 'Fill in at least name, ingredients, and calories per 100g.'; return; }
@@ -9620,10 +9658,12 @@ async function savePrepMealEditor() {
       p_digital_id: adminSession.digitalId, p_password: adminSession.password,
       p_id: idVal ? Number(idVal) : null, p_category: category, p_name: name, p_ingredients: ingredients, p_procedure: procedure,
       p_cal_per_100g: calPer100g, p_protein_per_100g: proteinPer100g, p_carbs_per_100g: carbsPer100g, p_fat_per_100g: fatPer100g,
+      p_fiber_per_100g: fiberPer100g, p_sodium_per_100g: sodiumPer100g,
       p_active: active, p_image_url: imageUrl,
     });
     if (error) throw error;
     note.textContent = 'Saved.';
+    if (imageUrl) await addImageToMediaSyncSlideshow(imageUrl);
     prepMealsCache = await fetchPrepMeals();
     refreshOpenFoodPrepsScreen(idVal);
     renderPrepMealManager();

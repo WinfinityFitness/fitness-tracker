@@ -2785,10 +2785,10 @@
         <span class="prep-meal-name" id="foodPrepsDetailName" style="font-size:1.05rem;"></span>
         <span class="prep-meal-author-badge" id="foodPrepsDetailBadge"></span>
       </div>
-      <div class="prep-meal-detail-amount">
-        <span id="foodPrepsDetailGrams">0G</span>
-        <span class="prep-meal-detail-amount-sub">serving size</span>
-      </div>
+      <label class="field prep-meal-serving-row">
+        <span>Serving size (g)</span>
+        <input type="number" id="foodPrepsServingSize" min="1" value="100">
+      </label>
       <div class="prep-meal-macros-head"><span class="prep-meal-macros-head-bar"></span><span>Estimated Macros</span></div>
       <div class="gradient-stat-row">
         <div class="gradient-stat-row-head"><span>Protein</span><span><strong id="foodPrepsDetailProtein">0g</strong></span></div>
@@ -2802,10 +2802,12 @@
         <div class="gradient-stat-row-head"><span>Fat</span><span><strong id="foodPrepsDetailFat">0g</strong></span></div>
         <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="foodPrepsDetailFatBar" style="width:0%"><span class="gradient-bar-dot"></span></div></div>
       </div>
+      <div class="prep-meal-detail-extra-row"><span>Fiber</span><strong id="foodPrepsDetailFiber">0g</strong></div>
+      <div class="prep-meal-detail-extra-row"><span>Sodium</span><strong id="foodPrepsDetailSodium">0mg</strong></div>
       <p class="field-group-heading" style="margin-top:16px;">Ingredients</p>
-      <p class="prep-meal-detail-text" id="foodPrepsDetailIngredients"></p>
+      <ul class="prep-meal-detail-list" id="foodPrepsDetailIngredients"></ul>
       <p class="field-group-heading">Preparation procedure</p>
-      <p class="prep-meal-detail-text" id="foodPrepsDetailProcedure"></p>
+      <ol class="prep-meal-detail-list" id="foodPrepsDetailProcedure"></ol>
     </div>
   </div>
 </div>
@@ -2869,6 +2871,16 @@
         <input type="number" id="prepMealFormFat" min="0" placeholder="e.g. 10">
       </label>
     </div>
+    <div class="field-row">
+      <label class="field">
+        <span>Fiber / 100g</span>
+        <input type="number" id="prepMealFormFiber" min="0" placeholder="e.g. 2">
+      </label>
+      <label class="field">
+        <span>Sodium (mg) / 100g</span>
+        <input type="number" id="prepMealFormSodium" min="0" placeholder="e.g. 380">
+      </label>
+    </div>
     <label class="field">
       <span>Ingredients list</span>
       <textarea id="prepMealFormIngredients" rows="4" placeholder="One per line, e.g.&#10;3 egg whites&#10;1 cup spinach&#10;4 shiitake mushrooms"></textarea>
@@ -2878,7 +2890,7 @@
       <textarea id="prepMealFormProcedure" rows="5" placeholder="1. ...&#10;2. ...&#10;3. ..."></textarea>
     </label>
     <label class="field" id="prepMealFormImageRow">
-      <span>Image URL <span class="hint hint--sm" style="display:inline;margin:0;">(admin only — leave blank to use the default icon)</span></span>
+      <span>Image URL <span class="hint hint--sm" style="display:inline;margin:0;">(admin only — also auto-added to the Food Prep Options slideshow)</span></span>
       <input type="text" id="prepMealFormImageUrl" placeholder="https://...">
     </label>
     <label class="field field--checkbox" id="prepMealFormActiveRow"><input type="checkbox" id="prepMealFormActive" checked><span>Active (visible to everyone)</span></label>

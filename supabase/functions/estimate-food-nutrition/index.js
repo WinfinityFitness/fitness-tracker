@@ -98,8 +98,8 @@ Deno.serve(async (req) => {
     parts.push({
       text: `Read the following meal/recipe description (pasted text or webpage content) and extract structured prep-meal data for a fitness tracking app.
 Respond with ONLY a JSON object, no markdown, no explanation, in exactly this shape:
-{"name": string, "calories": number, "protein": number, "carbs": number, "fat": number, "ingredients": string, "procedure": string}
-"calories"/"protein"/"carbs"/"fat" are your best nutrition estimate PER 100 GRAMS of the prepared dish as described (like a nutrition facts label) — if the source gives a total-dish or per-serving amount and a total/serving weight, convert to per-100g yourself. "ingredients" is a newline-separated list of ingredients (with quantities if given). "procedure" is the numbered preparation steps as plain newline-separated text. If a field can't be determined, give your best reasonable estimate — never refuse.
+{"name": string, "calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "sodium": number, "ingredients": string, "procedure": string}
+"calories"/"protein"/"carbs"/"fat"/"fiber"/"sodium" are your best nutrition estimate PER 100 GRAMS of the prepared dish as described (like a nutrition facts label) — if the source gives a total-dish or per-serving amount and a total/serving weight, convert to per-100g yourself. calories in kcal, protein/carbs/fat/fiber in grams, sodium in milligrams. "ingredients" is a newline-separated list of ingredients (with quantities if given). "procedure" is the numbered preparation steps as plain newline-separated text. If a field can't be determined, give your best reasonable estimate — never refuse.
 
 SOURCE:
 """
@@ -172,6 +172,8 @@ All values are per 100g. calories in kcal, protein/carbs/fat/fiber in grams, sod
       protein: Number(parsed.protein) || 0,
       carbs: Number(parsed.carbs) || 0,
       fat: Number(parsed.fat) || 0,
+      fiber: Number(parsed.fiber) || 0,
+      sodium: Number(parsed.sodium) || 0,
       ingredients: parsed.ingredients || '',
       procedure: parsed.procedure || '',
     });

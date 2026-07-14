@@ -2677,10 +2677,15 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .ad-manager-row.prep-meal-manager-row { align-items: flex-start; }
 
 .prep-meal-detail-image { width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; object-fit: cover; background: var(--surface-2); border: 1px solid var(--border-soft); }
-.prep-meal-detail-amount { display: flex; align-items: baseline; gap: 8px; margin: 10px 0; }
-.prep-meal-detail-amount span:first-child { font-family: var(--font-mono); font-weight: 700; font-size: 1.3rem; color: var(--cyan); }
-.prep-meal-detail-amount-sub { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
-.prep-meal-detail-text { white-space: pre-line; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin: 4px 0 0; }
+.prep-meal-serving-row { margin-top: 10px; }
+.prep-meal-detail-extra-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0; border-bottom: 1px solid var(--border-soft);
+  font-size: 0.82rem; color: var(--text-secondary);
+}
+.prep-meal-detail-extra-row strong { color: var(--text-primary); font-family: var(--font-mono); }
+.prep-meal-detail-list { padding-left: 20px; margin: 4px 0 0; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6; }
+.prep-meal-detail-list li { margin-bottom: 4px; }
 
 .prep-meal-thumb-preview {
   position: fixed;
