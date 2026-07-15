@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tracking is actively running — path snapshot bitmap plus live
+     steps/pace/distance, pushed from the cardio GPS tick loop in app.js. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:padding="10dp"
+    android:background="@drawable/widget_background">
+    <ImageView
+        android:id="@+id/widgetPathImage"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:scaleType="fitCenter"
+        android:background="#0A0E12" />
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:layout_marginStart="10dp"
+        android:orientation="vertical"
+        android:gravity="center_vertical">
+        <TextView
+            android:id="@+id/widgetDistance"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#33C8CC"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/widgetPace"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#DDE3E5"
+            android:textSize="12sp" />
+        <TextView
+            android:id="@+id/widgetSteps"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#7E8E95"
+            android:textSize="12sp" />
+    </LinearLayout>
+    <ImageButton
+        android:id="@+id/widgetFinishIcon"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_gravity="center_vertical"
+        android:background="@android:color/transparent"
+        android:src="@drawable/widget_icon_finish"
+        android:scaleType="fitCenter"
+        android:padding="2dp"
+        android:contentDescription="Finish" />
+</LinearLayout>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- updatePeriodMillis=0: Android's own periodic refresh is capped at a
+     30-minute floor regardless of what's set here, far too infrequent for
+     a "live" widget — updates are instead pushed on demand from the app
+     via WidgetBridgePlugin whenever training state actually changes. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="110dp"
+    android:minHeight="110dp"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/widget_icon_only"
+    android:previewImage="@drawable/widget_icon_start"
+    android:widgetCategory="home_screen"
+    android:resizeMode="horizontal|vertical" />

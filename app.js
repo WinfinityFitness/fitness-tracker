@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.11.0';
+const APP_VERSION = 'WF_SYS_V.11.2';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -2017,6 +2017,51 @@ function initDeepLinkHandling() {
   }
 }
 
+/* ---------------------------------------------------------------- */
+/* Home-screen widgets (Training / Outdoor Activity) — native-only.    */
+/* See WidgetBridgePlugin.java + Training/OutdoorWidgetProvider.java    */
+/* in capacitor-app/native-src. A widget tap can't run this app's JS    */
+/* directly, so MainActivity just stashes which action was tapped;      */
+/* checkPendingWidgetAction asks for it once this JS is actually ready  */
+/* to act on it (on load, and again on every resume from background).   */
+/* ---------------------------------------------------------------- */
+function handleWidgetAction(action) {
+  const trainingTabBtn = document.querySelector('.tab-btn[data-target="training"]');
+  if (action === 'startTraining' || action === 'finishTraining') {
+    // No single-call "finish" exists (it's a confirm()-gated flow tied to
+    // whatever date/exercises are currently loaded — see btnSessionCompleted
+    // in initTraining) — deliberately NOT auto-triggered from a background
+    // tap. Both actions just bring the app to the Training tab so the real
+    // controls (including that confirmation) are the ones actually used.
+    if (trainingTabBtn) trainingTabBtn.click();
+  } else if (action === 'startOutdoor') {
+    if (trainingTabBtn) trainingTabBtn.click();
+    if (!cardioWatchId) startCardioTracking();
+  } else if (action === 'finishOutdoor') {
+    if (cardioWatchId) stopCardioTracking();
+  }
+}
+
+async function checkPendingWidgetAction() {
+  if (!isNativeApp() || !window.Capacitor.Plugins.WidgetBridge) return;
+  try {
+    const { action } = await window.Capacitor.Plugins.WidgetBridge.getPendingWidgetAction();
+    if (action) handleWidgetAction(action);
+  } catch (e) { /* plugin unavailable — ignore */ }
+}
+
+function initWidgetActionHandling() {
+  if (!isNativeApp()) return;
+  checkPendingWidgetAction();
+  // Covers the "app was already running, just backgrounded" case — a
+  // widget tap there lands in MainActivity.onNewIntent while this JS is
+  // already loaded, so re-checking as soon as the WebView is visible again
+  // picks it up without waiting for a fresh page load.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) checkPendingWidgetAction();
+  });
+}
+
 function saveEndDayLog() {
   const profile = getProfile();
   const date = document.getElementById('edlDate').value || todayISO();
@@ -3070,6 +3115,69 @@ function renderCardioRouteSketch() {
   svg.innerHTML = `<polyline points="${points}" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>`;
 }
 
+// Same bounding-box normalization as renderCardioRouteSketch above, just
+// drawn to an offscreen canvas and exported as a PNG data URL — the
+// Outdoor widget can't host a real interactive map, so this static
+// snapshot of the path-so-far is what WidgetBridgePlugin.updateOutdoorWidget
+// decodes into a Bitmap for the widget's RemoteViews ImageView.
+function renderCardioPathSnapshot() {
+  const size = 144, pad = 14;
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#0a0e12';
+  ctx.fillRect(0, 0, size, size);
+  if (cardioTrack.length < 2) return canvas.toDataURL('image/png');
+  const lats = cardioTrack.map(p => p.lat), lons = cardioTrack.map(p => p.lon);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const minLon = Math.min(...lons), maxLon = Math.max(...lons);
+  const spanLat = Math.max(maxLat - minLat, 0.0001);
+  const spanLon = Math.max(maxLon - minLon, 0.0001);
+  const points = cardioTrack.map(p => {
+    const x = pad + ((p.lon - minLon) / spanLon) * (size - pad * 2);
+    const y = size - pad - ((p.lat - minLat) / spanLat) * (size - pad * 2);
+    return [x, y];
+  });
+  ctx.strokeStyle = '#33c8cc';
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  points.forEach(([x, y], i) => { if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+  ctx.stroke();
+  return canvas.toDataURL('image/png');
+}
+
+// Throttled to every 5th tick (updateCardioStats runs every 1s) — the path
+// snapshot re-render is real canvas work, no need to pay for it every
+// single second when the widget itself only repaints when the OS gets
+// around to it anyway.
+let cardioWidgetSyncTick = 0;
+function syncOutdoorWidget(elapsedSec) {
+  if (!isNativeApp() || !window.Capacitor.Plugins.WidgetBridge) return;
+  cardioWidgetSyncTick++;
+  if (cardioWidgetSyncTick % 5 !== 0) return;
+  const type = document.getElementById('cardioType').value;
+  const steps = estimateCardioSteps(cardioDistanceKm, type);
+  // Independent of distUnitForProfile — the widget's layout always labels
+  // this "km/h" (see widget_outdoor_active.xml), so it needs a true km/h
+  // value regardless of whether the on-screen stat is showing mph for a
+  // mile-preferring profile.
+  const avgSpeedKmh = elapsedSec > 0 ? cardioDistanceKm / (elapsedSec / 3600) : 0;
+  window.Capacitor.Plugins.WidgetBridge.updateOutdoorWidget({
+    state: 'active',
+    steps: steps != null ? String(steps) : '0',
+    paceKph: avgSpeedKmh.toFixed(1),
+    distanceKm: cardioDistanceKm.toFixed(2),
+    pathImageBase64: renderCardioPathSnapshot(),
+  }).catch(() => { /* widget not present / plugin unavailable — non-fatal */ });
+}
+
+function setOutdoorWidgetIdle() {
+  if (!isNativeApp() || !window.Capacitor.Plugins.WidgetBridge) return;
+  window.Capacitor.Plugins.WidgetBridge.updateOutdoorWidget({ state: 'idle' }).catch(() => {});
+}
+
 function formatPaceSecPerUnit(sec) {
   if (!sec || !isFinite(sec)) return '--:--';
   const m = Math.floor(sec / 60), s = Math.round(sec % 60);
@@ -3114,6 +3222,7 @@ function updateCardioStats() {
   const steps = estimateCardioSteps(cardioDistanceKm, type);
   document.getElementById('cardioStepsTile').hidden = steps == null;
   if (steps != null) document.getElementById('cardioSteps').textContent = steps.toLocaleString();
+  syncOutdoorWidget(elapsed);
 }
 
 // In the plain browser / installed PWA, GPS tracking is regular
@@ -3227,6 +3336,13 @@ function startCardioTracking() {
 
   cardioTickId = setInterval(updateCardioStats, 1000);
   startCardioHydrationReminders();
+
+  cardioWidgetSyncTick = 0;
+  if (isNativeApp() && window.Capacitor.Plugins.WidgetBridge) {
+    window.Capacitor.Plugins.WidgetBridge.updateOutdoorWidget({
+      state: 'active', steps: '0', paceKph: '0.0', distanceKm: '0.00', pathImageBase64: null,
+    }).catch(() => {});
+  }
 }
 
 let lastCardioSession = null;
@@ -3237,6 +3353,7 @@ function stopCardioTracking() {
   cardioWatchId = null;
   cardioTickId = null;
   stopCardioHydrationReminders();
+  setOutdoorWidgetIdle();
 
   const elapsedSec = Math.round((Date.now() - cardioStartTime) / 1000);
   const type = document.getElementById('cardioType').value;
@@ -4990,6 +5107,34 @@ function renderExerciseTimerDisplays() {
     }
   });
   if (changed) saveExTimers(all);
+  syncTrainingWidget(day);
+}
+
+// Training has no single continuous "session timer" the way Cardio does —
+// the closest equivalent to "something is actively happening right now" is
+// a rest countdown ticking between sets (see startExerciseTimer/
+// renderExerciseTimerDisplays above, which this piggybacks on — it already
+// runs every second for as long as the app has ever started a rest timer
+// this session). "cooldown" (icon-only, tap finishes) vs "idle" (icon-only,
+// tap starts) both use the same layout on the native side — see
+// TrainingWidgetProvider — differing only in which icon/action is shown.
+function syncTrainingWidget(day) {
+  if (!isNativeApp() || !window.Capacitor.Plugins.WidgetBridge) return;
+  let active = null;
+  Object.keys(day).forEach(exIdx => {
+    const t = day[exIdx];
+    const remaining = Math.max(0, Math.round((t.endAt - Date.now()) / 1000));
+    if (remaining > 0 && !active) active = { exName: t.exName, remaining };
+  });
+  let state = 'idle', exerciseName = '', timerText = '';
+  if (active) {
+    state = 'active';
+    exerciseName = active.exName;
+    timerText = formatTime(active.remaining);
+  } else if (currentExercises.some(ex => ex.sets.some(s => s.completed))) {
+    state = 'cooldown';
+  }
+  window.Capacitor.Plugins.WidgetBridge.updateTrainingWidget({ state, exerciseName, timerText }).catch(() => {});
 }
 
 const ALARM_TONE_PRESETS = {
@@ -8993,10 +9138,16 @@ function renderNexusRankings(rows) {
 }
 
 let currentChatRoomId = localStorage.getItem('wft_chat_room') || null;
+let pendingChatImageDataUrl = null;
+function clearPendingChatImage() {
+  pendingChatImageDataUrl = null;
+  document.getElementById('chatPendingImage').hidden = true;
+  document.getElementById('chatImageInput').value = '';
+}
 
 async function fetchChatMessages() {
   const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  let q = sb.from('chat_messages').select('id, code_name, message, created_at, deleted, sender_share_key').gte('created_at', cutoff);
+  let q = sb.from('chat_messages').select('id, code_name, message, image_url, created_at, deleted, sender_share_key').gte('created_at', cutoff);
   q = currentChatRoomId ? q.eq('room_id', currentChatRoomId) : q.is('room_id', null);
   const { data, error } = await q.order('created_at', { ascending: false }).limit(50);
   if (error) throw error;
@@ -9011,16 +9162,30 @@ async function fetchChatMessages() {
   return messages;
 }
 
-async function postChatMessage(text) {
+async function postChatMessage(text, imageDataUrl) {
   const trimmed = text.trim().slice(0, 280);
-  if (!trimmed) return;
+  if (!trimmed && !imageDataUrl) return;
+
+  let imageUrl = null;
+  if (imageDataUrl) imageUrl = await uploadChatImage(imageDataUrl);
+
   const { error } = await sb.from('chat_messages').insert({
     code_name: effectiveLeaderboardName(),
     message: trimmed,
+    image_url: imageUrl,
     room_id: currentChatRoomId || null,
     sender_share_key: getOrCreateShareKey(),
   });
   if (error) throw error;
+}
+
+async function uploadChatImage(dataUrl) {
+  const blob = await (await fetch(dataUrl)).blob();
+  const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+  const path = `${getOrCreateShareKey()}/${Date.now()}.${ext}`;
+  const { error } = await sb.storage.from('chat-images').upload(path, blob, { contentType: blob.type });
+  if (error) throw error;
+  return sb.storage.from('chat-images').getPublicUrl(path).data.publicUrl;
 }
 
 function getOrCreateShareKey() {
@@ -11333,9 +11498,10 @@ function renderChatMessages(messages) {
       ? `<span class="chat-name chat-name-link" data-dm-name="${escapeHtml(m.code_name)}">${escapeHtml(m.code_name)}</span>`
       : '';
     const myReaction = (m.reactions || []).find(r => r.share_key === myShareKey);
+    const imageHtml = (!m.deleted && m.image_url) ? `<img class="chat-msg-image" src="${m.image_url}" alt="Shared photo" data-lightbox="${m.image_url}">` : '';
     const bubbleInner = m.deleted
       ? `<span class="chat-msg chat-msg-unsent">Unsent a message</span><span class="chat-time">${time}</span>`
-      : `<span class="chat-msg">${escapeHtml(m.message)}</span><span class="chat-time">${time}</span>`;
+      : `${imageHtml}<span class="chat-msg">${escapeHtml(m.message)}</span><span class="chat-time">${time}</span>`;
     const counts = aggregateReactions(m.reactions);
     const totalReactions = (m.reactions || []).length;
     // One small combined badge (all distinct emojis + total count) rather
@@ -11344,13 +11510,26 @@ function renderChatMessages(messages) {
     const reactionsHtml = Object.keys(counts).length
       ? `<div class="chat-reactions"><span class="chat-reaction-pill${myReaction ? ' is-mine' : ''}">${Object.keys(counts).join('')}${totalReactions > 1 ? ' ' + totalReactions : ''}</span></div>`
       : '';
-    row.innerHTML = `${nameHtml}<div class="chat-bubble" data-msg-id="${m.id}" data-deleted="${m.deleted ? 1 : 0}" data-own="${isOwn ? 1 : 0}" data-my-reaction="${myReaction ? myReaction.emoji : ''}">${bubbleInner}${reactionsHtml}</div>`;
+    const bubbleClass = 'chat-bubble' + (imageHtml ? ' chat-bubble--has-image' : '');
+    row.innerHTML = `${nameHtml}<div class="${bubbleClass}" data-msg-id="${m.id}" data-deleted="${m.deleted ? 1 : 0}" data-own="${isOwn ? 1 : 0}" data-my-reaction="${myReaction ? myReaction.emoji : ''}">${bubbleInner}${reactionsHtml}</div>`;
     list.appendChild(row);
   });
   list.querySelectorAll('[data-dm-name]').forEach(el => {
     el.addEventListener('click', e => openChatUserMenu(el.dataset.dmName, e.clientX, e.clientY));
   });
+  list.querySelectorAll('[data-lightbox]').forEach(img => {
+    img.addEventListener('click', e => { e.stopPropagation(); openChatLightbox(img.dataset.lightbox); });
+  });
   list.scrollTop = list.scrollHeight;
+}
+
+function openChatLightbox(src) {
+  document.getElementById('chatLightboxImg').src = src;
+  document.getElementById('chatLightbox').hidden = false;
+}
+function closeChatLightbox() {
+  document.getElementById('chatLightbox').hidden = true;
+  document.getElementById('chatLightboxImg').src = '';
 }
 
 /* ---- Press-and-hold a chat bubble: emoji reactions + unsend ---- */
@@ -11860,17 +12039,36 @@ function initLeaderboard() {
 
   document.getElementById('btnLbChatSend').addEventListener('click', async () => {
     const input = document.getElementById('lbChatInput');
-    if (!input.value.trim() || !sbConfigured()) return;
+    if ((!input.value.trim() && !pendingChatImageDataUrl) || !sbConfigured()) return;
+    const imageToSend = pendingChatImageDataUrl;
     try {
-      await postChatMessage(input.value);
+      await postChatMessage(input.value, imageToSend);
       input.value = '';
+      clearPendingChatImage();
       const messages = await fetchChatMessages();
       renderChatMessages(messages);
-    } catch (e) { /* best effort */ }
+    } catch (e) { showRestToast('Could not send: ' + (e.message || 'check your connection')); }
   });
   document.getElementById('lbChatInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') document.getElementById('btnLbChatSend').click();
   });
+
+  document.getElementById('btnChatAttachImage').addEventListener('click', () => {
+    document.getElementById('chatImageInput').click();
+  });
+  document.getElementById('chatImageInput').addEventListener('change', () => {
+    const file = document.getElementById('chatImageInput').files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      pendingChatImageDataUrl = reader.result;
+      document.getElementById('chatPendingImagePreview').src = pendingChatImageDataUrl;
+      document.getElementById('chatPendingImage').hidden = false;
+    };
+    reader.readAsDataURL(file);
+  });
+  document.getElementById('btnChatPendingImageRemove').addEventListener('click', clearPendingChatImage);
+  document.getElementById('chatLightbox').addEventListener('click', closeChatLightbox);
 
   document.getElementById('btnChatRefresh').addEventListener('click', async () => {
     const refreshBtn = document.getElementById('btnChatRefresh');
@@ -13196,6 +13394,7 @@ safeInit(initCustomBackground, 'initCustomBackground');
 safeInit(initTextSizeSlider, 'initTextSizeSlider');
 safeInit(initPushNotifications, 'initPushNotifications');
 safeInit(initDeepLinkHandling, 'initDeepLinkHandling');
+safeInit(initWidgetActionHandling, 'initWidgetActionHandling');
 safeInit(initProgressPhotoCamera, 'initProgressPhotoCamera');
 safeInit(initLeaderboard, 'initLeaderboard');
 safeInit(initAnnouncementWidget, 'initAnnouncementWidget');

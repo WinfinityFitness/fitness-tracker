@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Idle (no session) and cooldown (resting between sets) states for both
+     widgets — just a centered tappable icon. Which icon/action it is gets
+     set at update time in TrainingWidgetProvider/OutdoorWidgetProvider. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background">
+    <ImageButton
+        android:id="@+id/widgetIcon"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_gravity="center"
+        android:background="@android:color/transparent"
+        android:scaleType="fitCenter"
+        android:padding="12dp"
+        android:contentDescription="@string/app_name" />
+</FrameLayout>

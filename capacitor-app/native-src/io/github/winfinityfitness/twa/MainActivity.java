@@ -1,6 +1,9 @@
 package io.github.winfinityfitness.twa;
 
 import android.Manifest;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.os.Build;
@@ -22,7 +25,9 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(WidgetBridgePlugin.class);
         super.onCreate(savedInstanceState);
+        stashPendingWidgetAction(getIntent());
         // Android 13+ requires POST_NOTIFICATIONS to be explicitly granted, or
         // the background-geolocation plugin's foreground-service notification
         // can silently fail to post once the app backgrounds — taking the
@@ -55,5 +60,27 @@ public class MainActivity extends BridgeActivity {
             ViewGroup parent = (ViewGroup) overlay.getParent();
             if (parent != null) parent.removeView(overlay);
         }, SPLASH_HOLD_MS);
+    }
+
+    // launchMode="singleTask" (see AndroidManifest.xml) means a widget tap
+    // while the app is already running delivers here instead of onCreate —
+    // covered separately since onCreate's own getIntent() call wouldn't see it.
+    @Override
+    public void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        stashPendingWidgetAction(intent);
+    }
+
+    // A widget tap can't run the app's JS directly (may not even be loaded
+    // yet on a cold start) — this just stashes which action was tapped so
+    // the JS side can ask for it once ready, via
+    // WidgetBridgePlugin.getPendingWidgetAction (checked on load and on
+    // every visibilitychange — see initWidgetActionHandling in app.js).
+    private void stashPendingWidgetAction(Intent intent) {
+        if (intent == null) return;
+        String action = intent.getStringExtra("widget_action");
+        if (action == null) return;
+        SharedPreferences prefs = getSharedPreferences(WidgetBridgePlugin.PREFS, Context.MODE_PRIVATE);
+        prefs.edit().putString("pending_widget_action", action).apply();
     }
 }

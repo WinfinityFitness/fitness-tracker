@@ -28,6 +28,30 @@
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- Home-screen widgets (see WidgetBridgePlugin, TrainingWidgetProvider,
+             OutdoorWidgetProvider) — not exported, only the OS itself ever
+             addresses these. -->
+        <receiver
+            android:name=".TrainingWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/training_widget_info" />
+        </receiver>
+        <receiver
+            android:name=".OutdoorWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/outdoor_widget_info" />
+        </receiver>
+
         <!-- Firebase (added for FCM push notifications) auto-initializes at
              app startup via its own ContentProvider by default, EVERY launch,
              even for users who never opt into push — this includes a network
