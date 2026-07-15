@@ -2413,17 +2413,20 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 
 /* ---------------- Admin Command Center (slide-out drawer) ---------------- */
 /* Tab visibility is gated to isAdminLoggedIn() in refreshDigitalIdOverrideVisibility()
-   — it never shows for a regular user. Sized ~3mm x 20mm per spec (11px x 76px at
-   a 96dpi CSS reference), with the tap/drag hit target padded out wider than the
-   visible bar since 11px alone is under any comfortable touch-target minimum. */
+   — it never shows for a regular user. Visual bar is an 8mm-diameter semicircle
+   bump (30px diameter / 15px radius at a 96dpi CSS reference) — a true semicircle
+   comes from a box exactly radius-wide and diameter-tall with both same-side
+   corners fully rounded by that radius. The tap/drag hit target (the button
+   itself) is padded out wider than the visible bump since 15px alone is under
+   any comfortable touch-target minimum. */
 .admin-drawer-tab {
   position: fixed;
   top: 50%;
   right: 0;
   transform: translateY(-50%);
   z-index: 400;
-  width: 30px;
-  height: 92px;
+  width: 26px;
+  height: 40px;
   padding: 0;
   margin: 0;
   border: none;
@@ -2437,9 +2440,10 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .admin-drawer-tab[hidden] { display: none; }
 .admin-drawer-tab:active { cursor: grabbing; }
 .admin-drawer-tab-bar {
-  width: 11px;
-  height: 76px;
-  border-radius: 6px 0 0 6px;
+  width: 15px;
+  height: 30px;
+  border-top-left-radius: 15px;
+  border-bottom-left-radius: 15px;
   background: linear-gradient(180deg, var(--cyan), var(--cyan-dim));
   box-shadow: 0 0 10px var(--cyan-glow), -1px 0 3px rgba(0,0,0,0.3);
   position: relative;
@@ -2447,10 +2451,10 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .admin-drawer-tab-bar::after {
   content: '‹';
   position: absolute;
-  top: 50%; left: 50%;
+  top: 50%; left: 42%;
   transform: translate(-50%, -52%);
   color: var(--bg);
-  font-size: 12px;
+  font-size: 9px;
   font-weight: 700;
   line-height: 1;
 }
@@ -2543,58 +2547,51 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
    on top of (not replacing) each section's own admin-login-gated [hidden]. */
 .admin-drawer-section.is-not-focused { display: none; }
 
-/* Floating icon pill — opened by the edge tab, one icon per admin feature.
-   Sits just inboard of the tab at the same vertical center. Tapping an
-   icon either opens the panel focused on that one section (data-target)
-   or fires the action directly (data-action, forwarded via .click() to
-   the matching hidden button above). */
+/* Rotatable icon arc — opened by the edge tab. A semicircle of icons on a
+   virtual full circle (see ADMIN_ARC_RADIUS/layoutAdminDrawerArc in app.js):
+   each icon's on-screen x/y is computed from its angle and set via inline
+   transform, so this container is just a positioning anchor (its own box
+   has no visible background) — the circular hit area (pointer-events:auto
+   in .is-open) is what lets a drag started anywhere in the gaps between
+   icons rotate the arc, not just a drag started on an icon itself. Only the
+   icon nearest the front (angle ~0, i.e. "most left") is interactive and
+   grown — see .is-focused — the rest are rotate-into-view only.
+   150mm as literally requested would put icons ~567px out from the edge,
+   off the left side of most phone screens — capped to 45mm (~170px) so the
+   full sweep stays on-screen while still reading as a big, dramatic fan. */
 .admin-drawer-pill {
   position: fixed;
   top: 50%;
-  right: 44px;
+  right: -170px;
+  transform: translateY(-50%);
+  width: 340px;
+  height: 340px;
   z-index: 400;
-  max-height: 80vh;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  padding: 8px;
-  border-radius: 22px;
-  background: var(--surface-1);
-  border: 1px solid var(--border);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
   opacity: 0;
   pointer-events: none;
-  transform: translateY(-50%) translateX(12px);
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  touch-action: none;
+  transition: opacity 0.2s ease;
 }
 .admin-drawer-pill[hidden] { display: none; }
-.admin-drawer-pill.is-open {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(-50%) translateX(0);
-}
+.admin-drawer-pill.is-open { opacity: 1; pointer-events: auto; }
 .admin-drawer-pill-item {
+  position: absolute;
+  top: 50%; left: 50%;
   width: 36px; height: 36px;
-  flex-shrink: 0;
+  margin: -18px 0 0 -18px;
   border-radius: 50%;
   border: 1px solid var(--border-soft);
   background: var(--surface-2);
-  font-size: 16px;
-  line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition: transform 0.18s ease, opacity 0.18s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
-.admin-drawer-pill-item:active { background: var(--cyan-dim); }
-.admin-drawer-pill-sep {
-  width: 20px;
-  height: 1px;
-  flex-shrink: 0;
-  margin: 3px 0;
-  background: var(--border-soft);
+.admin-drawer-pill-item.is-focused {
+  background: var(--cyan-dim);
+  border-color: var(--cyan);
+  box-shadow: 0 0 14px var(--cyan-glow);
 }
 
 .donation-overlay {

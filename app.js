@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.10.3';
+const APP_VERSION = 'WF_SYS_V.10.4';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9166,10 +9166,61 @@ function syncAdminDrawerBackdrop() {
   }
 }
 
+// Radius the icon arc sweeps at — keep in sync with .admin-drawer-pill's
+// width/height (2x) and right (-radius) in style.css. 150mm as literally
+// requested would put icons ~567px out from the edge, off the left side of
+// most phone screens — capped to 45mm (~170px), see the CSS comment.
+const ADMIN_ARC_RADIUS = 170;
+let adminDrawerArcRotation = 0;
+
+function normalizeAngle180(deg) {
+  let a = deg % 360;
+  if (a > 180) a -= 360;
+  if (a < -180) a += 360;
+  return a;
+}
+
+// Positions each icon along a virtual full circle based on
+// adminDrawerArcRotation (only the semicircle nearest the tab, angle
+// within ~100° of "pointing left," is ever visible) and marks only the one
+// nearest the front (angle ~0, i.e. "most left") as .is-focused — grown
+// and the only one with pointer-events enabled, so a hidden icon has to be
+// rotated to the front before it's tappable.
+function layoutAdminDrawerArc() {
+  const pill = document.getElementById('adminDrawerPill');
+  if (!pill) return;
+  const items = Array.from(pill.querySelectorAll('.admin-drawer-pill-item'));
+  const n = items.length;
+  if (!n) return;
+  const state = items.map((el, i) => {
+    const home = (360 / n) * i;
+    const phi = normalizeAngle180(home + adminDrawerArcRotation);
+    return { el, phi, abs: Math.abs(phi) };
+  });
+  let focusedIdx = 0, minAbs = Infinity;
+  state.forEach((s, i) => { if (s.abs < minAbs) { minAbs = s.abs; focusedIdx = i; } });
+  state.forEach((s, i) => {
+    const rad = s.phi * Math.PI / 180;
+    const x = -ADMIN_ARC_RADIUS * Math.cos(rad);
+    const y = ADMIN_ARC_RADIUS * Math.sin(rad);
+    const isFocused = i === focusedIdx;
+    s.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${isFocused ? 1.3 : 1})`;
+    let opacity;
+    if (s.abs <= 80) opacity = 1;
+    else if (s.abs <= 100) opacity = 1 - (s.abs - 80) / 20;
+    else opacity = 0;
+    s.el.style.opacity = opacity;
+    s.el.style.pointerEvents = isFocused ? 'auto' : 'none';
+    s.el.classList.toggle('is-focused', isFocused);
+  });
+}
+
 function openAdminDrawerPill() {
   const pill = document.getElementById('adminDrawerPill');
   if (!pill) return;
   adminDrawerPillOpen = true;
+  adminDrawerArcRotation = 0;
+  layoutAdminDrawerArc();
   pill.hidden = false;
   requestAnimationFrame(() => pill.classList.add('is-open'));
   syncAdminDrawerBackdrop();
@@ -9275,7 +9326,35 @@ function initAdminDrawer() {
     });
   }
 
+  // Drag up/down anywhere on the arc (including through a dimmed icon,
+  // since only the focused one has pointer-events enabled — see
+  // layoutAdminDrawerArc) spins it like a dial. A completed drag suppresses
+  // the click that would otherwise fire on release, so spinning past the
+  // focused icon's position doesn't also select it.
+  let arcDragging = false;
+  let arcDragStartY = 0;
+  let arcDragStartRotation = 0;
+  let arcJustDragged = false;
+  pill.addEventListener('pointerdown', e => {
+    arcDragging = true;
+    arcDragStartY = e.clientY;
+    arcDragStartRotation = adminDrawerArcRotation;
+    arcJustDragged = false;
+    pill.setPointerCapture(e.pointerId);
+  });
+  pill.addEventListener('pointermove', e => {
+    if (!arcDragging) return;
+    const dy = e.clientY - arcDragStartY;
+    if (Math.abs(dy) > 6) arcJustDragged = true;
+    adminDrawerArcRotation = arcDragStartRotation + (dy / ADMIN_ARC_RADIUS) * (180 / Math.PI);
+    layoutAdminDrawerArc();
+  });
+  const endArcDrag = () => { arcDragging = false; };
+  pill.addEventListener('pointerup', endArcDrag);
+  pill.addEventListener('pointercancel', endArcDrag);
+
   pill.addEventListener('click', e => {
+    if (arcJustDragged) { arcJustDragged = false; return; }
     const btn = e.target.closest('.admin-drawer-pill-item');
     if (!btn) return;
     if (btn.dataset.target) { openAdminDrawerSection(btn.dataset.target.split(',')); return; }
