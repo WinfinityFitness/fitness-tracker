@@ -2868,20 +2868,22 @@
       <button class="sheet-close" id="btnClosePrepMealEditor">✕</button>
     </div>
 
-    <p class="field-group-heading">Auto-fill with AI</p>
-    <label class="field">
-      <span>Paste a full meal menu / recipe</span>
-      <textarea id="prepMealAiText" rows="3" placeholder="Paste ingredients + instructions here..."></textarea>
-    </label>
-    <label class="field">
-      <span>...or a URL</span>
-      <input type="text" id="prepMealAiUrl" placeholder="https://...">
-    </label>
-    <button type="button" class="btn glass-emboss" id="btnPrepMealAiFill" style="width:100%;">Auto-fill with AI</button>
-    <input type="file" id="prepMealAiPhotoInput" accept="image/*" hidden>
-    <button type="button" class="btn glass-emboss" id="btnPrepMealAiPhoto" style="width:100%;margin-top:8px;">📷 ...or upload a photo (dish or recipe page)</button>
-    <img id="prepMealAiPhotoPreview" alt="" hidden style="width:100%;max-height:160px;object-fit:contain;border-radius:8px;margin-top:8px;background:var(--surface-2);">
-    <p class="save-note" id="prepMealAiNote"></p>
+    <div id="prepMealAiSection">
+      <p class="field-group-heading">Auto-fill with AI</p>
+      <label class="field">
+        <span>Paste a full meal menu / recipe</span>
+        <textarea id="prepMealAiText" rows="3" placeholder="Paste ingredients + instructions here..."></textarea>
+      </label>
+      <label class="field">
+        <span>...or a URL</span>
+        <input type="text" id="prepMealAiUrl" placeholder="https://...">
+      </label>
+      <button type="button" class="btn glass-emboss" id="btnPrepMealAiFill" style="width:100%;">Auto-fill with AI</button>
+      <input type="file" id="prepMealAiPhotoInput" accept="image/*" hidden>
+      <button type="button" class="btn glass-emboss" id="btnPrepMealAiPhoto" style="width:100%;margin-top:8px;">📷 ...or upload a photo (dish or recipe page)</button>
+      <img id="prepMealAiPhotoPreview" alt="" hidden style="width:100%;max-height:160px;object-fit:contain;border-radius:8px;margin-top:8px;background:var(--surface-2);">
+      <p class="save-note" id="prepMealAiNote"></p>
+    </div>
 
     <p class="field-group-heading" style="margin-top:18px;">Meal Details</p>
     <input type="hidden" id="prepMealFormId">

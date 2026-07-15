@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.8.8';
+const APP_VERSION = 'WF_SYS_V.8.9';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -10079,9 +10079,12 @@ function openPrepMealEditor(existingMeal) {
   document.getElementById('prepMealEditorTitle').textContent = existingMeal ? 'Edit Prep Meal' : 'Add Prep Meal';
   // Image URL/framing and the Active toggle stay admin-only — a user
   // submission can't inject an arbitrary image, and visibility moderation
-  // belongs to the admin. Everything else is open to the submitting user.
+  // belongs to the admin. AI auto-fill is admin-only too (Gemini API cost
+  // control) — a submitting user gets the plain manual form. Everything
+  // else is open to the submitting user.
   document.getElementById('prepMealFormImageRow').hidden = !admin;
   document.getElementById('prepMealFormActiveRow').hidden = !admin;
+  document.getElementById('prepMealAiSection').hidden = !admin;
   if (!admin) document.getElementById('prepMealImageCropSection').hidden = true;
   document.getElementById('btnDeletePrepMeal').hidden = !existingMeal;
   document.getElementById('prepMealEditorOverlay').hidden = false;
