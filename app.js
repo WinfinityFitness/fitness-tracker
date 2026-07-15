@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.9.0';
+const APP_VERSION = 'WF_SYS_V.9.1';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -865,6 +865,52 @@ function slugifyFilename(text) {
   return (text || 'winfinity-share').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'winfinity-share';
 }
 
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read that file.'));
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(blob);
+  });
+}
+
+// navigator.share/canShare and the <a download> trick below are both
+// browser APIs Chrome provides — inside the Capacitor-wrapped Android app's
+// bare WebView (not real Chrome, unlike the old TWA) they're either absent
+// or silently non-functional, which is why every share button and the
+// "auto-save to gallery" behavior broke when the GPS fix moved off TWA.
+// These native equivalents cover the same ground: Media.savePhoto() writes
+// straight to a real gallery album via MediaStore (Filesystem writes alone
+// don't show up in Gallery on Android 10+, scoped storage doesn't index
+// them), and Share.share() with a real file:// URI opens the full native
+// share sheet — every installed app that registers as a share target, not
+// just whatever a web share sheet happens to offer.
+async function nativeSaveImageToGallery(blob, filename) {
+  if (!(isNativeApp() && window.Capacitor.Plugins.Media)) return false;
+  try {
+    const dataUrl = await blobToDataUrl(blob);
+    await window.Capacitor.Plugins.Media.savePhoto({ path: dataUrl, albumIdentifier: 'Winfinity', fileName: filename.replace(/\.[^.]+$/, '') });
+    return true;
+  } catch (e) { return false; }
+}
+
+async function nativeShareFile(blob, filename, mimeType, { title, text } = {}) {
+  if (!(isNativeApp() && window.Capacitor.Plugins.Filesystem && window.Capacitor.Plugins.Share)) return false;
+  try {
+    const dataUrl = await blobToDataUrl(blob);
+    const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+    const { Filesystem, Share } = window.Capacitor.Plugins;
+    await Filesystem.writeFile({ path: filename, data: base64, directory: 'CACHE' });
+    const { uri } = await Filesystem.getUri({ path: filename, directory: 'CACHE' });
+    await Share.share({ title, text, url: uri, dialogTitle: title || 'Share' });
+    return true;
+  } catch (e) {
+    // AbortError-equivalent (user backed out of the native share sheet) —
+    // not a failure, same as the web path's AbortError handling.
+    return true;
+  }
+}
+
 function downloadImageBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -874,6 +920,22 @@ function downloadImageBlob(blob, filename) {
 }
 
 async function shareViaWebShare(shareData, imageBlob) {
+  if (isNativeApp()) {
+    if (imageBlob) {
+      const filename = `${slugifyFilename(shareData.title)}.png`;
+      const saved = await nativeSaveImageToGallery(imageBlob, filename);
+      if (saved) showRestToast('Image saved to your gallery.');
+      await nativeShareFile(imageBlob, filename, 'image/png', shareData);
+      return;
+    }
+    if (navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(shareData.text ? `${shareData.text} ${shareData.url || ''}`.trim() : shareData.url);
+        showRestToast('Copied — paste it anywhere to share!');
+      } catch (e) { /* ignore */ }
+    }
+    return;
+  }
   if (imageBlob) {
     downloadImageBlob(imageBlob, `${slugifyFilename(shareData.title)}.png`);
     showRestToast('Image saved to your device.');
@@ -903,6 +965,14 @@ async function shareViaWebShare(shareData, imageBlob) {
 // case, matching "save automatically when share is tapped" regardless of
 // what happens with the OS share sheet afterward.
 async function shareMultipleViaWebShare(shareData, namedBlobs) {
+  if (isNativeApp()) {
+    if (namedBlobs.length) {
+      await Promise.all(namedBlobs.map(({ name, blob }) => nativeSaveImageToGallery(blob, name)));
+      showRestToast(`${namedBlobs.length} image${namedBlobs.length > 1 ? 's' : ''} saved to your gallery.`);
+      await nativeShareFile(namedBlobs[0].blob, namedBlobs[0].name, 'image/png', shareData);
+    }
+    return 'shared';
+  }
   // The share attempt goes first, as close as possible to the click that
   // triggered it — a mobile browser's "this came from a real tap" grace
   // period for navigator.share() is short, and generating several images
@@ -8244,6 +8314,10 @@ async function exportCSV(logsArr, filenamePrefix) {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const file = new File([blob], filename, { type: 'text/csv' });
 
+  if (isNativeApp()) {
+    await nativeShareFile(blob, filename, 'text/csv', { title: filename, text: 'Weekly fitness log' });
+    return;
+  }
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
       await navigator.share({ files: [file], title: filename, text: 'Weekly fitness log' });
