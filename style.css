@@ -4048,6 +4048,224 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   backdrop-filter: none;
 }
 
+/* ================================================================== */
+/* SKIN: Aether-Industrial Core — Victorian mechanical engineering meets */
+/* HUD telemetry. "Heavy machinery as interface": cast-iron panels,     */
+/* copper/gold metal accents, rivets at every card corner, machined     */
+/* (etched/extruded) controls. Courier New stands in for Courier Prime  */
+/* (label-tech role) — a system-font-safe equivalent with the same      */
+/* typewriter/blueprint character, no extra font file to self-host.     */
+/* Dark is the intended mode (every surface token in the source spec is */
+/* near-black); light is a derived companion so the toggle still works. */
+/* ================================================================== */
+:root[data-skin="aether-industrial-core"] {
+  --bg: #131313;
+  --bg-elevated: #1c1b1b;
+  --surface-1: #1c1b1b;
+  --surface-2: #20201f;
+  --surface-1-rgb: 28,27,27;
+  --surface-2-rgb: 32,32,31;
+  --border: #a18d7f;
+  --border-soft: #534438;
+  --text-primary: #e5e2e1;
+  --text-secondary: #d8c2b2;
+  --text-muted: #a18d7f;
+  --gridline: rgba(161, 141, 127, 0.25);
+  --baseline: #a18d7f;
+
+  --cyan: #ffb779;
+  --cyan-dim: #8e4e00;
+  --cyan-glow: rgba(255, 183, 121, 0.4);
+  --violet: #e9c349;
+  --magenta: #ffb4ab;
+
+  --series-1: #ffb779;
+  --series-2: #e9c349;
+  --gradient-bar: linear-gradient(90deg, #cd7f32 0%, #ffb779 55%, #e9c349 100%);
+  --gradient-glow: rgba(255, 183, 121, 0.36);
+
+  --good: #8bb26a;
+  --warning: #e9c349;
+  --serious: #d17c46;
+  --critical: #ffb4ab;
+
+  --surface-translucent: rgba(19, 19, 19, 0.92);
+  --nav-translucent: rgba(14, 14, 14, 0.94);
+
+  --card-radius: 4px;
+  --font-mono: 'Courier New', ui-monospace, monospace;
+  --font-display: 'Sora', system-ui, sans-serif;
+  --font-headline: 'Sora', system-ui, sans-serif;
+
+  --rivet-highlight: #6b5a4a;
+  --rivet-mid: #3a2f26;
+  --rivet-shadow: #131313;
+}
+:root[data-skin="aether-industrial-core"][data-theme="light"] {
+  --bg: #e8e2da;
+  --bg-elevated: #f4efe8;
+  --surface-1: #f4efe8;
+  --surface-2: #ddd4c6;
+  --surface-1-rgb: 244,239,232;
+  --surface-2-rgb: 221,212,198;
+  --border: #6c5c4c;
+  --border-soft: #b8a891;
+  --text-primary: #2a2118;
+  --text-secondary: #4c3c2c;
+  --text-muted: #6c5c4c;
+  --gridline: rgba(42, 33, 24, 0.14);
+  --baseline: #b8a891;
+
+  --cyan: #8e4e00;
+  --cyan-dim: #6c3a00;
+  --cyan-glow: rgba(142, 78, 0, 0.24);
+  --violet: #8a6b00;
+  --magenta: #93000a;
+
+  --series-1: #8e4e00;
+  --series-2: #8a6b00;
+  --gradient-bar: linear-gradient(90deg, #8e4e00 0%, #cd7f32 55%, #af8d11 100%);
+  --gradient-glow: rgba(142, 78, 0, 0.2);
+
+  --good: #3f6b21;
+  --warning: #7a5c00;
+  --serious: #a13d0f;
+  --critical: #93000a;
+
+  --surface-translucent: rgba(232, 226, 218, 0.92);
+  --nav-translucent: rgba(244, 239, 232, 0.94);
+
+  --rivet-highlight: #d8c9b3;
+  --rivet-mid: #a8987f;
+  --rivet-shadow: #6c5c4c;
+}
+
+[data-skin="aether-industrial-core"] .hero-title,
+[data-skin="aether-industrial-core"] .chart-card-title,
+[data-skin="aether-industrial-core"] .section-title,
+[data-skin="aether-industrial-core"] .app-header h1,
+[data-skin="aether-industrial-core"] .sheet-head h2,
+[data-skin="aether-industrial-core"] .field-group-heading {
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.5), 0 -1px 0 rgba(255,255,255,0.08);
+}
+/* Rivets: four machined screw-heads, one per corner, laid in as a
+   background-image stack (no extra markup) — a radial gradient per rivet,
+   positioned via background-position, sized small and never repeating. */
+[data-skin="aether-industrial-core"] .hero-card,
+[data-skin="aether-industrial-core"] .chart-card,
+[data-skin="aether-industrial-core"] .stat-tile,
+[data-skin="aether-industrial-core"] .ring-card,
+[data-skin="aether-industrial-core"] .computed-card {
+  position: relative;
+  border: 1px solid var(--border-soft);
+  border-top-color: rgba(255,255,255,0.1);
+  border-bottom-color: rgba(0,0,0,0.6);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
+  background-image:
+    radial-gradient(circle at 35% 35%, var(--rivet-highlight) 0%, var(--rivet-mid) 55%, var(--rivet-shadow) 100%),
+    radial-gradient(circle at 35% 35%, var(--rivet-highlight) 0%, var(--rivet-mid) 55%, var(--rivet-shadow) 100%),
+    radial-gradient(circle at 35% 35%, var(--rivet-highlight) 0%, var(--rivet-mid) 55%, var(--rivet-shadow) 100%),
+    radial-gradient(circle at 35% 35%, var(--rivet-highlight) 0%, var(--rivet-mid) 55%, var(--rivet-shadow) 100%);
+  background-size: 8px 8px;
+  background-repeat: no-repeat;
+  background-position: 9px 9px, calc(100% - 9px) 9px, 9px calc(100% - 9px), calc(100% - 9px) calc(100% - 9px);
+}
+/* Section headings get a small etched gear beside them — the one purely
+   decorative flourish, kept small and muted so it reads as detailing
+   rather than clutter. */
+[data-skin="aether-industrial-core"] .chart-card-title::before,
+[data-skin="aether-industrial-core"] .hero-title::before {
+  content: '\2699';
+  display: inline-block;
+  margin-right: 6px;
+  color: var(--text-muted);
+  font-size: 0.85em;
+  opacity: 0.7;
+}
+/* Buttons: polished copper on primary (gradient bevel, brighter "filament"
+   glow on hover/press feedback), sunken machined iron on everything else. */
+[data-skin="aether-industrial-core"] .btn {
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border-soft);
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+}
+[data-skin="aether-industrial-core"] .btn--primary {
+  background: linear-gradient(180deg, #ffdcc1 0%, #ffb779 30%, #cd7f32 72%, #8e4e00 100%);
+  border-color: #6c3a00;
+  color: #2e1500;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.35);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -3px 6px rgba(0,0,0,0.28), 0 2px 6px rgba(0,0,0,0.4);
+  transition: box-shadow 0.15s ease, transform 0.08s ease;
+}
+[data-skin="aether-industrial-core"] .btn--primary:hover {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -3px 6px rgba(0,0,0,0.24), 0 0 14px var(--cyan-glow), 0 2px 6px rgba(0,0,0,0.4);
+}
+[data-skin="aether-industrial-core"] .btn--primary:active {
+  transform: translateY(1px);
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.45);
+}
+[data-skin="aether-industrial-core"] .btn:not(.btn--primary) {
+  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 100%);
+  color: var(--text-primary);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.5), inset 0 -1px 0 rgba(255,255,255,0.05);
+}
+/* Inputs: etched into the panel — deep inner shadow, glowing amber text,
+   polished-gold border on focus (vs. the resting weathered-copper one). */
+[data-skin="aether-industrial-core"] input,
+[data-skin="aether-industrial-core"] select,
+[data-skin="aether-industrial-core"] textarea {
+  background: var(--bg);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--card-radius);
+  color: var(--cyan);
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.6);
+}
+[data-skin="aether-industrial-core"] input:focus,
+[data-skin="aether-industrial-core"] select:focus,
+[data-skin="aether-industrial-core"] textarea:focus {
+  border-color: var(--violet);
+  outline: none;
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.6), 0 0 0 1px var(--violet);
+}
+[data-skin="aether-industrial-core"] .chip,
+[data-skin="aether-industrial-core"] .pill {
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border-soft);
+  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 100%);
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+}
+[data-skin="aether-industrial-core"] .mod-tag {
+  font-family: var(--font-mono);
+  letter-spacing: 0.1em;
+}
+[data-skin="aether-industrial-core"] .switch-track {
+  background: var(--bg);
+  border: 1px solid var(--border-soft);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+}
+[data-skin="aether-industrial-core"] .switch input:checked + .switch-track {
+  background: linear-gradient(180deg, #ffb779 0%, #cd7f32 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 0 10px var(--cyan-glow);
+}
+[data-skin="aether-industrial-core"] .tab-bar {
+  border-top: 2px solid var(--border-soft);
+  background: var(--nav-translucent);
+  backdrop-filter: none;
+  box-shadow: 0 -3px 10px rgba(0,0,0,0.4);
+}
+[data-skin="aether-industrial-core"] .app-header {
+  border-bottom: 2px solid var(--border-soft);
+  background: var(--nav-translucent);
+  backdrop-filter: none;
+}
+
 .sheet-section { margin-bottom: 22px; }
 .sheet-section--compact { margin-bottom: 14px; }
 .sheet-section--compact .field-group-heading { margin: 0 0 6px; font-size: 0.86rem; }
