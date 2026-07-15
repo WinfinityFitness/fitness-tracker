@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.11.3';
+const APP_VERSION = 'WF_SYS_V.11.4';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -3192,37 +3192,52 @@ function estimateCardioSteps(distanceKm, type) {
   return Math.round((distanceKm * 1000) / stride);
 }
 
+let cardioStatsErrorShown = false;
 function updateCardioStats() {
-  const elapsed = Math.round((Date.now() - cardioStartTime) / 1000);
-  document.getElementById('cardioDuration').textContent = formatCardioClock(elapsed);
-  const unit = distUnitForProfile(getProfile());
-  const dist = unit === 'mi' ? kmToMi(cardioDistanceKm) : cardioDistanceKm;
-  document.getElementById('cardioDistance').textContent = dist.toFixed(2);
-  document.getElementById('cardioDistanceLabel').textContent = `Distance (${unit})`;
-  document.getElementById('cardioPaceLabel').textContent = `Avg pace /${unit}`;
-  document.getElementById('cardioBestPaceLabel').textContent = `Fastest /${unit}`;
-  document.getElementById('cardioAvgSpeedLabel').textContent = `Avg speed ${unit === 'mi' ? 'mph' : 'km/h'}`;
-  document.getElementById('cardioMaxSpeedLabel').textContent = `Max speed ${unit === 'mi' ? 'mph' : 'km/h'}`;
+  // Temporary diagnostic wrapper — a live bug report says these on-screen
+  // stats never move during tracking even though the underlying data is
+  // clearly fine (the saved record on Stop & Save is accurate), pointing at
+  // an exception somewhere in this function that's failing silently with
+  // no console access available to read it directly. Surfaces the actual
+  // error as a toast (once) instead, so it can be read directly off the
+  // device. Remove this try/catch once the real cause is found and fixed.
+  try {
+    const elapsed = Math.round((Date.now() - cardioStartTime) / 1000);
+    document.getElementById('cardioDuration').textContent = formatCardioClock(elapsed);
+    const unit = distUnitForProfile(getProfile());
+    const dist = unit === 'mi' ? kmToMi(cardioDistanceKm) : cardioDistanceKm;
+    document.getElementById('cardioDistance').textContent = dist.toFixed(2);
+    document.getElementById('cardioDistanceLabel').textContent = `Distance (${unit})`;
+    document.getElementById('cardioPaceLabel').textContent = `Avg pace /${unit}`;
+    document.getElementById('cardioBestPaceLabel').textContent = `Fastest /${unit}`;
+    document.getElementById('cardioAvgSpeedLabel').textContent = `Avg speed ${unit === 'mi' ? 'mph' : 'km/h'}`;
+    document.getElementById('cardioMaxSpeedLabel').textContent = `Max speed ${unit === 'mi' ? 'mph' : 'km/h'}`;
 
-  if (dist > 0.05) {
-    document.getElementById('cardioPace').textContent = formatPaceSecPerUnit(elapsed / dist);
-  }
-  const avgSpeedKmh = elapsed > 0 ? cardioDistanceKm / (elapsed / 3600) : 0;
-  const avgSpeed = unit === 'mi' ? kmToMi(avgSpeedKmh) : avgSpeedKmh;
-  document.getElementById('cardioAvgSpeed').textContent = avgSpeed.toFixed(1);
-  const maxSpeed = unit === 'mi' ? kmToMi(cardioMaxSpeedKmh) : cardioMaxSpeedKmh;
-  document.getElementById('cardioMaxSpeed').textContent = maxSpeed.toFixed(1);
-  if (cardioMaxSpeedKmh > 0) {
-    const bestPaceSecPerKm = 3600 / cardioMaxSpeedKmh;
-    const bestPaceSecPerUnit = unit === 'mi' ? bestPaceSecPerKm / 0.621371 : bestPaceSecPerKm;
-    document.getElementById('cardioBestPace').textContent = formatPaceSecPerUnit(bestPaceSecPerUnit);
-  }
+    if (dist > 0.05) {
+      document.getElementById('cardioPace').textContent = formatPaceSecPerUnit(elapsed / dist);
+    }
+    const avgSpeedKmh = elapsed > 0 ? cardioDistanceKm / (elapsed / 3600) : 0;
+    const avgSpeed = unit === 'mi' ? kmToMi(avgSpeedKmh) : avgSpeedKmh;
+    document.getElementById('cardioAvgSpeed').textContent = avgSpeed.toFixed(1);
+    const maxSpeed = unit === 'mi' ? kmToMi(cardioMaxSpeedKmh) : cardioMaxSpeedKmh;
+    document.getElementById('cardioMaxSpeed').textContent = maxSpeed.toFixed(1);
+    if (cardioMaxSpeedKmh > 0) {
+      const bestPaceSecPerKm = 3600 / cardioMaxSpeedKmh;
+      const bestPaceSecPerUnit = unit === 'mi' ? bestPaceSecPerKm / 0.621371 : bestPaceSecPerKm;
+      document.getElementById('cardioBestPace').textContent = formatPaceSecPerUnit(bestPaceSecPerUnit);
+    }
 
-  const type = document.getElementById('cardioType').value;
-  const steps = estimateCardioSteps(cardioDistanceKm, type);
-  document.getElementById('cardioStepsTile').hidden = steps == null;
-  if (steps != null) document.getElementById('cardioSteps').textContent = steps.toLocaleString();
-  syncOutdoorWidget(elapsed);
+    const type = document.getElementById('cardioType').value;
+    const steps = estimateCardioSteps(cardioDistanceKm, type);
+    document.getElementById('cardioStepsTile').hidden = steps == null;
+    if (steps != null) document.getElementById('cardioSteps').textContent = steps.toLocaleString();
+    syncOutdoorWidget(elapsed);
+  } catch (e) {
+    if (!cardioStatsErrorShown) {
+      cardioStatsErrorShown = true;
+      showRestToast('⚠️ updateCardioStats error: ' + (e && (e.message || e)) + (e && e.stack ? ' | ' + e.stack.split('\n')[0] : ''));
+    }
+  }
 }
 
 // In the plain browser / installed PWA, GPS tracking is regular
