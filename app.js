@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.9.7';
+const APP_VERSION = 'WF_SYS_V.9.8';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9110,6 +9110,74 @@ function refreshDigitalIdOverrideVisibility() {
   if (updatesRow) updatesRow.hidden = !loggedIn;
   const updatesHint = document.getElementById('updatesEnabledHint');
   if (updatesHint) updatesHint.hidden = !loggedIn;
+  const drawerTab = document.getElementById('adminDrawerTab');
+  if (drawerTab) drawerTab.hidden = !loggedIn;
+  if (!loggedIn) closeAdminDrawer();
+}
+
+/* ---------------------------------------------------------------- */
+/* Admin Command Center — small drag/tap tab on the screen edge that   */
+/* only appears while logged in as admin (see refreshDigitalIdOverrideVisibility */
+/* above), opening a slide-out panel holding every admin control that   */
+/* used to be scattered across Settings/Nexus.                          */
+/* ---------------------------------------------------------------- */
+function openAdminDrawer() {
+  const drawer = document.getElementById('adminDrawer');
+  const backdrop = document.getElementById('adminDrawerBackdrop');
+  if (!drawer) return;
+  drawer.hidden = false;
+  backdrop.hidden = false;
+  requestAnimationFrame(() => {
+    drawer.classList.add('is-open');
+    backdrop.classList.add('is-open');
+  });
+}
+function closeAdminDrawer() {
+  const drawer = document.getElementById('adminDrawer');
+  const backdrop = document.getElementById('adminDrawerBackdrop');
+  if (!drawer || drawer.hidden) return;
+  drawer.classList.remove('is-open');
+  backdrop.classList.remove('is-open');
+  setTimeout(() => { drawer.hidden = true; backdrop.hidden = true; }, 280);
+}
+function toggleAdminDrawer() {
+  const drawer = document.getElementById('adminDrawer');
+  if (drawer && drawer.classList.contains('is-open')) closeAdminDrawer();
+  else openAdminDrawer();
+}
+
+function initAdminDrawer() {
+  const tab = document.getElementById('adminDrawerTab');
+  const drawer = document.getElementById('adminDrawer');
+  const backdrop = document.getElementById('adminDrawerBackdrop');
+  const closeBtn = document.getElementById('btnCloseAdminDrawer');
+  const mediaSyncBtn = document.getElementById('btnDrawerOpenMediaSync');
+  const quicklinks = document.querySelector('.admin-drawer-quicklinks');
+  if (!tab || !drawer) return;
+
+  closeBtn.addEventListener('click', closeAdminDrawer);
+  backdrop.addEventListener('click', closeAdminDrawer);
+
+  // A short drag (or a plain tap) on the edge tab opens the drawer — both
+  // just measure the gesture on release and hand off to the same
+  // CSS-transition-driven open, rather than tracking the finger live, so
+  // there's one animation path instead of two to keep in sync.
+  let startX = null;
+  tab.addEventListener('pointerdown', e => { startX = e.clientX; });
+  tab.addEventListener('pointerup', e => {
+    if (startX === null) return;
+    const dx = startX - e.clientX; // positive = dragged left, toward open
+    startX = null;
+    if (dx > 12) openAdminDrawer(); else toggleAdminDrawer();
+  });
+
+  // Quick-action buttons (Post Announcement, Assign Targets) open their own
+  // overlay at a lower z-index than the drawer — close the drawer first so
+  // they don't end up rendering behind it.
+  quicklinks.addEventListener('click', e => {
+    if (e.target.closest('button')) closeAdminDrawer();
+  });
+  if (mediaSyncBtn) mediaSyncBtn.addEventListener('click', openMediaSyncCalibration);
 }
 
 function initDigitalIdOverride() {
@@ -12824,6 +12892,7 @@ safeInit(initDeepLinkHandling, 'initDeepLinkHandling');
 safeInit(initProgressPhotoCamera, 'initProgressPhotoCamera');
 safeInit(initLeaderboard, 'initLeaderboard');
 safeInit(initAnnouncementWidget, 'initAnnouncementWidget');
+safeInit(initAdminDrawer, 'initAdminDrawer');
 safeInit(loadSetupForm, 'loadSetupForm');
 safeInit(loadCheckinForm, 'loadCheckinForm');
 safeInit(() => { document.getElementById('sysVersion').textContent = APP_VERSION; }, 'sysVersion');

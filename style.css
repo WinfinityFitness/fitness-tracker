@@ -2410,6 +2410,127 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .sheet-overlay--fullscreen .sheet-handle { display: none; }
 #datePickerOverlay { z-index: 170; padding-left: 18px; padding-right: 18px; }
 
+/* ---------------- Admin Command Center (slide-out drawer) ---------------- */
+/* Tab visibility is gated to isAdminLoggedIn() in refreshDigitalIdOverrideVisibility()
+   — it never shows for a regular user. Sized ~3mm x 20mm per spec (11px x 76px at
+   a 96dpi CSS reference), with the tap/drag hit target padded out wider than the
+   visible bar since 11px alone is under any comfortable touch-target minimum. */
+.admin-drawer-tab {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 400;
+  width: 30px;
+  height: 92px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  cursor: grab;
+  touch-action: none;
+}
+.admin-drawer-tab[hidden] { display: none; }
+.admin-drawer-tab:active { cursor: grabbing; }
+.admin-drawer-tab-bar {
+  width: 11px;
+  height: 76px;
+  border-radius: 6px 0 0 6px;
+  background: linear-gradient(180deg, var(--cyan), var(--cyan-dim));
+  box-shadow: 0 0 10px var(--cyan-glow), -1px 0 3px rgba(0,0,0,0.3);
+  position: relative;
+}
+.admin-drawer-tab-bar::after {
+  content: '‹';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -52%);
+  color: var(--bg);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.admin-drawer-backdrop {
+  position: fixed; inset: 0;
+  z-index: 399;
+  background: rgba(0,0,0,0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.admin-drawer-backdrop[hidden] { display: none; }
+.admin-drawer-backdrop.is-open { opacity: 1; pointer-events: auto; }
+
+.admin-drawer {
+  position: fixed;
+  top: 0; right: 0;
+  height: 100%;
+  width: min(86vw, 380px);
+  z-index: 400;
+  background: var(--surface-1);
+  border-left: 1px solid var(--border);
+  box-shadow: -8px 0 28px rgba(0,0,0,0.45);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.28s cubic-bezier(.2,.8,.2,1);
+}
+.admin-drawer[hidden] { display: none; }
+.admin-drawer.is-open { transform: translateX(0); }
+.admin-drawer.is-dragging { transition: none; }
+.admin-drawer-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: calc(14px + env(safe-area-inset-top)) 16px 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.admin-drawer-close {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.admin-drawer-title {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.admin-drawer-scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px 16px calc(28px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.admin-drawer-quicklinks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.admin-drawer-quicklinks .announcement-menu-item {
+  display: block;
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--card-radius);
+  padding: 10px 12px;
+}
+
 .donation-overlay {
   position: fixed;
   inset: 0;

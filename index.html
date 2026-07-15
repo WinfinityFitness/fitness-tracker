@@ -22,6 +22,182 @@
   <div class="custom-bg-overlay" id="customBgOverlay"></div>
 </div>
 
+<!-- Admin Command Center: small drag/tap tab on the right edge, visible only
+     while logged in as admin (see refreshDigitalIdOverrideVisibility() in
+     app.js), opens a slide-out panel holding every admin control that used
+     to be scattered across Settings/Nexus. -->
+<button type="button" class="admin-drawer-tab" id="adminDrawerTab" hidden aria-label="Open admin panel">
+  <span class="admin-drawer-tab-bar" aria-hidden="true"></span>
+</button>
+<div class="admin-drawer-backdrop" id="adminDrawerBackdrop" hidden></div>
+<div class="admin-drawer" id="adminDrawer" hidden>
+  <div class="admin-drawer-header">
+    <button type="button" class="admin-drawer-close" id="btnCloseAdminDrawer" aria-label="Close admin panel">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+    </button>
+    <p class="admin-drawer-title">Admin Panel</p>
+  </div>
+  <div class="admin-drawer-scroll" id="adminDrawerScroll">
+    <div class="admin-drawer-quicklinks">
+      <button type="button" class="announcement-menu-item" id="btnAdminPost" hidden>Post Announcement</button>
+      <button type="button" class="announcement-menu-item" id="btnAdminAssignTargets" hidden>Assign Targets</button>
+      <button type="button" class="announcement-menu-item" id="btnDrawerOpenMediaSync">Media Sync Calibration</button>
+      <button type="button" class="announcement-menu-item" id="btnAdminLogout" hidden>Log Out</button>
+    </div>
+
+    <div class="chart-card" id="updatesEnabledSection">
+      <p class="mod-tag">Admin_updates_01</p>
+      <div class="chart-card-head"><span class="chart-card-title">Admin: Force Updates</span></div>
+      <div class="theme-toggle-row" id="updatesEnabledRow" style="margin-top:12px;" hidden>
+        <span>Updates enabled (app-wide)</span>
+        <label class="switch">
+          <input type="checkbox" id="updatesEnabledToggle">
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+        </label>
+      </div>
+      <p class="hint hint--sm" id="updatesEnabledHint" hidden>Admin only. Turn this off to freeze every user on their current version — no one's app will check for or apply an update until it's switched back on.</p>
+    </div>
+
+    <div class="sheet-section" id="digitalIdOverrideSection" hidden>
+      <p class="field-group-heading">Admin: Digital ID Transfer</p>
+      <p class="hint">Your own Digital ID is restored automatically from your local/Drive backup now, so this is only for fixing another user's ID (e.g. a duplicate row after a data wipe). Everything tied to their account moves to the new ID, fully replacing whatever was already there.</p>
+      <label class="field">
+        <span>User Digital ID</span>
+        <input type="text" id="digitalIdOverrideFromInput" placeholder="e.g. WF-4JVFB4" maxlength="9" style="text-transform:uppercase;">
+      </label>
+      <label class="field">
+        <span>New Digital ID</span>
+        <input type="text" id="digitalIdOverrideInput" placeholder="e.g. WF-B932GB" maxlength="9" style="text-transform:uppercase;">
+      </label>
+      <button type="button" class="btn btn--primary" id="btnSetDigitalId">Transfer Digital ID</button>
+      <p class="save-note" id="digitalIdOverrideNote"></p>
+    </div>
+
+    <div class="sheet-section" id="adFreeOverrideSection" hidden>
+      <p class="field-group-heading">Admin: Ad-Free Access</p>
+      <p class="hint">Manually confirm their GCash donation came in first (there's no automatic payment confirmation), then grant a time-limited ad-free window — it expires on its own, nothing to remember to revoke.</p>
+      <label class="field">
+        <span>Digital ID</span>
+        <input type="text" id="adFreeDigitalIdInput" placeholder="e.g. WF-B932GB" maxlength="9" style="text-transform:uppercase;">
+      </label>
+      <label class="field">
+        <span>Hours</span>
+        <input type="number" id="adFreeHoursInput" min="1" step="1" value="24">
+      </label>
+      <div class="btn-row">
+        <button type="button" class="btn btn--primary" id="btnGrantAdFree">Grant ad-free</button>
+        <button type="button" class="btn" id="btnRevokeAdFree">Revoke ad-free</button>
+      </div>
+      <p class="save-note" id="adFreeNote"></p>
+    </div>
+
+    <div class="chart-card" id="adManagerSection" hidden>
+      <p class="mod-tag">Admin_ads_01</p>
+      <div class="chart-card-head"><span class="chart-card-title">Admin: Startup Ad Splash</span></div>
+      <div class="theme-toggle-row">
+        <span>Ads enabled (app-wide)</span>
+        <label class="switch">
+          <input type="checkbox" id="adsEnabledToggle">
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+        </label>
+      </div>
+      <p class="hint hint--sm">Turn this off to pause the startup ad splash for everyone — useful while you don't have any affiliate links set up yet.</p>
+      <div id="adManagerList"></div>
+      <p class="empty-note" id="adManagerEmptyNote" hidden>No ad products yet — add one below.</p>
+      <p class="field-group-heading" style="font-size:0.8rem;margin-top:14px;">Add / edit ad</p>
+      <input type="hidden" id="adFormId">
+      <label class="field">
+        <span>Product name</span>
+        <input type="text" id="adFormName" placeholder="e.g. Resistance Bands Set">
+      </label>
+      <label class="field">
+        <span>Image URL</span>
+        <input type="text" id="adFormImage" placeholder="https://...">
+      </label>
+      <label class="field">
+        <span>Affiliate link</span>
+        <input type="text" id="adFormLink" placeholder="https://...">
+      </label>
+      <label class="field field--checkbox"><input type="checkbox" id="adFormActive" checked><span>Active</span></label>
+      <div class="btn-row">
+        <button type="button" class="btn btn--primary" id="btnSaveAdProduct">Save ad</button>
+        <button type="button" class="btn" id="btnCancelAdEdit" hidden>Cancel edit</button>
+      </div>
+      <p class="save-note" id="adManagerNote"></p>
+    </div>
+
+    <div class="chart-card" id="splashLogoManagerSection" hidden>
+      <p class="mod-tag">Admin_splash_01</p>
+      <div class="chart-card-head"><span class="chart-card-title">Admin: App Boot Logo</span></div>
+      <p class="hint hint--sm">The smaller logo+text loading screen shown while the app boots (not the big flashed logo on the Android app's first frame — that one's bundled into the app and needs a rebuild to change). Paste an image URL to replace it for everyone right away, no update required. Leave the field blank and Save to go back to the default Winfinity logo.</p>
+      <label class="field">
+        <span>Boot logo image URL</span>
+        <input type="text" id="splashLogoManagerUrl" placeholder="https://...">
+      </label>
+      <label class="field">
+        <span>Tolerance</span>
+        <input type="range" id="splashLogoRemoveBgTolerance" min="1" max="100" step="1" value="13">
+        <output id="splashLogoRemoveBgToleranceOut">13</output>
+      </label>
+      <p class="hint hint--sm">How close a color has to be to count as background — low tolerance only clears near-exact matches (safer around a subject with similar shading), high tolerance clears a wider range of colors in one tap (faster for a noisy/gradient background, but risks eating into the subject). Applies to both the automatic edge pass and each tap-to-remove spot below.</p>
+      <button type="button" class="btn glass-emboss" id="btnSplashLogoRemoveBg" style="width:100%;">🪄 Convert to PNG &amp; remove background</button>
+      <p class="hint hint--sm">Processes the image above in your browser: converts it to a transparent PNG and clears out a solid-color background (flood-filled in from the edges, so any subject in the middle stays intact). Only works if the image host allows cross-origin access — if it fails, download the image and host it somewhere that does (e.g. Supabase, Imgur).</p>
+      <p class="save-note" id="splashLogoRemoveBgNote"></p>
+      <div id="splashLogoRemoveBgPreviewSection" hidden>
+        <p class="hint hint--sm">Tap any leftover patch below (like an enclosed hole the edge-fill couldn't reach) to clear it too — keep tapping until it looks right.</p>
+        <canvas id="splashLogoRemoveBgCanvas" style="width:100%;height:auto;border-radius:8px;background:repeating-conic-gradient(#2a2a2a 0% 25%, #1a1a1a 0% 50%) 50% / 16px 16px;cursor:crosshair;"></canvas>
+        <button type="button" class="btn btn--primary" id="btnSplashLogoRemoveBgApply" style="width:100%;margin-top:8px;">✅ Use this image</button>
+      </div>
+      <div id="splashLogoCropSection" hidden>
+        <p class="field-group-heading" style="font-size:0.8rem;">Image framing</p>
+        <div class="prep-meal-crop-frame prep-meal-crop-frame--phone" id="splashLogoCropFrame">
+          <img id="splashLogoCropImg" src="" alt="" draggable="false">
+        </div>
+        <div class="media-timing-row">
+          <span>0.3x</span>
+          <span class="media-timing-value" id="splashLogoZoomValue">1.0x</span>
+          <span>3x</span>
+        </div>
+        <input type="range" id="splashLogoZoomSlider" min="30" max="300" step="5" value="100">
+        <p class="hint hint--sm">Drag the preview to reposition the focal point; slide to zoom in or out (below 1x shrinks the logo with room around it). Preview is shaped like a phone screen to match the loading screen.</p>
+      </div>
+      <button type="button" class="btn btn--primary" id="btnSplashLogoManagerSave" style="width:100%;margin-top:10px;">Save</button>
+      <p class="save-note" id="splashLogoManagerNote"></p>
+    </div>
+
+    <div class="chart-card" id="prepMealManagerSection" hidden>
+      <p class="mod-tag">Admin_prepmeal_01</p>
+      <div class="chart-card-head">
+        <span class="chart-card-title">Admin: Prep Meal Menu</span>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <button type="button" class="icon-btn glass-emboss" id="btnPrepMealManagerExpand" aria-label="Show more prep meals" hidden>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <button type="button" class="btn btn--sm" id="btnAdminAddPrepMeal">+ Add meal</button>
+        </div>
+      </div>
+      <p class="hint hint--sm">Covers meals from both Admin and users — edit or delete any row here. User-submitted meals keep their original "by" credit even after an admin edit.</p>
+      <div id="prepMealManagerList"></div>
+      <p class="empty-note" id="prepMealManagerEmptyNote" hidden>No prep meals yet — tap + Add meal above.</p>
+    </div>
+
+    <div class="chart-card" id="syncLogsSection" hidden>
+      <p class="mod-tag">Admin_sync_01</p>
+      <div class="chart-card-head">
+        <span class="chart-card-title">Sync Logs</span>
+        <button type="button" class="icon-btn glass-emboss" id="btnShareSyncLogs" aria-label="Share Sync Logs">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="2"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.6l7.4-4.2M8.3 13.4l7.4 4.2"/></svg>
+        </button>
+      </div>
+      <p class="hint hint--sm">Digital IDs that have connected Google Drive backup, with the email, gender, and location synced at that time. Admin-only — never visible to other users.</p>
+      <p class="sync-log-summary" id="syncLogsSummary">0 synced</p>
+      <div class="sync-log-header"><span>Digital ID</span><span>Gender</span><span>Email</span><span>Location</span></div>
+      <div id="syncLogsList"></div>
+      <p class="empty-note" id="syncLogsEmptyNote" hidden>No synced accounts yet.</p>
+    </div>
+  </div>
+</div>
+
 <div class="splash-screen" id="splashScreen">
   <img class="splash-logo" src="icons/icon-512.png" alt="Winfinity" id="splashLogo">
   <p class="splash-caption">Masarap talaga kumain at matulog, pero mas masarap if ikaw mismo masarap din</p>
@@ -478,21 +654,6 @@
       </div>
     </div>
 
-    <div class="chart-card" id="prepMealManagerSection" hidden>
-      <p class="mod-tag">Admin_prepmeal_01</p>
-      <div class="chart-card-head">
-        <span class="chart-card-title">Admin: Prep Meal Menu</span>
-        <div style="display:flex;align-items:center;gap:6px;">
-          <button type="button" class="icon-btn glass-emboss" id="btnPrepMealManagerExpand" aria-label="Show more prep meals" hidden>
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-          </button>
-          <button type="button" class="btn btn--sm" id="btnAdminAddPrepMeal">+ Add meal</button>
-        </div>
-      </div>
-      <p class="hint hint--sm">Covers meals from both Admin and users — edit or delete any row here. User-submitted meals keep their original "by" credit even after an admin edit.</p>
-      <div id="prepMealManagerList"></div>
-      <p class="empty-note" id="prepMealManagerEmptyNote" hidden>No prep meals yet — tap + Add meal above.</p>
-    </div>
 
     <div class="hero-card fuel-status-card" id="fuelStatusCard">
       <div class="chart-card-head">
@@ -811,94 +972,8 @@
     </div>
     <p class="empty-note" id="lbEmptyNote" hidden>No Nexus data yet. Tap Sync to share and see others.</p>
 
-    <div class="chart-card" id="adManagerSection" hidden>
-      <p class="mod-tag">Admin_ads_01</p>
-      <div class="chart-card-head"><span class="chart-card-title">Admin: Startup Ad Splash</span></div>
-      <div class="theme-toggle-row">
-        <span>Ads enabled (app-wide)</span>
-        <label class="switch">
-          <input type="checkbox" id="adsEnabledToggle">
-          <span class="switch-track"><span class="switch-thumb"></span></span>
-        </label>
-      </div>
-      <p class="hint hint--sm">Turn this off to pause the startup ad splash for everyone — useful while you don't have any affiliate links set up yet.</p>
-      <div id="adManagerList"></div>
-      <p class="empty-note" id="adManagerEmptyNote" hidden>No ad products yet — add one below.</p>
-      <p class="field-group-heading" style="font-size:0.8rem;margin-top:14px;">Add / edit ad</p>
-      <input type="hidden" id="adFormId">
-      <label class="field">
-        <span>Product name</span>
-        <input type="text" id="adFormName" placeholder="e.g. Resistance Bands Set">
-      </label>
-      <label class="field">
-        <span>Image URL</span>
-        <input type="text" id="adFormImage" placeholder="https://...">
-      </label>
-      <label class="field">
-        <span>Affiliate link</span>
-        <input type="text" id="adFormLink" placeholder="https://...">
-      </label>
-      <label class="field field--checkbox"><input type="checkbox" id="adFormActive" checked><span>Active</span></label>
-      <div class="btn-row">
-        <button type="button" class="btn btn--primary" id="btnSaveAdProduct">Save ad</button>
-        <button type="button" class="btn" id="btnCancelAdEdit" hidden>Cancel edit</button>
-      </div>
-      <p class="save-note" id="adManagerNote"></p>
-    </div>
 
-    <div class="chart-card" id="splashLogoManagerSection" hidden>
-      <p class="mod-tag">Admin_splash_01</p>
-      <div class="chart-card-head"><span class="chart-card-title">Admin: App Boot Logo</span></div>
-      <p class="hint hint--sm">The smaller logo+text loading screen shown while the app boots (not the big flashed logo on the Android app's first frame — that one's bundled into the app and needs a rebuild to change). Paste an image URL to replace it for everyone right away, no update required. Leave the field blank and Save to go back to the default Winfinity logo.</p>
-      <label class="field">
-        <span>Boot logo image URL</span>
-        <input type="text" id="splashLogoManagerUrl" placeholder="https://...">
-      </label>
-      <label class="field">
-        <span>Tolerance</span>
-        <input type="range" id="splashLogoRemoveBgTolerance" min="1" max="100" step="1" value="13">
-        <output id="splashLogoRemoveBgToleranceOut">13</output>
-      </label>
-      <p class="hint hint--sm">How close a color has to be to count as background — low tolerance only clears near-exact matches (safer around a subject with similar shading), high tolerance clears a wider range of colors in one tap (faster for a noisy/gradient background, but risks eating into the subject). Applies to both the automatic edge pass and each tap-to-remove spot below.</p>
-      <button type="button" class="btn glass-emboss" id="btnSplashLogoRemoveBg" style="width:100%;">🪄 Convert to PNG &amp; remove background</button>
-      <p class="hint hint--sm">Processes the image above in your browser: converts it to a transparent PNG and clears out a solid-color background (flood-filled in from the edges, so any subject in the middle stays intact). Only works if the image host allows cross-origin access — if it fails, download the image and host it somewhere that does (e.g. Supabase, Imgur).</p>
-      <p class="save-note" id="splashLogoRemoveBgNote"></p>
-      <div id="splashLogoRemoveBgPreviewSection" hidden>
-        <p class="hint hint--sm">Tap any leftover patch below (like an enclosed hole the edge-fill couldn't reach) to clear it too — keep tapping until it looks right.</p>
-        <canvas id="splashLogoRemoveBgCanvas" style="width:100%;height:auto;border-radius:8px;background:repeating-conic-gradient(#2a2a2a 0% 25%, #1a1a1a 0% 50%) 50% / 16px 16px;cursor:crosshair;"></canvas>
-        <button type="button" class="btn btn--primary" id="btnSplashLogoRemoveBgApply" style="width:100%;margin-top:8px;">✅ Use this image</button>
-      </div>
-      <div id="splashLogoCropSection" hidden>
-        <p class="field-group-heading" style="font-size:0.8rem;">Image framing</p>
-        <div class="prep-meal-crop-frame prep-meal-crop-frame--phone" id="splashLogoCropFrame">
-          <img id="splashLogoCropImg" src="" alt="" draggable="false">
-        </div>
-        <div class="media-timing-row">
-          <span>0.3x</span>
-          <span class="media-timing-value" id="splashLogoZoomValue">1.0x</span>
-          <span>3x</span>
-        </div>
-        <input type="range" id="splashLogoZoomSlider" min="30" max="300" step="5" value="100">
-        <p class="hint hint--sm">Drag the preview to reposition the focal point; slide to zoom in or out (below 1x shrinks the logo with room around it). Preview is shaped like a phone screen to match the loading screen.</p>
-      </div>
-      <button type="button" class="btn btn--primary" id="btnSplashLogoManagerSave" style="width:100%;margin-top:10px;">Save</button>
-      <p class="save-note" id="splashLogoManagerNote"></p>
-    </div>
 
-    <div class="chart-card" id="syncLogsSection" hidden>
-      <p class="mod-tag">Admin_sync_01</p>
-      <div class="chart-card-head">
-        <span class="chart-card-title">Sync Logs</span>
-        <button type="button" class="icon-btn glass-emboss" id="btnShareSyncLogs" aria-label="Share Sync Logs">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="2"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.6l7.4-4.2M8.3 13.4l7.4 4.2"/></svg>
-        </button>
-      </div>
-      <p class="hint hint--sm">Digital IDs that have connected Google Drive backup, with the email, gender, and location synced at that time. Admin-only — never visible to other users.</p>
-      <p class="sync-log-summary" id="syncLogsSummary">0 synced</p>
-      <div class="sync-log-header"><span>Digital ID</span><span>Gender</span><span>Email</span><span>Location</span></div>
-      <div id="syncLogsList"></div>
-      <p class="empty-note" id="syncLogsEmptyNote" hidden>No synced accounts yet.</p>
-    </div>
 
     <div class="chart-card announcement-card" id="announcementCard">
       <div class="chart-card-head">
@@ -909,9 +984,6 @@
           </button>
           <div class="announcement-menu" id="announcementMenu" hidden>
             <button type="button" class="announcement-menu-item" id="btnAdminLogin">Admin Log In</button>
-            <button type="button" class="announcement-menu-item" id="btnAdminPost" hidden>Post Announcement</button>
-            <button type="button" class="announcement-menu-item" id="btnAdminAssignTargets" hidden>Assign Targets</button>
-            <button type="button" class="announcement-menu-item" id="btnAdminLogout" hidden>Log Out</button>
           </div>
         </div>
       </div>
@@ -1723,38 +1795,7 @@
       <p class="hint hint--sm" id="pushNotifHint"></p>
     </div>
 
-    <div class="sheet-section" id="digitalIdOverrideSection" hidden>
-      <p class="field-group-heading">Admin: Digital ID Transfer</p>
-      <p class="hint">Your own Digital ID is restored automatically from your local/Drive backup now, so this is only for fixing another user's ID (e.g. a duplicate row after a data wipe). Everything tied to their account moves to the new ID, fully replacing whatever was already there.</p>
-      <label class="field">
-        <span>User Digital ID</span>
-        <input type="text" id="digitalIdOverrideFromInput" placeholder="e.g. WF-4JVFB4" maxlength="9" style="text-transform:uppercase;">
-      </label>
-      <label class="field">
-        <span>New Digital ID</span>
-        <input type="text" id="digitalIdOverrideInput" placeholder="e.g. WF-B932GB" maxlength="9" style="text-transform:uppercase;">
-      </label>
-      <button type="button" class="btn btn--primary" id="btnSetDigitalId">Transfer Digital ID</button>
-      <p class="save-note" id="digitalIdOverrideNote"></p>
-    </div>
 
-    <div class="sheet-section" id="adFreeOverrideSection" hidden>
-      <p class="field-group-heading">Admin: Ad-Free Access</p>
-      <p class="hint">Manually confirm their GCash donation came in first (there's no automatic payment confirmation), then grant a time-limited ad-free window — it expires on its own, nothing to remember to revoke.</p>
-      <label class="field">
-        <span>Digital ID</span>
-        <input type="text" id="adFreeDigitalIdInput" placeholder="e.g. WF-B932GB" maxlength="9" style="text-transform:uppercase;">
-      </label>
-      <label class="field">
-        <span>Hours</span>
-        <input type="number" id="adFreeHoursInput" min="1" step="1" value="24">
-      </label>
-      <div class="btn-row">
-        <button type="button" class="btn btn--primary" id="btnGrantAdFree">Grant ad-free</button>
-        <button type="button" class="btn" id="btnRevokeAdFree">Revoke ad-free</button>
-      </div>
-      <p class="save-note" id="adFreeNote"></p>
-    </div>
 
     <div class="sheet-section">
       <p class="field-group-heading">Hydration Reminders</p>
@@ -1826,14 +1867,6 @@
       </div>
       <p class="hint hint--sm">When on, a pending update installs automatically right after you Sync to Nexus or Back Up (local or Drive) — those are safe checkpoints since your data's already saved. The app reloads once, right after.</p>
 
-      <div class="theme-toggle-row" id="updatesEnabledRow" style="margin-top:12px;" hidden>
-        <span>Updates enabled (app-wide)</span>
-        <label class="switch">
-          <input type="checkbox" id="updatesEnabledToggle">
-          <span class="switch-track"><span class="switch-thumb"></span></span>
-        </label>
-      </div>
-      <p class="hint hint--sm" id="updatesEnabledHint" hidden>Admin only. Turn this off to freeze every user on their current version — no one's app will check for or apply an update until it's switched back on.</p>
     </div>
   </div>
 </div>
