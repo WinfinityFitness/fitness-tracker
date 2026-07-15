@@ -856,6 +856,11 @@
       <button type="button" class="btn glass-emboss" id="btnSplashLogoRemoveBg" style="width:100%;">🪄 Convert to PNG &amp; remove background</button>
       <p class="hint hint--sm">Processes the image above in your browser: converts it to a transparent PNG and clears out a solid-color background (flood-filled in from the edges, so any subject in the middle stays intact). Only works if the image host allows cross-origin access — if it fails, download the image and host it somewhere that does (e.g. Supabase, Imgur).</p>
       <p class="save-note" id="splashLogoRemoveBgNote"></p>
+      <div id="splashLogoRemoveBgPreviewSection" hidden>
+        <p class="hint hint--sm">Tap any leftover patch below (like an enclosed hole the edge-fill couldn't reach) to clear it too — keep tapping until it looks right.</p>
+        <canvas id="splashLogoRemoveBgCanvas" style="width:100%;height:auto;border-radius:8px;background:repeating-conic-gradient(#2a2a2a 0% 25%, #1a1a1a 0% 50%) 50% / 16px 16px;cursor:crosshair;"></canvas>
+        <button type="button" class="btn btn--primary" id="btnSplashLogoRemoveBgApply" style="width:100%;margin-top:8px;">✅ Use this image</button>
+      </div>
       <div id="splashLogoCropSection" hidden>
         <p class="field-group-heading" style="font-size:0.8rem;">Image framing</p>
         <div class="prep-meal-crop-frame" id="splashLogoCropFrame">
@@ -1602,7 +1607,7 @@
           <option value="sovereign-core">Sovereign Core</option>
           <option value="hashira-core">Hashira Core</option>
           <option value="asanoha-digital">Nezuko Digital</option>
-          <option value="aether-industrial-core">Aether-Industrial Core</option>
+          <option value="steampunk-core">Steampunk Core</option>
         </select>
       </label>
       <p class="hint">Themes work with the light/dark switch above — pick a theme, then toggle light or dark within it. Grand Core is designed for light mode.</p>

@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.9.2';
+const APP_VERSION = 'WF_SYS_V.9.3';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9399,7 +9399,44 @@ function floodRemoveBackground(imageData, threshold = 32) {
   return imageData;
 }
 
-async function removeImageBackgroundClientSide(url) {
+// Same flood-fill as floodRemoveBackground, but seeded from one clicked
+// point instead of every border pixel — for enclosed regions (a hole inside
+// a logo, a gap between two subject parts) that the border pass can't
+// reach because nothing connects them to the image edge. Color reference is
+// sampled at the click point itself rather than the corners.
+function floodRemoveFromPoint(imageData, startX, startY, threshold = 32) {
+  const { data, width, height } = imageData;
+  const idx = (x, y) => (y * width + x) * 4;
+  const i0 = idx(startX, startY);
+  const br = data[i0], bg = data[i0 + 1], bb = data[i0 + 2];
+
+  const visited = new Uint8Array(width * height);
+  const isBg = (x, y) => {
+    const i = idx(x, y);
+    const dr = data[i] - br, dg = data[i + 1] - bg, db = data[i + 2] - bb;
+    return Math.sqrt(dr * dr + dg * dg + db * db) <= threshold;
+  };
+  const stack = [];
+  const seed = (x, y) => {
+    if (x < 0 || y < 0 || x >= width || y >= height) return;
+    const p = y * width + x;
+    if (!visited[p] && isBg(x, y)) { visited[p] = 1; stack.push(p); }
+  };
+  seed(startX, startY);
+  while (stack.length) {
+    const p = stack.pop();
+    const x = p % width, y = (p / width) | 0;
+    seed(x - 1, y); seed(x + 1, y); seed(x, y - 1); seed(x, y + 1);
+  }
+  for (let p = 0; p < width * height; p++) if (visited[p]) data[p * 4 + 3] = 0;
+  return imageData;
+}
+
+// Loads the URL, runs the automatic border-seeded pass, and draws the
+// result onto the given visible <canvas> (sized to the image's natural
+// resolution) so btnSplashLogoRemoveBgApply's click handler can keep
+// punching out leftover enclosed regions before finalizing.
+async function removeImageBackgroundClientSide(url, targetCanvas) {
   const img = await new Promise((resolve, reject) => {
     const el = new Image();
     el.crossOrigin = 'anonymous';
@@ -9407,20 +9444,18 @@ async function removeImageBackgroundClientSide(url) {
     el.onerror = () => reject(new Error('Could not load that image URL.'));
     el.src = url;
   });
-  const canvas = document.createElement('canvas');
-  canvas.width = img.naturalWidth;
-  canvas.height = img.naturalHeight;
-  const ctx = canvas.getContext('2d');
+  targetCanvas.width = img.naturalWidth;
+  targetCanvas.height = img.naturalHeight;
+  const ctx = targetCanvas.getContext('2d');
   ctx.drawImage(img, 0, 0);
   let imageData;
   try {
-    imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    imageData = ctx.getImageData(0, 0, targetCanvas.width, targetCanvas.height);
   } catch (e) {
     throw new Error('This image host blocks cross-origin access — download it and host it somewhere that allows CORS (e.g. Supabase Storage, Imgur).');
   }
   floodRemoveBackground(imageData);
   ctx.putImageData(imageData, 0, 0);
-  return canvas.toDataURL('image/png');
 }
 
 async function fetchSplashSettings() {
@@ -9524,7 +9559,9 @@ function initSplashLogoManager() {
   if (!saveBtn) return;
   initSplashLogoCropControls();
   const removeBgBtn = document.getElementById('btnSplashLogoRemoveBg');
-  if (removeBgBtn) {
+  const previewSection = document.getElementById('splashLogoRemoveBgPreviewSection');
+  const previewCanvas = document.getElementById('splashLogoRemoveBgCanvas');
+  if (removeBgBtn && previewCanvas) {
     removeBgBtn.addEventListener('click', async () => {
       const note = document.getElementById('splashLogoRemoveBgNote');
       const urlInput = document.getElementById('splashLogoManagerUrl');
@@ -9533,15 +9570,29 @@ function initSplashLogoManager() {
       note.textContent = 'Processing…';
       removeBgBtn.disabled = true;
       try {
-        const dataUrl = await removeImageBackgroundClientSide(url);
-        urlInput.value = dataUrl;
-        refreshSplashLogoCropSection();
-        note.textContent = 'Done — background removed. Review the framing below, then Save.';
+        await removeImageBackgroundClientSide(url, previewCanvas);
+        previewSection.hidden = false;
+        note.textContent = 'Edges cleared — tap any leftover patch (like an enclosed hole) to remove it too, then confirm below.';
       } catch (e) {
         note.textContent = e.message || 'Could not process that image.';
       } finally {
         removeBgBtn.disabled = false;
       }
+    });
+    previewCanvas.addEventListener('click', e => {
+      const rect = previewCanvas.getBoundingClientRect();
+      const x = Math.round((e.clientX - rect.left) / rect.width * previewCanvas.width);
+      const y = Math.round((e.clientY - rect.top) / rect.height * previewCanvas.height);
+      const ctx = previewCanvas.getContext('2d');
+      const imageData = ctx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
+      floodRemoveFromPoint(imageData, x, y);
+      ctx.putImageData(imageData, 0, 0);
+    });
+    document.getElementById('btnSplashLogoRemoveBgApply').addEventListener('click', () => {
+      document.getElementById('splashLogoManagerUrl').value = previewCanvas.toDataURL('image/png');
+      previewSection.hidden = true;
+      refreshSplashLogoCropSection();
+      document.getElementById('splashLogoRemoveBgNote').textContent = 'Applied. Review the framing below, then Save.';
     });
   }
   saveBtn.addEventListener('click', async () => {
