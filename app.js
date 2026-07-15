@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.11.5';
+const APP_VERSION = 'WF_SYS_V.11.6';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -3206,7 +3206,7 @@ function updateCardioStats() {
   // startCardioTracking) once the real cause is found and fixed.
   if (!cardioStatsFirstTickShown) {
     cardioStatsFirstTickShown = true;
-    showRestToast('🔧 diag: updateCardioStats tick #1 fired');
+    alert('🔧 diag: updateCardioStats tick #1 fired');
   }
   try {
     const elapsed = Math.round((Date.now() - cardioStartTime) / 1000);
@@ -3325,7 +3325,7 @@ function startCardioTracking() {
     const { latitude, longitude, accuracy } = pos.coords;
     if (!cardioGpsFirstFixShown) {
       cardioGpsFirstFixShown = true;
-      showRestToast(`🔧 diag: first GPS fix, accuracy=${accuracy}`);
+      alert(`🔧 diag: first GPS fix, accuracy=${accuracy}`);
     }
     if (accuracy != null && accuracy > 50) return;
     const point = { lat: latitude, lon: longitude, t: Date.now(), accuracy: accuracy || 0 };
@@ -3363,7 +3363,7 @@ function startCardioTracking() {
     }
   });
 
-  showRestToast('🔧 diag: reached setInterval setup');
+  alert('🔧 diag: reached setInterval setup');
   cardioTickId = setInterval(updateCardioStats, 1000);
   startCardioHydrationReminders();
 
