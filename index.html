@@ -853,6 +853,9 @@
         <span>Boot logo image URL</span>
         <input type="text" id="splashLogoManagerUrl" placeholder="https://...">
       </label>
+      <button type="button" class="btn glass-emboss" id="btnSplashLogoRemoveBg" style="width:100%;">🪄 Convert to PNG &amp; remove background</button>
+      <p class="hint hint--sm">Processes the image above in your browser: converts it to a transparent PNG and clears out a solid-color background (flood-filled in from the edges, so any subject in the middle stays intact). Only works if the image host allows cross-origin access — if it fails, download the image and host it somewhere that does (e.g. Supabase, Imgur).</p>
+      <p class="save-note" id="splashLogoRemoveBgNote"></p>
       <div id="splashLogoCropSection" hidden>
         <p class="field-group-heading" style="font-size:0.8rem;">Image framing</p>
         <div class="prep-meal-crop-frame" id="splashLogoCropFrame">

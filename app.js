@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.9.1';
+const APP_VERSION = 'WF_SYS_V.9.2';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9344,6 +9344,85 @@ function initAdManager() {
 /* the big native logo flash before it is bundled into the APK and     */
 /* can only change on rebuild).                                        */
 /* ---------------------------------------------------------------- */
+
+// Flood-fills a solid-color background out to transparent, seeded from the
+// image's own border pixels (not a global color threshold) — same technique
+// used to clean up the Aether-Industrial splash logo, run here in-browser
+// via Canvas instead of a Node/sharp script. Background color is sampled
+// from the four corners (averaged) rather than assumed to be black, so it
+// works on any solid-colored source. A couple of dilation passes afterward
+// clean up the leftover antialiasing fringe right at the cutout edge.
+function floodRemoveBackground(imageData, threshold = 32) {
+  const { data, width, height } = imageData;
+  const idx = (x, y) => (y * width + x) * 4;
+  const corners = [[0, 0], [width - 1, 0], [0, height - 1], [width - 1, height - 1]];
+  let br = 0, bg = 0, bb = 0;
+  corners.forEach(([x, y]) => { const i = idx(x, y); br += data[i]; bg += data[i + 1]; bb += data[i + 2]; });
+  br /= 4; bg /= 4; bb /= 4;
+
+  const visited = new Uint8Array(width * height);
+  const isBg = (x, y) => {
+    const i = idx(x, y);
+    const dr = data[i] - br, dg = data[i + 1] - bg, db = data[i + 2] - bb;
+    return Math.sqrt(dr * dr + dg * dg + db * db) <= threshold;
+  };
+  const stack = [];
+  const seed = (x, y) => {
+    if (x < 0 || y < 0 || x >= width || y >= height) return;
+    const p = y * width + x;
+    if (!visited[p] && isBg(x, y)) { visited[p] = 1; stack.push(p); }
+  };
+  for (let x = 0; x < width; x++) { seed(x, 0); seed(x, height - 1); }
+  for (let y = 0; y < height; y++) { seed(0, y); seed(width - 1, y); }
+  while (stack.length) {
+    const p = stack.pop();
+    const x = p % width, y = (p / width) | 0;
+    seed(x - 1, y); seed(x + 1, y); seed(x, y - 1); seed(x, y + 1);
+  }
+
+  let mask = visited;
+  for (let pass = 0; pass < 2; pass++) {
+    const next = new Uint8Array(mask);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const p = y * width + x;
+        if (mask[p]) continue;
+        if ((x > 0 && mask[p - 1]) || (x < width - 1 && mask[p + 1]) ||
+            (y > 0 && mask[p - width]) || (y < height - 1 && mask[p + width])) {
+          next[p] = 1;
+        }
+      }
+    }
+    mask = next;
+  }
+  for (let p = 0; p < width * height; p++) if (mask[p]) data[p * 4 + 3] = 0;
+  return imageData;
+}
+
+async function removeImageBackgroundClientSide(url) {
+  const img = await new Promise((resolve, reject) => {
+    const el = new Image();
+    el.crossOrigin = 'anonymous';
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error('Could not load that image URL.'));
+    el.src = url;
+  });
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+  let imageData;
+  try {
+    imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  } catch (e) {
+    throw new Error('This image host blocks cross-origin access — download it and host it somewhere that allows CORS (e.g. Supabase Storage, Imgur).');
+  }
+  floodRemoveBackground(imageData);
+  ctx.putImageData(imageData, 0, 0);
+  return canvas.toDataURL('image/png');
+}
+
 async function fetchSplashSettings() {
   if (!sbConfigured()) return null;
   try {
@@ -9444,6 +9523,27 @@ function initSplashLogoManager() {
   const saveBtn = document.getElementById('btnSplashLogoManagerSave');
   if (!saveBtn) return;
   initSplashLogoCropControls();
+  const removeBgBtn = document.getElementById('btnSplashLogoRemoveBg');
+  if (removeBgBtn) {
+    removeBgBtn.addEventListener('click', async () => {
+      const note = document.getElementById('splashLogoRemoveBgNote');
+      const urlInput = document.getElementById('splashLogoManagerUrl');
+      const url = urlInput.value.trim();
+      if (!url) { note.textContent = 'Paste an image URL first.'; return; }
+      note.textContent = 'Processing…';
+      removeBgBtn.disabled = true;
+      try {
+        const dataUrl = await removeImageBackgroundClientSide(url);
+        urlInput.value = dataUrl;
+        refreshSplashLogoCropSection();
+        note.textContent = 'Done — background removed. Review the framing below, then Save.';
+      } catch (e) {
+        note.textContent = e.message || 'Could not process that image.';
+      } finally {
+        removeBgBtn.disabled = false;
+      }
+    });
+  }
   saveBtn.addEventListener('click', async () => {
     const note = document.getElementById('splashLogoManagerNote');
     if (!isAdminLoggedIn()) { note.textContent = 'Admin login required.'; return; }
