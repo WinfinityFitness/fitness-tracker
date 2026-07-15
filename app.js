@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.9.4';
+const APP_VERSION = 'WF_SYS_V.9.5';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9436,7 +9436,7 @@ function floodRemoveFromPoint(imageData, startX, startY, threshold = 32) {
 // result onto the given visible <canvas> (sized to the image's natural
 // resolution) so btnSplashLogoRemoveBgApply's click handler can keep
 // punching out leftover enclosed regions before finalizing.
-async function removeImageBackgroundClientSide(url, targetCanvas) {
+async function removeImageBackgroundClientSide(url, targetCanvas, threshold = 32) {
   const img = await new Promise((resolve, reject) => {
     const el = new Image();
     el.crossOrigin = 'anonymous';
@@ -9454,7 +9454,7 @@ async function removeImageBackgroundClientSide(url, targetCanvas) {
   } catch (e) {
     throw new Error('This image host blocks cross-origin access — download it and host it somewhere that allows CORS (e.g. Supabase Storage, Imgur).');
   }
-  floodRemoveBackground(imageData);
+  floodRemoveBackground(imageData, threshold);
   ctx.putImageData(imageData, 0, 0);
 }
 
@@ -9561,6 +9561,12 @@ function initSplashLogoManager() {
   const removeBgBtn = document.getElementById('btnSplashLogoRemoveBg');
   const previewSection = document.getElementById('splashLogoRemoveBgPreviewSection');
   const previewCanvas = document.getElementById('splashLogoRemoveBgCanvas');
+  const toleranceSlider = document.getElementById('splashLogoRemoveBgTolerance');
+  const toleranceOut = document.getElementById('splashLogoRemoveBgToleranceOut');
+  if (toleranceSlider && toleranceOut) {
+    toleranceSlider.addEventListener('input', () => { toleranceOut.textContent = toleranceSlider.value; });
+  }
+  const getTolerance = () => (toleranceSlider ? Number(toleranceSlider.value) : 13);
   if (removeBgBtn && previewCanvas) {
     removeBgBtn.addEventListener('click', async () => {
       const note = document.getElementById('splashLogoRemoveBgNote');
@@ -9570,7 +9576,7 @@ function initSplashLogoManager() {
       note.textContent = 'Processing…';
       removeBgBtn.disabled = true;
       try {
-        await removeImageBackgroundClientSide(url, previewCanvas);
+        await removeImageBackgroundClientSide(url, previewCanvas, getTolerance());
         previewSection.hidden = false;
         note.textContent = 'Edges cleared — tap any leftover patch (like an enclosed hole) to remove it too, then confirm below.';
       } catch (e) {
@@ -9585,7 +9591,7 @@ function initSplashLogoManager() {
       const y = Math.round((e.clientY - rect.top) / rect.height * previewCanvas.height);
       const ctx = previewCanvas.getContext('2d');
       const imageData = ctx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
-      floodRemoveFromPoint(imageData, x, y);
+      floodRemoveFromPoint(imageData, x, y, getTolerance());
       ctx.putImageData(imageData, 0, 0);
     });
     document.getElementById('btnSplashLogoRemoveBgApply').addEventListener('click', () => {

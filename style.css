@@ -2744,8 +2744,8 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 }
 .prep-meal-crop-frame:active { cursor: grabbing; }
 /* Matches a typical phone screen's proportions instead of the default
-   16:9 so the boot-logo framing preview reflects how it'll actually look
-   on the loading screen, not an arbitrary wide crop. */
+   16:9 so the boot-logo framing preview (including the 0.3x-3x resize)
+   reflects how it'll actually look laid out on the loading screen. */
 .prep-meal-crop-frame--phone { aspect-ratio: 9 / 19.5; max-width: 260px; margin-left: auto; margin-right: auto; }
 .prep-meal-crop-frame img {
   width: 100%; height: 100%;
@@ -4321,7 +4321,13 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .bg-crop-wrap { margin: 4px 0 8px; }
 .bg-crop-preview {
   width: 100%;
-  height: 160px;
+  /* Phone-screen proportions instead of a fixed short rectangle — this
+     photo becomes the app's whole background, so the preview should
+     reflect that shape rather than an arbitrary wide crop. */
+  aspect-ratio: 9 / 19.5;
+  max-width: 260px;
+  margin-left: auto;
+  margin-right: auto;
   border: 1px solid var(--border);
   border-radius: var(--card-radius);
   background-repeat: no-repeat;

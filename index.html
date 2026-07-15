@@ -853,6 +853,12 @@
         <span>Boot logo image URL</span>
         <input type="text" id="splashLogoManagerUrl" placeholder="https://...">
       </label>
+      <label class="field">
+        <span>Tolerance</span>
+        <input type="range" id="splashLogoRemoveBgTolerance" min="1" max="100" step="1" value="13">
+        <output id="splashLogoRemoveBgToleranceOut">13</output>
+      </label>
+      <p class="hint hint--sm">How close a color has to be to count as background — low tolerance only clears near-exact matches (safer around a subject with similar shading), high tolerance clears a wider range of colors in one tap (faster for a noisy/gradient background, but risks eating into the subject). Applies to both the automatic edge pass and each tap-to-remove spot below.</p>
       <button type="button" class="btn glass-emboss" id="btnSplashLogoRemoveBg" style="width:100%;">🪄 Convert to PNG &amp; remove background</button>
       <p class="hint hint--sm">Processes the image above in your browser: converts it to a transparent PNG and clears out a solid-color background (flood-filled in from the edges, so any subject in the middle stays intact). Only works if the image host allows cross-origin access — if it fails, download the image and host it somewhere that does (e.g. Supabase, Imgur).</p>
       <p class="save-note" id="splashLogoRemoveBgNote"></p>
