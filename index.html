@@ -25,28 +25,40 @@
 <!-- Admin Command Center: small drag/tap tab on the right edge, visible only
      while logged in as admin (see refreshDigitalIdOverrideVisibility() in
      app.js). Tapping/dragging the tab opens a floating icon pill (one icon
-     per admin feature); tapping an icon either fires that action directly
-     (data-action, e.g. Log Out) or opens the slide-out panel focused on
-     just that one section (data-target), with the panel's back arrow
-     returning to the pill. -->
+     per admin feature, several features grouped under one icon); tapping
+     an icon either fires that action directly (data-action, e.g. Log Out)
+     or opens the slide-out panel focused on just that section/group
+     (data-target, comma-separated for a group), with the panel's back
+     arrow returning to the pill. Icons match the app's existing thin
+     cyan-stroke line-icon style rather than emoji. -->
 <button type="button" class="admin-drawer-tab" id="adminDrawerTab" hidden aria-label="Open admin panel">
   <span class="admin-drawer-tab-bar" aria-hidden="true"></span>
 </button>
 <div class="admin-drawer-backdrop" id="adminDrawerBackdrop" hidden></div>
 
 <div class="admin-drawer-pill" id="adminDrawerPill" hidden>
-  <button type="button" class="admin-drawer-pill-item" data-target="digitalIdOverrideSection" aria-label="Digital ID Transfer" title="Digital ID Transfer">🆔</button>
-  <button type="button" class="admin-drawer-pill-item" data-target="adFreeOverrideSection" aria-label="Ad-Free Access" title="Ad-Free Access">🛡️</button>
-  <button type="button" class="admin-drawer-pill-item" data-target="updatesEnabledSection" aria-label="Force Updates" title="Force Updates">🔄</button>
-  <button type="button" class="admin-drawer-pill-item" data-target="adManagerSection" aria-label="Startup Ad Splash" title="Startup Ad Splash">📢</button>
-  <button type="button" class="admin-drawer-pill-item" data-target="splashLogoManagerSection" aria-label="App Boot Logo" title="App Boot Logo">🖼️</button>
-  <button type="button" class="admin-drawer-pill-item" data-target="prepMealManagerSection" aria-label="Prep Meal Menu" title="Prep Meal Menu">🍱</button>
-  <button type="button" class="admin-drawer-pill-item" data-target="syncLogsSection" aria-label="Sync Logs" title="Sync Logs">📋</button>
+  <button type="button" class="admin-drawer-pill-item" data-target="digitalIdOverrideSection,adFreeOverrideSection,updatesEnabledSection" aria-label="Account Admin (Digital ID, Ad-Free, Force Updates)" title="Account Admin">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M5 17c0-2 2-3 4-3s4 1 4 3"/><line x1="14" y1="9" x2="19" y2="9"/><line x1="14" y1="13" x2="19" y2="13"/></svg>
+  </button>
+  <button type="button" class="admin-drawer-pill-item" data-target="adManagerSection" aria-label="Startup Ad Splash" title="Startup Ad Splash">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12.5 12 21l-9-9V4a1 1 0 0 1 1-1h8l8.5 8.5a1 1 0 0 1 0 1.4z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>
+  </button>
+  <button type="button" class="admin-drawer-pill-item" data-target="splashLogoManagerSection" aria-label="App Boot Logo" title="App Boot Logo">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+  </button>
+  <button type="button" class="admin-drawer-pill-item" data-target="prepMealManagerSection" aria-label="Prep Meal Menu" title="Prep Meal Menu">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v6a2 2 0 0 0 2 2v12"/><path d="M6 2v6"/><path d="M10 2v6"/><path d="M18 2c-2 0-3 2-3 5v3h3v10"/></svg>
+  </button>
+  <button type="button" class="admin-drawer-pill-item" data-target="syncLogsSection" aria-label="Sync Logs" title="Sync Logs">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/></svg>
+  </button>
+  <button type="button" class="admin-drawer-pill-item" data-target="adminBroadcastToolsSection" aria-label="Broadcast &amp; Sync Tools (Post Announcement, Assign Targets, Media Sync)" title="Broadcast &amp; Sync Tools">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9v6h3l6 4V5L6 9H3z"/><path d="M16 8a4 4 0 0 1 0 8"/></svg>
+  </button>
   <span class="admin-drawer-pill-sep" aria-hidden="true"></span>
-  <button type="button" class="admin-drawer-pill-item" data-action="btnAdminPost" aria-label="Post Announcement" title="Post Announcement">📣</button>
-  <button type="button" class="admin-drawer-pill-item" data-action="btnAdminAssignTargets" aria-label="Assign Targets" title="Assign Targets">🎯</button>
-  <button type="button" class="admin-drawer-pill-item" data-action="btnDrawerOpenMediaSync" aria-label="Media Sync Calibration" title="Media Sync Calibration">🎬</button>
-  <button type="button" class="admin-drawer-pill-item" data-action="btnAdminLogout" aria-label="Log Out" title="Log Out">🚪</button>
+  <button type="button" class="admin-drawer-pill-item" data-action="btnAdminLogout" aria-label="Log Out" title="Log Out">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+  </button>
 </div>
 
 <div class="admin-drawer" id="adminDrawer" hidden>
@@ -57,11 +69,20 @@
     <p class="admin-drawer-title">Admin Panel</p>
   </div>
   <div class="admin-drawer-scroll" id="adminDrawerScroll">
-    <div class="admin-drawer-quicklinks">
-      <button type="button" class="announcement-menu-item" id="btnAdminPost" hidden>Post Announcement</button>
-      <button type="button" class="announcement-menu-item" id="btnAdminAssignTargets" hidden>Assign Targets</button>
-      <button type="button" class="announcement-menu-item" id="btnDrawerOpenMediaSync">Media Sync Calibration</button>
-      <button type="button" class="announcement-menu-item" id="btnAdminLogout" hidden>Log Out</button>
+    <!-- Log Out has no widget of its own — reachable only via the pill's
+         Log Out icon, which forwards a .click() here. -->
+    <div class="admin-drawer-hidden-proxies" aria-hidden="true">
+      <button type="button" id="btnAdminLogout" hidden>Log Out</button>
+    </div>
+
+    <div class="chart-card admin-drawer-section" id="adminBroadcastToolsSection">
+      <p class="mod-tag">Admin_broadcast_01</p>
+      <div class="chart-card-head"><span class="chart-card-title">Admin: Broadcast &amp; Sync Tools</span></div>
+      <div class="admin-drawer-launcher-list">
+        <button type="button" class="announcement-menu-item" id="btnAdminPost" hidden>Post Announcement</button>
+        <button type="button" class="announcement-menu-item" id="btnAdminAssignTargets" hidden>Assign Targets</button>
+        <button type="button" class="announcement-menu-item" id="btnDrawerOpenMediaSync">Media Sync Calibration</button>
+      </div>
     </div>
 
     <div class="chart-card admin-drawer-section" id="updatesEnabledSection">

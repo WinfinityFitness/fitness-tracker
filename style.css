@@ -2518,11 +2518,25 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   flex-direction: column;
   gap: 14px;
 }
-/* Post Announcement / Assign Targets / Media Sync / Log Out now live only
-   as icons in .admin-drawer-pill below — these buttons stay in the DOM
-   (their existing click listeners are wired to these exact IDs elsewhere
-   in app.js) purely as click-forwarding targets, never shown directly. */
-.admin-drawer-quicklinks { display: none; }
+/* Log Out has no widget of its own — this proxy button stays in the DOM
+   (its existing click listener is wired to this exact ID elsewhere in
+   app.js) purely as a click-forwarding target for the pill's Log Out icon,
+   never shown directly. Post Announcement / Assign Targets / Media Sync
+   ARE shown directly, as real buttons inside #adminBroadcastToolsSection. */
+.admin-drawer-hidden-proxies { display: none; }
+.admin-drawer-launcher-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.admin-drawer-launcher-list .announcement-menu-item {
+  display: block;
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--card-radius);
+  padding: 10px 12px;
+}
 
 /* Focused-section mode: opening the panel via a pill icon hides every
    other admin-drawer-section so only the tapped feature shows — layered

@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.10.1';
+const APP_VERSION = 'WF_SYS_V.10.2';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9191,15 +9191,31 @@ function closeAdminDrawerAll() {
   closeAdminDrawerPill();
   closeAdminDrawer();
 }
-// Hides every other admin-drawer-section so only the tapped feature shows,
+// Hides every other admin-drawer-section so only the tapped feature (or
+// group of features, e.g. Account Admin bundles three together) shows,
 // layered on top of (not replacing) each section's own admin-login-gated
 // [hidden] — see refreshDigitalIdOverrideVisibility above.
-function openAdminDrawerSection(sectionId) {
+function openAdminDrawerSection(sectionIds) {
+  const ids = Array.isArray(sectionIds) ? sectionIds : [sectionIds];
   document.querySelectorAll('.admin-drawer-section').forEach(el => {
-    el.classList.toggle('is-not-focused', el.id !== sectionId);
+    el.classList.toggle('is-not-focused', !ids.includes(el.id));
   });
   closeAdminDrawerPill();
   openAdminDrawer();
+}
+// Skips the fade — Post Announcement/Assign Targets/Media Sync each open
+// their own full sheet-overlay immediately on top, and that overlay's
+// z-index sits below the drawer's, so animating the drawer/pill/backdrop
+// closed in parallel let them visually sit on top of (or dim) the overlay
+// for the transition's duration, reading as "nothing happened."
+function closeAdminDrawerInstant() {
+  const pill = document.getElementById('adminDrawerPill');
+  const drawer = document.getElementById('adminDrawer');
+  const backdrop = document.getElementById('adminDrawerBackdrop');
+  if (adminDrawerBackdropHideTimer) { clearTimeout(adminDrawerBackdropHideTimer); adminDrawerBackdropHideTimer = null; }
+  if (pill) { pill.classList.remove('is-open'); pill.hidden = true; }
+  if (drawer) { drawer.classList.remove('is-open'); drawer.hidden = true; }
+  if (backdrop) { backdrop.classList.remove('is-open'); backdrop.hidden = true; }
 }
 
 function initAdminDrawer() {
@@ -9209,6 +9225,7 @@ function initAdminDrawer() {
   const backdrop = document.getElementById('adminDrawerBackdrop');
   const closeBtn = document.getElementById('btnCloseAdminDrawer');
   const mediaSyncBtn = document.getElementById('btnDrawerOpenMediaSync');
+  const broadcastSection = document.getElementById('adminBroadcastToolsSection');
   if (!tab || !pill || !drawer) return;
 
   // Back arrow drills back up to the pill rather than closing everything,
@@ -9232,10 +9249,19 @@ function initAdminDrawer() {
 
   if (mediaSyncBtn) mediaSyncBtn.addEventListener('click', openMediaSyncCalibration);
 
+  // Post Announcement / Assign Targets / Media Sync each open their own
+  // overlay on top — close the drawer instantly (see closeAdminDrawerInstant)
+  // rather than letting it fade out in parallel and obscure that overlay.
+  if (broadcastSection) {
+    broadcastSection.addEventListener('click', e => {
+      if (e.target.closest('button')) closeAdminDrawerInstant();
+    });
+  }
+
   pill.addEventListener('click', e => {
     const btn = e.target.closest('.admin-drawer-pill-item');
     if (!btn) return;
-    if (btn.dataset.target) { openAdminDrawerSection(btn.dataset.target); return; }
+    if (btn.dataset.target) { openAdminDrawerSection(btn.dataset.target.split(',')); return; }
     if (btn.dataset.action) {
       closeAdminDrawerPill();
       const target = document.getElementById(btn.dataset.action);
