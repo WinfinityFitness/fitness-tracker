@@ -1146,10 +1146,20 @@
       </div>
 
       <div id="lbChatList" class="chat-list"></div>
+      <div class="chat-pending-image" id="chatPendingImage" hidden>
+        <img id="chatPendingImagePreview" alt="">
+        <button type="button" id="btnChatPendingImageRemove" aria-label="Remove image">✕</button>
+      </div>
       <div class="chat-input-row">
+        <button type="button" class="btn btn--sm chat-attach-btn" id="btnChatAttachImage" aria-label="Attach image">📎</button>
+        <input type="file" id="chatImageInput" accept="image/*" hidden>
         <input type="text" id="lbChatInput" maxlength="280" placeholder="Transmit message…">
         <button type="button" class="btn btn--primary btn--sm" id="btnLbChatSend">➤</button>
       </div>
+    </div>
+
+    <div class="chat-lightbox" id="chatLightbox" hidden>
+      <img id="chatLightboxImg" alt="">
     </div>
 
     <div class="chat-user-menu" id="chatUserMenu" hidden>
