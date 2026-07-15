@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.9.5';
+const APP_VERSION = 'WF_SYS_V.9.6';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -4659,10 +4659,69 @@ async function unsubscribeFromPush() {
   } catch (e) { /* best effort */ }
 }
 
+// Native Android app: the browser Push API (PushManager) this whole file
+// otherwise relies on doesn't exist in a bare Capacitor WebView at all —
+// same root cause as Google Sign-In and Web Share being unavailable there.
+// Firebase Cloud Messaging via @capacitor/push-notifications is the native
+// equivalent; the token it produces is stored in fcm_tokens (parallel to
+// push_subscriptions) and the send-push Edge Function delivers to both.
+function initNativePushNotifications(toggle, hint) {
+  const { PushNotifications } = window.Capacitor.Plugins;
+  const wasEnabled = localStorage.getItem('wft_push_enabled') === '1';
+  toggle.checked = wasEnabled;
+
+  PushNotifications.addListener('registration', async (token) => {
+    const value = token && token.value;
+    if (!value) return;
+    localStorage.setItem('wft_fcm_token', value);
+    localStorage.setItem('wft_push_enabled', '1');
+    toggle.checked = true;
+    if (sbConfigured()) {
+      try { await sb.rpc('upsert_fcm_token', { p_share_key: getOrCreateShareKey(), p_token: value }); }
+      catch (e) { /* best effort */ }
+    }
+  });
+  PushNotifications.addListener('registrationError', () => {
+    toggle.checked = false;
+    if (hint) hint.textContent = 'Could not enable on this device.';
+  });
+
+  toggle.addEventListener('change', async () => {
+    if (toggle.checked) {
+      try {
+        const perm = await PushNotifications.requestPermissions();
+        if (perm.receive !== 'granted') { toggle.checked = false; return; }
+        await PushNotifications.register();
+      } catch (e) {
+        toggle.checked = false;
+        if (hint) hint.textContent = 'Could not enable on this device.';
+      }
+    } else {
+      localStorage.setItem('wft_push_enabled', '0');
+      const token = localStorage.getItem('wft_fcm_token');
+      if (token && sbConfigured()) {
+        try { await sb.rpc('delete_fcm_token', { p_token: token }); } catch (e) { /* best effort */ }
+      }
+    }
+  });
+
+  // Re-register silently on load if previously opted in and permission is
+  // still granted (mirrors the web path's silent re-subscribe).
+  if (wasEnabled) {
+    PushNotifications.checkPermissions().then(perm => {
+      if (perm.receive === 'granted') PushNotifications.register();
+    });
+  }
+}
+
 function initPushNotifications() {
   const toggle = document.getElementById('pushNotifToggle');
   const hint = document.getElementById('pushNotifHint');
   if (!toggle) return;
+  if (isNativeApp() && window.Capacitor.Plugins.PushNotifications) {
+    initNativePushNotifications(toggle, hint);
+    return;
+  }
   // Some Android TWA/WebView environments support ServiceWorker + PushManager
   // while leaving window.Notification entirely undefined — check for all
   // three so unsupported devices get a clear disabled state instead of a

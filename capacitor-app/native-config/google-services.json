@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "61766354133",
+    "project_id": "winfin-501313",
+    "storage_bucket": "winfin-501313.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:61766354133:android:30619f94eb9b9860400e5c",
+        "android_client_info": {
+          "package_name": "io.github.winfinityfitness.twa"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "61766354133-38gfl9pkak9955639ubh5svaq0fginc3.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDzr39Avo3NNtC-E9UgMTDWg94knPNsWg8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "61766354133-38gfl9pkak9955639ubh5svaq0fginc3.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
