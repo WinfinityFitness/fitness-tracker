@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.11.7';
+const APP_VERSION = 'WF_SYS_V.11.8';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -3073,7 +3073,6 @@ let cardioWatchId = null;
 let cardioTickId = null;
 let cardioTrack = [];
 let cardioGpsErrorShown = false;
-let cardioGpsFirstFixShown = false;
 let cardioDistanceKm = 0;
 let cardioMaxSpeedKmh = 0;
 let cardioStartTime = null;
@@ -3194,20 +3193,12 @@ function estimateCardioSteps(distanceKm, type) {
 }
 
 let cardioStatsErrorShown = false;
-let cardioStatsFirstTickShown = false;
 function updateCardioStats() {
-  // Temporary diagnostic wrapper — a live bug report says these on-screen
-  // stats never move during tracking even though the underlying data is
-  // clearly fine (the saved record on Stop & Save is accurate), pointing at
-  // an exception somewhere in this function that's failing silently with
-  // no console access available to read it directly. Surfaces the actual
-  // error as a toast (once) instead, so it can be read directly off the
-  // device. Remove this try/catch (and the diag toasts below/in
-  // startCardioTracking) once the real cause is found and fixed.
-  if (!cardioStatsFirstTickShown) {
-    cardioStatsFirstTickShown = true;
-    alert('🔧 diag: updateCardioStats tick #1 fired');
-  }
+  // Wrapped defensively — this drives every on-screen tracking stat on a
+  // 1-second loop, so one unexpected exception (e.g. the addWatcher()
+  // promise-shape bug this once caught — see startGpsWatch) would otherwise
+  // freeze the whole display silently for the rest of the session with no
+  // signal that anything had gone wrong.
   try {
     const elapsed = Math.round((Date.now() - cardioStartTime) / 1000);
     document.getElementById('cardioDuration').textContent = formatCardioClock(elapsed);
@@ -3267,7 +3258,16 @@ function startGpsWatch(onPosition, onError) {
     // killing tracking along with it. The geolocation plugin only requests
     // the location permission, never this one — MainActivity.onCreate
     // requests POST_NOTIFICATIONS natively at app launch instead.
-    window.Capacitor.Plugins.BackgroundGeolocation.addWatcher({
+    // addWatcher() does NOT reliably return a real Promise when called via
+    // the raw window.Capacitor.Plugins proxy (rather than this plugin's own
+    // npm JS wrapper, which this remote-loaded app doesn't bundle) under
+    // this app's useLegacyBridge config — chaining .then() on it threw
+    // "addWatcher(...).then is not a function" every time, aborting the
+    // rest of startCardioTracking() (including the setInterval that drives
+    // the on-screen stats) before it ever ran, even though the location
+    // callback itself still fired fine since it's registered separately.
+    // Guard the chain instead of assuming a promise.
+    const addWatcherResult = window.Capacitor.Plugins.BackgroundGeolocation.addWatcher({
       backgroundTitle: 'Winfinity Tracker',
       backgroundMessage: 'Tracking your outdoor activity — tap to return to the app.',
       requestPermissions: true,
@@ -3276,7 +3276,16 @@ function startGpsWatch(onPosition, onError) {
     }, (location, error) => {
       if (error) { onError(error); return; }
       onPosition({ coords: { latitude: location.latitude, longitude: location.longitude, accuracy: location.accuracy } });
-    }).then(id => { cardioNativeWatcherId = id; }).catch(err => onError(err));
+    });
+    if (addWatcherResult && typeof addWatcherResult.then === 'function') {
+      addWatcherResult.then(id => { cardioNativeWatcherId = id; }).catch(err => onError(err));
+    } else {
+      // Not a promise — the raw bridge call likely already returned the
+      // watcher id (or nothing) synchronously instead. Either way, the
+      // location callback above works regardless; this only affects
+      // removeWatcher() being able to target the right id on stop.
+      cardioNativeWatcherId = addWatcherResult || null;
+    }
     return 'native';
   }
   return navigator.geolocation.watchPosition(onPosition, onError, {
@@ -3318,64 +3327,45 @@ function startCardioTracking() {
   renderCardioRouteSketch();
   cardioGpsErrorShown = false;
   cardioStatsErrorShown = false;
-  cardioStatsFirstTickShown = false;
-  cardioGpsFirstFixShown = false;
 
-  // Temporary diagnostic: "reached setInterval setup" below never fires even
-  // though the GPS position callback demonstrably does (confirmed live) —
-  // since alert() is synchronous/blocking, that's only possible if
-  // startGpsWatch() itself throws synchronously (not from inside the
-  // callback), aborting the rest of this function before the interval ever
-  // gets created, while the native watcher — already registered on the
-  // native side by that point — keeps delivering positions independently.
-  // This wraps that exact call to catch and surface whatever it is.
-  try {
-    cardioWatchId = startGpsWatch(pos => {
-      const { latitude, longitude, accuracy } = pos.coords;
-      if (!cardioGpsFirstFixShown) {
-        cardioGpsFirstFixShown = true;
-        alert(`🔧 diag: first GPS fix, accuracy=${accuracy}`);
-      }
-      if (accuracy != null && accuracy > 50) return;
-      const point = { lat: latitude, lon: longitude, t: Date.now(), accuracy: accuracy || 0 };
-      if (cardioTrack.length) {
-        const last = cardioTrack[cardioTrack.length - 1];
-        const segKm = haversineKm(last.lat, last.lon, point.lat, point.lon);
-        // GPS jitters a few meters even standing still — with a flat 3m floor,
-        // that jitter alone can register as "movement" while stopped. Scaling
-        // the floor to the worse of the two fixes' own reported accuracy fixes
-        // that (a sloppy 20m fix needs a real ~12m move to count) without
-        // dulling sensitivity to genuine slow walking, since a sharp 4-5m fix
-        // still only needs the same ~4m floor it always had.
-        const noiseFloorKm = Math.max(0.004, (Math.max(point.accuracy, last.accuracy || 0) * 0.6) / 1000);
-        if (segKm > noiseFloorKm) {
-          const segHours = (point.t - last.t) / 3600000;
-          const segSpeedKmh = segHours > 0 ? segKm / segHours : 0;
-          const speedCap = document.getElementById('cardioType').value === 'ride' ? 80 : 45;
-          if (segSpeedKmh > 0 && segSpeedKmh <= speedCap) cardioMaxSpeedKmh = Math.max(cardioMaxSpeedKmh, segSpeedKmh);
-          cardioDistanceKm += segKm;
-          cardioTrack.push(point);
-          renderCardioRouteSketch();
-        }
-      } else {
+  cardioWatchId = startGpsWatch(pos => {
+    const { latitude, longitude, accuracy } = pos.coords;
+    if (accuracy != null && accuracy > 50) return;
+    const point = { lat: latitude, lon: longitude, t: Date.now(), accuracy: accuracy || 0 };
+    if (cardioTrack.length) {
+      const last = cardioTrack[cardioTrack.length - 1];
+      const segKm = haversineKm(last.lat, last.lon, point.lat, point.lon);
+      // GPS jitters a few meters even standing still — with a flat 3m floor,
+      // that jitter alone can register as "movement" while stopped. Scaling
+      // the floor to the worse of the two fixes' own reported accuracy fixes
+      // that (a sloppy 20m fix needs a real ~12m move to count) without
+      // dulling sensitivity to genuine slow walking, since a sharp 4-5m fix
+      // still only needs the same ~4m floor it always had.
+      const noiseFloorKm = Math.max(0.004, (Math.max(point.accuracy, last.accuracy || 0) * 0.6) / 1000);
+      if (segKm > noiseFloorKm) {
+        const segHours = (point.t - last.t) / 3600000;
+        const segSpeedKmh = segHours > 0 ? segKm / segHours : 0;
+        const speedCap = document.getElementById('cardioType').value === 'ride' ? 80 : 45;
+        if (segSpeedKmh > 0 && segSpeedKmh <= speedCap) cardioMaxSpeedKmh = Math.max(cardioMaxSpeedKmh, segSpeedKmh);
+        cardioDistanceKm += segKm;
         cardioTrack.push(point);
+        renderCardioRouteSketch();
       }
-    }, err => {
-      // Keep the timer running either way — a transient GPS blip shouldn't end
-      // the session — but surface it once so a permission denial or a failed
-      // native watcher (silent otherwise) is actually visible instead of just
-      // quietly producing a flat, un-tracked stretch of the route.
-      if (!cardioGpsErrorShown) {
-        cardioGpsErrorShown = true;
-        const msg = (err && (err.message || err.code)) || 'unknown error';
-        showRestToast(`⚠️ GPS tracking issue: ${msg}. Check location/notification permissions in phone settings.`);
-      }
-    });
-  } catch (e) {
-    alert('🔧 diag: startGpsWatch() threw: ' + (e && (e.message || e)) + (e && e.stack ? ' | ' + e.stack.split('\n')[0] : ''));
-  }
+    } else {
+      cardioTrack.push(point);
+    }
+  }, err => {
+    // Keep the timer running either way — a transient GPS blip shouldn't end
+    // the session — but surface it once so a permission denial or a failed
+    // native watcher (silent otherwise) is actually visible instead of just
+    // quietly producing a flat, un-tracked stretch of the route.
+    if (!cardioGpsErrorShown) {
+      cardioGpsErrorShown = true;
+      const msg = (err && (err.message || err.code)) || 'unknown error';
+      showRestToast(`⚠️ GPS tracking issue: ${msg}. Check location/notification permissions in phone settings.`);
+    }
+  });
 
-  alert('🔧 diag: reached setInterval setup');
   cardioTickId = setInterval(updateCardioStats, 1000);
   startCardioHydrationReminders();
 
