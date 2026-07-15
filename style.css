@@ -1185,22 +1185,30 @@ tbody tr:nth-child(even) { background: rgba(255,255,255,0.02); }
 .cardio-stat-label { font-family: var(--font-mono); font-size: 0.52rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-top: 1px; }
 .cardio-route-sketch {
   width: 100%;
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 2 / 1;
   height: auto;
   background: var(--surface-2);
   border: 1px solid var(--border-soft);
   border-radius: 5px;
   margin-bottom: 10px;
 }
+/* Deliberately bigger than the route sketch it replaces, not matched to
+   it — pulled up with a negative margin so it visually pops out over the
+   hint text above once Stop & Save reveals the real map, instead of just
+   swapping in at the same small footprint. */
 .cardio-map-view {
+  position: relative;
+  z-index: 5;
   width: 100%;
   aspect-ratio: 1 / 1;
   height: auto;
   background: var(--surface-2);
   border: 1px solid var(--border-soft);
   border-radius: 5px;
+  margin-top: -36px;
   margin-bottom: 10px;
   overflow: hidden;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.45);
 }
 .cardio-map-view[hidden] { display: none; }
 .cardio-map-zoom-row { display: flex; gap: 8px; margin-bottom: 10px; }
