@@ -13,7 +13,7 @@
     "GoogleAuth": {
       "scopes": ["profile", "email", "https://www.googleapis.com/auth/drive.file"],
       "serverClientId": "61766354133-38gfl9pkak9955639ubh5svaq0fginc3.apps.googleusercontent.com",
-      "androidClientId": "PASTE_THE_NEW_ANDROID_OAUTH_CLIENT_ID_HERE"
+      "androidClientId": "61766354133-3v6ak04745nomf9mudutoqrdrovmv5sl.apps.googleusercontent.com"
     }
   }
 }
