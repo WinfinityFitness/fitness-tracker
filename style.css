@@ -2518,18 +2518,69 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   flex-direction: column;
   gap: 14px;
 }
-.admin-drawer-quicklinks {
+/* Post Announcement / Assign Targets / Media Sync / Log Out now live only
+   as icons in .admin-drawer-pill below — these buttons stay in the DOM
+   (their existing click listeners are wired to these exact IDs elsewhere
+   in app.js) purely as click-forwarding targets, never shown directly. */
+.admin-drawer-quicklinks { display: none; }
+
+/* Focused-section mode: opening the panel via a pill icon hides every
+   other admin-drawer-section so only the tapped feature shows — layered
+   on top of (not replacing) each section's own admin-login-gated [hidden]. */
+.admin-drawer-section.is-not-focused { display: none; }
+
+/* Floating icon pill — opened by the edge tab, one icon per admin feature.
+   Sits just inboard of the tab at the same vertical center. Tapping an
+   icon either opens the panel focused on that one section (data-target)
+   or fires the action directly (data-action, forwarded via .click() to
+   the matching hidden button above). */
+.admin-drawer-pill {
+  position: fixed;
+  top: 50%;
+  right: 44px;
+  z-index: 400;
+  max-height: 80vh;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  gap: 5px;
+  padding: 8px;
+  border-radius: 22px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) translateX(12px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
-.admin-drawer-quicklinks .announcement-menu-item {
-  display: block;
-  width: 100%;
-  background: var(--surface-2);
+.admin-drawer-pill[hidden] { display: none; }
+.admin-drawer-pill.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%) translateX(0);
+}
+.admin-drawer-pill-item {
+  width: 36px; height: 36px;
+  flex-shrink: 0;
+  border-radius: 50%;
   border: 1px solid var(--border-soft);
-  border-radius: var(--card-radius);
-  padding: 10px 12px;
+  background: var(--surface-2);
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.admin-drawer-pill-item:active { background: var(--cyan-dim); }
+.admin-drawer-pill-sep {
+  width: 20px;
+  height: 1px;
+  flex-shrink: 0;
+  margin: 3px 0;
+  background: var(--border-soft);
 }
 
 .donation-overlay {

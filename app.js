@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.9.9';
+const APP_VERSION = 'WF_SYS_V.10.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9112,53 +9112,104 @@ function refreshDigitalIdOverrideVisibility() {
   if (updatesHint) updatesHint.hidden = !loggedIn;
   const drawerTab = document.getElementById('adminDrawerTab');
   if (drawerTab) drawerTab.hidden = !loggedIn;
-  if (!loggedIn) closeAdminDrawer();
+  if (!loggedIn) closeAdminDrawerAll();
 }
 
 /* ---------------------------------------------------------------- */
 /* Admin Command Center — small drag/tap tab on the screen edge that   */
 /* only appears while logged in as admin (see refreshDigitalIdOverrideVisibility */
-/* above), opening a slide-out panel holding every admin control that   */
-/* used to be scattered across Settings/Nexus.                          */
+/* above). Two levels: tapping/dragging the tab opens a floating icon    */
+/* pill (one icon per admin feature); tapping a pill icon either fires   */
+/* that action directly or opens the slide-out panel focused on just     */
+/* that one section, with the panel's back arrow returning to the pill.  */
 /* ---------------------------------------------------------------- */
+function isAdminDrawerAnythingOpen() {
+  const pill = document.getElementById('adminDrawerPill');
+  const drawer = document.getElementById('adminDrawer');
+  return (pill && !pill.hidden) || (drawer && !drawer.hidden);
+}
+let adminDrawerBackdropHideTimer = null;
+function syncAdminDrawerBackdrop() {
+  const backdrop = document.getElementById('adminDrawerBackdrop');
+  if (!backdrop) return;
+  if (adminDrawerBackdropHideTimer) { clearTimeout(adminDrawerBackdropHideTimer); adminDrawerBackdropHideTimer = null; }
+  if (isAdminDrawerAnythingOpen()) {
+    backdrop.hidden = false;
+    requestAnimationFrame(() => backdrop.classList.add('is-open'));
+  } else {
+    backdrop.classList.remove('is-open');
+    adminDrawerBackdropHideTimer = setTimeout(() => {
+      if (!isAdminDrawerAnythingOpen()) backdrop.hidden = true;
+      adminDrawerBackdropHideTimer = null;
+    }, 280);
+  }
+}
+
+function openAdminDrawerPill() {
+  const pill = document.getElementById('adminDrawerPill');
+  if (!pill) return;
+  pill.hidden = false;
+  requestAnimationFrame(() => pill.classList.add('is-open'));
+  syncAdminDrawerBackdrop();
+}
+function closeAdminDrawerPill() {
+  const pill = document.getElementById('adminDrawerPill');
+  if (!pill || pill.hidden) return;
+  pill.classList.remove('is-open');
+  setTimeout(() => { pill.hidden = true; }, 220);
+  syncAdminDrawerBackdrop();
+}
+function toggleAdminDrawerPill() {
+  const pill = document.getElementById('adminDrawerPill');
+  if (pill && pill.classList.contains('is-open')) closeAdminDrawerPill();
+  else openAdminDrawerPill();
+}
+
 function openAdminDrawer() {
   const drawer = document.getElementById('adminDrawer');
-  const backdrop = document.getElementById('adminDrawerBackdrop');
   if (!drawer) return;
   drawer.hidden = false;
-  backdrop.hidden = false;
-  requestAnimationFrame(() => {
-    drawer.classList.add('is-open');
-    backdrop.classList.add('is-open');
-  });
+  requestAnimationFrame(() => drawer.classList.add('is-open'));
+  syncAdminDrawerBackdrop();
 }
 function closeAdminDrawer() {
   const drawer = document.getElementById('adminDrawer');
-  const backdrop = document.getElementById('adminDrawerBackdrop');
   if (!drawer || drawer.hidden) return;
   drawer.classList.remove('is-open');
-  backdrop.classList.remove('is-open');
-  setTimeout(() => { drawer.hidden = true; backdrop.hidden = true; }, 280);
+  setTimeout(() => { drawer.hidden = true; }, 280);
+  syncAdminDrawerBackdrop();
 }
-function toggleAdminDrawer() {
-  const drawer = document.getElementById('adminDrawer');
-  if (drawer && drawer.classList.contains('is-open')) closeAdminDrawer();
-  else openAdminDrawer();
+function closeAdminDrawerAll() {
+  closeAdminDrawerPill();
+  closeAdminDrawer();
+}
+// Hides every other admin-drawer-section so only the tapped feature shows,
+// layered on top of (not replacing) each section's own admin-login-gated
+// [hidden] — see refreshDigitalIdOverrideVisibility above.
+function openAdminDrawerSection(sectionId) {
+  document.querySelectorAll('.admin-drawer-section').forEach(el => {
+    el.classList.toggle('is-not-focused', el.id !== sectionId);
+  });
+  closeAdminDrawerPill();
+  openAdminDrawer();
 }
 
 function initAdminDrawer() {
   const tab = document.getElementById('adminDrawerTab');
+  const pill = document.getElementById('adminDrawerPill');
   const drawer = document.getElementById('adminDrawer');
   const backdrop = document.getElementById('adminDrawerBackdrop');
   const closeBtn = document.getElementById('btnCloseAdminDrawer');
   const mediaSyncBtn = document.getElementById('btnDrawerOpenMediaSync');
-  const quicklinks = document.querySelector('.admin-drawer-quicklinks');
-  if (!tab || !drawer) return;
+  if (!tab || !pill || !drawer) return;
 
-  closeBtn.addEventListener('click', closeAdminDrawer);
-  backdrop.addEventListener('click', closeAdminDrawer);
+  // Back arrow drills back up to the pill rather than closing everything,
+  // so checking several features in a row doesn't need a re-drag/re-tap
+  // of the edge tab each time.
+  closeBtn.addEventListener('click', () => { closeAdminDrawer(); openAdminDrawerPill(); });
+  backdrop.addEventListener('click', closeAdminDrawerAll);
 
-  // A short drag (or a plain tap) on the edge tab opens the drawer — both
+  // A short drag (or a plain tap) on the edge tab opens the pill — both
   // just measure the gesture on release and hand off to the same
   // CSS-transition-driven open, rather than tracking the finger live, so
   // there's one animation path instead of two to keep in sync.
@@ -9168,16 +9219,21 @@ function initAdminDrawer() {
     if (startX === null) return;
     const dx = startX - e.clientX; // positive = dragged left, toward open
     startX = null;
-    if (dx > 12) openAdminDrawer(); else toggleAdminDrawer();
+    if (dx > 12) openAdminDrawerPill(); else toggleAdminDrawerPill();
   });
 
-  // Quick-action buttons (Post Announcement, Assign Targets) open their own
-  // overlay at a lower z-index than the drawer — close the drawer first so
-  // they don't end up rendering behind it.
-  quicklinks.addEventListener('click', e => {
-    if (e.target.closest('button')) closeAdminDrawer();
-  });
   if (mediaSyncBtn) mediaSyncBtn.addEventListener('click', openMediaSyncCalibration);
+
+  pill.addEventListener('click', e => {
+    const btn = e.target.closest('.admin-drawer-pill-item');
+    if (!btn) return;
+    if (btn.dataset.target) { openAdminDrawerSection(btn.dataset.target); return; }
+    if (btn.dataset.action) {
+      closeAdminDrawerPill();
+      const target = document.getElementById(btn.dataset.action);
+      if (target) target.click();
+    }
+  });
 }
 
 function initDigitalIdOverride() {

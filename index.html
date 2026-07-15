@@ -24,16 +24,35 @@
 
 <!-- Admin Command Center: small drag/tap tab on the right edge, visible only
      while logged in as admin (see refreshDigitalIdOverrideVisibility() in
-     app.js), opens a slide-out panel holding every admin control that used
-     to be scattered across Settings/Nexus. -->
+     app.js). Tapping/dragging the tab opens a floating icon pill (one icon
+     per admin feature); tapping an icon either fires that action directly
+     (data-action, e.g. Log Out) or opens the slide-out panel focused on
+     just that one section (data-target), with the panel's back arrow
+     returning to the pill. -->
 <button type="button" class="admin-drawer-tab" id="adminDrawerTab" hidden aria-label="Open admin panel">
   <span class="admin-drawer-tab-bar" aria-hidden="true"></span>
 </button>
 <div class="admin-drawer-backdrop" id="adminDrawerBackdrop" hidden></div>
+
+<div class="admin-drawer-pill" id="adminDrawerPill" hidden>
+  <button type="button" class="admin-drawer-pill-item" data-target="digitalIdOverrideSection" aria-label="Digital ID Transfer" title="Digital ID Transfer">🆔</button>
+  <button type="button" class="admin-drawer-pill-item" data-target="adFreeOverrideSection" aria-label="Ad-Free Access" title="Ad-Free Access">🛡️</button>
+  <button type="button" class="admin-drawer-pill-item" data-target="updatesEnabledSection" aria-label="Force Updates" title="Force Updates">🔄</button>
+  <button type="button" class="admin-drawer-pill-item" data-target="adManagerSection" aria-label="Startup Ad Splash" title="Startup Ad Splash">📢</button>
+  <button type="button" class="admin-drawer-pill-item" data-target="splashLogoManagerSection" aria-label="App Boot Logo" title="App Boot Logo">🖼️</button>
+  <button type="button" class="admin-drawer-pill-item" data-target="prepMealManagerSection" aria-label="Prep Meal Menu" title="Prep Meal Menu">🍱</button>
+  <button type="button" class="admin-drawer-pill-item" data-target="syncLogsSection" aria-label="Sync Logs" title="Sync Logs">📋</button>
+  <span class="admin-drawer-pill-sep" aria-hidden="true"></span>
+  <button type="button" class="admin-drawer-pill-item" data-action="btnAdminPost" aria-label="Post Announcement" title="Post Announcement">📣</button>
+  <button type="button" class="admin-drawer-pill-item" data-action="btnAdminAssignTargets" aria-label="Assign Targets" title="Assign Targets">🎯</button>
+  <button type="button" class="admin-drawer-pill-item" data-action="btnDrawerOpenMediaSync" aria-label="Media Sync Calibration" title="Media Sync Calibration">🎬</button>
+  <button type="button" class="admin-drawer-pill-item" data-action="btnAdminLogout" aria-label="Log Out" title="Log Out">🚪</button>
+</div>
+
 <div class="admin-drawer" id="adminDrawer" hidden>
   <div class="admin-drawer-header">
-    <button type="button" class="admin-drawer-close" id="btnCloseAdminDrawer" aria-label="Close admin panel">
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+    <button type="button" class="admin-drawer-close" id="btnCloseAdminDrawer" aria-label="Back to admin menu">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"/></svg>
     </button>
     <p class="admin-drawer-title">Admin Panel</p>
   </div>
@@ -45,7 +64,7 @@
       <button type="button" class="announcement-menu-item" id="btnAdminLogout" hidden>Log Out</button>
     </div>
 
-    <div class="chart-card" id="updatesEnabledSection">
+    <div class="chart-card admin-drawer-section" id="updatesEnabledSection">
       <p class="mod-tag">Admin_updates_01</p>
       <div class="chart-card-head"><span class="chart-card-title">Admin: Force Updates</span></div>
       <div class="theme-toggle-row" id="updatesEnabledRow" style="margin-top:12px;" hidden>
@@ -58,7 +77,7 @@
       <p class="hint hint--sm" id="updatesEnabledHint" hidden>Admin only. Turn this off to freeze every user on their current version — no one's app will check for or apply an update until it's switched back on.</p>
     </div>
 
-    <div class="sheet-section" id="digitalIdOverrideSection" hidden>
+    <div class="sheet-section admin-drawer-section" id="digitalIdOverrideSection" hidden>
       <p class="field-group-heading">Admin: Digital ID Transfer</p>
       <p class="hint">Your own Digital ID is restored automatically from your local/Drive backup now, so this is only for fixing another user's ID (e.g. a duplicate row after a data wipe). Everything tied to their account moves to the new ID, fully replacing whatever was already there.</p>
       <label class="field">
@@ -73,7 +92,7 @@
       <p class="save-note" id="digitalIdOverrideNote"></p>
     </div>
 
-    <div class="sheet-section" id="adFreeOverrideSection" hidden>
+    <div class="sheet-section admin-drawer-section" id="adFreeOverrideSection" hidden>
       <p class="field-group-heading">Admin: Ad-Free Access</p>
       <p class="hint">Manually confirm their GCash donation came in first (there's no automatic payment confirmation), then grant a time-limited ad-free window — it expires on its own, nothing to remember to revoke.</p>
       <label class="field">
@@ -91,7 +110,7 @@
       <p class="save-note" id="adFreeNote"></p>
     </div>
 
-    <div class="chart-card" id="adManagerSection" hidden>
+    <div class="chart-card admin-drawer-section" id="adManagerSection" hidden>
       <p class="mod-tag">Admin_ads_01</p>
       <div class="chart-card-head"><span class="chart-card-title">Admin: Startup Ad Splash</span></div>
       <div class="theme-toggle-row">
@@ -126,7 +145,7 @@
       <p class="save-note" id="adManagerNote"></p>
     </div>
 
-    <div class="chart-card" id="splashLogoManagerSection" hidden>
+    <div class="chart-card admin-drawer-section" id="splashLogoManagerSection" hidden>
       <p class="mod-tag">Admin_splash_01</p>
       <div class="chart-card-head"><span class="chart-card-title">Admin: App Boot Logo</span></div>
       <p class="hint hint--sm">The smaller logo+text loading screen shown while the app boots (not the big flashed logo on the Android app's first frame — that one's bundled into the app and needs a rebuild to change). Paste an image URL to replace it for everyone right away, no update required. Leave the field blank and Save to go back to the default Winfinity logo.</p>
@@ -165,7 +184,7 @@
       <p class="save-note" id="splashLogoManagerNote"></p>
     </div>
 
-    <div class="chart-card" id="prepMealManagerSection" hidden>
+    <div class="chart-card admin-drawer-section" id="prepMealManagerSection" hidden>
       <p class="mod-tag">Admin_prepmeal_01</p>
       <div class="chart-card-head">
         <span class="chart-card-title">Admin: Prep Meal Menu</span>
@@ -181,7 +200,7 @@
       <p class="empty-note" id="prepMealManagerEmptyNote" hidden>No prep meals yet — tap + Add meal above.</p>
     </div>
 
-    <div class="chart-card" id="syncLogsSection" hidden>
+    <div class="chart-card admin-drawer-section" id="syncLogsSection" hidden>
       <p class="mod-tag">Admin_sync_01</p>
       <div class="chart-card-head">
         <span class="chart-card-title">Sync Logs</span>
