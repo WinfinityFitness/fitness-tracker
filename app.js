@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.10.4';
+const APP_VERSION = 'WF_SYS_V.10.5';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9146,6 +9146,13 @@ function refreshDigitalIdOverrideVisibility() {
 // refreshDigitalIdOverrideVisibility's closeAdminDrawerAll()).
 let adminDrawerPillOpen = false;
 let adminDrawerPanelOpen = false;
+// Set right before forwarding a Broadcast & Sync Tools tap (Post
+// Announcement / Assign Targets / Media Sync) to its overlay — lets
+// initAdminDrawerReopenOnOverlayClose tell "closed an overlay the drawer
+// just launched" apart from e.g. Media Sync Calibration's other, unrelated
+// entry point on the Nutrition tab widget, which shouldn't pop the dial
+// back open on close.
+let adminDrawerLaunchedOverlay = false;
 function isAdminDrawerAnythingOpen() {
   return adminDrawerPillOpen || adminDrawerPanelOpen;
 }
@@ -9320,9 +9327,16 @@ function initAdminDrawer() {
   // Post Announcement / Assign Targets / Media Sync each open their own
   // overlay on top — close the drawer instantly (see closeAdminDrawerInstant)
   // rather than letting it fade out in parallel and obscure that overlay.
+  // adminDrawerLaunchedOverlay marks this as "the drawer opened it," so
+  // initAdminDrawerReopenOnOverlayClose brings the dial back once it's
+  // closed instead of leaving everything closed and needing a re-tap of
+  // the edge tab.
   if (broadcastSection) {
     broadcastSection.addEventListener('click', e => {
-      if (e.target.closest('button')) closeAdminDrawerInstant();
+      if (e.target.closest('button')) {
+        adminDrawerLaunchedOverlay = true;
+        closeAdminDrawerInstant();
+      }
     });
   }
 
@@ -9363,6 +9377,26 @@ function initAdminDrawer() {
       const target = document.getElementById(btn.dataset.action);
       if (target) target.click();
     }
+  });
+
+  // Post Announcement / Assign Targets / Media Sync were closed after the
+  // drawer opened them (adminDrawerLaunchedOverlay) — bring the dial back
+  // instead of leaving everything closed and needing a re-tap of the edge
+  // tab. Same MutationObserver technique as initBackButtonNav, so this
+  // catches every way the overlay can close (X button, backdrop tap, a
+  // successful submit's own auto-close) without hooking each one directly.
+  const reopenObserver = new MutationObserver(mutations => {
+    mutations.forEach(m => {
+      const el = m.target;
+      if (el.hidden && adminDrawerLaunchedOverlay && isAdminLoggedIn()) {
+        adminDrawerLaunchedOverlay = false;
+        openAdminDrawerPill();
+      }
+    });
+  });
+  ['adminPostOverlay', 'adminAssignTargetsOverlay', 'mediaSyncCalibrationOverlay'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) reopenObserver.observe(el, { attributes: true, attributeFilter: ['hidden'] });
   });
 }
 
@@ -11595,6 +11629,7 @@ function initAnnouncementWidget() {
     document.getElementById('adminLoginOverlay').hidden = false;
   });
   document.getElementById('btnAdminLogout').addEventListener('click', () => {
+    if (!confirm('Log out of admin?')) return;
     adminSession = { digitalId: null, password: null };
     localStorage.removeItem('wft_admin_session');
     menu.hidden = true;
