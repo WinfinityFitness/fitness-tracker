@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.10.6';
+const APP_VERSION = 'WF_SYS_V.11.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9118,8 +9118,11 @@ function refreshDigitalIdOverrideVisibility() {
   if (updatesRow) updatesRow.hidden = !loggedIn;
   const updatesHint = document.getElementById('updatesEnabledHint');
   if (updatesHint) updatesHint.hidden = !loggedIn;
-  const drawerTab = document.getElementById('adminDrawerTab');
-  if (drawerTab) drawerTab.hidden = !loggedIn;
+  // The drawer tab itself is visible to every user now — only the
+  // admin-specific icons inside it (marked data-admin-only in the HTML)
+  // are gated here. Quick Log icons (data-quicklog-key) are unrelated to
+  // login state — see loadQuickLogDialConfig/applyQuickLogDialConfig.
+  document.querySelectorAll('.admin-drawer-pill-item[data-admin-only]').forEach(el => { el.hidden = !loggedIn; });
   if (!loggedIn) closeAdminDrawerAll();
 }
 
@@ -9208,7 +9211,7 @@ function normalizeAngle180(deg) {
 function layoutAdminDrawerArc() {
   const pill = document.getElementById('adminDrawerPill');
   if (!pill) return;
-  const items = Array.from(pill.querySelectorAll('.admin-drawer-pill-item'));
+  const items = Array.from(pill.querySelectorAll('.admin-drawer-pill-item:not([hidden])'));
   const n = items.length;
   if (!n) return;
   const radius = computeAdminArcRadius(n);
@@ -9296,6 +9299,7 @@ function openAdminDrawerSection(sectionIds) {
   document.querySelectorAll('.admin-drawer-section').forEach(el => {
     el.classList.toggle('is-not-focused', !ids.includes(el.id));
   });
+  if (ids.includes('adminBroadcastToolsSection')) renderQuickLogDialSettings();
   closeAdminDrawerPill();
   openAdminDrawer();
 }
@@ -9420,6 +9424,65 @@ function initAdminDrawer() {
   ['adminPostOverlay', 'adminAssignTargetsOverlay', 'mediaSyncCalibrationOverlay'].forEach(id => {
     const el = document.getElementById(id);
     if (el) reopenObserver.observe(el, { attributes: true, attributeFilter: ['hidden'] });
+  });
+
+  initQuickLogDialSettings();
+  loadQuickLogDialConfig();
+}
+
+// The six Quick Log shortcuts (see initQuickLogLaunchers/initTrainingLogQuickPopup/
+// initFuelLogQuickPopup/initCommunityQuickPopup) that CAN appear as dial
+// icons for every user — which ones actually do is a single admin-set list
+// shared by everyone (Drawer Settings), not per-user. Local default matches
+// the DB column's default so the dial is useful even before the first fetch
+// resolves (or fully offline).
+const QUICK_LOG_DIAL_KEYS = ['startDayLog', 'endDayLog', 'weekendLog', 'trainingLog', 'fuelLog', 'communityLog'];
+let quickLogDialConfig = QUICK_LOG_DIAL_KEYS.slice();
+
+function applyQuickLogDialConfig() {
+  document.querySelectorAll('.admin-drawer-pill-item[data-quicklog-key]').forEach(el => {
+    el.hidden = !quickLogDialConfig.includes(el.dataset.quicklogKey);
+  });
+}
+
+async function loadQuickLogDialConfig() {
+  if (!sbConfigured()) { applyQuickLogDialConfig(); return; }
+  try {
+    const { data } = await sb.from('ad_settings').select('quick_log_dial_buttons').eq('id', 1).maybeSingle();
+    if (data && Array.isArray(data.quick_log_dial_buttons)) quickLogDialConfig = data.quick_log_dial_buttons;
+  } catch (e) { /* offline/unreachable — keep the local default */ }
+  applyQuickLogDialConfig();
+}
+
+// Re-synced every time Drawer Settings opens (see openAdminDrawerSection)
+// so the checkboxes always reflect the last-saved state, including if
+// another admin session changed it since this one loaded.
+function renderQuickLogDialSettings() {
+  document.querySelectorAll('#adminBroadcastToolsSection input[data-quicklog-key]').forEach(input => {
+    input.checked = quickLogDialConfig.includes(input.dataset.quicklogKey);
+  });
+}
+
+function initQuickLogDialSettings() {
+  const inputs = Array.from(document.querySelectorAll('#adminBroadcastToolsSection input[data-quicklog-key]'));
+  const note = document.getElementById('quickLogDialNote');
+  inputs.forEach(input => {
+    input.addEventListener('change', async () => {
+      if (!isAdminLoggedIn()) { input.checked = !input.checked; return; }
+      const newConfig = inputs.filter(i => i.checked).map(i => i.dataset.quicklogKey);
+      try {
+        const { error } = await sb.rpc('admin_set_quick_log_dial_buttons', {
+          p_digital_id: adminSession.digitalId, p_password: adminSession.password, p_buttons: newConfig,
+        });
+        if (error) throw error;
+        quickLogDialConfig = newConfig;
+        applyQuickLogDialConfig();
+        if (note) { note.textContent = 'Saved.'; setTimeout(() => { note.textContent = ''; }, 1500); }
+      } catch (e) {
+        input.checked = !input.checked;
+        if (note) note.textContent = 'Failed to save — try again.';
+      }
+    });
   });
 }
 
