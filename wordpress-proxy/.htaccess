@@ -1,0 +1,9 @@
+# Routes every request for this subdomain through index.php, which fetches
+# and re-serves the matching path from the real GitHub Pages site — see
+# index.php for why (keeps the browser on this domain instead of a
+# redirect, so the app's origin — and anyone's already-stored local data —
+# stays stable).
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [L]
