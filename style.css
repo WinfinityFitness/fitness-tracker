@@ -2548,17 +2548,19 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .admin-drawer-section.is-not-focused { display: none; }
 
 /* Rotatable icon arc — opened by the edge tab. A semicircle of icons on a
-   virtual full circle (see ADMIN_ARC_RADIUS/layoutAdminDrawerArc in app.js):
-   each icon's on-screen x/y is computed from its angle and set via inline
-   transform, so this container is just a positioning anchor (its own box
-   has no visible background) — the circular hit area (pointer-events:auto
-   in .is-open) is what lets a drag started anywhere in the gaps between
-   icons rotate the arc, not just a drag started on an icon itself. Only the
-   icon nearest the front (angle ~0, i.e. "most left") is interactive and
-   grown — see .is-focused — the rest are rotate-into-view only.
-   150mm as literally requested would put icons ~567px out from the edge,
-   off the left side of most phone screens — capped to 45mm (~170px) so the
-   full sweep stays on-screen while still reading as a big, dramatic fan. */
+   virtual full circle (see computeAdminArcRadius/layoutAdminDrawerArc in
+   app.js): each icon's on-screen x/y is computed from its angle and set
+   via inline transform, so this container is just a positioning anchor
+   (its own box has no visible background) — the circular hit area
+   (pointer-events:auto in .is-open) is what lets a drag started anywhere
+   in the gaps between icons rotate the arc, not just a drag started on an
+   icon itself. Only the icon nearest the front (angle ~0, i.e. "most
+   left") is interactive and grown — see .is-focused — the rest are
+   rotate-into-view only. Width/height/right are set inline by JS, not
+   here — the radius (and so the container size) scales with icon count so
+   the "one icon space apart" spacing holds as icons are added, capped to
+   a floor so it doesn't look cramped with only a few. Default values below
+   are just a safe pre-JS fallback. */
 .admin-drawer-pill {
   position: fixed;
   top: 50%;
@@ -2570,7 +2572,7 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   opacity: 0;
   pointer-events: none;
   touch-action: none;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.2s ease, width 0.2s ease, height 0.2s ease, right 0.2s ease;
 }
 .admin-drawer-pill[hidden] { display: none; }
 .admin-drawer-pill.is-open { opacity: 1; pointer-events: auto; }
@@ -2592,6 +2594,24 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   background: var(--cyan-dim);
   border-color: var(--cyan);
   box-shadow: 0 0 14px var(--cyan-glow);
+}
+/* Small readout naming the currently-focused (blown-up) icon, kept in sync
+   with it every layout pass — including live while dragging/rotating. */
+.admin-drawer-arc-label {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-9999px, -9999px);
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--text-primary);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 8px;
+  pointer-events: none;
 }
 
 .donation-overlay {

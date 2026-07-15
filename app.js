@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.10.5';
+const APP_VERSION = 'WF_SYS_V.10.6';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9173,12 +9173,23 @@ function syncAdminDrawerBackdrop() {
   }
 }
 
-// Radius the icon arc sweeps at — keep in sync with .admin-drawer-pill's
-// width/height (2x) and right (-radius) in style.css. 150mm as literally
-// requested would put icons ~567px out from the edge, off the left side of
-// most phone screens — capped to 45mm (~170px), see the CSS comment.
-const ADMIN_ARC_RADIUS = 170;
+// Icon diameter matches .admin-drawer-pill-item's width/height in
+// style.css. Target arc-length spacing between icon CENTERS is one full
+// icon-width of empty gap between edges, i.e. two icon-diameters — "an
+// icon space apart." Radius is then derived FROM that spacing and the
+// current icon count (circumference = n * spacing), not the other way
+// around, so the arc naturally "expands" as icons are added later (e.g.
+// via Drawer Settings) while the spacing itself stays constant. Floored at
+// a minimum so it doesn't look cramped with only a handful of icons.
+const ADMIN_ARC_ICON_DIAMETER = 36;
+const ADMIN_ARC_ICON_SPACING = ADMIN_ARC_ICON_DIAMETER * 2;
+const ADMIN_ARC_MIN_RADIUS = 90;
+let adminDrawerArcRadius = ADMIN_ARC_MIN_RADIUS; // updated every layout, read by the drag handler
 let adminDrawerArcRotation = 0;
+
+function computeAdminArcRadius(n) {
+  return Math.max(ADMIN_ARC_MIN_RADIUS, (n * ADMIN_ARC_ICON_SPACING) / (2 * Math.PI));
+}
 
 function normalizeAngle180(deg) {
   let a = deg % 360;
@@ -9190,15 +9201,21 @@ function normalizeAngle180(deg) {
 // Positions each icon along a virtual full circle based on
 // adminDrawerArcRotation (only the semicircle nearest the tab, angle
 // within ~100° of "pointing left," is ever visible) and marks only the one
-// nearest the front (angle ~0, i.e. "most left") as .is-focused — grown
-// and the only one with pointer-events enabled, so a hidden icon has to be
-// rotated to the front before it's tappable.
+// nearest the front (angle ~0, i.e. "most left") as .is-focused — grown,
+// the only one with pointer-events enabled (so a hidden icon has to be
+// rotated to the front before it's tappable), and named in the small
+// label that follows it around the arc.
 function layoutAdminDrawerArc() {
   const pill = document.getElementById('adminDrawerPill');
   if (!pill) return;
   const items = Array.from(pill.querySelectorAll('.admin-drawer-pill-item'));
   const n = items.length;
   if (!n) return;
+  const radius = computeAdminArcRadius(n);
+  adminDrawerArcRadius = radius;
+  pill.style.width = pill.style.height = `${(radius * 2).toFixed(1)}px`;
+  pill.style.right = `${(-radius).toFixed(1)}px`;
+
   const state = items.map((el, i) => {
     const home = (360 / n) * i;
     const phi = normalizeAngle180(home + adminDrawerArcRotation);
@@ -9206,10 +9223,12 @@ function layoutAdminDrawerArc() {
   });
   let focusedIdx = 0, minAbs = Infinity;
   state.forEach((s, i) => { if (s.abs < minAbs) { minAbs = s.abs; focusedIdx = i; } });
+
+  const label = document.getElementById('adminDrawerArcLabel');
   state.forEach((s, i) => {
     const rad = s.phi * Math.PI / 180;
-    const x = -ADMIN_ARC_RADIUS * Math.cos(rad);
-    const y = ADMIN_ARC_RADIUS * Math.sin(rad);
+    const x = -radius * Math.cos(rad);
+    const y = radius * Math.sin(rad);
     const isFocused = i === focusedIdx;
     s.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${isFocused ? 1.3 : 1})`;
     let opacity;
@@ -9219,6 +9238,10 @@ function layoutAdminDrawerArc() {
     s.el.style.opacity = opacity;
     s.el.style.pointerEvents = isFocused ? 'auto' : 'none';
     s.el.classList.toggle('is-focused', isFocused);
+    if (isFocused && label) {
+      label.textContent = s.el.title || s.el.getAttribute('aria-label') || '';
+      label.style.transform = `translate(${(x - 16).toFixed(1)}px, ${y.toFixed(1)}px) translate(-100%, -50%)`;
+    }
   });
 }
 
@@ -9360,7 +9383,7 @@ function initAdminDrawer() {
     if (!arcDragging) return;
     const dy = e.clientY - arcDragStartY;
     if (Math.abs(dy) > 6) arcJustDragged = true;
-    adminDrawerArcRotation = arcDragStartRotation + (dy / ADMIN_ARC_RADIUS) * (180 / Math.PI);
+    adminDrawerArcRotation = arcDragStartRotation + (dy / adminDrawerArcRadius) * (180 / Math.PI);
     layoutAdminDrawerArc();
   });
   const endArcDrag = () => { arcDragging = false; };
