@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.9.6';
+const APP_VERSION = 'WF_SYS_V.9.7';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -12513,6 +12513,16 @@ function applyCustomBg() {
   document.body.classList.add('has-custom-bg');
   layer.style.backgroundColor = imgData.dominantColor || '';
   imageEl.style.backgroundImage = `url(${imgData.dataUrl})`;
+  // Fit mode is the one mode that reliably leaves letterbox gaps (top/bottom
+  // for a wide image, left/right for a tall one) — fill them with a blurred,
+  // full-bleed copy of the same photo instead of the flat dominant-color
+  // tint alone, so the gap reads as the photo's own colors extending rather
+  // than a mismatched solid block.
+  const backdropEl = document.getElementById('customBgBackdrop');
+  if (backdropEl) {
+    backdropEl.hidden = s.mode !== 'contain';
+    backdropEl.style.backgroundImage = s.mode === 'contain' ? `url(${imgData.dataUrl})` : '';
+  }
   if (s.mode === 'tile') {
     imageEl.style.backgroundSize = 'auto';
     imageEl.style.backgroundRepeat = 'repeat';

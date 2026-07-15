@@ -116,6 +116,24 @@ body.has-custom-bg { background-color: transparent; }
 
 .custom-bg-layer { position: fixed; inset: 0; z-index: -1; overflow: hidden; }
 .custom-bg-layer[hidden] { display: none; }
+/* Fit/Contain mode leaves letterbox gaps around the image (whichever axis
+   doesn't match the screen's aspect ratio) — this shows the SAME photo
+   behind it, scaled to fully cover and heavily blurred, so the gaps read
+   as an extension of the photo's own colors instead of a flat, likely-
+   mismatched average tint. Same technique Spotify/YouTube Music use for
+   art that doesn't fill its frame. inset is well past -24px specifically
+   because a strong blur needs a lot of overscanned source to avoid a
+   visible soft edge/vignette at the screen boundary. */
+.custom-bg-backdrop {
+  position: absolute;
+  inset: -60px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  filter: blur(40px) brightness(0.75) saturate(1.15);
+  transform: scale(1.15);
+}
+.custom-bg-backdrop[hidden] { display: none; }
 .custom-bg-image {
   position: absolute;
   inset: -24px;
