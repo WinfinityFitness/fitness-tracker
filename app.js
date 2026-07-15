@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.10.2';
+const APP_VERSION = 'WF_SYS_V.10.3';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9131,10 +9131,23 @@ function refreshDigitalIdOverrideVisibility() {
 /* that action directly or opens the slide-out panel focused on just     */
 /* that one section, with the panel's back arrow returning to the pill.  */
 /* ---------------------------------------------------------------- */
+// Plain flags, not the [hidden] attribute or the .is-open class — both of
+// those are intentionally *deferred* relative to the moment open/close is
+// requested (hidden flips ~220-280ms late so the close fade can play; the
+// class is added a frame late via rAF so the open fade has a "before" state
+// to transition from), so checking either one right after calling
+// open/close reads a stale value. These flags flip synchronously with the
+// call itself, so isAdminDrawerAnythingOpen() is always accurate — and the
+// early-return guards below make a second close call on an already-closing
+// element a true no-op (it won't re-trigger syncAdminDrawerBackdrop and
+// wrongly re-show a backdrop that's mid-fade-out, which previously left a
+// full-screen, pointer-events-blocking backdrop stuck open forever, e.g.
+// after Log Out closes the pill twice — directly, then again via
+// refreshDigitalIdOverrideVisibility's closeAdminDrawerAll()).
+let adminDrawerPillOpen = false;
+let adminDrawerPanelOpen = false;
 function isAdminDrawerAnythingOpen() {
-  const pill = document.getElementById('adminDrawerPill');
-  const drawer = document.getElementById('adminDrawer');
-  return (pill && !pill.hidden) || (drawer && !drawer.hidden);
+  return adminDrawerPillOpen || adminDrawerPanelOpen;
 }
 let adminDrawerBackdropHideTimer = null;
 function syncAdminDrawerBackdrop() {
@@ -9156,33 +9169,35 @@ function syncAdminDrawerBackdrop() {
 function openAdminDrawerPill() {
   const pill = document.getElementById('adminDrawerPill');
   if (!pill) return;
+  adminDrawerPillOpen = true;
   pill.hidden = false;
   requestAnimationFrame(() => pill.classList.add('is-open'));
   syncAdminDrawerBackdrop();
 }
 function closeAdminDrawerPill() {
   const pill = document.getElementById('adminDrawerPill');
-  if (!pill || pill.hidden) return;
+  if (!pill || !adminDrawerPillOpen) return;
+  adminDrawerPillOpen = false;
   pill.classList.remove('is-open');
   setTimeout(() => { pill.hidden = true; }, 220);
   syncAdminDrawerBackdrop();
 }
 function toggleAdminDrawerPill() {
-  const pill = document.getElementById('adminDrawerPill');
-  if (pill && pill.classList.contains('is-open')) closeAdminDrawerPill();
-  else openAdminDrawerPill();
+  if (adminDrawerPillOpen) closeAdminDrawerPill(); else openAdminDrawerPill();
 }
 
 function openAdminDrawer() {
   const drawer = document.getElementById('adminDrawer');
   if (!drawer) return;
+  adminDrawerPanelOpen = true;
   drawer.hidden = false;
   requestAnimationFrame(() => drawer.classList.add('is-open'));
   syncAdminDrawerBackdrop();
 }
 function closeAdminDrawer() {
   const drawer = document.getElementById('adminDrawer');
-  if (!drawer || drawer.hidden) return;
+  if (!drawer || !adminDrawerPanelOpen) return;
+  adminDrawerPanelOpen = false;
   drawer.classList.remove('is-open');
   setTimeout(() => { drawer.hidden = true; }, 280);
   syncAdminDrawerBackdrop();
@@ -9212,6 +9227,8 @@ function closeAdminDrawerInstant() {
   const pill = document.getElementById('adminDrawerPill');
   const drawer = document.getElementById('adminDrawer');
   const backdrop = document.getElementById('adminDrawerBackdrop');
+  adminDrawerPillOpen = false;
+  adminDrawerPanelOpen = false;
   if (adminDrawerBackdropHideTimer) { clearTimeout(adminDrawerBackdropHideTimer); adminDrawerBackdropHideTimer = null; }
   if (pill) { pill.classList.remove('is-open'); pill.hidden = true; }
   if (drawer) { drawer.classList.remove('is-open'); drawer.hidden = true; }
