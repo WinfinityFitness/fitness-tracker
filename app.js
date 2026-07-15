@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.8.6';
+const APP_VERSION = 'WF_SYS_V.8.7';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -3120,11 +3120,18 @@ function startCardioTracking() {
   cardioWatchId = startGpsWatch(pos => {
     const { latitude, longitude, accuracy } = pos.coords;
     if (accuracy != null && accuracy > 50) return;
-    const point = { lat: latitude, lon: longitude, t: Date.now() };
+    const point = { lat: latitude, lon: longitude, t: Date.now(), accuracy: accuracy || 0 };
     if (cardioTrack.length) {
       const last = cardioTrack[cardioTrack.length - 1];
       const segKm = haversineKm(last.lat, last.lon, point.lat, point.lon);
-      if (segKm > 0.003) {
+      // GPS jitters a few meters even standing still — with a flat 3m floor,
+      // that jitter alone can register as "movement" while stopped. Scaling
+      // the floor to the worse of the two fixes' own reported accuracy fixes
+      // that (a sloppy 20m fix needs a real ~12m move to count) without
+      // dulling sensitivity to genuine slow walking, since a sharp 4-5m fix
+      // still only needs the same ~4m floor it always had.
+      const noiseFloorKm = Math.max(0.004, (Math.max(point.accuracy, last.accuracy || 0) * 0.6) / 1000);
+      if (segKm > noiseFloorKm) {
         const segHours = (point.t - last.t) / 3600000;
         const segSpeedKmh = segHours > 0 ? segKm / segHours : 0;
         const speedCap = document.getElementById('cardioType').value === 'ride' ? 80 : 45;
