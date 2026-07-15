@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.10.0';
+const APP_VERSION = 'WF_SYS_V.10.1';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -3317,7 +3317,15 @@ function renderCardioMap(track) {
   const path = L.polyline(latlngs, { color: '#33c8cc', weight: 4, lineCap: 'round', lineJoin: 'round' }).addTo(map);
   L.circleMarker(latlngs[0], { radius: 7, weight: 2, color: '#fff', fillColor: '#34bd7c', fillOpacity: 1 }).addTo(map);
   L.circleMarker(latlngs[latlngs.length - 1], { radius: 7, weight: 2, color: '#fff', fillColor: '#e6516a', fillOpacity: 1 }).addTo(map);
-  map.fitBounds(path.getBounds(), { padding: [20, 20] });
+  // mapEl was just unhidden this same tick — it's sized via aspect-ratio,
+  // not a fixed px height, so Leaflet can measure it before the browser
+  // finishes committing that layout change and init at the wrong (sometimes
+  // zero) size, which throws fitBounds' zoom pick off too. One deferred
+  // frame lets layout settle before Leaflet re-measures and fits the path.
+  requestAnimationFrame(() => {
+    map.invalidateSize();
+    map.fitBounds(path.getBounds(), { padding: [20, 20] });
+  });
 }
 
 function lonToPixelX(lon, zoom) { return (lon + 180) / 360 * 256 * Math.pow(2, zoom); }
