@@ -11,7 +11,7 @@
   },
   "plugins": {
     "GoogleAuth": {
-      "scopes": ["profile", "email", "https://www.googleapis.com/auth/drive.file"],
+      "scopes": ["https://www.googleapis.com/auth/userinfo.profile", "https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/drive.file"],
       "serverClientId": "61766354133-38gfl9pkak9955639ubh5svaq0fginc3.apps.googleusercontent.com",
       "androidClientId": "61766354133-3v6ak04745nomf9mudutoqrdrovmv5sl.apps.googleusercontent.com"
     }
