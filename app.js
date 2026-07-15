@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.11.4';
+const APP_VERSION = 'WF_SYS_V.11.5';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -3073,6 +3073,7 @@ let cardioWatchId = null;
 let cardioTickId = null;
 let cardioTrack = [];
 let cardioGpsErrorShown = false;
+let cardioGpsFirstFixShown = false;
 let cardioDistanceKm = 0;
 let cardioMaxSpeedKmh = 0;
 let cardioStartTime = null;
@@ -3193,6 +3194,7 @@ function estimateCardioSteps(distanceKm, type) {
 }
 
 let cardioStatsErrorShown = false;
+let cardioStatsFirstTickShown = false;
 function updateCardioStats() {
   // Temporary diagnostic wrapper — a live bug report says these on-screen
   // stats never move during tracking even though the underlying data is
@@ -3200,7 +3202,12 @@ function updateCardioStats() {
   // an exception somewhere in this function that's failing silently with
   // no console access available to read it directly. Surfaces the actual
   // error as a toast (once) instead, so it can be read directly off the
-  // device. Remove this try/catch once the real cause is found and fixed.
+  // device. Remove this try/catch (and the diag toasts below/in
+  // startCardioTracking) once the real cause is found and fixed.
+  if (!cardioStatsFirstTickShown) {
+    cardioStatsFirstTickShown = true;
+    showRestToast('🔧 diag: updateCardioStats tick #1 fired');
+  }
   try {
     const elapsed = Math.round((Date.now() - cardioStartTime) / 1000);
     document.getElementById('cardioDuration').textContent = formatCardioClock(elapsed);
@@ -3310,9 +3317,16 @@ function startCardioTracking() {
   document.getElementById('cardioMapZoomRow').hidden = true;
   renderCardioRouteSketch();
   cardioGpsErrorShown = false;
+  cardioStatsErrorShown = false;
+  cardioStatsFirstTickShown = false;
+  cardioGpsFirstFixShown = false;
 
   cardioWatchId = startGpsWatch(pos => {
     const { latitude, longitude, accuracy } = pos.coords;
+    if (!cardioGpsFirstFixShown) {
+      cardioGpsFirstFixShown = true;
+      showRestToast(`🔧 diag: first GPS fix, accuracy=${accuracy}`);
+    }
     if (accuracy != null && accuracy > 50) return;
     const point = { lat: latitude, lon: longitude, t: Date.now(), accuracy: accuracy || 0 };
     if (cardioTrack.length) {
@@ -3349,6 +3363,7 @@ function startCardioTracking() {
     }
   });
 
+  showRestToast('🔧 diag: reached setInterval setup');
   cardioTickId = setInterval(updateCardioStats, 1000);
   startCardioHydrationReminders();
 
