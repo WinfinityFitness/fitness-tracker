@@ -183,6 +183,7 @@ body.has-custom-bg { background-color: transparent; }
   width: 96px;
   height: 96px;
   border-radius: 20%;
+  object-fit: cover;
   filter: drop-shadow(0 0 18px var(--cyan-glow));
   animation: splash-pulse 1.8s ease-in-out infinite;
 }
@@ -2882,10 +2883,11 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   margin-bottom: 8px;
 }
 .prep-meal-crop-frame:active { cursor: grabbing; }
-/* Matches a typical phone screen's proportions instead of the default
-   16:9 so the boot-logo framing preview (including the 0.3x-3x resize)
-   reflects how it'll actually look laid out on the loading screen. */
-.prep-meal-crop-frame--phone { aspect-ratio: 9 / 19.5; max-width: 260px; margin-left: auto; margin-right: auto; }
+/* Matches the real boot logo's rendered shape — a small 96x96, 20%-rounded
+   square (see .splash-logo) — instead of the default 16:9, so the framing
+   preview (including the 0.3x-3x resize) shows exactly what ends up on the
+   loading screen instead of implying it fills the whole phone screen. */
+.prep-meal-crop-frame--icon { aspect-ratio: 1 / 1; max-width: 160px; border-radius: 20%; margin-left: auto; margin-right: auto; }
 .prep-meal-crop-frame img {
   width: 100%; height: 100%;
   object-fit: cover;
