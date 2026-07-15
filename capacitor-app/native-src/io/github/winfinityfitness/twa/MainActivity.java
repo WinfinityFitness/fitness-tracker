@@ -83,4 +83,25 @@ public class MainActivity extends BridgeActivity {
         SharedPreferences prefs = getSharedPreferences(WidgetBridgePlugin.PREFS, Context.MODE_PRIVATE);
         prefs.edit().putString("pending_widget_action", action).apply();
     }
+
+    // Capacitor's own default back-button handling (when nothing overrides
+    // it) falls straight through to finishing the Activity — a hard exit —
+    // regardless of whatever the web app's own history.pushState/popstate
+    // logic (see initBackButtonNav in app.js: closes an open overlay,
+    // scrolls a tab to top, steps back through tab visit history) has set
+    // up, since that's all WebView-internal browsing history that this
+    // native side was never actually routing the hardware back button
+    // through. Routing it through the WebView's own canGoBack()/goBack()
+    // first is what makes those pushState entries reachable at all —
+    // goBack() fires a real popstate the JS side already handles. Only
+    // once there's truly nothing left to go back through does this send
+    // the app to the background (moveTaskToBack), never a hard exit.
+    @Override
+    public void onBackPressed() {
+        if (bridge != null && bridge.getWebView() != null && bridge.getWebView().canGoBack()) {
+            bridge.getWebView().goBack();
+        } else {
+            moveTaskToBack(true);
+        }
+    }
 }
