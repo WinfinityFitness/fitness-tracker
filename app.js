@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.8.9';
+const APP_VERSION = 'WF_SYS_V.9.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -8387,6 +8387,24 @@ function initDrive() {
     if (localStorage.getItem('wft_lb_optin') === '1' && sbConfigured()) updateLeaderboard();
   });
 
+  // Native Android app: Google Identity Services (the web flow below)
+  // deliberately refuses to run inside any embedded WebView as an
+  // anti-phishing measure — that's what "Google sign-in isn't available
+  // right now" actually means here, not a real connectivity problem. The
+  // real Android Google Sign-In SDK isn't subject to that restriction, so
+  // it's wired in via the GoogleAuth Capacitor plugin instead.
+  if (isNativeApp() && window.Capacitor.Plugins.GoogleAuth) {
+    window.Capacitor.Plugins.GoogleAuth.initialize().catch(() => {});
+    if (localStorage.getItem('wft_drive_connected')) {
+      connectBtn.hidden = true;
+      syncBtn.hidden = false;
+      setDriveStatus('Connected. Tap Backup now to sync.');
+    } else {
+      setDriveStatus('Not connected.');
+    }
+    return;
+  }
+
   const tryInit = () => {
     if (!window.google || !google.accounts || !google.accounts.oauth2) {
       setDriveStatus('Waiting for Google sign-in to load (requires internet)…');
@@ -8422,6 +8440,20 @@ function initDrive() {
 }
 
 function connectDrive() {
+  if (isNativeApp() && window.Capacitor.Plugins.GoogleAuth) {
+    window.Capacitor.Plugins.GoogleAuth.signIn().then(user => {
+      driveAccessToken = user.authentication.accessToken;
+      localStorage.setItem('wft_drive_connected', '1');
+      document.getElementById('btnDriveConnect').hidden = true;
+      document.getElementById('btnDriveSyncNow').hidden = false;
+      setDriveStatus('Connected. Syncing…');
+      saveToDrive();
+      syncAccountLogFromGoogle(driveAccessToken);
+    }).catch(err => {
+      setDriveStatus('Sign-in failed: ' + ((err && err.message) || 'try again.'));
+    });
+    return;
+  }
   if (!driveTokenClient) {
     alert('Google sign-in isn\'t available right now. Check your internet connection and try again.');
     return;
@@ -8434,6 +8466,17 @@ async function saveToDrive(manual) {
     const wasConnected = localStorage.getItem('wft_drive_connected');
     if (!wasConnected) {
       if (manual) alert('Not connected to Google Drive yet.');
+      return;
+    }
+    if (isNativeApp() && window.Capacitor.Plugins.GoogleAuth) {
+      setDriveStatus('Reconnecting…');
+      try {
+        const user = await window.Capacitor.Plugins.GoogleAuth.signIn();
+        driveAccessToken = user.authentication.accessToken;
+        saveToDrive(manual);
+      } catch (e) {
+        setDriveStatus('Reconnect failed — tap Connect to sign in again.');
+      }
       return;
     }
     if (!driveTokenClient) {
