@@ -6,8 +6,10 @@
 //   native-src/    -> android/app/src/main/java/   (POST_NOTIFICATIONS request)
 //   native-res/    -> android/app/src/main/res/    (clean centered splash, not
 //                                                    Capacitor's default stretched one)
-//   native-config/ -> android/app/                 (google-services.json — Firebase
-//                                                    Cloud Messaging for native push)
+//   native-config/   -> android/app/                 (google-services.json — Firebase
+//                                                      Cloud Messaging for native push)
+//   native-manifest/ -> android/app/src/main/         (AndroidManifest.xml — disables
+//                                                      Firebase's eager auto-init)
 const fs = require('fs');
 const path = require('path');
 
@@ -28,3 +30,4 @@ function copyRecursive(src, dest) {
 copyRecursive(path.join(__dirname, 'native-src'), path.join(__dirname, 'android', 'app', 'src', 'main', 'java'));
 copyRecursive(path.join(__dirname, 'native-res'), path.join(__dirname, 'android', 'app', 'src', 'main', 'res'));
 copyRecursive(path.join(__dirname, 'native-config'), path.join(__dirname, 'android', 'app'));
+copyRecursive(path.join(__dirname, 'native-manifest'), path.join(__dirname, 'android', 'app', 'src', 'main'));
