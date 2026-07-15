@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.11.9';
+const APP_VERSION = 'WF_SYS_V.12.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -583,14 +583,22 @@ function bindOverlayBackdropClose(overlay, onClose) {
 
 function initBackButtonNav() {
   const DISMISSIBLE_SELECTOR = '.sheet-overlay';
+  const SCROLL_TOP_THRESHOLD = 40; // px — "already basically at the top" vs. "actually scrolled down"
   let handlingPopstate = false;
   // Set right before the observer's own synthetic history.back() call (from
   // closing an overlay via X / backdrop tap / any non-back-button UI path).
-  // The popstate that call triggers must NOT also run the "nothing open,
-  // jump to Status" logic below — otherwise closing an overlay with the X
-  // button forces you back to the Status tab instead of just revealing
-  // whatever tab was already underneath it.
+  // The popstate that call triggers must NOT also run the "nothing open"
+  // logic below — otherwise closing an overlay with the X button forces a
+  // scroll-to-top/tab-change instead of just revealing whatever tab was
+  // already underneath it.
   let closingViaObserver = false;
+  // Which tab to return to on back — the tab you were on immediately
+  // before the current one, so back walks backward through your actual
+  // navigation instead of always jumping straight to Status. Popped (not
+  // re-pushed) on every step back, so revisiting a tab forward again
+  // starts a fresh trail from there.
+  const initialTab = document.querySelector('.tab-btn.is-active');
+  let tabHistory = initialTab ? [initialTab.dataset.target] : [];
 
   history.replaceState({ wftNav: true }, '');
 
@@ -616,7 +624,9 @@ function initBackButtonNav() {
 
   document.querySelectorAll('.tab-btn[data-target]').forEach(btn => {
     btn.addEventListener('click', () => {
-      if (handlingPopstate) return;
+      if (handlingPopstate) return; // programmatic .click() from the back-nav branch below — already accounted for
+      const target = btn.dataset.target;
+      if (tabHistory[tabHistory.length - 1] !== target) tabHistory.push(target);
       history.pushState({ wftNav: true }, '');
     });
   });
@@ -632,17 +642,25 @@ function initBackButtonNav() {
     let openOverlay = null;
     document.querySelectorAll(DISMISSIBLE_SELECTOR).forEach(el => { if (!el.hidden) openOverlay = el; });
     if (openOverlay) {
+      // Exception to everything below — a popup always just closes on back.
       const closeBtn = openOverlay.querySelector('.sheet-close');
       if (closeBtn) closeBtn.click(); else openOverlay.hidden = true;
+    } else if (window.scrollY > SCROLL_TOP_THRESHOLD) {
+      // First back press while scrolled down a tab: scroll to top instead
+      // of navigating away, and re-push the state so there's still
+      // something for the NEXT back press to pop — otherwise this press
+      // would silently consume a history entry without actually doing
+      // anything once already at the top.
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      history.pushState({ wftNav: true }, '');
     } else {
-      const activeTab = document.querySelector('.tab-btn.is-active');
-      if (activeTab && activeTab.dataset.target !== 'status') {
-        const statusBtn = document.querySelector('.tab-btn[data-target="status"]');
-        if (statusBtn) statusBtn.click();
-      }
-      // Else: already on Status with nothing open — let the browser/TWA's
-      // own back behavior proceed (exits the app), the expected outcome at
-      // the true "root" screen.
+      // Already at the top — step back through actual tab visit history.
+      tabHistory.pop(); // discard the current tab
+      const prevTab = tabHistory[tabHistory.length - 1];
+      const prevBtn = prevTab && document.querySelector(`.tab-btn[data-target="${prevTab}"]`);
+      if (prevBtn) prevBtn.click();
+      // Else: no previous tab left (the true "root") — let the browser/TWA's
+      // own back behavior proceed (backgrounds/exits the app).
     }
     // MutationObserver callbacks run as a microtask (before this timeout's
     // macrotask), so it still sees handlingPopstate=true and correctly
@@ -4512,7 +4530,7 @@ function formatTime(sec) {
 /* ---------------------------------------------------------------- */
 /* Exercise hold timer popup (Dead Hang, etc.)                        */
 /* ---------------------------------------------------------------- */
-let exTimerPopupState = null; // { exIdx, setIdx, phase: 'idle'|'countdown'|'running', intervalId, startedAt }
+let exTimerPopupState = null; // { exIdx, setIdx, phase: 'idle'|'countdown'|'running', intervalId, countdownId, startedAt }
 
 function openExerciseTimerPopup(exIdx, setIdx) {
   exTimerPopupState = { exIdx, setIdx, phase: 'idle', intervalId: null, startedAt: null };
@@ -4529,22 +4547,26 @@ function openExerciseTimerPopup(exIdx, setIdx) {
 
 function closeExerciseTimerPopup() {
   if (exTimerPopupState && exTimerPopupState.intervalId) clearInterval(exTimerPopupState.intervalId);
+  if (exTimerPopupState && exTimerPopupState.countdownId) clearInterval(exTimerPopupState.countdownId);
   exTimerPopupState = null;
   document.getElementById('exerciseTimerOverlay').hidden = true;
 }
 
-function startExerciseHoldCountdown() {
-  if (!exTimerPopupState || exTimerPopupState.phase !== 'idle') return;
+// startCount defaults to a full 5s "get ready" countdown; skipExerciseCountdown
+// below restarts this at 2s instead, for tapping the circle mid-countdown to
+// fast-forward through the wait rather than sitting through the rest of it.
+function startExerciseHoldCountdown(startCount) {
+  if (!exTimerPopupState || (exTimerPopupState.phase !== 'idle' && exTimerPopupState.phase !== 'countdown')) return;
   exTimerPopupState.phase = 'countdown';
   const display = document.getElementById('exerciseTimerDisplay');
   display.className = 'timer-popup-display is-counting-in';
   document.getElementById('btnExerciseTimerStart').disabled = true;
 
-  let count = 3;
+  let count = startCount || 5;
   display.textContent = String(count);
   if (navigator.vibrate) navigator.vibrate(80);
   playBeep();
-  const countdownId = setInterval(() => {
+  exTimerPopupState.countdownId = setInterval(() => {
     count -= 1;
     if (count > 0) {
       display.textContent = String(count);
@@ -4552,10 +4574,19 @@ function startExerciseHoldCountdown() {
       playBeep();
       return;
     }
-    clearInterval(countdownId);
+    clearInterval(exTimerPopupState.countdownId);
     if (!exTimerPopupState) return; // popup was closed mid-countdown
     beginExerciseHoldStopwatch();
   }, 1000);
+}
+
+// Tapping the big circle while it's already counting down skips ahead to a
+// final 2-second stretch instead of waiting out the full 5 — for when
+// you're already set up and ready before the countdown finishes.
+function skipExerciseCountdown() {
+  if (!exTimerPopupState || exTimerPopupState.phase !== 'countdown') return;
+  clearInterval(exTimerPopupState.countdownId);
+  startExerciseHoldCountdown(2);
 }
 
 function beginExerciseHoldStopwatch() {
@@ -4578,7 +4609,11 @@ function beginExerciseHoldStopwatch() {
 function stopExerciseHold() {
   if (!exTimerPopupState || exTimerPopupState.phase !== 'running') return;
   clearInterval(exTimerPopupState.intervalId);
-  const elapsedSec = Math.max(0, Math.round((Date.now() - exTimerPopupState.startedAt) / 1000));
+  // -2s reaction-time compensation: the phone is typically set down at a
+  // distance during a hold, not in hand, so there's a real gap between
+  // actually letting go and reaching over to tap the stop circle. Trims
+  // that lag back out of the recorded duration.
+  const elapsedSec = Math.max(0, Math.round((Date.now() - exTimerPopupState.startedAt) / 1000) - 2);
   const { exIdx, setIdx } = exTimerPopupState;
   if (currentExercises[exIdx] && currentExercises[exIdx].sets[setIdx]) {
     currentExercises[exIdx].sets[setIdx].reps = elapsedSec;
@@ -4590,10 +4625,21 @@ function stopExerciseHold() {
   closeExerciseTimerPopup();
 }
 
+// The big circle itself is tappable — same actions as the Start/Stop
+// buttons below it, dispatched by whichever phase is currently active, so
+// it doubles as the large, easy-to-hit target the buttons already are.
+function handleTimerDisplayTap() {
+  if (!exTimerPopupState) return;
+  if (exTimerPopupState.phase === 'idle') startExerciseHoldCountdown();
+  else if (exTimerPopupState.phase === 'countdown') skipExerciseCountdown();
+  else if (exTimerPopupState.phase === 'running') stopExerciseHold();
+}
+
 function initExerciseTimerPopup() {
   const overlay = document.getElementById('exerciseTimerOverlay');
-  document.getElementById('btnExerciseTimerStart').addEventListener('click', startExerciseHoldCountdown);
+  document.getElementById('btnExerciseTimerStart').addEventListener('click', () => startExerciseHoldCountdown());
   document.getElementById('btnExerciseTimerStop').addEventListener('click', stopExerciseHold);
+  document.getElementById('exerciseTimerDisplay').addEventListener('click', handleTimerDisplayTap);
   document.getElementById('btnCloseExerciseTimer').addEventListener('click', closeExerciseTimerPopup);
   bindOverlayBackdropClose(overlay, closeExerciseTimerPopup);
 }

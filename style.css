@@ -1671,16 +1671,44 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   color: var(--cyan);
   margin: 0 0 16px;
 }
+/* A large tappable circle (~3cm / 114px at a 96dpi reference) instead of
+   plain text — Dead Hang and other timed holds are typically done with
+   the phone set down at a distance, not held, so this needs to read
+   clearly from a few feet away and be an easy, big target to tap without
+   looking closely. Tapping it (see handleTimerDisplayTap in app.js) does
+   whatever the current phase calls for — start, skip the countdown ahead
+   to 2s, or stop — same as the Start/Stop buttons below it. */
 .timer-popup-display {
+  width: 114px;
+  height: 114px;
+  border-radius: 50%;
+  margin: 0 auto 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-family: var(--font-mono);
-  font-size: 2.6rem;
-  font-weight: 700;
+  font-size: 1.9rem;
+  font-weight: 800;
   color: var(--text-primary);
-  margin-bottom: 22px;
   font-variant-numeric: tabular-nums;
+  background: var(--surface-2);
+  border: 3px solid var(--border-soft);
+  cursor: pointer;
+  transition: transform 0.1s ease;
 }
-.timer-popup-display.is-counting-in { color: var(--cyan); }
-.timer-popup-display.is-running { color: var(--accent, var(--cyan)); }
+.timer-popup-display:active { transform: scale(0.96); }
+.timer-popup-display.is-counting-in {
+  color: var(--bg);
+  background: var(--cyan);
+  border-color: var(--cyan);
+  box-shadow: 0 0 24px var(--cyan-glow);
+}
+.timer-popup-display.is-running {
+  color: var(--bg);
+  background: var(--accent, var(--cyan));
+  border-color: var(--accent, var(--cyan));
+  box-shadow: 0 0 24px var(--cyan-glow);
+}
 .timer-popup-actions .btn { width: 100%; }
 .ex-set-timer-btn {
   width: 100%;
