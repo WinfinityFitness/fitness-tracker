@@ -1822,6 +1822,14 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .chat-msg { color: var(--text-primary); font-size: 0.78rem; line-height: 1.35; word-break: break-word; }
 .chat-msg-unsent { font-style: italic; color: var(--text-muted); }
 .chat-time { font-family: var(--font-mono); font-size: 0.56rem; color: var(--text-muted); flex: none; white-space: nowrap; }
+/* "Seen by" row — desktop-only, under the most recent message only. */
+.wds-chat-seen-row { display: flex; align-self: flex-end; margin: 2px 4px 0 0; }
+.wds-chat-seen-avatar {
+  width: 15px; height: 15px; border-radius: 50%; background: var(--surface-2); border: 1.5px solid var(--surface-1);
+  display: grid; place-items: center; font-size: 0.5rem; font-weight: 700; color: var(--text-secondary);
+  margin-left: -5px;
+}
+.wds-chat-seen-avatar:first-child { margin-left: 0; }
 /* Overlapping badge on the bubble's bottom corner — bottom-right for
    received messages, bottom-left for your own (mirrored, per request). */
 .chat-reactions {
@@ -4927,19 +4935,70 @@ html.wf-desktop-shell body { overflow-x: auto; }
 .wds-composer { display: flex; gap: 10px; align-items: flex-start; }
 .wds-composer-box { flex: 1; }
 .wds-composer-input {
-  width: 100%; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 20px;
-  padding: 10px 16px; color: var(--text-muted); font-size: 0.84rem; box-sizing: border-box;
+  width: 100%; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 14px;
+  padding: 10px 16px; color: var(--text-primary); font-size: 0.84rem; box-sizing: border-box;
+  font-family: var(--font-display); resize: vertical; min-height: 40px;
+}
+.wds-composer-input:focus { outline: none; border-color: var(--border); }
+.wds-composer-input::placeholder { color: var(--text-muted); }
+.wds-composer-pending-image { position: relative; margin-top: 10px; display: inline-block; }
+.wds-composer-pending-image img { max-height: 160px; border-radius: 8px; display: block; }
+.wds-composer-pending-image button {
+  position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--critical); color: #fff; border: none; cursor: pointer; font-size: 0.7rem;
 }
 .wds-composer-actions { display: flex; gap: 6px; margin-top: 10px; }
 .wds-composer-action-btn {
   flex: 1; background: none; border: 1px solid var(--border-soft); border-radius: 8px; padding: 7px;
-  color: var(--text-muted); font-size: 0.74rem; cursor: not-allowed;
+  color: var(--text-secondary); font-size: 0.74rem; cursor: pointer;
 }
+.wds-composer-action-btn:hover { background: var(--surface-2); color: var(--text-primary); }
+.wds-composer-post-btn { flex: none; padding: 7px 20px; background: var(--gradient-bar); color: #060a0d; font-weight: 700; border: none; }
+.wds-composer-post-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* Feed placeholder */
-.wds-feed-placeholder { text-align: center; padding: 40px 24px; }
-.wds-feed-placeholder-icon { font-size: 2rem; margin-bottom: 8px; }
-.wds-feed-placeholder .wds-card-sub { display: block; max-width: 400px; margin: 0 auto; line-height: 1.5; }
+/* Feed list */
+.wds-feed-list { display: flex; flex-direction: column; gap: 14px; }
+.wds-feed-post { display: flex; flex-direction: column; gap: 10px; }
+.wds-feed-post[data-deleted="1"] { opacity: 0.6; }
+.wds-post-head { display: flex; align-items: center; gap: 10px; }
+.wds-post-avatar {
+  width: 40px; height: 40px; border-radius: 50%; background: var(--surface-2); border: 1px solid var(--border-soft);
+  display: grid; place-items: center; font-weight: 700; font-size: 0.9rem; color: var(--text-primary); flex-shrink: 0;
+}
+.wds-post-meta { flex: 1; min-width: 0; }
+.wds-post-meta strong { display: block; font-size: 0.84rem; color: var(--text-primary); }
+.wds-post-meta span { font-size: 0.68rem; color: var(--text-muted); font-family: var(--font-mono); }
+.wds-post-unsend-btn { background: none; border: none; color: var(--text-muted); font-size: 0.68rem; cursor: pointer; padding: 4px 8px; }
+.wds-post-unsend-btn:hover { color: var(--critical); }
+.wds-post-body { font-size: 0.86rem; color: var(--text-secondary); line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.wds-post-body.is-unsent { font-style: italic; color: var(--text-muted); }
+.wds-post-image { width: 100%; max-height: 420px; object-fit: cover; border-radius: 8px; display: block; }
+.wds-post-actions { display: flex; gap: 4px; border-top: 1px solid var(--border-soft); padding-top: 8px; }
+.wds-post-action-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  background: none; border: none; color: var(--text-secondary); font-size: 0.76rem; padding: 6px; border-radius: 6px; cursor: pointer;
+}
+.wds-post-action-btn:hover { background: var(--surface-2); color: var(--text-primary); }
+.wds-post-action-btn.is-liked { color: var(--magenta); }
+
+.wds-post-comments { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border-soft); padding-top: 10px; }
+.wds-post-comment { display: flex; gap: 8px; }
+.wds-post-comment-avatar {
+  width: 26px; height: 26px; border-radius: 50%; background: var(--surface-2); border: 1px solid var(--border-soft);
+  display: grid; place-items: center; font-weight: 700; font-size: 0.68rem; flex-shrink: 0;
+}
+.wds-post-comment-bubble { background: var(--surface-2); border-radius: 12px; padding: 6px 12px; flex: 1; }
+.wds-post-comment-bubble strong { display: block; font-size: 0.72rem; color: var(--text-primary); }
+.wds-post-comment-bubble span { font-size: 0.8rem; color: var(--text-secondary); }
+.wds-post-comment-compose { display: flex; gap: 8px; margin-top: 2px; }
+.wds-post-comment-compose input {
+  flex: 1; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 20px;
+  padding: 7px 14px; color: var(--text-primary); font-size: 0.78rem; font-family: var(--font-display);
+}
+.wds-post-comment-compose button {
+  background: var(--gradient-bar); border: none; border-radius: 50%; width: 30px; height: 30px;
+  color: #060a0d; font-weight: 800; cursor: pointer; flex-shrink: 0;
+}
 
 .wds-notif-card #wdsNotifList { display: flex; flex-direction: column; }
 

@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.19.0';
+const APP_VERSION = 'WF_SYS_V.21.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -133,12 +133,13 @@ function initDesktopShell() {
     const composerAvatarEl = document.getElementById('wdsComposerAvatar');
     if (composerAvatarEl) composerAvatarEl.textContent = displayName.trim().charAt(0).toUpperCase();
     const composerInputEl = document.getElementById('wdsComposerInput');
-    if (composerInputEl) composerInputEl.textContent = `What's on your mind, ${displayName.split(' ')[0]}?`;
+    if (composerInputEl) composerInputEl.placeholder = `What's on your mind, ${displayName.split(' ')[0]}?`;
     renderWdsDashboard();
     gate.hidden = true;
     dashboard.hidden = false;
     startWdsDashboardPolling();
     startWdsChatPolling();
+    startWdsFeedPolling();
     return true;
   }
 
@@ -176,6 +177,7 @@ function initDesktopShell() {
     wdsRemoteData = null;
     stopWdsDashboardPolling();
     stopWdsChatPolling();
+    stopWdsFeedPolling();
     dashboard.hidden = true;
     gate.hidden = false;
     idInput.value = '';
@@ -235,6 +237,53 @@ function initDesktopShell() {
   chatSendBtn.addEventListener('click', sendWdsChat);
   chatInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendWdsChat(); });
   initWdsChatReactionMenu();
+
+  // Nexus Feed — composer (text + optional image) and the post/like/comment
+  // event delegation set up in initWdsFeed.
+  const composerInput = document.getElementById('wdsComposerInput');
+  const composerPostBtn = document.getElementById('btnWdsComposerPost');
+  const composerAttachBtn = document.getElementById('btnWdsComposerAttach');
+  const composerImageInput = document.getElementById('wdsComposerImageInput');
+  const composerPendingImage = document.getElementById('wdsComposerPendingImage');
+  const composerPendingImagePreview = document.getElementById('wdsComposerPendingImagePreview');
+  const composerPendingImageRemoveBtn = document.getElementById('btnWdsComposerImageRemove');
+  let wdsPendingPostImageDataUrl = null;
+
+  const clearWdsPendingPostImage = () => {
+    wdsPendingPostImageDataUrl = null;
+    composerPendingImage.hidden = true;
+    composerImageInput.value = '';
+  };
+  composerAttachBtn.addEventListener('click', () => composerImageInput.click());
+  composerImageInput.addEventListener('change', () => {
+    const file = composerImageInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      wdsPendingPostImageDataUrl = reader.result;
+      composerPendingImagePreview.src = wdsPendingPostImageDataUrl;
+      composerPendingImage.hidden = false;
+    };
+    reader.readAsDataURL(file);
+  });
+  composerPendingImageRemoveBtn.addEventListener('click', clearWdsPendingPostImage);
+
+  composerPostBtn.addEventListener('click', async () => {
+    if (!wdsRemoteData || !wdsRemoteData.shareKey || !sbConfigured()) return;
+    const text = composerInput.value;
+    const image = wdsPendingPostImageDataUrl;
+    if (!text.trim() && !image) return;
+    composerPostBtn.disabled = true;
+    try {
+      const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
+      await postFeedPost(text, image, wdsRemoteData.shareKey, codeName);
+      composerInput.value = '';
+      clearWdsPendingPostImage();
+      await refreshWdsFeed();
+    } catch (e) { /* best effort — composer keeps the typed text so nothing is lost */ }
+    finally { composerPostBtn.disabled = false; }
+  });
+  initWdsFeed();
 
   // Refresh — re-fetches the signed-in account's data (dashboard doesn't
   // auto-poll; only chat does), reusing the same remembered session
@@ -384,6 +433,7 @@ function renderWdsDashboard() {
   renderWdsNutrition();
   renderWdsBio();
   renderWdsNexus().catch(() => {});
+  refreshWdsFeed().catch(() => {});
   renderWdsMenu();
   renderWdsNotifications();
 }
@@ -549,13 +599,35 @@ async function renderWdsNexus() {
 // desktop compose box is not implemented in this pass — text only.
 // ---------------------------------------------------------------------
 let wdsLastChatMessages = [];
+async function fetchChatSeenReceipts(roomKey) {
+  const { data, error } = await sb.from('chat_read_receipts').select('share_key, code_name, last_read_at').eq('room_key', roomKey);
+  if (error) throw error;
+  return data || [];
+}
+
+let wdsLastMarkReadAt = 0;
+// Throttled — called on every chat refresh (every 5s while polling) but
+// only actually writes at most once per ~15s, since the receipt only needs
+// to be roughly current, not to the second.
+async function wdsMaybeMarkChatRead() {
+  if (!wdsRemoteData || !wdsRemoteData.shareKey || !sbConfigured()) return;
+  const now = Date.now();
+  if (now - wdsLastMarkReadAt < 15000) return;
+  wdsLastMarkReadAt = now;
+  const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
+  try { await sb.rpc('mark_chat_read', { p_room_key: 'global', p_share_key: wdsRemoteData.shareKey, p_code_name: codeName }); }
+  catch (e) { /* best effort — seen-by row just won't reflect this session until next successful call */ }
+}
+
 async function refreshWdsChat() {
   const listEl = document.getElementById('wdsChatList');
   try {
     const messages = await fetchChatMessages();
     wdsLastChatMessages = messages;
-    renderWdsChatMessages(messages);
+    const receipts = await fetchChatSeenReceipts('global').catch(() => []);
+    renderWdsChatMessages(messages, receipts);
     renderWdsNotifications();
+    wdsMaybeMarkChatRead();
   } catch (e) {
     listEl.innerHTML = '<p class="empty-note">Could not load chat.</p>';
   }
@@ -624,7 +696,7 @@ function wdsExtractVideoEmbed(text) {
   return '';
 }
 
-function renderWdsChatMessages(messages) {
+function renderWdsChatMessages(messages, receipts) {
   const list = document.getElementById('wdsChatList');
   list.innerHTML = '';
   if (!messages.length) { list.innerHTML = '<p class="empty-note">No messages yet. Say hi!</p>'; return; }
@@ -657,6 +729,25 @@ function renderWdsChatMessages(messages) {
     e.stopPropagation();
     window.open(img.dataset.lightbox, '_blank', 'noopener');
   }));
+
+  // "Seen by" row — Messenger-group-chat style, only under the most recent
+  // non-unsent message, only the people who've read AT OR AFTER it was
+  // sent (and excluding its own sender).
+  const lastMsg = messages.slice().reverse().find(m => !m.deleted);
+  if (lastMsg && receipts && receipts.length) {
+    const seenBy = receipts.filter(r =>
+      r.share_key !== lastMsg.sender_share_key && new Date(r.last_read_at) >= new Date(lastMsg.created_at)
+    );
+    if (seenBy.length) {
+      const seenRow = document.createElement('div');
+      seenRow.className = 'wds-chat-seen-row';
+      seenRow.innerHTML = seenBy.slice(0, 8).map(r =>
+        `<span class="wds-chat-seen-avatar" title="Seen by ${escapeHtml(r.code_name || '?')}">${escapeHtml((r.code_name || '?').charAt(0).toUpperCase())}</span>`
+      ).join('');
+      list.appendChild(seenRow);
+    }
+  }
+
   list.scrollTop = list.scrollHeight;
 }
 
@@ -744,6 +835,200 @@ function startWdsChatPolling() {
 }
 function stopWdsChatPolling() {
   if (wdsChatPollId) { clearInterval(wdsChatPollId); wdsChatPollId = null; }
+}
+
+// ---------------------------------------------------------------------
+// Nexus Feed — the center column's Facebook-style feed. Same trust model
+// as chat: share_key is the identity anchor, posting/commenting are plain
+// inserts (RLS-permissive, no real per-user auth exists anywhere in this
+// app), liking/unsending go through RPCs (see supabase_feed_migration.sql).
+// Desktop-only, same as chat — no mobile equivalent exists.
+// ---------------------------------------------------------------------
+async function fetchFeedPosts() {
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await sb.from('feed_posts')
+    .select('id, share_key, code_name, message, image_url, deleted, created_at')
+    .gte('created_at', cutoff)
+    .order('created_at', { ascending: false })
+    .limit(30);
+  if (error) throw error;
+  const posts = data || [];
+  const ids = posts.map(p => p.id);
+  if (ids.length) {
+    const [{ data: likes }, { data: comments }] = await Promise.all([
+      sb.from('feed_post_likes').select('post_id, share_key').in('post_id', ids),
+      sb.from('feed_post_comments').select('id, post_id, share_key, code_name, message, deleted, created_at').in('post_id', ids).order('created_at', { ascending: true }),
+    ]);
+    const likesByPost = {}, commentsByPost = {};
+    (likes || []).forEach(l => { (likesByPost[l.post_id] = likesByPost[l.post_id] || []).push(l); });
+    (comments || []).forEach(c => { (commentsByPost[c.post_id] = commentsByPost[c.post_id] || []).push(c); });
+    posts.forEach(p => { p.likes = likesByPost[p.id] || []; p.comments = commentsByPost[p.id] || []; });
+  }
+  return posts;
+}
+
+async function postFeedPost(text, imageDataUrl, shareKey, codeName) {
+  const trimmed = text.trim().slice(0, 2000);
+  if (!trimmed && !imageDataUrl) return;
+  let imageUrl = null;
+  if (imageDataUrl) imageUrl = await uploadChatImage(imageDataUrl, shareKey);
+  const { error } = await sb.from('feed_posts').insert({ share_key: shareKey, code_name: codeName, message: trimmed, image_url: imageUrl });
+  if (error) throw error;
+}
+
+async function toggleFeedPostLike(postId, shareKey) {
+  const { data, error } = await sb.rpc('toggle_feed_post_like', { p_post_id: postId, p_share_key: shareKey });
+  if (error) throw error;
+  return data;
+}
+
+async function postFeedComment(postId, text, shareKey, codeName) {
+  const trimmed = text.trim().slice(0, 500);
+  if (!trimmed) return;
+  const { error } = await sb.from('feed_post_comments').insert({ post_id: postId, share_key: shareKey, code_name: codeName, message: trimmed });
+  if (error) throw error;
+}
+
+async function unsendFeedPost(postId, shareKey) {
+  const { error } = await sb.rpc('unsend_feed_post', { p_post_id: postId, p_share_key: shareKey });
+  if (error) throw error;
+}
+
+async function unsendFeedComment(commentId, shareKey) {
+  const { error } = await sb.rpc('unsend_feed_comment', { p_comment_id: commentId, p_share_key: shareKey });
+  if (error) throw error;
+}
+
+// Comment sections collapse back to hidden on every re-render (a fresh
+// innerHTML rebuild) unless we remember which posts had them open —
+// re-applied in renderFeedPosts below.
+const wdsFeedExpandedComments = new Set();
+
+async function refreshWdsFeed() {
+  const listEl = document.getElementById('wdsFeedList');
+  if (!listEl) return;
+  try {
+    const posts = await fetchFeedPosts();
+    renderFeedPosts(posts);
+  } catch (e) {
+    listEl.innerHTML = '<p class="empty-note">Could not load the feed.</p>';
+  }
+}
+
+function renderFeedPosts(posts) {
+  const list = document.getElementById('wdsFeedList');
+  if (!posts.length) { list.innerHTML = '<p class="empty-note">No posts yet. Be the first to share something!</p>'; return; }
+  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+  list.innerHTML = posts.map(p => {
+    const isOwn = !!myShareKey && p.share_key === myShareKey;
+    const liked = (p.likes || []).some(l => l.share_key === myShareKey);
+    const likeCount = (p.likes || []).length;
+    const comments = (p.comments || []).filter(c => !c.deleted);
+    const imageHtml = (!p.deleted && p.image_url) ? `<img class="wds-post-image" src="${p.image_url}" alt="">` : '';
+    const videoHtml = p.deleted ? '' : wdsExtractVideoEmbed(p.message);
+    const bodyHtml = p.deleted
+      ? `<p class="wds-post-body is-unsent">This post was removed.</p>`
+      : `${p.message ? `<p class="wds-post-body">${escapeHtml(p.message)}</p>` : ''}${imageHtml}${videoHtml}`;
+    const expanded = wdsFeedExpandedComments.has(p.id);
+    const commentsHtml = comments.map(c => {
+      const canRemove = !!myShareKey && c.share_key === myShareKey;
+      return `<div class="wds-post-comment" data-comment-id="${c.id}">
+        <span class="wds-post-comment-avatar">${escapeHtml((c.code_name || '?').charAt(0).toUpperCase())}</span>
+        <div class="wds-post-comment-bubble"><strong>${escapeHtml(c.code_name || 'Anonymous')}</strong><span>${escapeHtml(c.message)}</span></div>
+        ${canRemove ? `<button type="button" class="wds-post-unsend-btn" data-action="unsend-comment">✕</button>` : ''}
+      </div>`;
+    }).join('');
+    return `
+      <div class="wds-card wds-feed-post" data-post-id="${p.id}" data-deleted="${p.deleted ? 1 : 0}">
+        <div class="wds-post-head">
+          <span class="wds-post-avatar">${escapeHtml((p.code_name || '?').charAt(0).toUpperCase())}</span>
+          <div class="wds-post-meta"><strong>${escapeHtml(p.code_name || 'Anonymous')}</strong><span>${wdsRelativeTime(p.created_at)}</span></div>
+          ${isOwn && !p.deleted ? `<button type="button" class="wds-post-unsend-btn" data-action="unsend-post">Remove</button>` : ''}
+        </div>
+        ${bodyHtml}
+        ${!p.deleted ? `
+        <div class="wds-post-actions">
+          <button type="button" class="wds-post-action-btn${liked ? ' is-liked' : ''}" data-action="like">♥ ${likeCount ? likeCount + ' ' : ''}Cheer</button>
+          <button type="button" class="wds-post-action-btn" data-action="toggle-comments">💬 ${comments.length ? comments.length + ' ' : ''}Comments</button>
+        </div>
+        <div class="wds-post-comments" ${expanded ? '' : 'hidden'}>
+          ${commentsHtml}
+          <div class="wds-post-comment-compose">
+            <input type="text" placeholder="Write a comment…" maxlength="500">
+            <button type="button" data-action="send-comment">➤</button>
+          </div>
+        </div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+function initWdsFeed() {
+  const list = document.getElementById('wdsFeedList');
+  if (!list) return;
+
+  list.addEventListener('click', async e => {
+    const card = e.target.closest('.wds-feed-post');
+    if (!card) return;
+    const postId = Number(card.dataset.postId);
+    const shareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+
+    if (e.target.closest('[data-action="like"]')) {
+      if (!shareKey) return;
+      try { await toggleFeedPostLike(postId, shareKey); await refreshWdsFeed(); } catch (err) { /* best effort */ }
+      return;
+    }
+    if (e.target.closest('[data-action="toggle-comments"]')) {
+      if (wdsFeedExpandedComments.has(postId)) wdsFeedExpandedComments.delete(postId);
+      else wdsFeedExpandedComments.add(postId);
+      const section = card.querySelector('.wds-post-comments');
+      if (section) section.hidden = !wdsFeedExpandedComments.has(postId);
+      return;
+    }
+    if (e.target.closest('[data-action="unsend-post"]')) {
+      if (!shareKey || !confirm('Remove this post?')) return;
+      try { await unsendFeedPost(postId, shareKey); await refreshWdsFeed(); } catch (err) { /* best effort */ }
+      return;
+    }
+    if (e.target.closest('[data-action="unsend-comment"]')) {
+      const commentRow = e.target.closest('[data-comment-id]');
+      const commentId = commentRow ? Number(commentRow.dataset.commentId) : null;
+      if (!shareKey || !commentId) return;
+      try {
+        await unsendFeedComment(commentId, shareKey);
+        wdsFeedExpandedComments.add(postId);
+        await refreshWdsFeed();
+      } catch (err) { /* best effort */ }
+      return;
+    }
+    if (e.target.closest('[data-action="send-comment"]')) {
+      const input = card.querySelector('.wds-post-comment-compose input');
+      if (!input || !input.value.trim() || !shareKey) return;
+      const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
+      try {
+        await postFeedComment(postId, input.value, shareKey, codeName);
+        input.value = '';
+        wdsFeedExpandedComments.add(postId);
+        await refreshWdsFeed();
+      } catch (err) { /* best effort */ }
+      return;
+    }
+  });
+
+  list.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.matches('.wds-post-comment-compose input')) {
+      const btn = e.target.closest('.wds-post-comments').querySelector('[data-action="send-comment"]');
+      if (btn) btn.click();
+    }
+  });
+}
+
+let wdsFeedPollId = null;
+function startWdsFeedPolling() {
+  stopWdsFeedPolling();
+  wdsFeedPollId = setInterval(refreshWdsFeed, 20000);
+}
+function stopWdsFeedPolling() {
+  if (wdsFeedPollId) { clearInterval(wdsFeedPollId); wdsFeedPollId = null; }
 }
 
 // Deferred (not called directly) for the same reason as applyCustomSplashLogo
