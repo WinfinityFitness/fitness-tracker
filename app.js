@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.24.0';
+const APP_VERSION = 'WF_SYS_V.25.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -348,6 +348,91 @@ function initDesktopShell() {
   });
   initWdsFeed();
 
+  // My Day — story composer (text + optional image, "+ Add" button and the
+  // ring itself when it's your own with no active story), story viewer
+  // (tapping any ring with an active story), and the unsend button inside
+  // the viewer (delegated, since its content is rebuilt per story).
+  const storyComposerOverlay = document.getElementById('wdsStoryComposerOverlay');
+  const storyComposerInput = document.getElementById('wdsStoryComposerInput');
+  const storyComposerPostBtn = document.getElementById('btnWdsStoryComposerPost');
+  const storyComposerAttachBtn = document.getElementById('btnWdsStoryComposerAttach');
+  const storyComposerImageInput = document.getElementById('wdsStoryComposerImageInput');
+  const storyComposerPendingImage = document.getElementById('wdsStoryComposerPendingImage');
+  const storyComposerPendingImagePreview = document.getElementById('wdsStoryComposerPendingImagePreview');
+  const storyComposerImageRemoveBtn = document.getElementById('btnWdsStoryComposerImageRemove');
+  const storyComposerCloseBtn = document.getElementById('btnWdsStoryComposerClose');
+  const storyComposerErrorEl = document.getElementById('wdsStoryComposerError');
+  let wdsPendingStoryImageDataUrl = null;
+
+  const clearWdsPendingStoryImage = () => {
+    wdsPendingStoryImageDataUrl = null;
+    storyComposerPendingImage.hidden = true;
+    storyComposerImageInput.value = '';
+  };
+  storyComposerAttachBtn.addEventListener('click', () => storyComposerImageInput.click());
+  storyComposerImageInput.addEventListener('change', () => {
+    const file = storyComposerImageInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      wdsPendingStoryImageDataUrl = reader.result;
+      storyComposerPendingImagePreview.src = wdsPendingStoryImageDataUrl;
+      storyComposerPendingImage.hidden = false;
+    };
+    reader.readAsDataURL(file);
+  });
+  storyComposerImageRemoveBtn.addEventListener('click', clearWdsPendingStoryImage);
+  storyComposerCloseBtn.addEventListener('click', () => {
+    wdsCloseStoryComposer();
+    storyComposerInput.value = '';
+    clearWdsPendingStoryImage();
+  });
+  storyComposerPostBtn.addEventListener('click', async () => {
+    if (storyComposerErrorEl) storyComposerErrorEl.hidden = true;
+    if (!wdsRemoteData || !wdsRemoteData.shareKey || !sbConfigured()) {
+      if (storyComposerErrorEl) { storyComposerErrorEl.textContent = 'Not signed in — try refreshing the page.'; storyComposerErrorEl.hidden = false; }
+      return;
+    }
+    const text = storyComposerInput.value;
+    const image = wdsPendingStoryImageDataUrl;
+    if (!text.trim() && !image) return;
+    storyComposerPostBtn.disabled = true;
+    try {
+      const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
+      await postFeedStory(text, image, wdsRemoteData.shareKey, codeName);
+      storyComposerInput.value = '';
+      clearWdsPendingStoryImage();
+      wdsCloseStoryComposer();
+      await refreshWdsMyday();
+    } catch (e) {
+      if (storyComposerErrorEl) { storyComposerErrorEl.textContent = 'Could not post: ' + ((e && e.message) || 'unknown error') + '. Try again.'; storyComposerErrorEl.hidden = false; }
+    }
+    finally { storyComposerPostBtn.disabled = false; }
+  });
+
+  document.getElementById('btnWdsAddStory').addEventListener('click', wdsOpenStoryComposer);
+  document.getElementById('wdsMydayRow').addEventListener('click', e => {
+    const item = e.target.closest('.wds-myday-item');
+    if (!item) return;
+    if (item.dataset.action === 'add-story') { wdsOpenStoryComposer(); return; }
+    const storyId = Number(item.dataset.storyId);
+    if (storyId) wdsOpenStoryViewer(storyId);
+  });
+  document.getElementById('btnWdsStoryViewerClose').addEventListener('click', wdsCloseStoryViewer);
+  document.getElementById('wdsStoryViewerOverlay').addEventListener('click', e => {
+    if (e.target.id === 'wdsStoryViewerOverlay') wdsCloseStoryViewer();
+  });
+  document.getElementById('wdsStoryViewerContent').addEventListener('click', async e => {
+    const btn = e.target.closest('#btnWdsUnsendStory');
+    if (!btn || !wdsRemoteData || !wdsRemoteData.shareKey) return;
+    btn.disabled = true;
+    try {
+      await unsendFeedStory(Number(btn.dataset.storyId), wdsRemoteData.shareKey);
+      wdsCloseStoryViewer();
+      await refreshWdsMyday();
+    } catch (e2) { btn.disabled = false; }
+  });
+
   // Refresh — re-fetches the signed-in account's data (dashboard doesn't
   // auto-poll; only chat does), reusing the same remembered session
   // credentials the reload-resume path below uses.
@@ -625,7 +710,6 @@ function renderWdsBio() {
 }
 
 async function renderWdsNexus() {
-  const mydayEl = document.getElementById('wdsMydayRow');
   const chatListEl = document.getElementById('wdsChatList');
 
   if (!sbConfigured()) {
@@ -634,22 +718,107 @@ async function renderWdsNexus() {
     return;
   }
 
-  // My Day row: real recently-active leaderboard members as story circles —
-  // just an activity indicator for now (no real "story" content yet), see
-  // the feed placeholder for what's still to be designed.
-  try {
-    const rows = await pullLeaderboard();
-    const recent = rows.slice().sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)).slice(0, 8);
-    const youItem = `<div class="wds-myday-item"><div class="wds-myday-ring wds-myday-ring--you"><div class="wds-myday-avatar">+</div></div><span>Your Day</span></div>`;
-    const otherItems = recent.map(r => {
-      const name = r.code_name || r.public_id || '?';
-      return `<div class="wds-myday-item"><div class="wds-myday-ring"><div class="wds-myday-avatar">${escapeHtml(name.charAt(0).toUpperCase())}</div></div><span>${escapeHtml(name)}</span></div>`;
-    }).join('');
-    if (mydayEl) mydayEl.innerHTML = youItem + otherItems;
-  } catch (e) { /* best effort — My Day row just keeps whatever it last had */ }
-
+  await refreshWdsMyday();
   await refreshWdsChat();
 }
+
+// ---------------------------------------------------------------------
+// My Day — Instagram/Facebook-style Stories. A photo or short text that
+// disappears after 24 hours; expiry is enforced server-side in the
+// feed_stories SELECT policy itself (created_at >= now() - 24h), so an
+// expired story just stops coming back from the query — nothing to clean
+// up client-side. One ring per person, showing their single most recent
+// active story (no per-user story carousel in this pass).
+// ---------------------------------------------------------------------
+async function fetchActiveStories() {
+  const { data, error } = await sb.from('feed_stories')
+    .select('id, share_key, code_name, message, image_url, created_at')
+    .eq('deleted', false)
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (error) throw error;
+  const seen = new Set();
+  const result = [];
+  (data || []).forEach(s => {
+    if (seen.has(s.share_key)) return;
+    seen.add(s.share_key);
+    result.push(s);
+  });
+  return result;
+}
+
+async function postFeedStory(text, imageDataUrl, shareKey, codeName) {
+  const trimmed = (text || '').trim().slice(0, 500);
+  if (!trimmed && !imageDataUrl) return;
+  let imageUrl = null;
+  if (imageDataUrl) imageUrl = await uploadChatImage(imageDataUrl, shareKey);
+  const { error } = await sb.from('feed_stories').insert({ share_key: shareKey, code_name: codeName, message: trimmed, image_url: imageUrl });
+  if (error) throw error;
+}
+
+async function unsendFeedStory(storyId, shareKey) {
+  const { error } = await sb.rpc('unsend_feed_story', { p_story_id: storyId, p_share_key: shareKey });
+  if (error) throw error;
+}
+
+let wdsActiveStories = [];
+async function refreshWdsMyday() {
+  const el = document.getElementById('wdsMydayRow');
+  if (!el) return;
+  try {
+    wdsActiveStories = await fetchActiveStories();
+    renderWdsMyday();
+  } catch (e) {
+    el.innerHTML = '<p class="empty-note">Could not load My Day.</p>';
+  }
+}
+
+function renderWdsMyday() {
+  const el = document.getElementById('wdsMydayRow');
+  if (!el) return;
+  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+  const mine = wdsActiveStories.find(s => s.share_key === myShareKey);
+  const others = wdsActiveStories.filter(s => s.share_key !== myShareKey);
+  const youRingClass = mine ? 'wds-myday-ring wds-myday-ring--has-story' : 'wds-myday-ring wds-myday-ring--you';
+  const youAvatar = mine ? escapeHtml((mine.code_name || '?').charAt(0).toUpperCase()) : '+';
+  const youItem = `<div class="wds-myday-item" data-action="${mine ? 'view-story' : 'add-story'}" data-story-id="${mine ? mine.id : ''}"><div class="${youRingClass}"><div class="wds-myday-avatar">${youAvatar}</div></div><span>Your Day</span></div>`;
+  const otherItems = others.map(s => {
+    const name = s.code_name || '?';
+    return `<div class="wds-myday-item" data-action="view-story" data-story-id="${s.id}"><div class="wds-myday-ring wds-myday-ring--has-story"><div class="wds-myday-avatar">${escapeHtml(name.charAt(0).toUpperCase())}</div></div><span>${escapeHtml(name)}</span></div>`;
+  }).join('');
+  el.innerHTML = youItem + otherItems;
+}
+
+function wdsOpenStoryViewer(storyId) {
+  const story = wdsActiveStories.find(s => s.id === storyId);
+  const overlay = document.getElementById('wdsStoryViewerOverlay');
+  const content = document.getElementById('wdsStoryViewerContent');
+  if (!story || !overlay || !content) return;
+  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+  const isOwn = !!myShareKey && story.share_key === myShareKey;
+  const mediaHtml = story.image_url
+    ? `<img class="wds-story-content-image" src="${escapeHtml(story.image_url)}" alt="">`
+    : `<div class="wds-story-content-text">${escapeHtml(story.message || '')}</div>`;
+  content.innerHTML = `
+    <div class="wds-story-content">
+      <div class="wds-story-content-head">
+        <span class="wds-post-avatar">${escapeHtml((story.code_name || '?').charAt(0).toUpperCase())}</span>
+        <div><strong>${escapeHtml(story.code_name || 'Anonymous')}</strong><span>${wdsRelativeTime(story.created_at)}</span></div>
+      </div>
+      ${mediaHtml}
+      ${story.image_url && story.message ? `<p class="wds-post-body" style="padding:10px 14px;color:#fff;">${escapeHtml(story.message)}</p>` : ''}
+      ${isOwn ? `<div class="wds-story-content-actions"><button type="button" class="wds-post-unsend-btn" id="btnWdsUnsendStory" data-story-id="${story.id}">Remove</button></div>` : ''}
+    </div>`;
+  overlay.hidden = false;
+}
+function wdsCloseStoryViewer() { const overlay = document.getElementById('wdsStoryViewerOverlay'); if (overlay) overlay.hidden = true; }
+function wdsOpenStoryComposer() {
+  const overlay = document.getElementById('wdsStoryComposerOverlay');
+  const errorEl = document.getElementById('wdsStoryComposerError');
+  if (errorEl) errorEl.hidden = true;
+  if (overlay) overlay.hidden = false;
+}
+function wdsCloseStoryComposer() { const overlay = document.getElementById('wdsStoryComposerOverlay'); if (overlay) overlay.hidden = true; }
 
 // ---------------------------------------------------------------------
 // Desktop Nexus chat — a real, usable substitute for the mobile Nexus tab
@@ -1060,15 +1229,25 @@ async function refreshWdsFeed() {
 // (app.js ~12961) so both surfaces offer the same six reactions.
 const WDS_REACTION_LABEL = { '👍': 'Like', '❤️': 'Love', '😂': 'Haha', '😮': 'Wow', '😢': 'Sad', '🙏': 'Pray' };
 
-// A small cluster of the top distinct emoji + the button's own label —
-// label reflects MY reaction if I've reacted, otherwise the generic "Like".
+// The Like button itself just shows the action ("Like", or my own reaction's
+// label if I've already reacted) — the WHO/WHICH-emoji summary is a
+// separate line at the bottom-right of the post (wdsReactionSummaryHtml
+// below), matching Facebook's actual layout instead of cramming both into
+// one button.
 function wdsReactionButtonHtml(likes, myShareKey) {
-  const counts = aggregateReactions(likes);
-  const total = (likes || []).length;
   const mine = (likes || []).find(l => l.share_key === myShareKey);
   const label = mine ? (WDS_REACTION_LABEL[mine.emoji] || 'Liked') : 'Like';
+  return `${mine ? mine.emoji : '👍'} ${label}`;
+}
+
+// Bottom-right summary: the top distinct reaction emoji + total count —
+// empty (renders nothing) until at least one person has reacted.
+function wdsReactionSummaryHtml(likes) {
+  const total = (likes || []).length;
+  if (!total) return '';
+  const counts = aggregateReactions(likes);
   const top = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 3).join('');
-  return `${top ? `<span class="wds-reaction-cluster">${top}</span> ` : '👍 '}${label}${total ? ' ' + total : ''}`;
+  return `<div class="wds-reaction-summary">${top ? `<span class="wds-reaction-cluster">${top}</span>` : ''}<span>${total}</span></div>`;
 }
 
 function renderFeedPosts(posts) {
@@ -1095,6 +1274,7 @@ function renderFeedPosts(posts) {
           <div class="wds-post-comment-bubble"><strong>${escapeHtml(c.code_name || 'Anonymous')}</strong><span>${escapeHtml(c.message)}</span></div>
           <div class="wds-post-comment-actions">
             <button type="button" class="wds-comment-action-btn${cMyLike ? ' is-liked' : ''}" data-action="like-comment" data-current-emoji="${cMyLike ? cMyLike.emoji : ''}">${wdsReactionButtonHtml(c.likes, myShareKey)}</button>
+            ${wdsReactionSummaryHtml(c.likes)}
             <span>${wdsRelativeTime(c.created_at)}</span>
             ${canRemove ? `<button type="button" class="wds-comment-action-btn" data-action="unsend-comment">Remove</button>` : ''}
           </div>
@@ -1110,6 +1290,7 @@ function renderFeedPosts(posts) {
         </div>
         ${bodyHtml}
         ${!p.deleted ? `
+        ${wdsReactionSummaryHtml(p.likes)}
         <div class="wds-post-actions">
           <button type="button" class="wds-post-action-btn${myLike ? ' is-liked' : ''}" data-action="like" data-current-emoji="${myLike ? myLike.emoji : ''}">${wdsReactionButtonHtml(p.likes, myShareKey)}</button>
           <button type="button" class="wds-post-action-btn" data-action="toggle-comments">💬 ${comments.length ? comments.length + ' ' : ''}Comments</button>
