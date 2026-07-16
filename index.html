@@ -23,7 +23,14 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="stylesheet" href="style.css">
+<!-- ?v= is a cache-busting query tied to APP_VERSION (bump alongside it and
+     CACHE_NAME on every deploy) — a hosting-side CDN in front of the
+     wellness.winfinityfitness.com reverse proxy was caching style.css/app.js
+     independently of index.html itself, so a fresh HTML page could still
+     end up paired with a stale cached script. A version-tagged URL is
+     guaranteed to be a cache MISS on every real deploy, regardless of
+     whatever caching behavior sits in front of the origin. -->
+<link rel="stylesheet" href="style.css?v=18.0">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3687,10 +3694,10 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
   </div>
 </div>
 
-<script src="config.js"></script>
+<script src="config.js?v=18.0"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js"></script>
+<script src="app.js?v=18.0"></script>
 </body>
 </html>
