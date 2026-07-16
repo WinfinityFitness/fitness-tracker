@@ -2524,9 +2524,37 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   justify-content: flex-end;
   cursor: grab;
   touch-action: none;
+  transition: transform 0.15s ease;
 }
 .admin-drawer-tab[hidden] { display: none; }
 .admin-drawer-tab:active { cursor: grabbing; }
+/* Press-and-hold-2s-then-drag reposition (see initAdminDrawer in app.js) —
+   the pulse/glow signals the tab has been "picked up" and is now following
+   the finger freely (vertically; horizontally it snaps to whichever edge
+   the pointer is nearer), distinct from the plain short-drag-to-open
+   gesture which never adds this class. */
+.admin-drawer-tab.is-repositioning {
+  transform: translateY(-50%) scale(1.18);
+}
+.admin-drawer-tab.is-repositioning .admin-drawer-tab-bar {
+  box-shadow: 0 0 18px var(--cyan-glow), 0 0 6px var(--cyan);
+}
+/* Docked to the left edge instead of the default right — mirrors the bump
+   shape (rounded corners + arrow flip to the other side) so it still reads
+   as "poking out from this edge" rather than a right-edge shape stranded
+   on the wrong side. */
+.admin-drawer-tab--left { justify-content: flex-start; }
+.admin-drawer-tab--left .admin-drawer-tab-bar {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-top-right-radius: 15px;
+  border-bottom-right-radius: 15px;
+  box-shadow: 0 0 10px var(--cyan-glow), 1px 0 3px rgba(0,0,0,0.3);
+}
+.admin-drawer-tab--left.is-repositioning .admin-drawer-tab-bar {
+  box-shadow: 0 0 18px var(--cyan-glow), 0 0 6px var(--cyan);
+}
+.admin-drawer-tab--left .admin-drawer-tab-bar::after { content: '›'; left: 58%; }
 .admin-drawer-tab-bar {
   width: 15px;
   height: 30px;
@@ -2660,8 +2688,13 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   opacity: 0;
   pointer-events: none;
   touch-action: none;
-  transition: opacity 0.2s ease, width 0.2s ease, height 0.2s ease, right 0.2s ease;
+  transition: opacity 0.2s ease, width 0.2s ease, height 0.2s ease, right 0.2s ease, left 0.2s ease;
 }
+/* Anchored to the tab's actual (possibly dragged) position by
+   positionAdminDrawerPill/layoutAdminDrawerArc in app.js every time it
+   opens — this default only matters before that first inline top/left/right
+   is ever set. */
+.admin-drawer-pill--left { left: -170px; right: auto; }
 .admin-drawer-pill[hidden] { display: none; }
 .admin-drawer-pill.is-open { opacity: 1; pointer-events: auto; }
 .admin-drawer-pill-item {

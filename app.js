@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.13.1';
+const APP_VERSION = 'WF_SYS_V.14.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9542,6 +9542,18 @@ function normalizeAngle180(deg) {
 // the only one with pointer-events enabled (so a hidden icon has to be
 // rotated to the front before it's tappable), and named in the small
 // label that follows it around the arc.
+// Anchors the pill's own container to wherever the edge tab currently sits
+// (it can be dragged anywhere now — see applyAdminTabPosition) and flips
+// which side it opens toward: right-docked tabs fan the arc leftward (as
+// before), left-docked tabs mirror everything so it fans rightward instead
+// and never opens off the edge of the screen.
+function positionAdminDrawerPill(tab, pill) {
+  const rect = tab.getBoundingClientRect();
+  const isLeft = tab.classList.contains('admin-drawer-tab--left');
+  pill.style.top = `${rect.top + rect.height / 2}px`;
+  pill.classList.toggle('admin-drawer-pill--left', isLeft);
+}
+
 function layoutAdminDrawerArc() {
   const pill = document.getElementById('adminDrawerPill');
   if (!pill) return;
@@ -9551,7 +9563,10 @@ function layoutAdminDrawerArc() {
   const radius = computeAdminArcRadius(n);
   adminDrawerArcRadius = radius;
   pill.style.width = pill.style.height = `${(radius * 2).toFixed(1)}px`;
-  pill.style.right = `${(-radius).toFixed(1)}px`;
+  const isLeft = pill.classList.contains('admin-drawer-pill--left');
+  if (isLeft) { pill.style.left = `${(-radius).toFixed(1)}px`; pill.style.right = 'auto'; }
+  else { pill.style.right = `${(-radius).toFixed(1)}px`; pill.style.left = 'auto'; }
+  const mirror = isLeft ? 1 : -1;
 
   const state = items.map((el, i) => {
     const home = (360 / n) * i;
@@ -9564,7 +9579,7 @@ function layoutAdminDrawerArc() {
   const label = document.getElementById('adminDrawerArcLabel');
   state.forEach((s, i) => {
     const rad = s.phi * Math.PI / 180;
-    const x = -radius * Math.cos(rad);
+    const x = mirror * radius * Math.cos(rad);
     const y = radius * Math.sin(rad);
     const isFocused = i === focusedIdx;
     s.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${isFocused ? 1.3 : 1})`;
@@ -9577,16 +9592,19 @@ function layoutAdminDrawerArc() {
     s.el.classList.toggle('is-focused', isFocused);
     if (isFocused && label) {
       label.textContent = s.el.title || s.el.getAttribute('aria-label') || '';
-      label.style.transform = `translate(${(x - 16).toFixed(1)}px, ${y.toFixed(1)}px) translate(-100%, -50%)`;
+      const labelX = isLeft ? x + 16 : x - 16;
+      label.style.transform = `translate(${labelX.toFixed(1)}px, ${y.toFixed(1)}px) translate(${isLeft ? '0%' : '-100%'}, -50%)`;
     }
   });
 }
 
 function openAdminDrawerPill() {
   const pill = document.getElementById('adminDrawerPill');
+  const tab = document.getElementById('adminDrawerTab');
   if (!pill) return;
   adminDrawerPillOpen = true;
   adminDrawerArcRotation = 0;
+  if (tab) positionAdminDrawerPill(tab, pill);
   layoutAdminDrawerArc();
   pill.hidden = false;
   requestAnimationFrame(() => pill.classList.add('is-open'));
@@ -9654,6 +9672,47 @@ function closeAdminDrawerInstant() {
   if (backdrop) { backdrop.classList.remove('is-open'); backdrop.hidden = true; }
 }
 
+// Press-and-hold-2s-then-drag repositioning for the edge tab — see the
+// pointer handlers in initAdminDrawer. Position is stored as a fraction of
+// viewport height (not raw px) so it stays sensible across orientation
+// changes and different screen sizes, and re-clamped on load/resize against
+// whatever the header/tab-bar heights actually are right now rather than a
+// hardcoded guess.
+const ADMIN_TAB_POS_KEY = 'wft_admin_tab_pos';
+function loadAdminTabPosition() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(ADMIN_TAB_POS_KEY));
+    if (!parsed || typeof parsed.yFrac !== 'number' || (parsed.edge !== 'left' && parsed.edge !== 'right')) return null;
+    return parsed;
+  } catch (e) { return null; }
+}
+function saveAdminTabPosition(edge, yFrac) {
+  localStorage.setItem(ADMIN_TAB_POS_KEY, JSON.stringify({ edge, yFrac }));
+}
+// Keeps the tab from ever landing on top of the sticky header or the
+// floating bottom tab bar — measured live via getBoundingClientRect rather
+// than a fixed number since both heights vary by skin/content/safe-area.
+function adminTabYBounds() {
+  const header = document.querySelector('.app-header');
+  const tabBarEl = document.querySelector('.tab-bar');
+  const headerBottom = header ? header.getBoundingClientRect().bottom : 0;
+  const tabBarTop = tabBarEl ? tabBarEl.getBoundingClientRect().top : window.innerHeight;
+  const minY = headerBottom + 24;
+  const maxY = tabBarTop - 24;
+  if (maxY <= minY) return { minY: window.innerHeight / 2, maxY: window.innerHeight / 2 };
+  return { minY, maxY };
+}
+function applyAdminTabPosition(tab) {
+  const pos = loadAdminTabPosition();
+  const edge = pos ? pos.edge : 'right';
+  const { minY, maxY } = adminTabYBounds();
+  const y = Math.min(maxY, Math.max(minY, (pos ? pos.yFrac : 0.5) * window.innerHeight));
+  tab.style.top = y + 'px';
+  tab.style.right = edge === 'right' ? '0' : 'auto';
+  tab.style.left = edge === 'left' ? '0' : 'auto';
+  tab.classList.toggle('admin-drawer-tab--left', edge === 'left');
+}
+
 function initAdminDrawer() {
   const tab = document.getElementById('adminDrawerTab');
   const pill = document.getElementById('adminDrawerPill');
@@ -9674,13 +9733,80 @@ function initAdminDrawer() {
   // just measure the gesture on release and hand off to the same
   // CSS-transition-driven open, rather than tracking the finger live, so
   // there's one animation path instead of two to keep in sync.
-  let startX = null;
-  tab.addEventListener('pointerdown', e => { startX = e.clientX; });
+  //
+  // Holding still for 2s instead turns the same pointer session into a
+  // free reposition drag (see is-repositioning in style.css): any real
+  // movement before the 2s mark cancels the hold and falls through to the
+  // short-drag/tap behavior above untouched, so the two gestures can't be
+  // confused for each other. Only the Y position tracks the finger
+  // directly — X always snaps to whichever screen edge the pointer is
+  // nearer, and Y is clamped (adminTabYBounds) so it can never land on top
+  // of the header or the bottom tab bar.
+  applyAdminTabPosition(tab);
+  window.addEventListener('resize', () => applyAdminTabPosition(tab));
+
+  const LONG_PRESS_MS = 2000;
+  const MOVE_CANCEL_PX = 8;
+  let gestureStartX = null;
+  let gestureStartY = null;
+  let holdTimer = null;
+  let repositioning = false;
+  let grabOffsetY = 0;
+  const clearHoldTimer = () => { if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; } };
+
+  tab.addEventListener('pointerdown', e => {
+    gestureStartX = e.clientX;
+    gestureStartY = e.clientY;
+    repositioning = false;
+    const rect = tab.getBoundingClientRect();
+    grabOffsetY = e.clientY - (rect.top + rect.height / 2);
+    tab.setPointerCapture(e.pointerId);
+    holdTimer = setTimeout(() => {
+      holdTimer = null;
+      repositioning = true;
+      tab.classList.add('is-repositioning');
+      if (navigator.vibrate) navigator.vibrate(30);
+    }, LONG_PRESS_MS);
+  });
+
+  tab.addEventListener('pointermove', e => {
+    if (repositioning) {
+      const { minY, maxY } = adminTabYBounds();
+      const y = Math.min(maxY, Math.max(minY, e.clientY - grabOffsetY));
+      tab.style.top = y + 'px';
+      const edge = e.clientX < window.innerWidth / 2 ? 'left' : 'right';
+      tab.style.right = edge === 'right' ? '0' : 'auto';
+      tab.style.left = edge === 'left' ? '0' : 'auto';
+      tab.classList.toggle('admin-drawer-tab--left', edge === 'left');
+      return;
+    }
+    if (holdTimer && (Math.abs(e.clientX - gestureStartX) > MOVE_CANCEL_PX || Math.abs(e.clientY - gestureStartY) > MOVE_CANCEL_PX)) {
+      clearHoldTimer();
+    }
+  });
+
   tab.addEventListener('pointerup', e => {
-    if (startX === null) return;
-    const dx = startX - e.clientX; // positive = dragged left, toward open
-    startX = null;
+    clearHoldTimer();
+    if (repositioning) {
+      repositioning = false;
+      tab.classList.remove('is-repositioning');
+      const edge = tab.classList.contains('admin-drawer-tab--left') ? 'left' : 'right';
+      const rect = tab.getBoundingClientRect();
+      saveAdminTabPosition(edge, (rect.top + rect.height / 2) / window.innerHeight);
+      gestureStartX = null;
+      return;
+    }
+    if (gestureStartX === null) return;
+    const dx = gestureStartX - e.clientX; // positive = dragged left, toward open
+    gestureStartX = null;
     if (dx > 12) openAdminDrawerPill(); else toggleAdminDrawerPill();
+  });
+
+  tab.addEventListener('pointercancel', () => {
+    clearHoldTimer();
+    repositioning = false;
+    tab.classList.remove('is-repositioning');
+    gestureStartX = null;
   });
 
   if (mediaSyncBtn) mediaSyncBtn.addEventListener('click', openMediaSyncCalibration);
