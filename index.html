@@ -30,7 +30,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=18.0">
+<link rel="stylesheet" href="style.css?v=19.0">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3268,33 +3268,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
         <img src="icons/icon-192.png" alt="">
         <span>WINFINITY</span>
       </div>
-      <nav class="wds-topnav-tabs" id="wdsTabNav">
-        <button type="button" class="wds-topnav-tab is-active" data-wds-tab="status">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="4" y2="14"/><line x1="12" y1="20" x2="12" y2="8"/><line x1="20" y1="20" x2="20" y2="4"/></svg>
-          <span>Status</span>
-        </button>
-        <button type="button" class="wds-topnav-tab" data-wds-tab="training">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/></svg>
-          <span>Training</span>
-        </button>
-        <button type="button" class="wds-topnav-tab" data-wds-tab="nutrition">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v6a2 2 0 0 0 2 2v12"/><path d="M6 2v6"/><path d="M10 2v6"/><path d="M18 2c-2 0-3 2-3 5v3h3v10"/></svg>
-          <span>Nutrition</span>
-        </button>
-        <button type="button" class="wds-topnav-tab" data-wds-tab="bio">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><ellipse cx="12" cy="12" rx="10" ry="4.5"/><ellipse cx="12" cy="12" rx="10" ry="4.5" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4.5" transform="rotate(120 12 12)"/></svg>
-          <span>Bio</span>
-        </button>
-        <button type="button" class="wds-topnav-tab" data-wds-tab="nexus">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 3a15 15 0 0 1 0 18"/><path d="M12 3a15 15 0 0 0 0 18"/></svg>
-          <span>Nexus</span>
-          <span class="wds-tab-dot" id="wdsNexusDot" hidden></span>
-        </button>
-        <button type="button" class="wds-topnav-tab" data-wds-tab="menu">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          <span>Menu</span>
-        </button>
-      </nav>
+      <div class="wds-topnav-spacer"></div>
       <div class="wds-topnav-user">
         <button type="button" class="wds-icon-btn" id="wdsRefreshBtn" aria-label="Refresh data" title="Refresh data">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
@@ -3317,387 +3291,198 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
       </div>
     </header>
 
-    <main class="wds-main">
+    <main class="wds-unified">
 
-      <!-- ===================== STATUS ===================== -->
-      <section class="wds-panel" id="wdsPanelStatus" data-wds-panel="status">
-        <div class="wds-grid wds-grid--status">
+      <!-- ===================== LEFT: condensed data widgets ===================== -->
+      <div class="wds-uni-col wds-uni-left">
 
-          <div class="wds-card wds-card--gauge">
-            <h3 class="wds-card-title">Consistency Index</h3>
-            <div class="wds-gauge" id="wdsConsistencyGauge" style="--pct:0;">
-              <span class="wds-gauge-value" id="wdsConsistencyValue">–<small>%</small></span>
-            </div>
-            <p class="wds-card-foot" id="wdsConsistencyFoot">No data yet</p>
+        <div class="wds-card wds-card--gauge">
+          <h3 class="wds-card-title">Consistency Index</h3>
+          <div class="wds-gauge wds-gauge--mini" id="wdsConsistencyGauge" style="--pct:0;">
+            <span class="wds-gauge-value" id="wdsConsistencyValue">–<small>%</small></span>
           </div>
-
-          <div class="wds-card wds-card--protocol">
-            <div class="wds-protocol-head">
-              <h3 class="wds-card-title">Fitness Mode</h3>
-              <span class="wds-pill wds-pill--cyan" id="wdsProtocolPill">–</span>
-            </div>
-            <p class="wds-protocol-name" id="wdsProtocolName">Logging consistency toward next tier</p>
-            <div class="wds-progress"><div class="wds-progress-fill" id="wdsProtocolBar" style="width:0%"></div></div>
-            <div class="wds-protocol-meta">
-              <span id="wdsProtocolMetaLeft">0 of 0 days</span>
-              <span id="wdsProtocolMetaRight">0% complete</span>
-            </div>
-          </div>
-
-          <div class="wds-tile-row">
-            <div class="wds-tile">
-              <span class="wds-tile-label">Sleep</span>
-              <span class="wds-tile-value" id="wdsTileSleepValue">–</span>
-              <span class="wds-tile-sub" id="wdsTileSleepSub"></span>
-            </div>
-            <div class="wds-tile">
-              <span class="wds-tile-label">Hydration</span>
-              <span class="wds-tile-value" id="wdsTileHydrationValue">–</span>
-              <span class="wds-tile-sub" id="wdsTileHydrationSub"></span>
-            </div>
-            <div class="wds-tile">
-              <span class="wds-tile-label">Steps</span>
-              <span class="wds-tile-value" id="wdsTileStepsValue">–</span>
-              <span class="wds-tile-sub" id="wdsTileStepsSub"></span>
-            </div>
-            <div class="wds-tile">
-              <span class="wds-tile-label">Mental Load</span>
-              <span class="wds-tile-value" id="wdsTileStressValue">–</span>
-              <span class="wds-tile-sub" id="wdsTileStressSub"></span>
-            </div>
-          </div>
-
-          <div class="wds-card wds-card--chart wds-card--wide">
-            <div class="wds-card-head">
-              <h3 class="wds-card-title">Weight Trend</h3>
-              <span class="wds-card-sub" id="wdsWeightChartSub">Last 90 days</span>
-            </div>
-            <svg class="wds-linechart" viewBox="0 0 560 160" preserveAspectRatio="none" id="wdsWeightChartSvg">
-              <defs>
-                <linearGradient id="wdsAreaFillStatus" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="var(--cyan)" stop-opacity="0.35"/>
-                  <stop offset="100%" stop-color="var(--cyan)" stop-opacity="0"/>
-                </linearGradient>
-              </defs>
-              <g class="wds-gridlines">
-                <line x1="0" y1="30" x2="560" y2="30"/>
-                <line x1="0" y1="80" x2="560" y2="80"/>
-                <line x1="0" y1="130" x2="560" y2="130"/>
-              </g>
-              <path id="wdsWeightChartArea" d="" fill="url(#wdsAreaFillStatus)"/>
-              <path id="wdsWeightChartLine" d="" fill="none" stroke="var(--cyan)" stroke-width="2.5" stroke-linecap="round"/>
-              <circle id="wdsWeightChartDot" cx="0" cy="0" r="4.5" fill="var(--cyan)" visibility="hidden"/>
-            </svg>
-            <p class="hint hint--sm" id="wdsWeightChartEmpty" hidden>No weight entries logged yet.</p>
-          </div>
-
-          <div class="wds-card wds-card--teaser">
-            <img class="wds-teaser-img" id="wdsNextModeImg" src="icons/mode-demigod.png" alt="">
-            <div class="wds-teaser-body">
-              <span class="wds-pill wds-pill--locked" id="wdsNextModePill">LOCKED</span>
-              <h3 class="wds-card-title" id="wdsNextModeTitle">Next Phase</h3>
-              <p class="wds-card-sub" id="wdsNextModeDesc"></p>
-            </div>
-          </div>
-
+          <p class="wds-card-foot" id="wdsConsistencyFoot">No data yet</p>
         </div>
-      </section>
 
-      <!-- ===================== TRAINING ===================== -->
-      <section class="wds-panel" id="wdsPanelTraining" data-wds-panel="training" hidden>
-        <div class="wds-grid wds-grid--training">
-
-          <div class="wds-card wds-card--hero wds-card--wide">
-            <div class="wds-hero-body">
-              <span class="wds-pill wds-pill--cyan">THIS WEEK</span>
-              <h2 class="wds-hero-title" id="wdsHeroTitle">Training summary</h2>
-              <p class="wds-card-sub" id="wdsHeroSub">–</p>
-            </div>
+        <div class="wds-card">
+          <h3 class="wds-card-title">Today</h3>
+          <div class="wds-mini-stat-grid">
+            <div class="wds-mini-stat"><span>Sleep</span><strong id="wdsTileSleepValue">–</strong><small id="wdsTileSleepSub"></small></div>
+            <div class="wds-mini-stat"><span>Hydration</span><strong id="wdsTileHydrationValue">–</strong><small id="wdsTileHydrationSub"></small></div>
+            <div class="wds-mini-stat"><span>Steps</span><strong id="wdsTileStepsValue">–</strong><small id="wdsTileStepsSub"></small></div>
+            <div class="wds-mini-stat"><span>Mental Load</span><strong id="wdsTileStressValue">–</strong><small id="wdsTileStressSub"></small></div>
           </div>
-
-          <div class="wds-card wds-card--gauge">
-            <h3 class="wds-card-title">Fatigue Level</h3>
-            <div class="wds-gauge wds-gauge--warning" id="wdsFatigueGauge" style="--pct:0;">
-              <span class="wds-gauge-value" id="wdsFatigueValue">–<small>%</small></span>
-            </div>
-            <p class="wds-card-foot" id="wdsFatigueFoot">No data yet</p>
-          </div>
-
-          <div class="wds-card wds-card--chart">
-            <h3 class="wds-card-title">Recent Volume</h3>
-            <div class="wds-bars" id="wdsVolumeBars"></div>
-            <p class="hint hint--sm" id="wdsVolumeEmpty" hidden>No completed training sessions logged yet.</p>
-          </div>
-
-          <div class="wds-card wds-card--wide">
-            <h3 class="wds-card-title">This Week</h3>
-            <div class="wds-weekstrip" id="wdsWeekstrip"></div>
-          </div>
-
-          <div class="wds-card wds-card--list wds-card--wide">
-            <h3 class="wds-card-title">This Week's Reflection</h3>
-            <ul class="wds-forecast-list" id="wdsReflectionList">
-              <li><span class="wds-forecast-dot"></span> No weekly review logged yet this week.</li>
-            </ul>
-          </div>
-
-          <div class="wds-tile-row wds-tile-row--wide">
-            <div class="wds-tile">
-              <span class="wds-tile-label">Volume This Week</span>
-              <span class="wds-tile-value" id="wdsTileVolumeValue">–</span>
-            </div>
-            <div class="wds-tile">
-              <span class="wds-tile-label">Heaviest Set</span>
-              <span class="wds-tile-value" id="wdsTileHeaviestValue">–</span>
-            </div>
-            <div class="wds-tile">
-              <span class="wds-tile-label">Longest Run</span>
-              <span class="wds-tile-value" id="wdsTileLongestRunValue">–</span>
-            </div>
-            <div class="wds-tile">
-              <span class="wds-tile-label">Fastest Pace</span>
-              <span class="wds-tile-value" id="wdsTileFastestPaceValue">–</span>
-            </div>
-          </div>
-
         </div>
-      </section>
 
-      <!-- ===================== NUTRITION ===================== -->
-      <section class="wds-panel" id="wdsPanelNutrition" data-wds-panel="nutrition" hidden>
-        <div class="wds-grid wds-grid--nutrition">
+        <div class="wds-card wds-card--chart">
+          <div class="wds-card-head">
+            <h3 class="wds-card-title">Weight Trend</h3>
+            <span class="wds-card-sub" id="wdsWeightChartSub">90d</span>
+          </div>
+          <svg class="wds-linechart wds-linechart--mini" viewBox="0 0 560 160" preserveAspectRatio="none" id="wdsWeightChartSvg">
+            <defs>
+              <linearGradient id="wdsAreaFillStatus" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="var(--cyan)" stop-opacity="0.35"/>
+                <stop offset="100%" stop-color="var(--cyan)" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path id="wdsWeightChartArea" d="" fill="url(#wdsAreaFillStatus)"/>
+            <path id="wdsWeightChartLine" d="" fill="none" stroke="var(--cyan)" stroke-width="2.5" stroke-linecap="round"/>
+            <circle id="wdsWeightChartDot" cx="0" cy="0" r="4.5" fill="var(--cyan)" visibility="hidden"/>
+          </svg>
+          <p class="hint hint--sm" id="wdsWeightChartEmpty" hidden>No weight entries logged yet.</p>
+        </div>
 
-          <div class="wds-card wds-card--wide">
-            <h3 class="wds-card-title">Daily Fuel Status</h3>
-            <div class="wds-macro-row">
-              <div class="wds-macro">
-                <div class="wds-macro-head"><span>Protein</span><span id="wdsMacroProteinText">– / –g</span></div>
-                <div class="wds-progress"><div class="wds-progress-fill" id="wdsMacroProteinBar" style="width:0%;background:var(--cyan)"></div></div>
-              </div>
-              <div class="wds-macro">
-                <div class="wds-macro-head"><span>Carbs</span><span id="wdsMacroCarbsText">– / –g</span></div>
-                <div class="wds-progress"><div class="wds-progress-fill" id="wdsMacroCarbsBar" style="width:0%;background:var(--violet)"></div></div>
-              </div>
-              <div class="wds-macro">
-                <div class="wds-macro-head"><span>Fat</span><span id="wdsMacroFatText">– / –g</span></div>
-                <div class="wds-progress"><div class="wds-progress-fill" id="wdsMacroFatBar" style="width:0%;background:var(--magenta)"></div></div>
+        <div class="wds-card wds-card--gauge">
+          <h3 class="wds-card-title">Fatigue Level</h3>
+          <div class="wds-gauge wds-gauge--mini wds-gauge--warning" id="wdsFatigueGauge" style="--pct:0;">
+            <span class="wds-gauge-value" id="wdsFatigueValue">–<small>%</small></span>
+          </div>
+          <p class="wds-card-foot" id="wdsFatigueFoot">No data yet</p>
+        </div>
+
+        <div class="wds-card">
+          <h3 class="wds-card-title">Training</h3>
+          <div class="wds-mini-stat-grid">
+            <div class="wds-mini-stat"><span>Volume</span><strong id="wdsTileVolumeValue">–</strong></div>
+            <div class="wds-mini-stat"><span>Heaviest Set</span><strong id="wdsTileHeaviestValue">–</strong></div>
+            <div class="wds-mini-stat"><span>Longest Run</span><strong id="wdsTileLongestRunValue">–</strong></div>
+            <div class="wds-mini-stat"><span>Fastest Pace</span><strong id="wdsTileFastestPaceValue">–</strong></div>
+          </div>
+        </div>
+
+        <div class="wds-card">
+          <h3 class="wds-card-title">Fuel Today</h3>
+          <div class="wds-macro-row">
+            <div class="wds-macro">
+              <div class="wds-macro-head"><span>Protein</span><span id="wdsMacroProteinText">– / –g</span></div>
+              <div class="wds-progress"><div class="wds-progress-fill" id="wdsMacroProteinBar" style="width:0%;background:var(--cyan)"></div></div>
+            </div>
+            <div class="wds-macro">
+              <div class="wds-macro-head"><span>Carbs</span><span id="wdsMacroCarbsText">– / –g</span></div>
+              <div class="wds-progress"><div class="wds-progress-fill" id="wdsMacroCarbsBar" style="width:0%;background:var(--violet)"></div></div>
+            </div>
+            <div class="wds-macro">
+              <div class="wds-macro-head"><span>Fat</span><span id="wdsMacroFatText">– / –g</span></div>
+              <div class="wds-progress"><div class="wds-progress-fill" id="wdsMacroFatBar" style="width:0%;background:var(--magenta)"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="wds-card wds-card--list">
+          <h3 class="wds-card-title">Bio-Markers</h3>
+          <div class="wds-marker-row">
+            <div class="wds-macro">
+              <div class="wds-macro-head"><span>Body Fat %</span><span id="wdsMarkerBodyFatText">–</span></div>
+              <div class="wds-progress"><div class="wds-progress-fill" id="wdsMarkerBodyFatBar" style="width:0%;background:var(--cyan)"></div></div>
+            </div>
+            <div class="wds-macro">
+              <div class="wds-macro-head"><span>Weight Progress</span><span id="wdsMarkerWeightProgressText">–</span></div>
+              <div class="wds-progress"><div class="wds-progress-fill" id="wdsMarkerWeightProgressBar" style="width:0%;background:var(--good)"></div></div>
+            </div>
+            <div class="wds-macro">
+              <div class="wds-macro-head"><span>Habit Completion (Today)</span><span id="wdsMarkerHabitText">–</span></div>
+              <div class="wds-progress"><div class="wds-progress-fill" id="wdsMarkerHabitBar" style="width:0%;background:var(--violet)"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="wds-card">
+          <h3 class="wds-card-title">Account</h3>
+          <div class="wds-menu-row"><span>Digital ID</span><strong id="wdsMenuDigitalId">–</strong></div>
+          <div class="wds-menu-row"><span>Fitness Mode</span><strong id="wdsMenuFitnessMode">–</strong></div>
+          <div class="wds-menu-row"><span>Days Active</span><strong id="wdsMenuDaysActive">–</strong></div>
+          <div class="wds-menu-row"><span>Step Goal</span><strong id="wdsMenuStepGoal">–</strong></div>
+          <div class="wds-menu-row"><span>Water Goal</span><strong id="wdsMenuWaterGoal">–</strong></div>
+          <div class="wds-menu-row"><span>Weight Unit</span><strong id="wdsMenuWeightUnit">–</strong></div>
+          <div class="wds-menu-row"><span>Goal</span><strong id="wdsMenuGoalMode">–</strong></div>
+          <div class="theme-toggle-row" style="margin-top:10px;">
+            <span>Light theme</span>
+            <label class="switch">
+              <input type="checkbox" id="wdsThemeToggle">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </label>
+          </div>
+          <ul class="wds-menu-links" style="margin-top:10px;">
+            <li><a href="https://www.facebook.com/winfinityfit/" target="_blank" rel="noopener noreferrer">Facebook</a></li>
+            <li><a href="https://www.instagram.com/windalchamp/" target="_blank" rel="noopener noreferrer">Instagram</a></li>
+          </ul>
+          <button type="button" class="wds-logout-btn" id="btnWdsMenuSignOut" style="margin-top:12px;display:block;">Log Out</button>
+        </div>
+
+      </div>
+
+      <!-- ===================== CENTER: Facebook-style feed ===================== -->
+      <div class="wds-uni-col wds-uni-center">
+
+        <div class="wds-card">
+          <h3 class="wds-card-title">My Day</h3>
+          <div class="wds-myday-row" id="wdsMydayRow">
+            <div class="wds-myday-item">
+              <div class="wds-myday-ring wds-myday-ring--you"><div class="wds-myday-avatar">+</div></div>
+              <span>Your Day</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="wds-card">
+          <div class="wds-composer">
+            <span class="wds-user-avatar" id="wdsComposerAvatar">–</span>
+            <div class="wds-composer-box">
+              <div class="wds-composer-input" id="wdsComposerInput">What's on your mind?</div>
+              <div class="wds-composer-actions">
+                <button type="button" class="wds-composer-action-btn" disabled>📷 Photo</button>
+                <button type="button" class="wds-composer-action-btn" disabled>🏆 Log a PR</button>
+                <button type="button" class="wds-composer-action-btn" disabled>📈 Share Progress</button>
               </div>
             </div>
           </div>
-
-          <div class="wds-card wds-card--gauge">
-            <h3 class="wds-card-title">Fluid Levels</h3>
-            <div class="wds-gauge" id="wdsFluidGauge" style="--pct:0;">
-              <span class="wds-gauge-value" id="wdsFluidValue">–<small>L</small></span>
-            </div>
-            <p class="wds-card-foot" id="wdsFluidFoot"></p>
-          </div>
-
-          <div class="wds-card wds-card--list">
-            <h3 class="wds-card-title">Today's Meals</h3>
-            <ul class="wds-fuel-list" id="wdsFuelList">
-              <li><span>No meals logged today.</span></li>
-            </ul>
-          </div>
-
-          <div class="wds-card">
-            <h3 class="wds-card-title">Hunger State</h3>
-            <div class="wds-slider-track"><div class="wds-slider-fill" id="wdsHungerFill" style="width:0%"></div><div class="wds-slider-knob" id="wdsHungerKnob" style="left:0%"></div></div>
-            <div class="wds-slider-labels"><span>Satisfied</span><span>Neutral</span><span>Ravenous</span></div>
-            <p class="hint hint--sm" id="wdsHungerEmpty" hidden>Not logged today.</p>
-          </div>
-
-          <div class="wds-card wds-card--chart wds-card--wide">
-            <div class="wds-card-head">
-              <h3 class="wds-card-title">Calorie Trend</h3>
-              <span class="wds-card-sub">Last 30 days</span>
-            </div>
-            <svg class="wds-linechart" viewBox="0 0 560 160" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="wdsAreaFillNutrition" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="var(--violet)" stop-opacity="0.35"/>
-                  <stop offset="100%" stop-color="var(--violet)" stop-opacity="0"/>
-                </linearGradient>
-              </defs>
-              <g class="wds-gridlines">
-                <line x1="0" y1="30" x2="560" y2="30"/>
-                <line x1="0" y1="80" x2="560" y2="80"/>
-                <line x1="0" y1="130" x2="560" y2="130"/>
-              </g>
-              <path id="wdsCalorieChartArea" d="" fill="url(#wdsAreaFillNutrition)"/>
-              <path id="wdsCalorieChartLine" d="" fill="none" stroke="var(--violet)" stroke-width="2.5" stroke-linecap="round"/>
-              <circle id="wdsCalorieChartDot" cx="0" cy="0" r="4.5" fill="var(--violet)" visibility="hidden"/>
-            </svg>
-            <p class="hint hint--sm" id="wdsCalorieChartEmpty" hidden>No nutrition entries logged yet.</p>
-          </div>
-
-          <div class="wds-tile-row wds-tile-row--wide">
-            <div class="wds-tile"><span class="wds-tile-label">Calories</span><span class="wds-tile-value" id="wdsTileCaloriesValue">–</span></div>
-            <div class="wds-tile"><span class="wds-tile-label">Fiber</span><span class="wds-tile-value" id="wdsTileFiberValue">–</span></div>
-            <div class="wds-tile"><span class="wds-tile-label">Sodium</span><span class="wds-tile-value" id="wdsTileSodiumValue">–</span></div>
-            <div class="wds-tile"><span class="wds-tile-label">Meals Logged</span><span class="wds-tile-value" id="wdsTileMealsValue">–</span></div>
-          </div>
-
         </div>
-      </section>
 
-      <!-- ===================== BIO ===================== -->
-      <section class="wds-panel" id="wdsPanelBio" data-wds-panel="bio" hidden>
-        <div class="wds-grid wds-grid--bio">
-
-          <div class="wds-card wds-card--chart">
-            <h3 class="wds-card-title">Sleep Quality</h3>
-            <div class="wds-bars wds-bars--sleep" id="wdsSleepBars"></div>
-            <p class="hint hint--sm" id="wdsSleepEmpty" hidden>No sleep entries logged yet.</p>
-          </div>
-
-          <div class="wds-card wds-card--chart wds-card--wide">
-            <div class="wds-card-head">
-              <h3 class="wds-card-title">Stress &amp; Fatigue Trend</h3>
-              <span class="wds-card-sub">Last 30 days</span>
-            </div>
-            <svg class="wds-linechart" viewBox="0 0 560 160" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="wdsAreaFillBio" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="var(--magenta)" stop-opacity="0.3"/>
-                  <stop offset="100%" stop-color="var(--magenta)" stop-opacity="0"/>
-                </linearGradient>
-              </defs>
-              <g class="wds-gridlines">
-                <line x1="0" y1="30" x2="560" y2="30"/>
-                <line x1="0" y1="80" x2="560" y2="80"/>
-                <line x1="0" y1="130" x2="560" y2="130"/>
-              </g>
-              <path id="wdsStressChartArea" d="" fill="url(#wdsAreaFillBio)"/>
-              <path id="wdsStressChartLine" d="" fill="none" stroke="var(--magenta)" stroke-width="2.5" stroke-linecap="round"/>
-              <path id="wdsFatigueChartLine" d="" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-dasharray="4 3"/>
-            </svg>
-            <p class="hint hint--sm" id="wdsStressChartEmpty" hidden>No stress/fatigue entries logged yet.</p>
-          </div>
-
-          <div class="wds-card wds-card--list wds-card--wide">
-            <h3 class="wds-card-title">Bio-Markers</h3>
-            <div class="wds-marker-row">
-              <div class="wds-macro">
-                <div class="wds-macro-head"><span>Body Fat %</span><span id="wdsMarkerBodyFatText">–</span></div>
-                <div class="wds-progress"><div class="wds-progress-fill" id="wdsMarkerBodyFatBar" style="width:0%;background:var(--cyan)"></div></div>
-              </div>
-              <div class="wds-macro">
-                <div class="wds-macro-head"><span>Weight Progress</span><span id="wdsMarkerWeightProgressText">–</span></div>
-                <div class="wds-progress"><div class="wds-progress-fill" id="wdsMarkerWeightProgressBar" style="width:0%;background:var(--good)"></div></div>
-              </div>
-              <div class="wds-macro">
-                <div class="wds-macro-head"><span>Habit Completion (Today)</span><span id="wdsMarkerHabitText">–</span></div>
-                <div class="wds-progress"><div class="wds-progress-fill" id="wdsMarkerHabitBar" style="width:0%;background:var(--violet)"></div></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="wds-card wds-card--teaser wds-card--wide">
-            <img class="wds-teaser-img" src="icons/mode-spartan.png" alt="">
-            <div class="wds-teaser-body">
-              <span class="wds-pill wds-pill--cyan">THIS WEEK'S WIN</span>
-              <h3 class="wds-card-title" id="wdsWinTitle">No weekly review yet</h3>
-              <p class="wds-card-sub" id="wdsWinDesc">Fill in Weekend Log's "Wins" field in the app to see it here.</p>
-            </div>
-          </div>
-
+        <div class="wds-card wds-feed-placeholder">
+          <div class="wds-feed-placeholder-icon">🚧</div>
+          <h3 class="wds-card-title" style="margin:0 0 6px;">Feed coming soon</h3>
+          <p class="wds-card-sub">Posting and a real activity feed aren't wired up yet — this is a layout placeholder while we figure out how it should work. Global Chat (real, working) is in the right column.</p>
         </div>
-      </section>
 
-      <!-- ===================== NEXUS ===================== -->
-      <section class="wds-panel" id="wdsPanelNexus" data-wds-panel="nexus" hidden>
-        <div class="wds-grid wds-grid--nexus">
+      </div>
 
-          <div class="wds-card wds-card--list">
-            <h3 class="wds-card-title">Global Leaderboard</h3>
-            <ol class="wds-lb-list" id="wdsLbList">
-              <li><span>Loading…</span></li>
-            </ol>
-          </div>
+      <!-- ===================== RIGHT: notifications + chat ===================== -->
+      <div class="wds-uni-col wds-uni-right">
 
-          <div class="wds-card wds-card--feed">
-            <h3 class="wds-card-title">Global Chat</h3>
-            <div class="chat-list wds-chat-list" id="wdsChatList">
-              <p class="empty-note">Loading…</p>
-            </div>
-            <div class="chat-pending-image" id="wdsChatPendingImage" hidden>
-              <img id="wdsChatPendingImagePreview" alt="">
-              <button type="button" id="btnWdsChatPendingImageRemove" aria-label="Remove image">✕</button>
-            </div>
-            <div class="chat-input-row wds-feed-compose">
-              <button type="button" class="btn btn--sm chat-attach-btn" id="btnWdsChatAttachImage" aria-label="Attach image">📎</button>
-              <input type="file" id="wdsChatImageInput" accept="image/*" hidden>
-              <input type="text" id="wdsChatInput" placeholder="Message Nexus…" maxlength="280">
-              <button type="button" class="wds-mini-btn" id="btnWdsChatSend">Send</button>
-            </div>
-          </div>
-          <div class="chat-reaction-menu" id="wdsChatReactionMenu" hidden></div>
-
-          <div class="wds-card wds-card--list">
-            <h3 class="wds-card-title">Recently Active</h3>
-            <ul class="wds-spotlight-list" id="wdsRecentActiveList">
-              <li><span>Loading…</span></li>
-            </ul>
-          </div>
-
+        <div class="wds-card wds-notif-card">
+          <h3 class="wds-card-title">Notifications</h3>
+          <div id="wdsNotifList"><p class="empty-note">No notifications.</p></div>
         </div>
-      </section>
 
-      <!-- ===================== MENU ===================== -->
-      <section class="wds-panel" id="wdsPanelMenu" data-wds-panel="menu" hidden>
-        <div class="wds-grid wds-grid--menu">
-
-          <div class="wds-card">
-            <h3 class="wds-card-title">Account</h3>
-            <div class="wds-menu-row"><span>Digital ID</span><strong id="wdsMenuDigitalId">–</strong></div>
-            <div class="wds-menu-row"><span>Fitness Mode</span><strong id="wdsMenuFitnessMode">–</strong></div>
-            <div class="wds-menu-row"><span>Program Started</span><strong id="wdsMenuStartDate">–</strong></div>
-            <div class="wds-menu-row"><span>Days Active</span><strong id="wdsMenuDaysActive">–</strong></div>
-            <button type="button" class="wds-logout-btn" id="btnWdsMenuSignOut" style="margin-top:12px;display:block;">Log Out</button>
+        <div class="wds-card wds-card--feed wds-chat-card">
+          <h3 class="wds-card-title">Global Chat</h3>
+          <div class="chat-list wds-chat-list" id="wdsChatList">
+            <p class="empty-note">Loading…</p>
           </div>
-
-          <div class="wds-card">
-            <h3 class="wds-card-title">Targets</h3>
-            <div class="wds-menu-row"><span>Step Goal</span><strong id="wdsMenuStepGoal">–</strong></div>
-            <div class="wds-menu-row"><span>Water Goal</span><strong id="wdsMenuWaterGoal">–</strong></div>
-            <div class="wds-menu-row"><span>Weight Unit</span><strong id="wdsMenuWeightUnit">–</strong></div>
-            <div class="wds-menu-row"><span>Goal</span><strong id="wdsMenuGoalMode">–</strong></div>
-            <p class="hint hint--sm" style="margin-top:8px;">Set in the app — read-only here for now.</p>
+          <div class="chat-pending-image" id="wdsChatPendingImage" hidden>
+            <img id="wdsChatPendingImagePreview" alt="">
+            <button type="button" id="btnWdsChatPendingImageRemove" aria-label="Remove image">✕</button>
           </div>
-
-          <div class="wds-card">
-            <h3 class="wds-card-title">Appearance</h3>
-            <p class="hint hint--sm">Affects this browser's view only — your mobile app theme is unchanged.</p>
-            <div class="theme-toggle-row">
-              <span>Light theme</span>
-              <label class="switch">
-                <input type="checkbox" id="wdsThemeToggle">
-                <span class="switch-track"><span class="switch-thumb"></span></span>
-              </label>
-            </div>
+          <div class="chat-input-row wds-feed-compose">
+            <button type="button" class="btn btn--sm chat-attach-btn" id="btnWdsChatAttachImage" aria-label="Attach image">📎</button>
+            <input type="file" id="wdsChatImageInput" accept="image/*" hidden>
+            <input type="text" id="wdsChatInput" placeholder="Message Nexus…" maxlength="280">
+            <button type="button" class="wds-mini-btn" id="btnWdsChatSend">Send</button>
           </div>
-
-          <div class="wds-card">
-            <h3 class="wds-card-title">Links</h3>
-            <ul class="wds-menu-links">
-              <li><a href="https://www.facebook.com/winfinityfit/" target="_blank" rel="noopener noreferrer">Facebook</a></li>
-              <li><a href="https://www.instagram.com/windalchamp/" target="_blank" rel="noopener noreferrer">Instagram</a></li>
-              <li><a href="http://www.facebook.com/aldruz3dsign" target="_blank" rel="noopener noreferrer">Affiliate</a></li>
-            </ul>
-          </div>
-
         </div>
-      </section>
+        <div class="chat-reaction-menu" id="wdsChatReactionMenu" hidden></div>
+
+      </div>
 
     </main>
   </div>
 </div>
 
-<script src="config.js?v=18.0"></script>
+<script src="config.js?v=19.0"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=18.0"></script>
+<script src="app.js?v=19.0"></script>
 </body>
 </html>

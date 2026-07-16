@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.18.0';
+const APP_VERSION = 'WF_SYS_V.19.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -130,10 +130,15 @@ function initDesktopShell() {
     const mode = getFitnessMode();
     modeIconImgEl.src = MODE_ICON[mode] || MODE_ICON.beginner;
     modeIconEl.title = MODE_LABEL[mode] || mode;
+    const composerAvatarEl = document.getElementById('wdsComposerAvatar');
+    if (composerAvatarEl) composerAvatarEl.textContent = displayName.trim().charAt(0).toUpperCase();
+    const composerInputEl = document.getElementById('wdsComposerInput');
+    if (composerInputEl) composerInputEl.textContent = `What's on your mind, ${displayName.split(' ')[0]}?`;
     renderWdsDashboard();
     gate.hidden = true;
     dashboard.hidden = false;
     startWdsDashboardPolling();
+    startWdsChatPolling();
     return true;
   }
 
@@ -178,28 +183,9 @@ function initDesktopShell() {
     idInput.focus();
   });
 
-  // Tab switching — plain show/hide, no routing, mirrors the mobile app's
-  // own tab-panel pattern (data-tab) but under its own data-wds-tab/wds-panel
-  // attributes so it can't collide with initTabs()'s selectors.
-  const tabButtons = document.querySelectorAll('.wds-topnav-tab');
-  const panels = document.querySelectorAll('.wds-panel');
-  tabButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const target = btn.dataset.wdsTab;
-      tabButtons.forEach(b => b.classList.toggle('is-active', b === btn));
-      panels.forEach(p => { p.hidden = p.dataset.wdsPanel !== target; });
-      // Chat only needs to poll for new messages while its tab is actually
-      // visible — same idea as the mobile app's startNexusPolling/
-      // stopNexusPolling, just keyed off this tab instead.
-      if (target === 'nexus') {
-        startWdsChatPolling();
-        localStorage.setItem('wft_web_nexus_last_seen', new Date().toISOString());
-        renderWdsNotifications();
-      } else {
-        stopWdsChatPolling();
-      }
-    });
-  });
+  // No more tabs — everything lives on one page now, so chat polling just
+  // runs continuously for as long as the dashboard is signed in (started
+  // alongside dashboard polling in enterDashboard, stopped on sign-out).
 
   // Nexus chat — send (text + optional image), react/unsend (long-press or
   // double-click a bubble).
@@ -411,9 +397,7 @@ function renderWdsMenu() {
   if (themeToggle) themeToggle.checked = document.documentElement.getAttribute('data-theme') === 'light';
 
   const profile = getProfile();
-  const startEl = document.getElementById('wdsMenuStartDate');
   const daysEl = document.getElementById('wdsMenuDaysActive');
-  if (startEl) startEl.textContent = (profile && profile.startDate) || '–';
   if (daysEl) {
     if (profile && profile.startDate) {
       const days = Math.max(0, Math.round((parseISO(todayISO()) - parseISO(profile.startDate)) / 86400000));
@@ -434,10 +418,8 @@ function renderWdsMenu() {
 }
 
 function renderWdsStatus() {
-  const profile = getProfile();
   const logsArr = sortedLogsArray();
   const mp = getModeProgress();
-  const mode = getFitnessMode();
   const today = todayISO();
   const todayEntry = getLogs()[today] || {};
 
@@ -448,14 +430,9 @@ function renderWdsStatus() {
   foot.textContent = `${mp.completeCount} of ${mp.target} days logged this cycle`;
   foot.className = 'wds-card-foot ' + (pct >= 70 ? 'wds-foot-good' : pct >= 40 ? 'wds-foot-warning' : '');
 
-  document.getElementById('wdsProtocolPill').textContent = (MODE_LABEL[mode] || mode).toUpperCase();
-  document.getElementById('wdsProtocolBar').style.width = Math.min(100, pct) + '%';
-  document.getElementById('wdsProtocolMetaLeft').textContent = `${mp.completeCount} of ${mp.target} days`;
-  document.getElementById('wdsProtocolMetaRight').textContent = pct + '% complete';
-
   const sleepAvg = avgOfLastNDays(logsArr, 'sleep', 7);
   document.getElementById('wdsTileSleepValue').textContent = sleepAvg != null ? sleepAvg.toFixed(1) + ' / 5' : '–';
-  document.getElementById('wdsTileSleepSub').textContent = sleepAvg != null ? '7-day average quality' : 'No data yet';
+  document.getElementById('wdsTileSleepSub').textContent = sleepAvg != null ? '7d avg' : 'No data';
 
   const waterTarget = effectiveWaterTargetML(today);
   const waterNow = todayEntry.water || 0;
@@ -464,47 +441,21 @@ function renderWdsStatus() {
 
   const stepsAvg = avgOfLastNDays(logsArr, 'steps', 7);
   document.getElementById('wdsTileStepsValue').textContent = stepsAvg != null ? Math.round(stepsAvg).toLocaleString() : '–';
-  document.getElementById('wdsTileStepsSub').textContent = stepsAvg != null ? '7-day average' : 'No data yet';
+  document.getElementById('wdsTileStepsSub').textContent = stepsAvg != null ? '7d avg' : 'No data';
 
   const stressAvg = avgOfLastNDays(logsArr, 'stress', 7);
   document.getElementById('wdsTileStressValue').textContent = stressAvg != null ? stressAvg.toFixed(1) + ' / 5' : '–';
-  document.getElementById('wdsTileStressSub').textContent = stressAvg != null ? '7-day average' : 'No data yet';
+  document.getElementById('wdsTileStressSub').textContent = stressAvg != null ? '7d avg' : 'No data';
 
   const series = computeTrendSeries(logsArr).slice(-90);
   wdsSetChartPaths('wdsWeightChartArea', 'wdsWeightChartLine', 'wdsWeightChartDot', 'wdsWeightChartEmpty', series.map(s => s.trendKg));
-
-  const nextMode = MODE_ORDER[MODE_ORDER.indexOf(mode) + 1];
-  const imgEl = document.getElementById('wdsNextModeImg');
-  const titleEl = document.getElementById('wdsNextModeTitle');
-  const descEl = document.getElementById('wdsNextModeDesc');
-  const pillEl = document.getElementById('wdsNextModePill');
-  if (nextMode) {
-    imgEl.src = MODE_ICON[nextMode];
-    titleEl.textContent = 'Next Phase: ' + MODE_LABEL[nextMode];
-    descEl.textContent = `${mp.completeCount} of ${mp.target} consistent days logged toward unlocking it.`;
-    pillEl.textContent = 'LOCKED';
-  } else {
-    imgEl.src = MODE_ICON[mode];
-    titleEl.textContent = MODE_LABEL[mode] + ' — highest tier';
-    descEl.textContent = 'Every feature is already unlocked.';
-    pillEl.textContent = 'MAX TIER';
-  }
 }
 
 function renderWdsTraining() {
   const profile = getProfile();
   const logsArr = sortedLogsArray();
   const stats = computeLeaderboardStats();
-  const vol = computeVolumeTrendData();
-  const today = todayISO();
-  const todayEntry = getLogs()[today];
-
-  document.getElementById('wdsHeroTitle').textContent = vol.volumes.length
-    ? `${vol.volumes.length} training session${vol.volumes.length === 1 ? '' : 's'} logged recently`
-    : 'No training sessions logged yet';
-  document.getElementById('wdsHeroSub').textContent = vol.volumes.length
-    ? `Total volume: ${vol.total.toLocaleString()} ${vol.wu} across the last ${vol.volumes.length} sessions`
-    : "Log a Training session in the app to see it here.";
+  const todayEntry = getLogs()[todayISO()];
 
   const fatigue = todayEntry && todayEntry.fatigue != null ? todayEntry.fatigue : null;
   const fatiguePct = fatigue != null ? Math.round((fatigue / 5) * 100) : 0;
@@ -513,49 +464,6 @@ function renderWdsTraining() {
   document.getElementById('wdsFatigueFoot').textContent = fatigue != null
     ? (fatigue <= 2 ? 'Well recovered' : fatigue <= 3 ? 'Moderate fatigue' : 'High fatigue — consider recovery')
     : 'Not logged today';
-
-  const barsEl = document.getElementById('wdsVolumeBars');
-  const volEmptyEl = document.getElementById('wdsVolumeEmpty');
-  if (vol.volumes.length) {
-    volEmptyEl.hidden = true;
-    const max = Math.max(...vol.volumes, 1);
-    barsEl.innerHTML = vol.volumes.map((v, i) => {
-      const h = Math.max(4, Math.round((v / max) * 100));
-      return `<div class="wds-bar-col"><div class="wds-bar" style="height:${h}%"></div><span>${escapeHtml(vol.labels[i])}</span></div>`;
-    }).join('');
-  } else {
-    volEmptyEl.hidden = false;
-    barsEl.innerHTML = '';
-  }
-
-  const weekstripEl = document.getElementById('wdsWeekstrip');
-  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const now = new Date();
-  const monday = new Date(now); monday.setDate(now.getDate() - ((now.getDay() + 6) % 7)); monday.setHours(0, 0, 0, 0);
-  const logsMap = getLogs();
-  const toISO = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-  let cells = '';
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(monday); d.setDate(monday.getDate() + i);
-    const iso = toISO(d);
-    const entry = logsMap[iso];
-    const trained = !!(entry && (
-      (entry.exercises && entry.exercises.some(ex => ex.sets.some(s => s.completed))) ||
-      (entry.cardioSessions && entry.cardioSessions.length)
-    ));
-    const isFuture = d > now && iso !== today;
-    const isToday = iso === today;
-    cells += `<div class="wds-weekday ${trained ? 'wds-weekday--push' : 'wds-weekday--rest'} ${isToday ? 'wds-weekday--active' : ''}"><span>${dayNames[d.getDay()]}</span><strong>${isFuture ? '–' : (trained ? 'Trained' : 'Rest')}</strong></div>`;
-  }
-  weekstripEl.innerHTML = cells;
-
-  const review = getCurrentWeekReview();
-  const reflectionEl = document.getElementById('wdsReflectionList');
-  const items = [];
-  if (review && review.wins) items.push(`<li><span class="wds-forecast-dot wds-foot-good"></span> Win: ${escapeHtml(review.wins)}</li>`);
-  if (review && review.improvements) items.push(`<li><span class="wds-forecast-dot wds-foot-warning"></span> To improve: ${escapeHtml(review.improvements)}</li>`);
-  if (review && review.focus && review.focus.length) items.push(`<li><span class="wds-forecast-dot"></span> Focus: ${review.focus.map(escapeHtml).join(', ')}</li>`);
-  reflectionEl.innerHTML = items.length ? items.join('') : '<li><span class="wds-forecast-dot"></span> No weekly review logged yet this week.</li>';
 
   document.getElementById('wdsTileVolumeValue').textContent = stats.volume != null ? `${stats.volume.toLocaleString()} ${stats.volumeUnit}` : '–';
   const heaviestKg = wdsHeaviestSetThisWeekKg(logsArr);
@@ -579,86 +487,15 @@ function renderWdsNutrition() {
     document.getElementById('wdsMacroCarbsBar').style.width = Math.min(100, (carbsNow / mt.carbTarget) * 100) + '%';
     document.getElementById('wdsMacroFatText').textContent = `${fatNow} / ${mt.fatTarget}g`;
     document.getElementById('wdsMacroFatBar').style.width = Math.min(100, (fatNow / mt.fatTarget) * 100) + '%';
-    document.getElementById('wdsTileCaloriesValue').textContent = `${entry.calories ?? 0} / ${mt.calorieTarget}`;
-    document.getElementById('wdsTileFiberValue').textContent = `${entry.fiber ?? 0}g`;
-    document.getElementById('wdsTileSodiumValue').textContent = `${entry.sodium ?? 0}mg`;
   } else {
     ['wdsMacroProteinText', 'wdsMacroCarbsText', 'wdsMacroFatText'].forEach(id => { document.getElementById(id).textContent = '– / –g'; });
-    document.getElementById('wdsTileCaloriesValue').textContent = '–';
-    document.getElementById('wdsTileFiberValue').textContent = '–';
-    document.getElementById('wdsTileSodiumValue').textContent = '–';
   }
-
-  const waterTarget = effectiveWaterTargetML(date);
-  const waterNow = entry.water || 0;
-  const fluidPct = waterTarget ? Math.min(100, Math.round((waterNow / waterTarget) * 100)) : 0;
-  document.getElementById('wdsFluidGauge').style.setProperty('--pct', fluidPct);
-  document.getElementById('wdsFluidValue').innerHTML = (waterNow / 1000).toFixed(1) + '<small>L</small>';
-  const remainMl = Math.max(0, waterTarget - waterNow);
-  document.getElementById('wdsFluidFoot').textContent = remainMl > 0 ? `${(remainMl / 1000).toFixed(1)}L to target` : 'Target met';
-
-  const mealsEl = document.getElementById('wdsFuelList');
-  const meals = entry.meals || {};
-  const mealKeys = ['breakfast', 'lunch', 'dinner', 'snacks'];
-  const allItems = mealKeys.flatMap(k => meals[k] || []);
-  mealsEl.innerHTML = allItems.length
-    ? allItems.slice(0, 8).map(it => `<li><span>${escapeHtml(it.name || 'Item')}</span><span>${Math.round(it.calories || 0)} kcal</span></li>`).join('')
-    : '<li><span>No meals logged today.</span></li>';
-  const mealCount = mealKeys.filter(k => meals[k] && meals[k].length).length;
-  document.getElementById('wdsTileMealsValue').textContent = `${mealCount} / 4`;
-
-  const hungerFillEl = document.getElementById('wdsHungerFill');
-  const hungerKnobEl = document.getElementById('wdsHungerKnob');
-  const hungerEmptyEl = document.getElementById('wdsHungerEmpty');
-  if (entry.hunger != null) {
-    const hp = Math.round(((entry.hunger - 1) / 4) * 100);
-    hungerFillEl.style.width = hp + '%';
-    hungerKnobEl.style.left = hp + '%';
-    hungerEmptyEl.hidden = true;
-  } else {
-    hungerFillEl.style.width = '0%';
-    hungerKnobEl.style.left = '0%';
-    hungerEmptyEl.hidden = false;
-  }
-
-  const recentWithCalories = sortedLogsArray().slice(-30).filter(l => l.calories != null);
-  wdsSetChartPaths('wdsCalorieChartArea', 'wdsCalorieChartLine', 'wdsCalorieChartDot', 'wdsCalorieChartEmpty', recentWithCalories.map(l => l.calories));
 }
 
 function renderWdsBio() {
   const profile = getProfile();
-  const logsArr = sortedLogsArray();
   const stats = computeLeaderboardStats();
   const today = todayISO();
-
-  const recent7 = logsArr.slice(-7);
-  const sleepBarsEl = document.getElementById('wdsSleepBars');
-  const sleepEmptyEl = document.getElementById('wdsSleepEmpty');
-  if (recent7.some(l => l.sleep != null)) {
-    sleepEmptyEl.hidden = true;
-    sleepBarsEl.innerHTML = recent7.map(l => {
-      const h = l.sleep != null ? Math.max(4, Math.round((l.sleep / 5) * 100)) : 2;
-      const d = parseISO(l.date);
-      return `<div class="wds-bar-col"><div class="wds-bar" style="height:${h}%"></div><span>${d.getMonth() + 1}/${d.getDate()}</span></div>`;
-    }).join('');
-  } else {
-    sleepEmptyEl.hidden = false;
-    sleepBarsEl.innerHTML = '';
-  }
-
-  const withBoth = logsArr.slice(-30).filter(l => l.stress != null && l.fatigue != null);
-  const stressEmptyEl = document.getElementById('wdsStressChartEmpty');
-  if (withBoth.length >= 2) {
-    stressEmptyEl.hidden = true;
-    wdsSetChartPaths('wdsStressChartArea', 'wdsStressChartLine', null, 'wdsStressChartEmpty', withBoth.map(l => l.stress));
-    const builtFatigue = wdsBuildLinePath(withBoth.map(l => l.fatigue), 560, 160, 20);
-    document.getElementById('wdsFatigueChartLine').setAttribute('d', builtFatigue ? builtFatigue.line : '');
-  } else {
-    stressEmptyEl.hidden = false;
-    document.getElementById('wdsStressChartArea').setAttribute('d', '');
-    document.getElementById('wdsStressChartLine').setAttribute('d', '');
-    document.getElementById('wdsFatigueChartLine').setAttribute('d', '');
-  }
 
   const bodyFatEntry = findLastBodyFatEntry(today);
   const bodyFatPct = bodyFatEntry ? computeBodyFatJP7(bodyFatEntry.skinfolds, profile ? profile.age : null, profile ? profile.gender : null) : null;
@@ -672,48 +509,31 @@ function renderWdsBio() {
   const habitPct = wdsTodayHabitPct(profile, todayEntry);
   document.getElementById('wdsMarkerHabitText').textContent = habitPct + '%';
   document.getElementById('wdsMarkerHabitBar').style.width = habitPct + '%';
-
-  const review = getCurrentWeekReview();
-  const winTitleEl = document.getElementById('wdsWinTitle');
-  const winDescEl = document.getElementById('wdsWinDesc');
-  if (review && review.wins) {
-    winTitleEl.textContent = "This Week's Win";
-    winDescEl.textContent = review.wins;
-  } else {
-    winTitleEl.textContent = 'No weekly review yet';
-    winDescEl.textContent = 'Fill in Weekend Log’s "Wins" field in the app to see it here.';
-  }
 }
 
 async function renderWdsNexus() {
-  const lbListEl = document.getElementById('wdsLbList');
-  const recentEl = document.getElementById('wdsRecentActiveList');
+  const mydayEl = document.getElementById('wdsMydayRow');
   const chatListEl = document.getElementById('wdsChatList');
-  const selfPublicId = wdsRemoteData ? wdsRemoteData.publicId : null;
 
   if (!sbConfigured()) {
-    lbListEl.innerHTML = '<li><span>Leaderboard unavailable.</span></li>';
-    recentEl.innerHTML = '<li><span>Unavailable.</span></li>';
     if (chatListEl) chatListEl.innerHTML = '<p class="empty-note">Chat unavailable.</p>';
+    await refreshWdsChat();
     return;
   }
 
+  // My Day row: real recently-active leaderboard members as story circles —
+  // just an activity indicator for now (no real "story" content yet), see
+  // the feed placeholder for what's still to be designed.
   try {
     const rows = await pullLeaderboard();
-    const ranked = rows.slice().sort((a, b) => (b.conscientious_score || 0) - (a.conscientious_score || 0)).slice(0, 10);
-    lbListEl.innerHTML = ranked.length ? ranked.map((r, i) => {
-      const isSelf = r.public_id === selfPublicId;
-      return `<li class="${isSelf ? 'wds-lb-self' : ''}"><span class="wds-lb-rank">${i + 1}</span><span class="wds-lb-name">${escapeHtml(r.code_name || r.public_id || '?')}</span><span class="wds-lb-score">${Math.round(r.conscientious_score || 0)}</span></li>`;
-    }).join('') : '<li><span>No active leaderboard entries yet.</span></li>';
-
-    const recent = rows.slice().sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)).slice(0, 5);
-    recentEl.innerHTML = recent.length ? recent.map(r =>
-      `<li><span class="wds-user-avatar wds-user-avatar--sm">${escapeHtml((r.code_name || '?').charAt(0).toUpperCase())}</span><span>${escapeHtml(r.code_name || r.public_id || '?')} synced ${wdsRelativeTime(r.updated_at)}</span></li>`
-    ).join('') : '<li><span>No recent activity.</span></li>';
-  } catch (e) {
-    lbListEl.innerHTML = '<li><span>Could not load leaderboard.</span></li>';
-    recentEl.innerHTML = '<li><span>Could not load.</span></li>';
-  }
+    const recent = rows.slice().sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)).slice(0, 8);
+    const youItem = `<div class="wds-myday-item"><div class="wds-myday-ring wds-myday-ring--you"><div class="wds-myday-avatar">+</div></div><span>Your Day</span></div>`;
+    const otherItems = recent.map(r => {
+      const name = r.code_name || r.public_id || '?';
+      return `<div class="wds-myday-item"><div class="wds-myday-ring"><div class="wds-myday-avatar">${escapeHtml(name.charAt(0).toUpperCase())}</div></div><span>${escapeHtml(name)}</span></div>`;
+    }).join('');
+    if (mydayEl) mydayEl.innerHTML = youItem + otherItems;
+  } catch (e) { /* best effort — My Day row just keeps whatever it last had */ }
 
   await refreshWdsChat();
 }
@@ -777,9 +597,12 @@ function renderWdsNotifications() {
 
   badge.textContent = String(items.length);
   badge.hidden = items.length === 0;
-  pop.innerHTML = items.length
+  const html = items.length
     ? items.map(it => `<p class="wds-notif-item"><strong>${escapeHtml(it.title)}</strong> — ${escapeHtml(it.body)}</p>`).join('')
     : '<p class="wds-notif-item">No notifications.</p>';
+  pop.innerHTML = html;
+  const list = document.getElementById('wdsNotifList');
+  if (list) list.innerHTML = items.length ? html : '<p class="empty-note">No notifications.</p>';
 }
 
 // Discord/Slack-style link preview — no video hosting of our own, just
