@@ -4956,6 +4956,24 @@ html.wf-desktop-shell body { overflow-x: auto; }
 .wds-composer-post-btn { flex: none; padding: 7px 20px; background: var(--gradient-bar); color: #060a0d; font-weight: 700; border: none; }
 .wds-composer-post-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* Link preview card — a pasted URL in the feed composer or a posted
+   message unfurls into this (see link-preview Edge Function). Direct
+   image/video URLs render as plain media instead (no card chrome). */
+.wds-link-preview-card {
+  position: relative; display: block; border: 1px solid var(--border-soft); border-radius: 10px;
+  overflow: hidden; text-decoration: none; color: inherit; background: var(--surface-2); margin-top: 10px;
+}
+a.wds-link-preview-card:hover { border-color: var(--border); }
+.wds-link-preview-img { width: 100%; max-height: 220px; object-fit: cover; display: block; }
+.wds-link-preview-body { padding: 10px 12px; }
+.wds-link-preview-site { display: block; font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 3px; }
+.wds-link-preview-title { display: block; font-size: 0.82rem; color: var(--text-primary); margin-bottom: 3px; }
+.wds-link-preview-desc { margin: 0; font-size: 0.76rem; color: var(--text-secondary); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.wds-link-preview-remove {
+  position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%;
+  background: rgba(5,10,14,0.75); color: #fff; border: none; cursor: pointer; font-size: 0.7rem; line-height: 1;
+}
+
 /* Feed list */
 .wds-feed-list { display: flex; flex-direction: column; gap: 14px; }
 .wds-feed-post { display: flex; flex-direction: column; gap: 10px; }

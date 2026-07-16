@@ -82,3 +82,9 @@ as $$
   update feed_post_comments set deleted = true where id = p_comment_id and share_key = p_share_key;
 $$;
 grant execute on function unsend_feed_comment(bigint, uuid) to anon;
+
+-- Addendum: stores the fetched Open Graph preview (title/description/image)
+-- at post time, via the new link-preview Edge Function, so a post's link
+-- card doesn't need to be re-fetched (and can't silently change) every time
+-- it's viewed.
+alter table feed_posts add column if not exists link_preview jsonb;

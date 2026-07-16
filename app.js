@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.21.0';
+const APP_VERSION = 'WF_SYS_V.22.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -268,6 +268,56 @@ function initDesktopShell() {
   });
   composerPendingImageRemoveBtn.addEventListener('click', clearWdsPendingPostImage);
 
+  // Live link preview — debounced scan for the first URL as the user
+  // types, skipped for YouTube/Facebook video links (those already embed
+  // directly at render time via wdsExtractVideoEmbed, no card needed).
+  const composerLinkPreviewBox = document.getElementById('wdsComposerLinkPreview');
+  let wdsComposerPreviewTimer = null;
+  let wdsComposerPreviewUrl = null;
+  let wdsComposerLinkPreview = null;
+
+  const renderWdsComposerLinkPreview = () => {
+    if (!wdsComposerLinkPreview) { composerLinkPreviewBox.hidden = true; composerLinkPreviewBox.innerHTML = ''; return; }
+    composerLinkPreviewBox.hidden = false;
+    composerLinkPreviewBox.innerHTML = `<div style="position:relative;">${wdsBuildLinkPreviewHtml(wdsComposerLinkPreview)}<button type="button" class="wds-link-preview-remove" id="btnWdsComposerLinkPreviewRemove" aria-label="Remove preview">✕</button></div>`;
+    composerLinkPreviewBox.querySelectorAll('a.wds-link-preview-card').forEach(a => a.style.pointerEvents = 'none');
+    document.getElementById('btnWdsComposerLinkPreviewRemove').addEventListener('click', () => {
+      wdsComposerLinkPreview = null;
+      renderWdsComposerLinkPreview();
+    });
+  };
+
+  const checkComposerLink = async () => {
+    const url = wdsDetectFirstUrl(composerInput.value);
+    if (!url) {
+      wdsComposerPreviewUrl = null;
+      wdsComposerLinkPreview = null;
+      renderWdsComposerLinkPreview();
+      return;
+    }
+    if (url === wdsComposerPreviewUrl) return;
+    wdsComposerPreviewUrl = url;
+    if (wdsExtractVideoEmbed(url)) {
+      wdsComposerLinkPreview = null;
+      renderWdsComposerLinkPreview();
+      return;
+    }
+    composerLinkPreviewBox.hidden = false;
+    composerLinkPreviewBox.innerHTML = '<p class="empty-note">Loading preview…</p>';
+    try {
+      const preview = await fetchLinkPreview(url);
+      if (wdsComposerPreviewUrl !== url) return; // text moved on while this was in flight
+      wdsComposerLinkPreview = preview;
+      renderWdsComposerLinkPreview();
+    } catch (e) {
+      if (wdsComposerPreviewUrl === url) { wdsComposerLinkPreview = null; renderWdsComposerLinkPreview(); }
+    }
+  };
+  composerInput.addEventListener('input', () => {
+    clearTimeout(wdsComposerPreviewTimer);
+    wdsComposerPreviewTimer = setTimeout(checkComposerLink, 600);
+  });
+
   composerPostBtn.addEventListener('click', async () => {
     if (!wdsRemoteData || !wdsRemoteData.shareKey || !sbConfigured()) return;
     const text = composerInput.value;
@@ -276,9 +326,12 @@ function initDesktopShell() {
     composerPostBtn.disabled = true;
     try {
       const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
-      await postFeedPost(text, image, wdsRemoteData.shareKey, codeName);
+      await postFeedPost(text, image, wdsRemoteData.shareKey, codeName, wdsComposerLinkPreview);
       composerInput.value = '';
       clearWdsPendingPostImage();
+      wdsComposerPreviewUrl = null;
+      wdsComposerLinkPreview = null;
+      renderWdsComposerLinkPreview();
       await refreshWdsFeed();
     } catch (e) { /* best effort — composer keeps the typed text so nothing is lost */ }
     finally { composerPostBtn.disabled = false; }
@@ -847,7 +900,7 @@ function stopWdsChatPolling() {
 async function fetchFeedPosts() {
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await sb.from('feed_posts')
-    .select('id, share_key, code_name, message, image_url, deleted, created_at')
+    .select('id, share_key, code_name, message, image_url, link_preview, deleted, created_at')
     .gte('created_at', cutoff)
     .order('created_at', { ascending: false })
     .limit(30);
@@ -867,13 +920,54 @@ async function fetchFeedPosts() {
   return posts;
 }
 
-async function postFeedPost(text, imageDataUrl, shareKey, codeName) {
+async function postFeedPost(text, imageDataUrl, shareKey, codeName, linkPreview) {
   const trimmed = text.trim().slice(0, 2000);
   if (!trimmed && !imageDataUrl) return;
   let imageUrl = null;
   if (imageDataUrl) imageUrl = await uploadChatImage(imageDataUrl, shareKey);
-  const { error } = await sb.from('feed_posts').insert({ share_key: shareKey, code_name: codeName, message: trimmed, image_url: imageUrl });
+  const { error } = await sb.from('feed_posts').insert({
+    share_key: shareKey, code_name: codeName, message: trimmed, image_url: imageUrl, link_preview: linkPreview || null,
+  });
   if (error) throw error;
+}
+
+// Facebook-style URL unfurling — server-side (see supabase/functions/link-preview),
+// since the client can't fetch arbitrary third-party pages itself (CORS).
+// A direct image/video file URL comes back as type 'image'/'video' (the
+// client just renders the media); anything else comes back as 'website'
+// with title/description/image pulled from Open Graph tags.
+async function fetchLinkPreview(url) {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/link-preview`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+    body: JSON.stringify({ url }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Preview failed');
+  return data;
+}
+
+function wdsDetectFirstUrl(text) {
+  const m = text.match(/https?:\/\/[^\s]+/i);
+  return m ? m[0] : null;
+}
+
+// Shared by the composer's live preview and the rendered post — a website
+// preview is a clickable card, an image/video URL is rendered as plain
+// media (matches how an uploaded photo already looks), per "full preview
+// like photos and videos, unless it's a full page — just preview/title/text".
+function wdsBuildLinkPreviewHtml(preview) {
+  if (!preview) return '';
+  if (preview.type === 'image') return `<img class="wds-post-image" src="${escapeHtml(preview.image || preview.url)}" alt="">`;
+  if (preview.type === 'video') return `<video class="wds-post-image" src="${escapeHtml(preview.video || preview.url)}" controls></video>`;
+  return `<a class="wds-link-preview-card" href="${escapeHtml(preview.url)}" target="_blank" rel="noopener noreferrer">
+    ${preview.image ? `<img class="wds-link-preview-img" src="${escapeHtml(preview.image)}" alt="">` : ''}
+    <div class="wds-link-preview-body">
+      ${preview.siteName ? `<span class="wds-link-preview-site">${escapeHtml(preview.siteName)}</span>` : ''}
+      <strong class="wds-link-preview-title">${escapeHtml(preview.title || preview.url)}</strong>
+      ${preview.description ? `<p class="wds-link-preview-desc">${escapeHtml(preview.description)}</p>` : ''}
+    </div>
+  </a>`;
 }
 
 async function toggleFeedPostLike(postId, shareKey) {
@@ -926,9 +1020,10 @@ function renderFeedPosts(posts) {
     const comments = (p.comments || []).filter(c => !c.deleted);
     const imageHtml = (!p.deleted && p.image_url) ? `<img class="wds-post-image" src="${p.image_url}" alt="">` : '';
     const videoHtml = p.deleted ? '' : wdsExtractVideoEmbed(p.message);
+    const linkPreviewHtml = (!p.deleted && !videoHtml) ? wdsBuildLinkPreviewHtml(p.link_preview) : '';
     const bodyHtml = p.deleted
       ? `<p class="wds-post-body is-unsent">This post was removed.</p>`
-      : `${p.message ? `<p class="wds-post-body">${escapeHtml(p.message)}</p>` : ''}${imageHtml}${videoHtml}`;
+      : `${p.message ? `<p class="wds-post-body">${escapeHtml(p.message)}</p>` : ''}${imageHtml}${videoHtml}${linkPreviewHtml}`;
     const expanded = wdsFeedExpandedComments.has(p.id);
     const commentsHtml = comments.map(c => {
       const canRemove = !!myShareKey && c.share_key === myShareKey;
