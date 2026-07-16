@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.12.0';
+const APP_VERSION = 'WF_SYS_V.13.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -26,6 +26,99 @@ function initCleanVariantFlag() {
   }
 }
 initCleanVariantFlag();
+
+/* ---------------------------------------------------------------- */
+/* Desktop Shell (wellness.winfinityfitness.com only)                */
+/* ---------------------------------------------------------------- */
+// The reverse-proxied desktop subdomain (see wordpress-proxy/) serves this
+// exact same file — the hostname check below (mirrored synchronously in
+// index.html's <head> so there's no flash of the mobile layout) is the only
+// thing that branches behavior. Everything under initDesktopShell is fully
+// self-contained (its own wds*-prefixed IDs/classes) and never touches the
+// mobile app's DOM, storage keys, or init flow, so the mobile app and plain
+// GitHub Pages URL run completely unaffected by any of this.
+const DESKTOP_SHELL_HOST = 'wellness.winfinityfitness.com';
+const isDesktopShellSite = location.hostname === DESKTOP_SHELL_HOST;
+
+// Preview build: the dashboard below is illustrative/sample data, not real
+// per-operator records — full per-operator data needs a real cloud-sync
+// backend keyed to Digital ID, which doesn't exist yet (today everything
+// lives in local device storage only). Sign-in here just gates the preview
+// behind a Digital ID prompt and remembers it for the tab session; it does
+// not verify anything server-side yet.
+function initDesktopShell() {
+  const shell = document.getElementById('wdsShell');
+  if (!shell) return;
+
+  const gate = document.getElementById('wdsGate');
+  const dashboard = document.getElementById('wdsDashboard');
+  const idInput = document.getElementById('wdsDigitalIdInput');
+  const signInBtn = document.getElementById('wdsSignInBtn');
+  const signOutBtn = document.getElementById('wdsSignOutBtn');
+  const operatorNameEl = document.getElementById('wdsOperatorName');
+  const operatorIdEl = document.getElementById('wdsOperatorId');
+  const avatarEl = document.getElementById('wdsUserAvatar');
+  const nexusSelfNameEl = document.getElementById('wdsNexusSelfName');
+
+  const SESSION_KEY = 'wds_operator_id';
+
+  function enterDashboard(digitalId) {
+    const clean = digitalId.trim();
+    if (!clean) return;
+    sessionStorage.setItem(SESSION_KEY, clean);
+    operatorNameEl.textContent = clean;
+    operatorIdEl.textContent = clean.toUpperCase();
+    avatarEl.textContent = clean.trim().charAt(0).toUpperCase();
+    nexusSelfNameEl.textContent = clean;
+    gate.hidden = true;
+    dashboard.hidden = false;
+  }
+
+  signInBtn.addEventListener('click', () => enterDashboard(idInput.value));
+  idInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') enterDashboard(idInput.value);
+  });
+
+  signOutBtn.addEventListener('click', () => {
+    sessionStorage.removeItem(SESSION_KEY);
+    dashboard.hidden = true;
+    gate.hidden = false;
+    idInput.value = '';
+    idInput.focus();
+  });
+
+  // Tab switching — plain show/hide, no routing, mirrors the mobile app's
+  // own tab-panel pattern (data-tab) but under its own data-wds-tab/wds-panel
+  // attributes so it can't collide with initTabs()'s selectors.
+  const tabButtons = document.querySelectorAll('.wds-topnav-tab');
+  const panels = document.querySelectorAll('.wds-panel');
+  tabButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.wdsTab;
+      tabButtons.forEach(b => b.classList.toggle('is-active', b === btn));
+      panels.forEach(p => { p.hidden = p.dataset.wdsPanel !== target; });
+    });
+  });
+
+  // Notification bell — simple open/close popover, closes on outside click.
+  const bellBtn = document.getElementById('wdsBellBtn');
+  const notifPop = document.getElementById('wdsNotifPop');
+  bellBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    notifPop.hidden = !notifPop.hidden;
+  });
+  document.addEventListener('click', e => {
+    if (!notifPop.hidden && !notifPop.contains(e.target) && e.target !== bellBtn) {
+      notifPop.hidden = true;
+    }
+  });
+
+  // A Digital ID entered earlier in this browser tab's session skips
+  // straight back to the dashboard on reload instead of re-prompting.
+  const remembered = sessionStorage.getItem(SESSION_KEY);
+  if (remembered) enterDashboard(remembered);
+}
+if (isDesktopShellSite) initDesktopShell();
 
 // Deferred via setTimeout (not called directly) so it runs after the rest of
 // this script finishes its first synchronous pass — sbConfigured() reads the
