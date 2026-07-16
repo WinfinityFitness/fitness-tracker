@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.22.0';
+const APP_VERSION = 'WF_SYS_V.23.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -318,8 +318,13 @@ function initDesktopShell() {
     wdsComposerPreviewTimer = setTimeout(checkComposerLink, 600);
   });
 
+  const composerErrorEl = document.getElementById('wdsComposerError');
   composerPostBtn.addEventListener('click', async () => {
-    if (!wdsRemoteData || !wdsRemoteData.shareKey || !sbConfigured()) return;
+    if (composerErrorEl) composerErrorEl.hidden = true;
+    if (!wdsRemoteData || !wdsRemoteData.shareKey || !sbConfigured()) {
+      if (composerErrorEl) { composerErrorEl.textContent = 'Not signed in — try refreshing the page.'; composerErrorEl.hidden = false; }
+      return;
+    }
     const text = composerInput.value;
     const image = wdsPendingPostImageDataUrl;
     if (!text.trim() && !image) return;
@@ -333,7 +338,12 @@ function initDesktopShell() {
       wdsComposerLinkPreview = null;
       renderWdsComposerLinkPreview();
       await refreshWdsFeed();
-    } catch (e) { /* best effort — composer keeps the typed text so nothing is lost */ }
+    } catch (e) {
+      // Composer keeps the typed text so nothing is lost — but the failure
+      // itself must be visible, not silent (this is exactly what made an
+      // earlier missing-column bug look like "the button does nothing").
+      if (composerErrorEl) { composerErrorEl.textContent = 'Could not post: ' + ((e && e.message) || 'unknown error') + '. Try again.'; composerErrorEl.hidden = false; }
+    }
     finally { composerPostBtn.disabled = false; }
   });
   initWdsFeed();
