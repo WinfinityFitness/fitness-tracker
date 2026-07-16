@@ -1887,6 +1887,14 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
    inline-flex row — see .chat-bubble above). */
 .chat-bubble--has-image { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .chat-row--own .chat-bubble--has-image { align-items: flex-end; }
+/* Desktop-only link preview (see wdsExtractVideoEmbed) — a public
+   YouTube/Facebook video URL already in the message text expands into the
+   platform's own embed player, capped to a compact fixed width so it can't
+   dominate the chat card. */
+.chat-bubble--has-video { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.chat-row--own .chat-bubble--has-video { align-items: flex-end; }
+.chat-video-embed { width: 260px; max-width: 100%; aspect-ratio: 16/9; border-radius: 8px; overflow: hidden; }
+.chat-video-embed iframe { width: 100%; height: 100%; border: 0; display: block; }
 .chat-msg-image {
   display: block;
   max-height: 140px;
@@ -4808,6 +4816,7 @@ html.wf-desktop-shell #wdsShell {
   border-bottom: 1px solid var(--border-soft); position: sticky; top: 0; z-index: 5;
 }
 .wds-topnav-brand { display: flex; align-items: center; gap: 10px; font-size: 1.05rem; letter-spacing: 0.05em; color: var(--cyan); font-weight: 800; white-space: nowrap; }
+.wds-topnav-brand img { width: 24px; height: 24px; flex-shrink: 0; }
 .wds-topnav-tabs { display: flex; gap: 4px; flex: 1; }
 .wds-topnav-tab {
   background: none; border: none; color: var(--text-secondary); font-size: 0.72rem;
@@ -4827,6 +4836,8 @@ html.wf-desktop-shell #wdsShell {
   cursor: pointer; position: relative;
 }
 .wds-icon-btn:hover { color: var(--cyan); border-color: var(--border); }
+.wds-icon-btn.is-spinning svg { animation: wds-spin 0.7s linear infinite; }
+@keyframes wds-spin { to { transform: rotate(360deg); } }
 .wds-bell-badge {
   position: absolute; top: -3px; right: -3px; background: var(--critical); color: #fff;
   font-size: 0.6rem; font-weight: 700; border-radius: 50%; width: 15px; height: 15px;
@@ -4845,6 +4856,12 @@ html.wf-desktop-shell #wdsShell {
   color: #060a0d; font-weight: 700; display: grid; place-items: center; font-size: 0.85rem;
   flex-shrink: 0;
 }
+.wds-user-mode-icon {
+  width: 34px; height: 34px; border-radius: 50%; background: var(--surface-2);
+  border: 1px solid var(--border); display: grid; place-items: center; padding: 5px;
+  box-sizing: border-box; flex-shrink: 0;
+}
+.wds-user-mode-icon img { width: 100%; height: 100%; object-fit: contain; }
 .wds-user-avatar--sm { width: 26px; height: 26px; font-size: 0.72rem; flex-shrink: 0; }
 .wds-user-meta { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.3; }
 .wds-user-label { font-size: 0.62rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
@@ -4996,7 +5013,8 @@ html.wf-desktop-shell #wdsShell {
 .wds-feed-body strong { color: var(--text-primary); }
 .wds-feed-time { color: var(--text-muted); font-size: 0.72rem; margin-left: 6px; }
 .wds-feed-actions { display: flex; gap: 14px; font-size: 0.74rem; color: var(--text-muted); }
-.wds-feed-compose { display: flex; gap: 8px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border-soft); }
+.wds-chat-list { max-height: 320px; }
+.wds-feed-compose { display: flex; gap: 8px; margin-top: 10px; padding-top: 0; border-top: none; }
 .wds-feed-compose input {
   flex: 1; padding: 9px 12px; border-radius: 6px; border: 1px solid var(--border-soft);
   background: var(--surface-2); color: var(--text-secondary); font-family: var(--font-display); font-size: 0.82rem;
@@ -5005,6 +5023,14 @@ html.wf-desktop-shell #wdsShell {
 
 .wds-spotlight-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
 .wds-spotlight-list li { display: flex; align-items: center; gap: 10px; font-size: 0.8rem; color: var(--text-secondary); }
+
+/* Menu tab */
+.wds-menu-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-soft); font-size: 0.84rem; color: var(--text-secondary); }
+.wds-menu-row:last-of-type { border-bottom: none; }
+.wds-menu-row strong { color: var(--text-primary); font-family: var(--font-mono); }
+.wds-menu-links { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.wds-menu-links a { color: var(--cyan); text-decoration: none; font-size: 0.84rem; }
+.wds-menu-links a:hover { text-decoration: underline; }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 1080px) {

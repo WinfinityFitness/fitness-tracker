@@ -180,6 +180,14 @@ grant execute on function web_sync_push_daily_reviews(uuid, jsonb) to anon;
 -- attempts in a row (nothing else in this project rate-limits anything, and
 -- this table holds meaningfully more sensitive data than anything else
 -- anon-readable in this schema, so it gets the one exception).
+--
+-- Also returns share_key itself (in the same trust tier as everywhere else
+-- in this app — it's a bearer-secret identity anchor, not a hashed
+-- credential) so a signed-in desktop session can post/react/unsend in
+-- Nexus chat as the real account, the same way the mobile app already can.
+-- A PIN-authenticated session already has full read access to this
+-- account's entire history, so granting it the same write capability the
+-- mobile app already has is not a meaningfully larger trust boundary.
 create or replace function web_sync_get_dashboard(p_public_id text, p_pin text, p_days int default 90) returns jsonb
 language plpgsql
 security definer
@@ -208,6 +216,7 @@ begin
   update web_sync_accounts set failed_attempts = 0, locked_until = null where share_key = acct.share_key;
 
   select jsonb_build_object(
+    'shareKey', acct.share_key,
     'profile', acct.profile,
     'theme', acct.theme,
     'skin', acct.skin,

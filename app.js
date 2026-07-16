@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.15.0';
+const APP_VERSION = 'WF_SYS_V.16.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -77,7 +77,8 @@ function initDesktopShell() {
   const signOutBtn = document.getElementById('wdsSignOutBtn');
   const errorEl = document.getElementById('wdsGateError');
   const operatorNameEl = document.getElementById('wdsOperatorName');
-  const avatarEl = document.getElementById('wdsUserAvatar');
+  const modeIconEl = document.getElementById('wdsUserModeIcon');
+  const modeIconImgEl = document.getElementById('wdsUserModeIconImg');
 
   const SESSION_ID_KEY = 'wds_operator_id';
   const SESSION_PIN_KEY = 'wds_operator_pin';
@@ -103,6 +104,7 @@ function initDesktopShell() {
       if (error) throw error;
       wdsRemoteData = {
         publicId: cleanId,
+        shareKey: data.shareKey || null,
         profile: data.profile || null,
         theme: data.theme || 'dark',
         skin: data.skin || 'default',
@@ -125,7 +127,9 @@ function initDesktopShell() {
     document.documentElement.setAttribute('data-skin', wdsRemoteData.skin);
     const displayName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || cleanId;
     operatorNameEl.textContent = displayName;
-    avatarEl.textContent = displayName.trim().charAt(0).toUpperCase();
+    const mode = getFitnessMode();
+    modeIconImgEl.src = MODE_ICON[mode] || MODE_ICON.beginner;
+    modeIconEl.title = MODE_LABEL[mode] || mode;
     renderWdsDashboard();
     gate.hidden = true;
     dashboard.hidden = false;
@@ -159,7 +163,52 @@ function initDesktopShell() {
       const target = btn.dataset.wdsTab;
       tabButtons.forEach(b => b.classList.toggle('is-active', b === btn));
       panels.forEach(p => { p.hidden = p.dataset.wdsPanel !== target; });
+      // Chat only needs to poll for new messages while its tab is actually
+      // visible — same idea as the mobile app's startNexusPolling/
+      // stopNexusPolling, just keyed off this tab instead.
+      if (target === 'nexus') startWdsChatPolling(); else stopWdsChatPolling();
     });
+  });
+
+  // Nexus chat — send, react/unsend (long-press or double-click a bubble).
+  const chatInput = document.getElementById('wdsChatInput');
+  const chatSendBtn = document.getElementById('btnWdsChatSend');
+  const sendWdsChat = async () => {
+    if (!wdsRemoteData || !wdsRemoteData.shareKey || !sbConfigured()) return;
+    const text = chatInput.value;
+    if (!text.trim()) return;
+    chatSendBtn.disabled = true;
+    try {
+      const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
+      await postChatMessage(text, null, wdsRemoteData.shareKey, codeName);
+      chatInput.value = '';
+      await refreshWdsChat();
+    } catch (e) { /* best effort — message just won't appear, input keeps the typed text so nothing is lost */ }
+    finally { chatSendBtn.disabled = false; }
+  };
+  chatSendBtn.addEventListener('click', sendWdsChat);
+  chatInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendWdsChat(); });
+  initWdsChatReactionMenu();
+
+  // Refresh — re-fetches the signed-in account's data (dashboard doesn't
+  // auto-poll; only chat does), reusing the same remembered session
+  // credentials the reload-resume path below uses.
+  const refreshBtn = document.getElementById('wdsRefreshBtn');
+  refreshBtn.addEventListener('click', async () => {
+    const id = sessionStorage.getItem(SESSION_ID_KEY);
+    const pin = sessionStorage.getItem(SESSION_PIN_KEY);
+    if (!id || !pin) return;
+    refreshBtn.classList.add('is-spinning');
+    try { await enterDashboard(id, pin); } finally { refreshBtn.classList.remove('is-spinning'); }
+  });
+
+  // Menu tab — sign out (duplicate of the topnav button, for convenience)
+  // and a local-only theme toggle (does not touch the synced profile).
+  const menuSignOutBtn = document.getElementById('btnWdsMenuSignOut');
+  if (menuSignOutBtn) menuSignOutBtn.addEventListener('click', () => signOutBtn.click());
+  const themeToggleEl = document.getElementById('wdsThemeToggle');
+  if (themeToggleEl) themeToggleEl.addEventListener('change', () => {
+    document.documentElement.setAttribute('data-theme', themeToggleEl.checked ? 'light' : 'dark');
   });
 
   // Notification bell — simple open/close popover, closes on outside click.
@@ -285,6 +334,16 @@ function renderWdsDashboard() {
   renderWdsNutrition();
   renderWdsBio();
   renderWdsNexus().catch(() => {});
+  renderWdsMenu();
+}
+
+function renderWdsMenu() {
+  const idEl = document.getElementById('wdsMenuDigitalId');
+  const modeEl = document.getElementById('wdsMenuFitnessMode');
+  if (idEl) idEl.textContent = wdsRemoteData ? wdsRemoteData.publicId : '–';
+  if (modeEl) modeEl.textContent = MODE_LABEL[getFitnessMode()] || '–';
+  const themeToggle = document.getElementById('wdsThemeToggle');
+  if (themeToggle) themeToggle.checked = document.documentElement.getAttribute('data-theme') === 'light';
 }
 
 function renderWdsStatus() {
@@ -542,13 +601,13 @@ function renderWdsBio() {
 async function renderWdsNexus() {
   const lbListEl = document.getElementById('wdsLbList');
   const recentEl = document.getElementById('wdsRecentActiveList');
-  const feedEl = document.getElementById('wdsFeedList');
+  const chatListEl = document.getElementById('wdsChatList');
   const selfPublicId = wdsRemoteData ? wdsRemoteData.publicId : null;
 
   if (!sbConfigured()) {
     lbListEl.innerHTML = '<li><span>Leaderboard unavailable.</span></li>';
     recentEl.innerHTML = '<li><span>Unavailable.</span></li>';
-    feedEl.innerHTML = '<p class="hint hint--sm">Chat unavailable.</p>';
+    if (chatListEl) chatListEl.innerHTML = '<p class="empty-note">Chat unavailable.</p>';
     return;
   }
 
@@ -569,20 +628,168 @@ async function renderWdsNexus() {
     recentEl.innerHTML = '<li><span>Could not load.</span></li>';
   }
 
+  await refreshWdsChat();
+}
+
+// ---------------------------------------------------------------------
+// Desktop Nexus chat — a real, usable substitute for the mobile Nexus tab
+// when someone isn't on the app. Reuses the exact same .chat-row/.chat-bubble
+// markup and CSS as mobile chat (style.css "Public chat (Nexus)" section)
+// for visual parity, and posts/reacts/unsends as the real signed-in account
+// via wdsRemoteData.shareKey (see postChatMessage/setChatReaction/
+// unsendChatMessage's override params above). Image *display* is supported
+// (mirrors whatever's already on a message); image *upload* from the
+// desktop compose box is not implemented in this pass — text only.
+// ---------------------------------------------------------------------
+async function refreshWdsChat() {
+  const listEl = document.getElementById('wdsChatList');
   try {
     const messages = await fetchChatMessages();
-    const recentMsgs = messages.filter(m => !m.deleted).slice(-8).reverse();
-    feedEl.innerHTML = recentMsgs.length ? recentMsgs.map(m => `
-      <div class="wds-feed-post">
-        <span class="wds-user-avatar wds-user-avatar--sm">${escapeHtml((m.code_name || '?').charAt(0).toUpperCase())}</span>
-        <div class="wds-feed-body">
-          <p><strong>${escapeHtml(m.code_name || 'Anonymous')}</strong> <span class="wds-feed-time">${wdsRelativeTime(m.created_at)}</span></p>
-          <p>${escapeHtml(m.message || '')}</p>
-        </div>
-      </div>`).join('') : '<p class="hint hint--sm">No messages in Global Chat yet.</p>';
+    renderWdsChatMessages(messages);
   } catch (e) {
-    feedEl.innerHTML = '<p class="hint hint--sm">Could not load chat.</p>';
+    listEl.innerHTML = '<p class="empty-note">Could not load chat.</p>';
   }
+}
+
+// Discord/Slack-style link preview — no video hosting of our own, just
+// detects a public YouTube/Facebook video URL already in the message text
+// and renders the platform's own embed player inline. Desktop chat only
+// (not mobile) per the scope discussed — a much lighter lift than actual
+// video upload/storage.
+function wdsExtractVideoEmbed(text) {
+  if (!text) return '';
+  const yt = text.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{6,})/);
+  if (yt) {
+    return `<div class="chat-video-embed"><iframe src="https://www.youtube.com/embed/${yt[1]}" title="YouTube video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`;
+  }
+  const fb = text.match(/(?:https?:\/\/)?(?:www\.)?facebook\.com\/[^\s]*\/videos\/[^\s]*/);
+  if (fb) {
+    const url = fb[0].startsWith('http') ? fb[0] : 'https://' + fb[0];
+    return `<div class="chat-video-embed"><iframe src="https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=false" title="Facebook video" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe></div>`;
+  }
+  return '';
+}
+
+function renderWdsChatMessages(messages) {
+  const list = document.getElementById('wdsChatList');
+  list.innerHTML = '';
+  if (!messages.length) { list.innerHTML = '<p class="empty-note">No messages yet. Say hi!</p>'; return; }
+  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+  messages.forEach(m => {
+    // Ownership by share_key (the real signed-in identity), not code_name —
+    // more correct than the mobile render's name-based check for this
+    // purpose, since two people could share a display name.
+    const isOwn = !!myShareKey && m.sender_share_key === myShareKey;
+    const row = document.createElement('div');
+    row.className = 'chat-row ' + (isOwn ? 'chat-row--own' : 'chat-row--other');
+    const time = new Date(m.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    const nameHtml = !isOwn ? `<span class="chat-name">${escapeHtml(m.code_name || 'Anonymous')}</span>` : '';
+    const myReaction = (m.reactions || []).find(r => r.share_key === myShareKey);
+    const imageHtml = (!m.deleted && m.image_url) ? `<img class="chat-msg-image" src="${m.image_url}" alt="Shared photo" data-lightbox="${m.image_url}">` : '';
+    const videoHtml = m.deleted ? '' : wdsExtractVideoEmbed(m.message);
+    const bubbleInner = m.deleted
+      ? `<span class="chat-msg chat-msg-unsent">Unsent a message</span><span class="chat-time">${time}</span>`
+      : `${imageHtml}<span class="chat-msg">${escapeHtml(m.message)}</span>${videoHtml}<span class="chat-time">${time}</span>`;
+    const counts = aggregateReactions(m.reactions);
+    const totalReactions = (m.reactions || []).length;
+    const reactionsHtml = Object.keys(counts).length
+      ? `<div class="chat-reactions"><span class="chat-reaction-pill${myReaction ? ' is-mine' : ''}">${Object.keys(counts).join('')}${totalReactions > 1 ? ' ' + totalReactions : ''}</span></div>`
+      : '';
+    const bubbleClass = 'chat-bubble' + (imageHtml ? ' chat-bubble--has-image' : videoHtml ? ' chat-bubble--has-video' : '');
+    row.innerHTML = `${nameHtml}<div class="${bubbleClass}" data-msg-id="${m.id}" data-deleted="${m.deleted ? 1 : 0}" data-own="${isOwn ? 1 : 0}" data-my-reaction="${myReaction ? myReaction.emoji : ''}">${bubbleInner}${reactionsHtml}</div>`;
+    list.appendChild(row);
+  });
+  list.querySelectorAll('[data-lightbox]').forEach(img => img.addEventListener('click', e => {
+    e.stopPropagation();
+    window.open(img.dataset.lightbox, '_blank', 'noopener');
+  }));
+  list.scrollTop = list.scrollHeight;
+}
+
+let wdsChatReactionTargetId = null;
+
+function wdsCloseChatReactionMenu() {
+  const menu = document.getElementById('wdsChatReactionMenu');
+  if (menu) menu.hidden = true;
+  wdsChatReactionTargetId = null;
+}
+
+function wdsOpenChatReactionMenu(bubble, x, y) {
+  const menu = document.getElementById('wdsChatReactionMenu');
+  if (!menu) return;
+  const messageId = Number(bubble.dataset.msgId);
+  const isOwn = bubble.dataset.own === '1';
+  const myReaction = bubble.dataset.myReaction || '';
+  wdsChatReactionTargetId = messageId;
+  const emojiRow = `<div class="chat-reaction-emoji-row">${QUICK_REACTIONS.map(e =>
+    `<button type="button" class="chat-reaction-emoji-btn${myReaction === e ? ' is-active' : ''}" data-emoji="${e}">${e}</button>`
+  ).join('')}</div>`;
+  const unsendBtn = isOwn ? `<button type="button" class="chat-room-menu-item chat-room-menu-item--danger" id="btnWdsUnsendChat">Unsend</button>` : '';
+  menu.innerHTML = emojiRow + unsendBtn;
+  menu.hidden = false;
+  const menuWidth = 240;
+  menu.style.left = Math.max(8, Math.min(x, window.innerWidth - menuWidth - 12)) + 'px';
+  menu.style.top = Math.max(8, Math.min(y, window.innerHeight - 140)) + 'px';
+}
+
+// Press-and-hold (mousedown, same as mobile's touch long-press) or
+// double-click a bubble to react/unsend — event-delegated on the list
+// container so it survives every renderWdsChatMessages() re-render.
+function wdsBindChatReactions(list) {
+  const HOLD_MS = 450;
+  let pressTimer = null;
+  const start = (bubble, x, y) => {
+    if (bubble.dataset.deleted === '1') return;
+    pressTimer = setTimeout(() => { pressTimer = null; wdsOpenChatReactionMenu(bubble, x, y); }, HOLD_MS);
+  };
+  const cancel = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } };
+  list.addEventListener('mousedown', e => {
+    const bubble = e.target.closest('.chat-bubble');
+    if (!bubble) return;
+    start(bubble, e.clientX, e.clientY);
+  });
+  list.addEventListener('mouseup', cancel);
+  list.addEventListener('mouseleave', cancel);
+  list.addEventListener('dblclick', e => {
+    const bubble = e.target.closest('.chat-bubble');
+    if (!bubble || bubble.dataset.deleted === '1') return;
+    wdsOpenChatReactionMenu(bubble, e.clientX, e.clientY);
+  });
+}
+
+function initWdsChatReactionMenu() {
+  const list = document.getElementById('wdsChatList');
+  const menu = document.getElementById('wdsChatReactionMenu');
+  if (!list || !menu) return;
+  wdsBindChatReactions(list);
+  menu.addEventListener('click', e => {
+    const shareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+    const emojiBtn = e.target.closest('.chat-reaction-emoji-btn');
+    if (emojiBtn) {
+      const isActive = emojiBtn.classList.contains('is-active');
+      const messageId = wdsChatReactionTargetId;
+      wdsCloseChatReactionMenu();
+      setChatReaction(messageId, isActive ? null : emojiBtn.dataset.emoji, shareKey, refreshWdsChat);
+      return;
+    }
+    if (e.target.id === 'btnWdsUnsendChat') {
+      const messageId = wdsChatReactionTargetId;
+      wdsCloseChatReactionMenu();
+      unsendChatMessage(messageId, shareKey, refreshWdsChat);
+    }
+  });
+  document.addEventListener('click', e => {
+    if (!menu.hidden && !menu.contains(e.target) && !e.target.closest('.chat-bubble')) wdsCloseChatReactionMenu();
+  });
+}
+
+let wdsChatPollId = null;
+function startWdsChatPolling() {
+  stopWdsChatPolling();
+  wdsChatPollId = setInterval(refreshWdsChat, 5000);
+}
+function stopWdsChatPolling() {
+  if (wdsChatPollId) { clearInterval(wdsChatPollId); wdsChatPollId = null; }
 }
 
 // Deferred (not called directly) for the same reason as applyCustomSplashLogo
@@ -9820,7 +10027,11 @@ async function fetchChatMessages() {
   return messages;
 }
 
-async function postChatMessage(text, imageDataUrl) {
+// shareKeyOverride/codeNameOverride let the desktop dashboard post as the
+// real signed-in account (wdsRemoteData.shareKey / profile name) instead of
+// this device's own local identity — every mobile call site omits them and
+// gets the exact same behavior as before.
+async function postChatMessage(text, imageDataUrl, shareKeyOverride, codeNameOverride) {
   const trimmed = text.trim().slice(0, 280);
   if (!trimmed && !imageDataUrl) return;
 
@@ -9828,11 +10039,11 @@ async function postChatMessage(text, imageDataUrl) {
   if (imageDataUrl) imageUrl = await uploadChatImage(imageDataUrl);
 
   const { error } = await sb.from('chat_messages').insert({
-    code_name: effectiveLeaderboardName(),
+    code_name: codeNameOverride || effectiveLeaderboardName(),
     message: trimmed,
     image_url: imageUrl,
     room_id: currentChatRoomId || null,
-    sender_share_key: getOrCreateShareKey(),
+    sender_share_key: shareKeyOverride || getOrCreateShareKey(),
   });
   if (error) throw error;
 }
@@ -12472,20 +12683,23 @@ function openChatReactionMenu(bubble, x, y) {
   menu.style.top = Math.max(8, Math.min(y, window.innerHeight - 140)) + 'px';
 }
 
-async function setChatReaction(messageId, emoji) {
+// shareKeyOverride/onDone let the desktop dashboard reuse this against its
+// own signed-in identity and its own chat list re-render instead of the
+// mobile Nexus tab's — see postChatMessage above for the same pattern.
+async function setChatReaction(messageId, emoji, shareKeyOverride, onDone) {
   if (!sbConfigured()) return;
   try {
-    await sb.rpc('set_chat_reaction', { p_message_id: messageId, p_share_key: getOrCreateShareKey(), p_emoji: emoji });
-    renderChatMessages(await fetchChatMessages());
+    await sb.rpc('set_chat_reaction', { p_message_id: messageId, p_share_key: shareKeyOverride || getOrCreateShareKey(), p_emoji: emoji });
+    if (onDone) await onDone(); else renderChatMessages(await fetchChatMessages());
   } catch (e) { showRestToast('Could not update reaction.'); }
 }
 
-async function unsendChatMessage(messageId) {
+async function unsendChatMessage(messageId, shareKeyOverride, onDone) {
   if (!confirm('Unsend this message? Others will see "Unsent a message" instead.')) return;
   if (!sbConfigured()) return;
   try {
-    await sb.rpc('unsend_chat_message', { p_message_id: messageId, p_share_key: getOrCreateShareKey() });
-    renderChatMessages(await fetchChatMessages());
+    await sb.rpc('unsend_chat_message', { p_message_id: messageId, p_share_key: shareKeyOverride || getOrCreateShareKey() });
+    if (onDone) await onDone(); else renderChatMessages(await fetchChatMessages());
     showRestToast('Message unsent.');
   } catch (e) { showRestToast('Could not unsend message.'); }
 }

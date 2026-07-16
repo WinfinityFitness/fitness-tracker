@@ -1311,7 +1311,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
         </div>
         <div class="footer-col">
           <h4>Social</h4>
-          <a class="footer-link" href="http://winfinityfitness.com" target="_blank" rel="noopener noreferrer">Webpage</a>
+          <a class="footer-link" href="http://wellness.winfinityfitness.com" target="_blank" rel="noopener noreferrer">Webpage</a>
           <a class="footer-link" href="https://www.facebook.com/winfinityfit/" target="_blank" rel="noopener noreferrer" id="footerFacebookLink">Facebook</a>
           <a class="footer-link" href="https://www.instagram.com/windalchamp/" target="_blank" rel="noopener noreferrer" id="footerInstagramLink">Instagram</a>
         </div>
@@ -3258,6 +3258,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
 
     <header class="wds-topnav">
       <div class="wds-topnav-brand">
+        <img src="icons/icon-192.png" alt="">
         <span>WINFINITY</span>
       </div>
       <nav class="wds-topnav-tabs" id="wdsTabNav">
@@ -3282,8 +3283,15 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
           <span>Nexus</span>
           <span class="wds-tab-dot" id="wdsNexusDot" hidden></span>
         </button>
+        <button type="button" class="wds-topnav-tab" data-wds-tab="menu">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Menu</span>
+        </button>
       </nav>
       <div class="wds-topnav-user">
+        <button type="button" class="wds-icon-btn" id="wdsRefreshBtn" aria-label="Refresh data" title="Refresh data">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        </button>
         <button type="button" class="wds-icon-btn" id="wdsBellBtn" aria-label="Notifications">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           <span class="wds-bell-badge">3</span>
@@ -3298,7 +3306,9 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
             <span class="wds-user-label">Operator</span>
             <span class="wds-user-name" id="wdsOperatorName">Operator</span>
           </span>
-          <span class="wds-user-avatar" id="wdsUserAvatar">W</span>
+          <span class="wds-user-mode-icon" id="wdsUserModeIcon" title="Fitness mode">
+            <img src="icons/mode-beginner.png" alt="" id="wdsUserModeIconImg">
+          </span>
         </div>
         <button type="button" class="wds-logout-btn" id="wdsSignOutBtn">Log Out</button>
       </div>
@@ -3604,20 +3614,56 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
           </div>
 
           <div class="wds-card wds-card--feed">
-            <h3 class="wds-card-title">Global Feed</h3>
-            <div class="wds-feed" id="wdsFeedList">
-              <p class="hint hint--sm">Loading…</p>
+            <h3 class="wds-card-title">Global Chat</h3>
+            <div class="chat-list wds-chat-list" id="wdsChatList">
+              <p class="empty-note">Loading…</p>
             </div>
             <div class="wds-feed-compose">
-              <input type="text" placeholder="Post from the app's Nexus tab to join the conversation" disabled>
-              <button type="button" class="wds-mini-btn" disabled>Post</button>
+              <input type="text" id="wdsChatInput" placeholder="Message Nexus…" maxlength="280">
+              <button type="button" class="wds-mini-btn" id="btnWdsChatSend">Send</button>
             </div>
           </div>
+          <div class="chat-reaction-menu" id="wdsChatReactionMenu" hidden></div>
 
           <div class="wds-card wds-card--list">
             <h3 class="wds-card-title">Recently Active</h3>
             <ul class="wds-spotlight-list" id="wdsRecentActiveList">
               <li><span>Loading…</span></li>
+            </ul>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ===================== MENU ===================== -->
+      <section class="wds-panel" id="wdsPanelMenu" data-wds-panel="menu" hidden>
+        <div class="wds-grid wds-grid--menu">
+
+          <div class="wds-card">
+            <h3 class="wds-card-title">Account</h3>
+            <div class="wds-menu-row"><span>Digital ID</span><strong id="wdsMenuDigitalId">–</strong></div>
+            <div class="wds-menu-row"><span>Fitness Mode</span><strong id="wdsMenuFitnessMode">–</strong></div>
+            <button type="button" class="wds-logout-btn" id="btnWdsMenuSignOut" style="margin-top:12px;display:block;">Log Out</button>
+          </div>
+
+          <div class="wds-card">
+            <h3 class="wds-card-title">Appearance</h3>
+            <p class="hint hint--sm">Affects this browser's view only — your mobile app theme is unchanged.</p>
+            <div class="theme-toggle-row">
+              <span>Light theme</span>
+              <label class="switch">
+                <input type="checkbox" id="wdsThemeToggle">
+                <span class="switch-track"><span class="switch-thumb"></span></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="wds-card">
+            <h3 class="wds-card-title">Links</h3>
+            <ul class="wds-menu-links">
+              <li><a href="https://www.facebook.com/winfinityfit/" target="_blank" rel="noopener noreferrer">Facebook</a></li>
+              <li><a href="https://www.instagram.com/windalchamp/" target="_blank" rel="noopener noreferrer">Instagram</a></li>
+              <li><a href="http://www.facebook.com/aldruz3dsign" target="_blank" rel="noopener noreferrer">Affiliate</a></li>
             </ul>
           </div>
 
