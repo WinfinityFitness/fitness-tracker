@@ -4989,6 +4989,8 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
 .wds-post-unsend-btn { background: none; border: none; color: var(--text-muted); font-size: 0.68rem; cursor: pointer; padding: 4px 8px; }
 .wds-post-unsend-btn:hover { color: var(--critical); }
 .wds-post-body { font-size: 0.86rem; color: var(--text-secondary); line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.wds-post-body a { color: var(--cyan); text-decoration: none; }
+.wds-post-body a:hover { text-decoration: underline; }
 .wds-post-body.is-unsent { font-style: italic; color: var(--text-muted); }
 .wds-post-image { width: 100%; max-height: 420px; object-fit: cover; border-radius: 8px; display: block; }
 .wds-post-actions { display: flex; gap: 4px; border-top: 1px solid var(--border-soft); padding-top: 8px; }
@@ -5005,9 +5007,19 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
   width: 26px; height: 26px; border-radius: 50%; background: var(--surface-2); border: 1px solid var(--border-soft);
   display: grid; place-items: center; font-weight: 700; font-size: 0.68rem; flex-shrink: 0;
 }
-.wds-post-comment-bubble { background: var(--surface-2); border-radius: 12px; padding: 6px 12px; flex: 1; }
+.wds-post-comment-body { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.wds-post-comment-bubble { background: var(--surface-2); border-radius: 12px; padding: 6px 12px; }
 .wds-post-comment-bubble strong { display: block; font-size: 0.72rem; color: var(--text-primary); }
 .wds-post-comment-bubble span { font-size: 0.8rem; color: var(--text-secondary); }
+.wds-post-comment-actions { display: flex; align-items: center; gap: 10px; padding-left: 12px; }
+.wds-post-comment-actions > span { font-size: 0.66rem; color: var(--text-muted); }
+.wds-comment-action-btn {
+  background: none; border: none; color: var(--text-muted); font-size: 0.68rem; font-weight: 700;
+  cursor: pointer; padding: 0; display: inline-flex; align-items: center; gap: 3px;
+}
+.wds-comment-action-btn:hover { color: var(--text-primary); }
+.wds-comment-action-btn.is-liked { color: var(--magenta); }
+.wds-reaction-cluster { font-size: 0.72rem; letter-spacing: -0.2em; }
 .wds-post-comment-compose { display: flex; gap: 8px; margin-top: 2px; }
 .wds-post-comment-compose input {
   flex: 1; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 20px;

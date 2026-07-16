@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.23.0';
+const APP_VERSION = 'WF_SYS_V.24.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -919,13 +919,24 @@ async function fetchFeedPosts() {
   const ids = posts.map(p => p.id);
   if (ids.length) {
     const [{ data: likes }, { data: comments }] = await Promise.all([
-      sb.from('feed_post_likes').select('post_id, share_key').in('post_id', ids),
+      sb.from('feed_post_likes').select('post_id, share_key, emoji').in('post_id', ids),
       sb.from('feed_post_comments').select('id, post_id, share_key, code_name, message, deleted, created_at').in('post_id', ids).order('created_at', { ascending: true }),
     ]);
     const likesByPost = {}, commentsByPost = {};
     (likes || []).forEach(l => { (likesByPost[l.post_id] = likesByPost[l.post_id] || []).push(l); });
     (comments || []).forEach(c => { (commentsByPost[c.post_id] = commentsByPost[c.post_id] || []).push(c); });
-    posts.forEach(p => { p.likes = likesByPost[p.id] || []; p.comments = commentsByPost[p.id] || []; });
+
+    const commentIds = (comments || []).map(c => c.id);
+    let commentLikesByComment = {};
+    if (commentIds.length) {
+      const { data: commentLikes } = await sb.from('feed_comment_likes').select('comment_id, share_key, emoji').in('comment_id', commentIds);
+      (commentLikes || []).forEach(l => { (commentLikesByComment[l.comment_id] = commentLikesByComment[l.comment_id] || []).push(l); });
+    }
+
+    posts.forEach(p => {
+      p.likes = likesByPost[p.id] || [];
+      p.comments = (commentsByPost[p.id] || []).map(c => Object.assign({}, c, { likes: commentLikesByComment[c.id] || [] }));
+    });
   }
   return posts;
 }
@@ -962,6 +973,26 @@ function wdsDetectFirstUrl(text) {
   return m ? m[0] : null;
 }
 
+// Turns any URL inside post text into a real link (opens in a new tab —
+// it's always an external destination, never a page within this app).
+// Escapes everything else normally; trims common trailing punctuation
+// (a period/comma ending the sentence) off the matched URL itself.
+function wdsLinkifyText(text) {
+  if (!text) return '';
+  const urlRe = /https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"]/g;
+  let result = '';
+  let lastIndex = 0;
+  let m;
+  while ((m = urlRe.exec(text))) {
+    result += escapeHtml(text.slice(lastIndex, m.index));
+    const url = m[0];
+    result += `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`;
+    lastIndex = m.index + url.length;
+  }
+  result += escapeHtml(text.slice(lastIndex));
+  return result;
+}
+
 // Shared by the composer's live preview and the rendered post — a website
 // preview is a clickable card, an image/video URL is rendered as plain
 // media (matches how an uploaded photo already looks), per "full preview
@@ -980,8 +1011,14 @@ function wdsBuildLinkPreviewHtml(preview) {
   </a>`;
 }
 
-async function toggleFeedPostLike(postId, shareKey) {
-  const { data, error } = await sb.rpc('toggle_feed_post_like', { p_post_id: postId, p_share_key: shareKey });
+async function toggleFeedPostLike(postId, shareKey, emoji) {
+  const { data, error } = await sb.rpc('toggle_feed_post_like', { p_post_id: postId, p_share_key: shareKey, p_emoji: emoji || '👍' });
+  if (error) throw error;
+  return data;
+}
+
+async function toggleFeedCommentLike(commentId, shareKey, emoji) {
+  const { data, error } = await sb.rpc('toggle_feed_comment_like', { p_comment_id: commentId, p_share_key: shareKey, p_emoji: emoji || '👍' });
   if (error) throw error;
   return data;
 }
@@ -1019,28 +1056,49 @@ async function refreshWdsFeed() {
   }
 }
 
+// Facebook's reaction set, reused from the chat QUICK_REACTIONS constant
+// (app.js ~12961) so both surfaces offer the same six reactions.
+const WDS_REACTION_LABEL = { '👍': 'Like', '❤️': 'Love', '😂': 'Haha', '😮': 'Wow', '😢': 'Sad', '🙏': 'Pray' };
+
+// A small cluster of the top distinct emoji + the button's own label —
+// label reflects MY reaction if I've reacted, otherwise the generic "Like".
+function wdsReactionButtonHtml(likes, myShareKey) {
+  const counts = aggregateReactions(likes);
+  const total = (likes || []).length;
+  const mine = (likes || []).find(l => l.share_key === myShareKey);
+  const label = mine ? (WDS_REACTION_LABEL[mine.emoji] || 'Liked') : 'Like';
+  const top = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 3).join('');
+  return `${top ? `<span class="wds-reaction-cluster">${top}</span> ` : '👍 '}${label}${total ? ' ' + total : ''}`;
+}
+
 function renderFeedPosts(posts) {
   const list = document.getElementById('wdsFeedList');
   if (!posts.length) { list.innerHTML = '<p class="empty-note">No posts yet. Be the first to share something!</p>'; return; }
   const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
   list.innerHTML = posts.map(p => {
     const isOwn = !!myShareKey && p.share_key === myShareKey;
-    const liked = (p.likes || []).some(l => l.share_key === myShareKey);
-    const likeCount = (p.likes || []).length;
+    const myLike = (p.likes || []).find(l => l.share_key === myShareKey);
     const comments = (p.comments || []).filter(c => !c.deleted);
     const imageHtml = (!p.deleted && p.image_url) ? `<img class="wds-post-image" src="${p.image_url}" alt="">` : '';
     const videoHtml = p.deleted ? '' : wdsExtractVideoEmbed(p.message);
     const linkPreviewHtml = (!p.deleted && !videoHtml) ? wdsBuildLinkPreviewHtml(p.link_preview) : '';
     const bodyHtml = p.deleted
       ? `<p class="wds-post-body is-unsent">This post was removed.</p>`
-      : `${p.message ? `<p class="wds-post-body">${escapeHtml(p.message)}</p>` : ''}${imageHtml}${videoHtml}${linkPreviewHtml}`;
+      : `${p.message ? `<p class="wds-post-body">${wdsLinkifyText(p.message)}</p>` : ''}${imageHtml}${videoHtml}${linkPreviewHtml}`;
     const expanded = wdsFeedExpandedComments.has(p.id);
     const commentsHtml = comments.map(c => {
       const canRemove = !!myShareKey && c.share_key === myShareKey;
+      const cMyLike = (c.likes || []).find(l => l.share_key === myShareKey);
       return `<div class="wds-post-comment" data-comment-id="${c.id}">
         <span class="wds-post-comment-avatar">${escapeHtml((c.code_name || '?').charAt(0).toUpperCase())}</span>
-        <div class="wds-post-comment-bubble"><strong>${escapeHtml(c.code_name || 'Anonymous')}</strong><span>${escapeHtml(c.message)}</span></div>
-        ${canRemove ? `<button type="button" class="wds-post-unsend-btn" data-action="unsend-comment">✕</button>` : ''}
+        <div class="wds-post-comment-body">
+          <div class="wds-post-comment-bubble"><strong>${escapeHtml(c.code_name || 'Anonymous')}</strong><span>${escapeHtml(c.message)}</span></div>
+          <div class="wds-post-comment-actions">
+            <button type="button" class="wds-comment-action-btn${cMyLike ? ' is-liked' : ''}" data-action="like-comment" data-current-emoji="${cMyLike ? cMyLike.emoji : ''}">${wdsReactionButtonHtml(c.likes, myShareKey)}</button>
+            <span>${wdsRelativeTime(c.created_at)}</span>
+            ${canRemove ? `<button type="button" class="wds-comment-action-btn" data-action="unsend-comment">Remove</button>` : ''}
+          </div>
+        </div>
       </div>`;
     }).join('');
     return `
@@ -1053,7 +1111,7 @@ function renderFeedPosts(posts) {
         ${bodyHtml}
         ${!p.deleted ? `
         <div class="wds-post-actions">
-          <button type="button" class="wds-post-action-btn${liked ? ' is-liked' : ''}" data-action="like">♥ ${likeCount ? likeCount + ' ' : ''}Cheer</button>
+          <button type="button" class="wds-post-action-btn${myLike ? ' is-liked' : ''}" data-action="like" data-current-emoji="${myLike ? myLike.emoji : ''}">${wdsReactionButtonHtml(p.likes, myShareKey)}</button>
           <button type="button" class="wds-post-action-btn" data-action="toggle-comments">💬 ${comments.length ? comments.length + ' ' : ''}Comments</button>
         </div>
         <div class="wds-post-comments" ${expanded ? '' : 'hidden'}>
@@ -1078,8 +1136,19 @@ function initWdsFeed() {
     const shareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
 
     if (e.target.closest('[data-action="like"]')) {
+      // A long-press just opened the reaction picker for this same click —
+      // don't also apply the plain-click default reaction on top of it.
+      if (wdsFeedJustLongPressed) { wdsFeedJustLongPressed = false; return; }
       if (!shareKey) return;
-      try { await toggleFeedPostLike(postId, shareKey); await refreshWdsFeed(); } catch (err) { /* best effort */ }
+      try { await toggleFeedPostLike(postId, shareKey, '👍'); await refreshWdsFeed(); } catch (err) { /* best effort */ }
+      return;
+    }
+    if (e.target.closest('[data-action="like-comment"]')) {
+      if (wdsFeedJustLongPressed) { wdsFeedJustLongPressed = false; return; }
+      const commentRow = e.target.closest('[data-comment-id]');
+      const commentId = commentRow ? Number(commentRow.dataset.commentId) : null;
+      if (!shareKey || !commentId) return;
+      try { await toggleFeedCommentLike(commentId, shareKey, '👍'); wdsFeedExpandedComments.add(postId); await refreshWdsFeed(); } catch (err) { /* best effort */ }
       return;
     }
     if (e.target.closest('[data-action="toggle-comments"]')) {
@@ -1124,6 +1193,87 @@ function initWdsFeed() {
       const btn = e.target.closest('.wds-post-comments').querySelector('[data-action="send-comment"]');
       if (btn) btn.click();
     }
+  });
+
+  initWdsFeedReactionMenu(list);
+}
+
+// Facebook-style reaction picker for feed posts/comments — press-and-hold
+// (or double-click) a Like button to choose a specific reaction; a plain
+// quick click applies the default 👍 (handled in initWdsFeed's click
+// delegation above). Mirrors wdsBindChatReactions/wdsOpenChatReactionMenu
+// exactly, just targeting [data-action="like"/"like-comment"] instead of
+// .chat-bubble, and its own #wdsFeedReactionMenu popover.
+let wdsFeedReactionTarget = null; // { type: 'post'|'comment', id }
+let wdsFeedJustLongPressed = false;
+
+function wdsCloseFeedReactionMenu() {
+  const menu = document.getElementById('wdsFeedReactionMenu');
+  if (menu) menu.hidden = true;
+  wdsFeedReactionTarget = null;
+}
+
+function wdsOpenFeedReactionMenu(btn, x, y) {
+  const menu = document.getElementById('wdsFeedReactionMenu');
+  if (!menu) return;
+  const isComment = btn.dataset.action === 'like-comment';
+  const id = isComment
+    ? Number(btn.closest('[data-comment-id]').dataset.commentId)
+    : Number(btn.closest('.wds-feed-post').dataset.postId);
+  wdsFeedReactionTarget = { type: isComment ? 'comment' : 'post', id };
+  const currentEmoji = btn.dataset.currentEmoji || '';
+  menu.innerHTML = `<div class="chat-reaction-emoji-row">${QUICK_REACTIONS.map(e =>
+    `<button type="button" class="chat-reaction-emoji-btn${currentEmoji === e ? ' is-active' : ''}" data-emoji="${e}">${e}</button>`
+  ).join('')}</div>`;
+  menu.hidden = false;
+  const menuWidth = 240;
+  menu.style.left = Math.max(8, Math.min(x, window.innerWidth - menuWidth - 12)) + 'px';
+  menu.style.top = Math.max(8, Math.min(y, window.innerHeight - 80)) + 'px';
+}
+
+function initWdsFeedReactionMenu(list) {
+  const menu = document.getElementById('wdsFeedReactionMenu');
+  if (!menu) return;
+  const HOLD_MS = 450;
+  let pressTimer = null;
+  const start = (btn, x, y) => {
+    pressTimer = setTimeout(() => {
+      pressTimer = null;
+      wdsFeedJustLongPressed = true;
+      wdsOpenFeedReactionMenu(btn, x, y);
+    }, HOLD_MS);
+  };
+  const cancel = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } };
+  list.addEventListener('mousedown', e => {
+    const btn = e.target.closest('[data-action="like"], [data-action="like-comment"]');
+    if (!btn) return;
+    start(btn, e.clientX, e.clientY);
+  });
+  list.addEventListener('mouseup', cancel);
+  list.addEventListener('mouseleave', cancel);
+  list.addEventListener('dblclick', e => {
+    const btn = e.target.closest('[data-action="like"], [data-action="like-comment"]');
+    if (!btn) return;
+    wdsFeedJustLongPressed = true;
+    wdsOpenFeedReactionMenu(btn, e.clientX, e.clientY);
+  });
+
+  menu.addEventListener('click', async e => {
+    const emojiBtn = e.target.closest('.chat-reaction-emoji-btn');
+    if (!emojiBtn || !wdsFeedReactionTarget) return;
+    const { type, id } = wdsFeedReactionTarget;
+    const emoji = emojiBtn.dataset.emoji;
+    const shareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+    wdsCloseFeedReactionMenu();
+    if (!shareKey) return;
+    try {
+      if (type === 'post') await toggleFeedPostLike(id, shareKey, emoji);
+      else await toggleFeedCommentLike(id, shareKey, emoji);
+      await refreshWdsFeed();
+    } catch (err) { /* best effort */ }
+  });
+  document.addEventListener('click', e => {
+    if (!menu.hidden && !menu.contains(e.target) && !e.target.closest('[data-action="like"], [data-action="like-comment"]')) wdsCloseFeedReactionMenu();
   });
 }
 

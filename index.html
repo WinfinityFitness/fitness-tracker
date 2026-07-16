@@ -30,7 +30,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=23.0">
+<link rel="stylesheet" href="style.css?v=24.0">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3448,6 +3448,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
         <div id="wdsFeedList" class="wds-feed-list">
           <p class="empty-note">Loading…</p>
         </div>
+        <div class="chat-reaction-menu" id="wdsFeedReactionMenu" hidden></div>
 
       </div>
 
@@ -3483,10 +3484,10 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
   </div>
 </div>
 
-<script src="config.js?v=23.0"></script>
+<script src="config.js?v=24.0"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=23.0"></script>
+<script src="app.js?v=24.0"></script>
 </body>
 </html>
