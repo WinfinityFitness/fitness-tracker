@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.13.0';
+const APP_VERSION = 'WF_SYS_V.13.1';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -56,7 +56,6 @@ function initDesktopShell() {
   const signInBtn = document.getElementById('wdsSignInBtn');
   const signOutBtn = document.getElementById('wdsSignOutBtn');
   const operatorNameEl = document.getElementById('wdsOperatorName');
-  const operatorIdEl = document.getElementById('wdsOperatorId');
   const avatarEl = document.getElementById('wdsUserAvatar');
   const nexusSelfNameEl = document.getElementById('wdsNexusSelfName');
 
@@ -67,7 +66,6 @@ function initDesktopShell() {
     if (!clean) return;
     sessionStorage.setItem(SESSION_KEY, clean);
     operatorNameEl.textContent = clean;
-    operatorIdEl.textContent = clean.toUpperCase();
     avatarEl.textContent = clean.trim().charAt(0).toUpperCase();
     nexusSelfNameEl.textContent = clean;
     gate.hidden = true;
