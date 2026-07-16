@@ -56,21 +56,22 @@ http_response_code($httpCode);
 if ($contentType) {
     header('Content-Type: ' . $contentType);
 }
-// Forward a small safe allowlist of caching-related headers from upstream —
-// skips hop-by-hop headers and anything that would leak the real origin.
-// Deliberately NOT forwarding Content-Encoding: cURL isn't asked to
-// negotiate compression here (no Accept-Encoding sent upstream), so the
-// body PHP echoes below is always plain — forwarding a stale gzip header
-// would make browsers try to decompress already-plain bytes and corrupt
-// the response.
+// Forward ETag/Last-Modified from upstream (harmless, and lets a future
+// conditional-GET optimization reuse them) but deliberately do NOT forward
+// upstream's own Cache-Control. GitHub Pages sends max-age=600 on static
+// assets, and Hostinger's own edge CDN (hCDN) sitting in front of this
+// script was honoring that and caching responses independently per edge
+// node for up to 10 minutes — so a fresh deploy could take 10+ minutes to
+// reach a given visitor depending on which edge routed their request, long
+// after GitHub Pages itself already had the new file. Overriding with
+// no-store here tells hCDN never to cache this response at all, so every
+// request re-runs this script (and its upstream fetch) fresh — the right
+// tradeoff for an app that's actively changing and has very low traffic.
 foreach (preg_split('/\r\n/', $rawHeaders) as $line) {
-    if (
-        stripos($line, 'Cache-Control:') === 0 ||
-        stripos($line, 'ETag:') === 0 ||
-        stripos($line, 'Last-Modified:') === 0
-    ) {
+    if (stripos($line, 'ETag:') === 0 || stripos($line, 'Last-Modified:') === 0) {
         header($line);
     }
 }
+header('Cache-Control: no-store, must-revalidate');
 
 echo $body;

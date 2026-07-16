@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.16.0';
+const APP_VERSION = 'WF_SYS_V.17.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -133,7 +133,30 @@ function initDesktopShell() {
     renderWdsDashboard();
     gate.hidden = true;
     dashboard.hidden = false;
+    startWdsDashboardPolling();
     return true;
+  }
+
+  // The dashboard tiles don't otherwise auto-update — a full re-sync from
+  // the app has to actually reach the server first. Polling every 2 minutes
+  // is a light middle ground between "fully manual" and real push, without
+  // an actual realtime backend. Stops itself if a poll ever fails (e.g. the
+  // PIN was changed elsewhere) instead of repeatedly hitting
+  // web_sync_get_dashboard with a now-wrong PIN and compounding the
+  // account's failed-attempt lockout counter.
+  let wdsDashboardPollId = null;
+  function startWdsDashboardPolling() {
+    stopWdsDashboardPolling();
+    wdsDashboardPollId = setInterval(async () => {
+      const id = sessionStorage.getItem(SESSION_ID_KEY);
+      const pin = sessionStorage.getItem(SESSION_PIN_KEY);
+      if (!id || !pin) { stopWdsDashboardPolling(); return; }
+      const ok = await enterDashboard(id, pin);
+      if (!ok) stopWdsDashboardPolling();
+    }, 120000);
+  }
+  function stopWdsDashboardPolling() {
+    if (wdsDashboardPollId) { clearInterval(wdsDashboardPollId); wdsDashboardPollId = null; }
   }
 
   const trySignIn = () => { enterDashboard(idInput.value, pinInput.value); };
@@ -146,6 +169,8 @@ function initDesktopShell() {
     sessionStorage.removeItem(SESSION_ID_KEY);
     sessionStorage.removeItem(SESSION_PIN_KEY);
     wdsRemoteData = null;
+    stopWdsDashboardPolling();
+    stopWdsChatPolling();
     dashboard.hidden = true;
     gate.hidden = false;
     idInput.value = '';
@@ -166,22 +191,57 @@ function initDesktopShell() {
       // Chat only needs to poll for new messages while its tab is actually
       // visible — same idea as the mobile app's startNexusPolling/
       // stopNexusPolling, just keyed off this tab instead.
-      if (target === 'nexus') startWdsChatPolling(); else stopWdsChatPolling();
+      if (target === 'nexus') {
+        startWdsChatPolling();
+        localStorage.setItem('wft_web_nexus_last_seen', new Date().toISOString());
+        renderWdsNotifications();
+      } else {
+        stopWdsChatPolling();
+      }
     });
   });
 
-  // Nexus chat — send, react/unsend (long-press or double-click a bubble).
+  // Nexus chat — send (text + optional image), react/unsend (long-press or
+  // double-click a bubble).
   const chatInput = document.getElementById('wdsChatInput');
   const chatSendBtn = document.getElementById('btnWdsChatSend');
+  const chatAttachBtn = document.getElementById('btnWdsChatAttachImage');
+  const chatImageInput = document.getElementById('wdsChatImageInput');
+  const chatPendingImage = document.getElementById('wdsChatPendingImage');
+  const chatPendingImagePreview = document.getElementById('wdsChatPendingImagePreview');
+  const chatPendingImageRemoveBtn = document.getElementById('btnWdsChatPendingImageRemove');
+  let wdsPendingChatImageDataUrl = null;
+
+  const clearWdsPendingChatImage = () => {
+    wdsPendingChatImageDataUrl = null;
+    chatPendingImage.hidden = true;
+    chatImageInput.value = '';
+  };
+  chatAttachBtn.addEventListener('click', () => chatImageInput.click());
+  chatImageInput.addEventListener('change', () => {
+    const file = chatImageInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      wdsPendingChatImageDataUrl = reader.result;
+      chatPendingImagePreview.src = wdsPendingChatImageDataUrl;
+      chatPendingImage.hidden = false;
+    };
+    reader.readAsDataURL(file);
+  });
+  chatPendingImageRemoveBtn.addEventListener('click', clearWdsPendingChatImage);
+
   const sendWdsChat = async () => {
     if (!wdsRemoteData || !wdsRemoteData.shareKey || !sbConfigured()) return;
     const text = chatInput.value;
-    if (!text.trim()) return;
+    const image = wdsPendingChatImageDataUrl;
+    if (!text.trim() && !image) return;
     chatSendBtn.disabled = true;
     try {
       const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
-      await postChatMessage(text, null, wdsRemoteData.shareKey, codeName);
+      await postChatMessage(text, image, wdsRemoteData.shareKey, codeName);
       chatInput.value = '';
+      clearWdsPendingChatImage();
       await refreshWdsChat();
     } catch (e) { /* best effort — message just won't appear, input keeps the typed text so nothing is lost */ }
     finally { chatSendBtn.disabled = false; }
@@ -217,6 +277,10 @@ function initDesktopShell() {
   bellBtn.addEventListener('click', e => {
     e.stopPropagation();
     notifPop.hidden = !notifPop.hidden;
+    if (!notifPop.hidden) {
+      localStorage.setItem('wft_web_nexus_last_seen', new Date().toISOString());
+      renderWdsNotifications();
+    }
   });
   document.addEventListener('click', e => {
     if (!notifPop.hidden && !notifPop.contains(e.target) && e.target !== bellBtn) {
@@ -335,6 +399,7 @@ function renderWdsDashboard() {
   renderWdsBio();
   renderWdsNexus().catch(() => {});
   renderWdsMenu();
+  renderWdsNotifications();
 }
 
 function renderWdsMenu() {
@@ -344,6 +409,28 @@ function renderWdsMenu() {
   if (modeEl) modeEl.textContent = MODE_LABEL[getFitnessMode()] || '–';
   const themeToggle = document.getElementById('wdsThemeToggle');
   if (themeToggle) themeToggle.checked = document.documentElement.getAttribute('data-theme') === 'light';
+
+  const profile = getProfile();
+  const startEl = document.getElementById('wdsMenuStartDate');
+  const daysEl = document.getElementById('wdsMenuDaysActive');
+  if (startEl) startEl.textContent = (profile && profile.startDate) || '–';
+  if (daysEl) {
+    if (profile && profile.startDate) {
+      const days = Math.max(0, Math.round((parseISO(todayISO()) - parseISO(profile.startDate)) / 86400000));
+      daysEl.textContent = days + (days === 1 ? ' day' : ' days');
+    } else {
+      daysEl.textContent = '–';
+    }
+  }
+
+  const stepGoalEl = document.getElementById('wdsMenuStepGoal');
+  const waterGoalEl = document.getElementById('wdsMenuWaterGoal');
+  const weightUnitEl = document.getElementById('wdsMenuWeightUnit');
+  const goalModeEl = document.getElementById('wdsMenuGoalMode');
+  if (stepGoalEl) stepGoalEl.textContent = profile ? getEffectiveStepGoal(profile).toLocaleString() : '–';
+  if (waterGoalEl) waterGoalEl.textContent = profile ? (effectiveWaterTargetML(todayISO()) / 1000).toFixed(1) + 'L' : '–';
+  if (weightUnitEl) weightUnitEl.textContent = profile ? (profile.weightUnit || 'kg').toUpperCase() : '–';
+  if (goalModeEl) goalModeEl.textContent = profile ? (profile.goalMode === 'bulk' ? 'Bulk' : 'Cut') : '–';
 }
 
 function renderWdsStatus() {
@@ -641,14 +728,58 @@ async function renderWdsNexus() {
 // (mirrors whatever's already on a message); image *upload* from the
 // desktop compose box is not implemented in this pass — text only.
 // ---------------------------------------------------------------------
+let wdsLastChatMessages = [];
 async function refreshWdsChat() {
   const listEl = document.getElementById('wdsChatList');
   try {
     const messages = await fetchChatMessages();
+    wdsLastChatMessages = messages;
     renderWdsChatMessages(messages);
+    renderWdsNotifications();
   } catch (e) {
     listEl.innerHTML = '<p class="empty-note">Could not load chat.</p>';
   }
+}
+
+// Real notification content — replaces the original mock list. Covers
+// today's logging status, a low-hydration nudge (afternoon-onward), hitting
+// the current mode-progress target, and unread Nexus messages (tracked via
+// a last-seen timestamp, cleared whenever the bell is opened or the Nexus
+// tab becomes active).
+function renderWdsNotifications() {
+  const pop = document.getElementById('wdsNotifPop');
+  const badge = document.getElementById('wdsBellBadge');
+  if (!pop || !badge) return;
+  const items = [];
+  const today = todayISO();
+  const entry = getLogs()[today];
+
+  const hasLoggedToday = !!(entry && (entry.weightKg != null || entry.steps != null || (entry.exercises && entry.exercises.length) || entry.calories != null));
+  if (!hasLoggedToday) items.push({ title: 'Today', body: 'Nothing logged yet today.' });
+
+  const waterTarget = effectiveWaterTargetML(today);
+  const waterNow = (entry && entry.water) || 0;
+  if (waterTarget && new Date().getHours() >= 15 && waterNow / waterTarget < 0.5) {
+    items.push({ title: 'Hydration', body: `Trending low today — ${Math.round((waterNow / waterTarget) * 100)}% of target.` });
+  }
+
+  const mp = getModeProgress();
+  if (mp.target && mp.completeCount >= mp.target) {
+    items.push({ title: 'Consistency', body: `You've hit your logging target this cycle (${mp.completeCount}/${mp.target}).` });
+  }
+
+  const lastSeen = localStorage.getItem('wft_web_nexus_last_seen');
+  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+  const unread = wdsLastChatMessages.filter(m =>
+    !m.deleted && m.sender_share_key !== myShareKey && (!lastSeen || new Date(m.created_at) > new Date(lastSeen))
+  );
+  if (unread.length) items.push({ title: 'Nexus', body: `${unread.length} new message${unread.length === 1 ? '' : 's'} in Global Chat.` });
+
+  badge.textContent = String(items.length);
+  badge.hidden = items.length === 0;
+  pop.innerHTML = items.length
+    ? items.map(it => `<p class="wds-notif-item"><strong>${escapeHtml(it.title)}</strong> — ${escapeHtml(it.body)}</p>`).join('')
+    : '<p class="wds-notif-item">No notifications.</p>';
 }
 
 // Discord/Slack-style link preview — no video hosting of our own, just
@@ -10036,7 +10167,7 @@ async function postChatMessage(text, imageDataUrl, shareKeyOverride, codeNameOve
   if (!trimmed && !imageDataUrl) return;
 
   let imageUrl = null;
-  if (imageDataUrl) imageUrl = await uploadChatImage(imageDataUrl);
+  if (imageDataUrl) imageUrl = await uploadChatImage(imageDataUrl, shareKeyOverride);
 
   const { error } = await sb.from('chat_messages').insert({
     code_name: codeNameOverride || effectiveLeaderboardName(),
@@ -10048,10 +10179,10 @@ async function postChatMessage(text, imageDataUrl, shareKeyOverride, codeNameOve
   if (error) throw error;
 }
 
-async function uploadChatImage(dataUrl) {
+async function uploadChatImage(dataUrl, shareKeyOverride) {
   const blob = await (await fetch(dataUrl)).blob();
   const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
-  const path = `${getOrCreateShareKey()}/${Date.now()}.${ext}`;
+  const path = `${shareKeyOverride || getOrCreateShareKey()}/${Date.now()}.${ext}`;
   const { error } = await sb.storage.from('chat-images').upload(path, blob, { contentType: blob.type });
   if (error) throw error;
   return sb.storage.from('chat-images').getPublicUrl(path).data.publicUrl;

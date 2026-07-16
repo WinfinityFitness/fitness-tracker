@@ -3294,13 +3294,9 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
         </button>
         <button type="button" class="wds-icon-btn" id="wdsBellBtn" aria-label="Notifications">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          <span class="wds-bell-badge">3</span>
+          <span class="wds-bell-badge" id="wdsBellBadge" hidden>0</span>
         </button>
-        <div class="wds-notif-pop" id="wdsNotifPop" hidden>
-          <p class="wds-notif-item"><strong>Protocol milestone</strong> — Week 4 of Hypertrophy phase complete.</p>
-          <p class="wds-notif-item"><strong>Nexus</strong> — 2 new messages in Global Chat.</p>
-          <p class="wds-notif-item"><strong>Recovery</strong> — Hydration is trending low today.</p>
-        </div>
+        <div class="wds-notif-pop" id="wdsNotifPop" hidden></div>
         <div class="wds-user-chip">
           <span class="wds-user-meta">
             <span class="wds-user-label">Operator</span>
@@ -3618,7 +3614,13 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
             <div class="chat-list wds-chat-list" id="wdsChatList">
               <p class="empty-note">Loading…</p>
             </div>
-            <div class="wds-feed-compose">
+            <div class="chat-pending-image" id="wdsChatPendingImage" hidden>
+              <img id="wdsChatPendingImagePreview" alt="">
+              <button type="button" id="btnWdsChatPendingImageRemove" aria-label="Remove image">✕</button>
+            </div>
+            <div class="chat-input-row wds-feed-compose">
+              <button type="button" class="btn btn--sm chat-attach-btn" id="btnWdsChatAttachImage" aria-label="Attach image">📎</button>
+              <input type="file" id="wdsChatImageInput" accept="image/*" hidden>
               <input type="text" id="wdsChatInput" placeholder="Message Nexus…" maxlength="280">
               <button type="button" class="wds-mini-btn" id="btnWdsChatSend">Send</button>
             </div>
@@ -3643,7 +3645,18 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
             <h3 class="wds-card-title">Account</h3>
             <div class="wds-menu-row"><span>Digital ID</span><strong id="wdsMenuDigitalId">–</strong></div>
             <div class="wds-menu-row"><span>Fitness Mode</span><strong id="wdsMenuFitnessMode">–</strong></div>
+            <div class="wds-menu-row"><span>Program Started</span><strong id="wdsMenuStartDate">–</strong></div>
+            <div class="wds-menu-row"><span>Days Active</span><strong id="wdsMenuDaysActive">–</strong></div>
             <button type="button" class="wds-logout-btn" id="btnWdsMenuSignOut" style="margin-top:12px;display:block;">Log Out</button>
+          </div>
+
+          <div class="wds-card">
+            <h3 class="wds-card-title">Targets</h3>
+            <div class="wds-menu-row"><span>Step Goal</span><strong id="wdsMenuStepGoal">–</strong></div>
+            <div class="wds-menu-row"><span>Water Goal</span><strong id="wdsMenuWaterGoal">–</strong></div>
+            <div class="wds-menu-row"><span>Weight Unit</span><strong id="wdsMenuWeightUnit">–</strong></div>
+            <div class="wds-menu-row"><span>Goal</span><strong id="wdsMenuGoalMode">–</strong></div>
+            <p class="hint hint--sm" style="margin-top:8px;">Set in the app — read-only here for now.</p>
           </div>
 
           <div class="wds-card">
