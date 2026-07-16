@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.14.0';
+const APP_VERSION = 'WF_SYS_V.15.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -40,12 +40,31 @@ initCleanVariantFlag();
 const DESKTOP_SHELL_HOST = 'wellness.winfinityfitness.com';
 const isDesktopShellSite = location.hostname === DESKTOP_SHELL_HOST;
 
+// Set only after a successful desktop sign-in (see signInWithWebSync below)
+// to the payload returned by web_sync_get_dashboard — {profile, theme, skin,
+// logs, reviews, dailyReviews}. Everywhere else this stays null forever, so
+// getProfile/getLogs/getReviews/getDailyReviews below fall through to their
+// normal localStorage reads unchanged. This is what lets the desktop shell
+// reuse the mobile app's own calculation functions (weight trend, macro
+// targets, body fat %, etc.) against a signed-in operator's real remote data
+// without touching any of those functions' call sites.
+let wdsRemoteData = null;
+
 // Preview build: the dashboard below is illustrative/sample data, not real
 // per-operator records — full per-operator data needs a real cloud-sync
 // backend keyed to Digital ID, which doesn't exist yet (today everything
 // lives in local device storage only). Sign-in here just gates the preview
 // behind a Digital ID prompt and remembers it for the tab session; it does
 // not verify anything server-side yet.
+// Converts the {date, data} array shape web_sync_get_dashboard returns for
+// logs/reviews/dailyReviews back into the date-keyed object shape
+// getLogs()/getReviews()/getDailyReviews() normally return locally.
+function wdsArrayToDateMap(arr) {
+  const map = {};
+  (arr || []).forEach(item => { if (item && item.date) map[item.date] = item.data; });
+  return map;
+}
+
 function initDesktopShell() {
   const shell = document.getElementById('wdsShell');
   if (!shell) return;
@@ -53,35 +72,80 @@ function initDesktopShell() {
   const gate = document.getElementById('wdsGate');
   const dashboard = document.getElementById('wdsDashboard');
   const idInput = document.getElementById('wdsDigitalIdInput');
+  const pinInput = document.getElementById('wdsPinInput');
   const signInBtn = document.getElementById('wdsSignInBtn');
   const signOutBtn = document.getElementById('wdsSignOutBtn');
+  const errorEl = document.getElementById('wdsGateError');
   const operatorNameEl = document.getElementById('wdsOperatorName');
   const avatarEl = document.getElementById('wdsUserAvatar');
-  const nexusSelfNameEl = document.getElementById('wdsNexusSelfName');
 
-  const SESSION_KEY = 'wds_operator_id';
+  const SESSION_ID_KEY = 'wds_operator_id';
+  const SESSION_PIN_KEY = 'wds_operator_pin';
 
-  function enterDashboard(digitalId) {
-    const clean = digitalId.trim();
-    if (!clean) return;
-    sessionStorage.setItem(SESSION_KEY, clean);
-    operatorNameEl.textContent = clean;
-    avatarEl.textContent = clean.trim().charAt(0).toUpperCase();
-    nexusSelfNameEl.textContent = clean;
+  // Fetches the real synced payload via web_sync_get_dashboard, wires it up
+  // as wdsRemoteData (so every calc function getProfile/getLogs/etc. already
+  // reuses picks it up automatically), applies the operator's own real
+  // theme/skin, and renders every real-data tile. Returns true on success.
+  async function enterDashboard(digitalId, pin) {
+    const cleanId = digitalId.trim().toUpperCase();
+    const cleanPin = pin.trim();
+    if (!cleanId || !cleanPin) return false;
+    errorEl.hidden = true;
+    if (!sbConfigured()) {
+      errorEl.textContent = 'Not connected — check your internet connection and try again.';
+      errorEl.hidden = false;
+      return false;
+    }
+    try {
+      const { data, error } = await sb.rpc('web_sync_get_dashboard', {
+        p_public_id: cleanId, p_pin: cleanPin, p_days: 90,
+      });
+      if (error) throw error;
+      wdsRemoteData = {
+        publicId: cleanId,
+        profile: data.profile || null,
+        theme: data.theme || 'dark',
+        skin: data.skin || 'default',
+        logsObj: wdsArrayToDateMap(data.logs),
+        reviewsObj: wdsArrayToDateMap(data.reviews),
+        dailyReviewsObj: wdsArrayToDateMap(data.dailyReviews),
+      };
+    } catch (e) {
+      errorEl.textContent = (e && e.message) || 'Sign-in failed — check your Digital ID and PIN.';
+      errorEl.hidden = false;
+      return false;
+    }
+    sessionStorage.setItem(SESSION_ID_KEY, cleanId);
+    sessionStorage.setItem(SESSION_PIN_KEY, cleanPin);
+    // Not applyTheme()/applySkin() — those also touch mobile-only Settings
+    // elements (themeIcon/themeToggle/skinSelect) that don't exist in this
+    // markup. Setting the attributes directly gets the same CSS repaint
+    // (every token in style.css keys off data-theme/data-skin) without it.
+    document.documentElement.setAttribute('data-theme', wdsRemoteData.theme);
+    document.documentElement.setAttribute('data-skin', wdsRemoteData.skin);
+    const displayName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || cleanId;
+    operatorNameEl.textContent = displayName;
+    avatarEl.textContent = displayName.trim().charAt(0).toUpperCase();
+    renderWdsDashboard();
     gate.hidden = true;
     dashboard.hidden = false;
+    return true;
   }
 
-  signInBtn.addEventListener('click', () => enterDashboard(idInput.value));
-  idInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter') enterDashboard(idInput.value);
-  });
+  const trySignIn = () => { enterDashboard(idInput.value, pinInput.value); };
+  signInBtn.addEventListener('click', trySignIn);
+  [idInput, pinInput].forEach(el => el.addEventListener('keydown', e => {
+    if (e.key === 'Enter') trySignIn();
+  }));
 
   signOutBtn.addEventListener('click', () => {
-    sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(SESSION_ID_KEY);
+    sessionStorage.removeItem(SESSION_PIN_KEY);
+    wdsRemoteData = null;
     dashboard.hidden = true;
     gate.hidden = false;
     idInput.value = '';
+    pinInput.value = '';
     idInput.focus();
   });
 
@@ -111,12 +175,421 @@ function initDesktopShell() {
     }
   });
 
-  // A Digital ID entered earlier in this browser tab's session skips
-  // straight back to the dashboard on reload instead of re-prompting.
-  const remembered = sessionStorage.getItem(SESSION_KEY);
-  if (remembered) enterDashboard(remembered);
+  // A Digital ID + PIN entered earlier in this browser tab's session
+  // re-signs-in automatically on reload (re-fetching fresh data) instead of
+  // re-prompting — sessionStorage is tab-scoped and cleared on tab close.
+  const rememberedId = sessionStorage.getItem(SESSION_ID_KEY);
+  const rememberedPin = sessionStorage.getItem(SESSION_PIN_KEY);
+  if (rememberedId && rememberedPin) enterDashboard(rememberedId, rememberedPin);
 }
-if (isDesktopShellSite) initDesktopShell();
+// ---------------------------------------------------------------------
+// Desktop dashboard rendering — calls the SAME pure calc functions the
+// mobile tabs use (they already read via getProfile/getLogs/etc, which
+// transparently pick up wdsRemoteData once signed in), then writes into
+// the wds*-prefixed ids. Never calls the mobile render* functions — those
+// target a completely different, mobile-only DOM tree.
+// ---------------------------------------------------------------------
+
+// Straight-line (not smoothed) chart path — honest for real, possibly
+// sparse data rather than implying precision a bezier curve would.
+// values: array of numbers, nulls filtered out (with their x position kept
+// proportional to the full array length so gaps still read as gaps).
+function wdsBuildLinePath(values, viewW, viewH, padY) {
+  const pts = values.map((v, i) => (v == null ? null : [i, v])).filter(Boolean);
+  if (pts.length < 2) return null;
+  const idxs = pts.map(p => p[0]);
+  const vals = pts.map(p => p[1]);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const range = (max - min) || 1;
+  const minIdx = Math.min(...idxs), maxIdx = Math.max(...idxs);
+  const spanIdx = (maxIdx - minIdx) || 1;
+  const coords = pts.map(([i, v]) => [
+    ((i - minIdx) / spanIdx) * viewW,
+    padY + (1 - (v - min) / range) * (viewH - padY * 2),
+  ]);
+  const line = coords.map((c, i) => (i === 0 ? 'M' : 'L') + c[0].toFixed(1) + ',' + c[1].toFixed(1)).join(' ');
+  const area = line + ` L${coords[coords.length - 1][0].toFixed(1)},${viewH} L${coords[0][0].toFixed(1)},${viewH} Z`;
+  return { line, area, last: coords[coords.length - 1] };
+}
+
+function wdsSetChartPaths(areaId, lineId, dotId, emptyId, values) {
+  const built = wdsBuildLinePath(values, 560, 160, 20);
+  const areaEl = document.getElementById(areaId);
+  const lineEl = document.getElementById(lineId);
+  const dotEl = dotId ? document.getElementById(dotId) : null;
+  const emptyEl = document.getElementById(emptyId);
+  if (built) {
+    areaEl.setAttribute('d', built.area);
+    lineEl.setAttribute('d', built.line);
+    if (dotEl) { dotEl.setAttribute('cx', built.last[0]); dotEl.setAttribute('cy', built.last[1]); dotEl.setAttribute('visibility', 'visible'); }
+    if (emptyEl) emptyEl.hidden = true;
+  } else {
+    areaEl.setAttribute('d', '');
+    lineEl.setAttribute('d', '');
+    if (dotEl) dotEl.setAttribute('visibility', 'hidden');
+    if (emptyEl) emptyEl.hidden = false;
+  }
+}
+
+function wdsFormatPace(secPerKm) {
+  const m = Math.floor(secPerKm / 60);
+  const s = Math.round(secPerKm % 60);
+  return `${m}:${String(s).padStart(2, '0')} /km`;
+}
+
+function wdsRelativeTime(iso) {
+  if (!iso) return '';
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return mins + 'm ago';
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return hrs + 'h ago';
+  return Math.round(hrs / 24) + 'd ago';
+}
+
+// Heaviest single completed set in the last 7 days — kg, canonical storage
+// unit (converted to the profile's preferred unit by the caller).
+function wdsHeaviestSetThisWeekKg(logsArr) {
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 6); cutoff.setHours(0, 0, 0, 0);
+  let heaviest = null;
+  logsArr.filter(l => parseISO(l.date) >= cutoff).forEach(l => {
+    (l.exercises || []).forEach(ex => (ex.sets || []).forEach(s => {
+      if (s.completed && s.weightKg != null && (heaviest == null || s.weightKg > heaviest)) heaviest = s.weightKg;
+    }));
+  });
+  return heaviest;
+}
+
+// Today's habit completion using only fields present in the synced
+// snapshot — deliberately NOT computeHabitCompletion(), which also reads
+// two device-local flags (wft_lb_optin, wft_drive_last_backup) that will
+// never be set on this origin and would understate the real score.
+function wdsTodayHabitPct(profile, entry) {
+  const checks = [
+    !!(entry && entry.exercises && entry.exercises.length > 0),
+    !!(entry && entry.steps != null && entry.steps >= getEffectiveStepGoal(profile)),
+    !!(entry && entry.weightKg != null),
+  ];
+  let total = checks.length, done = checks.filter(Boolean).length;
+  (profile ? profile.extraHabits || [] : []).forEach((label, i) => {
+    if (!label) return;
+    total++;
+    if (entry && entry.extra && entry.extra[i]) done++;
+  });
+  return total > 0 ? Math.round((done / total) * 100) : 0;
+}
+
+function renderWdsDashboard() {
+  renderWdsStatus();
+  renderWdsTraining();
+  renderWdsNutrition();
+  renderWdsBio();
+  renderWdsNexus().catch(() => {});
+}
+
+function renderWdsStatus() {
+  const profile = getProfile();
+  const logsArr = sortedLogsArray();
+  const mp = getModeProgress();
+  const mode = getFitnessMode();
+  const today = todayISO();
+  const todayEntry = getLogs()[today] || {};
+
+  const pct = mp.target ? Math.round((mp.completeCount / mp.target) * 100) : 0;
+  document.getElementById('wdsConsistencyGauge').style.setProperty('--pct', Math.min(100, pct));
+  document.getElementById('wdsConsistencyValue').innerHTML = pct + '<small>%</small>';
+  const foot = document.getElementById('wdsConsistencyFoot');
+  foot.textContent = `${mp.completeCount} of ${mp.target} days logged this cycle`;
+  foot.className = 'wds-card-foot ' + (pct >= 70 ? 'wds-foot-good' : pct >= 40 ? 'wds-foot-warning' : '');
+
+  document.getElementById('wdsProtocolPill').textContent = (MODE_LABEL[mode] || mode).toUpperCase();
+  document.getElementById('wdsProtocolBar').style.width = Math.min(100, pct) + '%';
+  document.getElementById('wdsProtocolMetaLeft').textContent = `${mp.completeCount} of ${mp.target} days`;
+  document.getElementById('wdsProtocolMetaRight').textContent = pct + '% complete';
+
+  const sleepAvg = avgOfLastNDays(logsArr, 'sleep', 7);
+  document.getElementById('wdsTileSleepValue').textContent = sleepAvg != null ? sleepAvg.toFixed(1) + ' / 5' : '–';
+  document.getElementById('wdsTileSleepSub').textContent = sleepAvg != null ? '7-day average quality' : 'No data yet';
+
+  const waterTarget = effectiveWaterTargetML(today);
+  const waterNow = todayEntry.water || 0;
+  document.getElementById('wdsTileHydrationValue').textContent = (waterNow / 1000).toFixed(1) + 'L';
+  document.getElementById('wdsTileHydrationSub').textContent = waterTarget ? Math.round((waterNow / waterTarget) * 100) + '% of target' : '';
+
+  const stepsAvg = avgOfLastNDays(logsArr, 'steps', 7);
+  document.getElementById('wdsTileStepsValue').textContent = stepsAvg != null ? Math.round(stepsAvg).toLocaleString() : '–';
+  document.getElementById('wdsTileStepsSub').textContent = stepsAvg != null ? '7-day average' : 'No data yet';
+
+  const stressAvg = avgOfLastNDays(logsArr, 'stress', 7);
+  document.getElementById('wdsTileStressValue').textContent = stressAvg != null ? stressAvg.toFixed(1) + ' / 5' : '–';
+  document.getElementById('wdsTileStressSub').textContent = stressAvg != null ? '7-day average' : 'No data yet';
+
+  const series = computeTrendSeries(logsArr).slice(-90);
+  wdsSetChartPaths('wdsWeightChartArea', 'wdsWeightChartLine', 'wdsWeightChartDot', 'wdsWeightChartEmpty', series.map(s => s.trendKg));
+
+  const nextMode = MODE_ORDER[MODE_ORDER.indexOf(mode) + 1];
+  const imgEl = document.getElementById('wdsNextModeImg');
+  const titleEl = document.getElementById('wdsNextModeTitle');
+  const descEl = document.getElementById('wdsNextModeDesc');
+  const pillEl = document.getElementById('wdsNextModePill');
+  if (nextMode) {
+    imgEl.src = MODE_ICON[nextMode];
+    titleEl.textContent = 'Next Phase: ' + MODE_LABEL[nextMode];
+    descEl.textContent = `${mp.completeCount} of ${mp.target} consistent days logged toward unlocking it.`;
+    pillEl.textContent = 'LOCKED';
+  } else {
+    imgEl.src = MODE_ICON[mode];
+    titleEl.textContent = MODE_LABEL[mode] + ' — highest tier';
+    descEl.textContent = 'Every feature is already unlocked.';
+    pillEl.textContent = 'MAX TIER';
+  }
+}
+
+function renderWdsTraining() {
+  const profile = getProfile();
+  const logsArr = sortedLogsArray();
+  const stats = computeLeaderboardStats();
+  const vol = computeVolumeTrendData();
+  const today = todayISO();
+  const todayEntry = getLogs()[today];
+
+  document.getElementById('wdsHeroTitle').textContent = vol.volumes.length
+    ? `${vol.volumes.length} training session${vol.volumes.length === 1 ? '' : 's'} logged recently`
+    : 'No training sessions logged yet';
+  document.getElementById('wdsHeroSub').textContent = vol.volumes.length
+    ? `Total volume: ${vol.total.toLocaleString()} ${vol.wu} across the last ${vol.volumes.length} sessions`
+    : "Log a Training session in the app to see it here.";
+
+  const fatigue = todayEntry && todayEntry.fatigue != null ? todayEntry.fatigue : null;
+  const fatiguePct = fatigue != null ? Math.round((fatigue / 5) * 100) : 0;
+  document.getElementById('wdsFatigueGauge').style.setProperty('--pct', fatiguePct);
+  document.getElementById('wdsFatigueValue').innerHTML = (fatigue != null ? fatiguePct : '–') + '<small>%</small>';
+  document.getElementById('wdsFatigueFoot').textContent = fatigue != null
+    ? (fatigue <= 2 ? 'Well recovered' : fatigue <= 3 ? 'Moderate fatigue' : 'High fatigue — consider recovery')
+    : 'Not logged today';
+
+  const barsEl = document.getElementById('wdsVolumeBars');
+  const volEmptyEl = document.getElementById('wdsVolumeEmpty');
+  if (vol.volumes.length) {
+    volEmptyEl.hidden = true;
+    const max = Math.max(...vol.volumes, 1);
+    barsEl.innerHTML = vol.volumes.map((v, i) => {
+      const h = Math.max(4, Math.round((v / max) * 100));
+      return `<div class="wds-bar-col"><div class="wds-bar" style="height:${h}%"></div><span>${escapeHtml(vol.labels[i])}</span></div>`;
+    }).join('');
+  } else {
+    volEmptyEl.hidden = false;
+    barsEl.innerHTML = '';
+  }
+
+  const weekstripEl = document.getElementById('wdsWeekstrip');
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const now = new Date();
+  const monday = new Date(now); monday.setDate(now.getDate() - ((now.getDay() + 6) % 7)); monday.setHours(0, 0, 0, 0);
+  const logsMap = getLogs();
+  const toISO = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  let cells = '';
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday); d.setDate(monday.getDate() + i);
+    const iso = toISO(d);
+    const entry = logsMap[iso];
+    const trained = !!(entry && (
+      (entry.exercises && entry.exercises.some(ex => ex.sets.some(s => s.completed))) ||
+      (entry.cardioSessions && entry.cardioSessions.length)
+    ));
+    const isFuture = d > now && iso !== today;
+    const isToday = iso === today;
+    cells += `<div class="wds-weekday ${trained ? 'wds-weekday--push' : 'wds-weekday--rest'} ${isToday ? 'wds-weekday--active' : ''}"><span>${dayNames[d.getDay()]}</span><strong>${isFuture ? '–' : (trained ? 'Trained' : 'Rest')}</strong></div>`;
+  }
+  weekstripEl.innerHTML = cells;
+
+  const review = getCurrentWeekReview();
+  const reflectionEl = document.getElementById('wdsReflectionList');
+  const items = [];
+  if (review && review.wins) items.push(`<li><span class="wds-forecast-dot wds-foot-good"></span> Win: ${escapeHtml(review.wins)}</li>`);
+  if (review && review.improvements) items.push(`<li><span class="wds-forecast-dot wds-foot-warning"></span> To improve: ${escapeHtml(review.improvements)}</li>`);
+  if (review && review.focus && review.focus.length) items.push(`<li><span class="wds-forecast-dot"></span> Focus: ${review.focus.map(escapeHtml).join(', ')}</li>`);
+  reflectionEl.innerHTML = items.length ? items.join('') : '<li><span class="wds-forecast-dot"></span> No weekly review logged yet this week.</li>';
+
+  document.getElementById('wdsTileVolumeValue').textContent = stats.volume != null ? `${stats.volume.toLocaleString()} ${stats.volumeUnit}` : '–';
+  const heaviestKg = wdsHeaviestSetThisWeekKg(logsArr);
+  const wu = (profile && profile.weightUnit) || 'kg';
+  document.getElementById('wdsTileHeaviestValue').textContent = heaviestKg != null ? `${round0(fromKg(heaviestKg, wu))} ${wu}` : '–';
+  document.getElementById('wdsTileLongestRunValue').textContent = stats.furthestRunKm != null ? `${stats.furthestRunKm} km` : '–';
+  document.getElementById('wdsTileFastestPaceValue').textContent = stats.fastestRunPaceSec != null ? wdsFormatPace(stats.fastestRunPaceSec) : '–';
+}
+
+function renderWdsNutrition() {
+  const profile = getProfile();
+  const date = todayISO();
+  const entry = getLogs()[date] || {};
+  const mt = profile ? computeMacroTargets(profile, date) : null;
+
+  if (mt) {
+    const proteinNow = entry.protein ?? 0, carbsNow = entry.carbs ?? 0, fatNow = entry.fat ?? 0;
+    document.getElementById('wdsMacroProteinText').textContent = `${proteinNow} / ${mt.proteinTarget}g`;
+    document.getElementById('wdsMacroProteinBar').style.width = Math.min(100, (proteinNow / mt.proteinTarget) * 100) + '%';
+    document.getElementById('wdsMacroCarbsText').textContent = `${carbsNow} / ${mt.carbTarget}g`;
+    document.getElementById('wdsMacroCarbsBar').style.width = Math.min(100, (carbsNow / mt.carbTarget) * 100) + '%';
+    document.getElementById('wdsMacroFatText').textContent = `${fatNow} / ${mt.fatTarget}g`;
+    document.getElementById('wdsMacroFatBar').style.width = Math.min(100, (fatNow / mt.fatTarget) * 100) + '%';
+    document.getElementById('wdsTileCaloriesValue').textContent = `${entry.calories ?? 0} / ${mt.calorieTarget}`;
+    document.getElementById('wdsTileFiberValue').textContent = `${entry.fiber ?? 0}g`;
+    document.getElementById('wdsTileSodiumValue').textContent = `${entry.sodium ?? 0}mg`;
+  } else {
+    ['wdsMacroProteinText', 'wdsMacroCarbsText', 'wdsMacroFatText'].forEach(id => { document.getElementById(id).textContent = '– / –g'; });
+    document.getElementById('wdsTileCaloriesValue').textContent = '–';
+    document.getElementById('wdsTileFiberValue').textContent = '–';
+    document.getElementById('wdsTileSodiumValue').textContent = '–';
+  }
+
+  const waterTarget = effectiveWaterTargetML(date);
+  const waterNow = entry.water || 0;
+  const fluidPct = waterTarget ? Math.min(100, Math.round((waterNow / waterTarget) * 100)) : 0;
+  document.getElementById('wdsFluidGauge').style.setProperty('--pct', fluidPct);
+  document.getElementById('wdsFluidValue').innerHTML = (waterNow / 1000).toFixed(1) + '<small>L</small>';
+  const remainMl = Math.max(0, waterTarget - waterNow);
+  document.getElementById('wdsFluidFoot').textContent = remainMl > 0 ? `${(remainMl / 1000).toFixed(1)}L to target` : 'Target met';
+
+  const mealsEl = document.getElementById('wdsFuelList');
+  const meals = entry.meals || {};
+  const mealKeys = ['breakfast', 'lunch', 'dinner', 'snacks'];
+  const allItems = mealKeys.flatMap(k => meals[k] || []);
+  mealsEl.innerHTML = allItems.length
+    ? allItems.slice(0, 8).map(it => `<li><span>${escapeHtml(it.name || 'Item')}</span><span>${Math.round(it.calories || 0)} kcal</span></li>`).join('')
+    : '<li><span>No meals logged today.</span></li>';
+  const mealCount = mealKeys.filter(k => meals[k] && meals[k].length).length;
+  document.getElementById('wdsTileMealsValue').textContent = `${mealCount} / 4`;
+
+  const hungerFillEl = document.getElementById('wdsHungerFill');
+  const hungerKnobEl = document.getElementById('wdsHungerKnob');
+  const hungerEmptyEl = document.getElementById('wdsHungerEmpty');
+  if (entry.hunger != null) {
+    const hp = Math.round(((entry.hunger - 1) / 4) * 100);
+    hungerFillEl.style.width = hp + '%';
+    hungerKnobEl.style.left = hp + '%';
+    hungerEmptyEl.hidden = true;
+  } else {
+    hungerFillEl.style.width = '0%';
+    hungerKnobEl.style.left = '0%';
+    hungerEmptyEl.hidden = false;
+  }
+
+  const recentWithCalories = sortedLogsArray().slice(-30).filter(l => l.calories != null);
+  wdsSetChartPaths('wdsCalorieChartArea', 'wdsCalorieChartLine', 'wdsCalorieChartDot', 'wdsCalorieChartEmpty', recentWithCalories.map(l => l.calories));
+}
+
+function renderWdsBio() {
+  const profile = getProfile();
+  const logsArr = sortedLogsArray();
+  const stats = computeLeaderboardStats();
+  const today = todayISO();
+
+  const recent7 = logsArr.slice(-7);
+  const sleepBarsEl = document.getElementById('wdsSleepBars');
+  const sleepEmptyEl = document.getElementById('wdsSleepEmpty');
+  if (recent7.some(l => l.sleep != null)) {
+    sleepEmptyEl.hidden = true;
+    sleepBarsEl.innerHTML = recent7.map(l => {
+      const h = l.sleep != null ? Math.max(4, Math.round((l.sleep / 5) * 100)) : 2;
+      const d = parseISO(l.date);
+      return `<div class="wds-bar-col"><div class="wds-bar" style="height:${h}%"></div><span>${d.getMonth() + 1}/${d.getDate()}</span></div>`;
+    }).join('');
+  } else {
+    sleepEmptyEl.hidden = false;
+    sleepBarsEl.innerHTML = '';
+  }
+
+  const withBoth = logsArr.slice(-30).filter(l => l.stress != null && l.fatigue != null);
+  const stressEmptyEl = document.getElementById('wdsStressChartEmpty');
+  if (withBoth.length >= 2) {
+    stressEmptyEl.hidden = true;
+    wdsSetChartPaths('wdsStressChartArea', 'wdsStressChartLine', null, 'wdsStressChartEmpty', withBoth.map(l => l.stress));
+    const builtFatigue = wdsBuildLinePath(withBoth.map(l => l.fatigue), 560, 160, 20);
+    document.getElementById('wdsFatigueChartLine').setAttribute('d', builtFatigue ? builtFatigue.line : '');
+  } else {
+    stressEmptyEl.hidden = false;
+    document.getElementById('wdsStressChartArea').setAttribute('d', '');
+    document.getElementById('wdsStressChartLine').setAttribute('d', '');
+    document.getElementById('wdsFatigueChartLine').setAttribute('d', '');
+  }
+
+  const bodyFatEntry = findLastBodyFatEntry(today);
+  const bodyFatPct = bodyFatEntry ? computeBodyFatJP7(bodyFatEntry.skinfolds, profile ? profile.age : null, profile ? profile.gender : null) : null;
+  document.getElementById('wdsMarkerBodyFatText').textContent = bodyFatPct != null ? bodyFatPct.toFixed(1) + '%' : '–';
+  document.getElementById('wdsMarkerBodyFatBar').style.width = bodyFatPct != null ? Math.min(100, bodyFatPct * 2) + '%' : '0%';
+
+  document.getElementById('wdsMarkerWeightProgressText').textContent = stats.progress != null ? `${stats.progress > 0 ? '+' : ''}${stats.progress}${stats.weightUnit}` : '–';
+  document.getElementById('wdsMarkerWeightProgressBar').style.width = stats.progressPct != null ? Math.min(100, Math.abs(stats.progressPct) * 5) + '%' : '0%';
+
+  const todayEntry = getLogs()[today];
+  const habitPct = wdsTodayHabitPct(profile, todayEntry);
+  document.getElementById('wdsMarkerHabitText').textContent = habitPct + '%';
+  document.getElementById('wdsMarkerHabitBar').style.width = habitPct + '%';
+
+  const review = getCurrentWeekReview();
+  const winTitleEl = document.getElementById('wdsWinTitle');
+  const winDescEl = document.getElementById('wdsWinDesc');
+  if (review && review.wins) {
+    winTitleEl.textContent = "This Week's Win";
+    winDescEl.textContent = review.wins;
+  } else {
+    winTitleEl.textContent = 'No weekly review yet';
+    winDescEl.textContent = 'Fill in Weekend Log’s "Wins" field in the app to see it here.';
+  }
+}
+
+async function renderWdsNexus() {
+  const lbListEl = document.getElementById('wdsLbList');
+  const recentEl = document.getElementById('wdsRecentActiveList');
+  const feedEl = document.getElementById('wdsFeedList');
+  const selfPublicId = wdsRemoteData ? wdsRemoteData.publicId : null;
+
+  if (!sbConfigured()) {
+    lbListEl.innerHTML = '<li><span>Leaderboard unavailable.</span></li>';
+    recentEl.innerHTML = '<li><span>Unavailable.</span></li>';
+    feedEl.innerHTML = '<p class="hint hint--sm">Chat unavailable.</p>';
+    return;
+  }
+
+  try {
+    const rows = await pullLeaderboard();
+    const ranked = rows.slice().sort((a, b) => (b.conscientious_score || 0) - (a.conscientious_score || 0)).slice(0, 10);
+    lbListEl.innerHTML = ranked.length ? ranked.map((r, i) => {
+      const isSelf = r.public_id === selfPublicId;
+      return `<li class="${isSelf ? 'wds-lb-self' : ''}"><span class="wds-lb-rank">${i + 1}</span><span class="wds-lb-name">${escapeHtml(r.code_name || r.public_id || '?')}</span><span class="wds-lb-score">${Math.round(r.conscientious_score || 0)}</span></li>`;
+    }).join('') : '<li><span>No active leaderboard entries yet.</span></li>';
+
+    const recent = rows.slice().sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)).slice(0, 5);
+    recentEl.innerHTML = recent.length ? recent.map(r =>
+      `<li><span class="wds-user-avatar wds-user-avatar--sm">${escapeHtml((r.code_name || '?').charAt(0).toUpperCase())}</span><span>${escapeHtml(r.code_name || r.public_id || '?')} synced ${wdsRelativeTime(r.updated_at)}</span></li>`
+    ).join('') : '<li><span>No recent activity.</span></li>';
+  } catch (e) {
+    lbListEl.innerHTML = '<li><span>Could not load leaderboard.</span></li>';
+    recentEl.innerHTML = '<li><span>Could not load.</span></li>';
+  }
+
+  try {
+    const messages = await fetchChatMessages();
+    const recentMsgs = messages.filter(m => !m.deleted).slice(-8).reverse();
+    feedEl.innerHTML = recentMsgs.length ? recentMsgs.map(m => `
+      <div class="wds-feed-post">
+        <span class="wds-user-avatar wds-user-avatar--sm">${escapeHtml((m.code_name || '?').charAt(0).toUpperCase())}</span>
+        <div class="wds-feed-body">
+          <p><strong>${escapeHtml(m.code_name || 'Anonymous')}</strong> <span class="wds-feed-time">${wdsRelativeTime(m.created_at)}</span></p>
+          <p>${escapeHtml(m.message || '')}</p>
+        </div>
+      </div>`).join('') : '<p class="hint hint--sm">No messages in Global Chat yet.</p>';
+  } catch (e) {
+    feedEl.innerHTML = '<p class="hint hint--sm">Could not load chat.</p>';
+  }
+}
+
+// Deferred (not called directly) for the same reason as applyCustomSplashLogo
+// below: the remembered-session auto-signin path reaches an `sb.rpc(...)`
+// call, and `sb` is a module-level `let` declared much further down this
+// file — reading it this early would throw (temporal dead zone).
+if (isDesktopShellSite) setTimeout(initDesktopShell, 0);
 
 // Deferred via setTimeout (not called directly) so it runs after the rest of
 // this script finishes its first synchronous pass — sbConfigured() reads the
@@ -125,12 +598,14 @@ if (isDesktopShellSite) initDesktopShell();
 setTimeout(applyCustomSplashLogo, 0);
 
 function getProfile() {
+  if (wdsRemoteData) return wdsRemoteData.profile;
   try { return JSON.parse(localStorage.getItem(KEYS.profile)) || null; }
   catch { return null; }
 }
 function saveProfile(p) { localStorage.setItem(KEYS.profile, JSON.stringify(p)); }
 
 function getLogs() {
+  if (wdsRemoteData) return wdsRemoteData.logsObj;
   try { return JSON.parse(localStorage.getItem(KEYS.logs)) || {}; }
   catch { return {}; }
 }
@@ -169,12 +644,14 @@ function updateLogFields(date, partial) {
 }
 
 function getReviews() {
+  if (wdsRemoteData) return wdsRemoteData.reviewsObj;
   try { return JSON.parse(localStorage.getItem(KEYS.reviews)) || {}; }
   catch { return {}; }
 }
 function saveReviews(r) { localStorage.setItem(KEYS.reviews, JSON.stringify(r)); }
 
 function getDailyReviews() {
+  if (wdsRemoteData) return wdsRemoteData.dailyReviewsObj;
   try { return JSON.parse(localStorage.getItem(KEYS.dailyReviews)) || {}; }
   catch { return {}; }
 }
@@ -914,6 +1391,7 @@ function initSettingsOverlay() {
   document.getElementById('btnPreviewAlarmTone').addEventListener('click', () => playAlarmTone(toneSelect.value));
 
   initHydrationReminderSettings();
+  initWebSyncSettings();
 }
 
 function initContact() {
@@ -8330,6 +8808,22 @@ function initRequestAssessment() {
   });
 }
 
+// Pure — protein/carb/fat/fiber/sodium targets for a given day. Shared by
+// the mobile Nutrition tab (renderNutritionTargets) and the desktop
+// dashboard (renderWdsNutrition) so the two formulas can't drift apart.
+function computeMacroTargets(profile, date) {
+  const kg = profile ? currentWeightKg(profile) : null;
+  const targets = (profile && kg) ? computeTargets(profile, kg) : null;
+  if (!targets) return null;
+  const calorieTarget = getEffectiveCalorieTarget(profile, date);
+  const proteinTarget = round0((targets.protein[0] + targets.protein[1]) / 2);
+  const fatTarget = round0((calorieTarget * 0.3) / 9);
+  const carbTarget = Math.max(0, round0((calorieTarget - proteinTarget * 4 - fatTarget * 9) / 4));
+  const fiberTarget = round0((calorieTarget / 1000) * 14);
+  const sodiumTarget = 2300;
+  return { calorieTarget, proteinTarget, carbTarget, fatTarget, fiberTarget, sodiumTarget };
+}
+
 function renderNutritionTargets() {
   const profile = getProfile();
   const emptyBox = document.getElementById('nutTargetsEmpty');
@@ -8346,12 +8840,7 @@ function renderNutritionTargets() {
   statRows.forEach(el => el.style.display = '');
 
   const date = document.getElementById('nutDate').value;
-  const calorieTarget = getEffectiveCalorieTarget(profile, date);
-  const proteinTarget = round0((targets.protein[0] + targets.protein[1]) / 2);
-  const fatTarget = round0((calorieTarget * 0.3) / 9);
-  const carbTarget = Math.max(0, round0((calorieTarget - proteinTarget * 4 - fatTarget * 9) / 4));
-  const fiberTarget = round0((calorieTarget / 1000) * 14);
-  const sodiumTarget = 2300;
+  const { calorieTarget, proteinTarget, carbTarget, fatTarget, fiberTarget, sodiumTarget } = computeMacroTargets(profile, date);
 
   const entry = getLogs()[date] || {};
   const caloriesNow = entry.calories ?? 0;
@@ -9371,6 +9860,136 @@ function generatePublicId() {
 function getOrCreatePublicId() {
   if (!localStorage.getItem('wft_public_id')) localStorage.setItem('wft_public_id', generatePublicId());
   return localStorage.getItem('wft_public_id');
+}
+
+/* ---------------------------------------------------------------- */
+/* Web Dashboard Sync — Settings > Web Dashboard Sync                */
+/* ---------------------------------------------------------------- */
+// Uploads the FULL local history (see wdsRemoteData above for the read side
+// on wellness.winfinityfitness.com) so a signed-in operator sees real data
+// there instead of placeholders. Deliberately separate from the silent,
+// automatic leaderboard sync (autoSyncLeaderboardIfOptedIn) — this uploads
+// far more, and more sensitive, data, so it only ever runs when the user
+// explicitly enables it and taps Sync Now.
+function dateMapToEntries(map) {
+  return Object.keys(map || {}).map(date => ({ date, data: map[date] }));
+}
+
+async function enableWebSync(pin) {
+  if (!sbConfigured()) throw new Error('Not connected.');
+  await sb.rpc('web_sync_set_pin', {
+    p_share_key: getOrCreateShareKey(),
+    p_public_id: getOrCreatePublicId(),
+    p_pin: pin,
+  }).then(({ error }) => { if (error) throw error; });
+}
+
+async function disableWebSync() {
+  if (!sbConfigured()) throw new Error('Not connected.');
+  await sb.rpc('web_sync_disable', { p_share_key: getOrCreateShareKey() })
+    .then(({ error }) => { if (error) throw error; });
+}
+
+// Explicit-tap-only (see initWebSyncSettings) — pushes the current local
+// snapshot in full each time rather than tracking deltas; upserts are
+// idempotent and one person's fitness history is small enough (hundreds to
+// a few thousand day-rows a year) that re-sending everything is simpler and
+// safe. Best-effort per call, same pattern as pushLeaderboardEntry, so one
+// failing piece doesn't block the others.
+async function pushWebSyncSnapshot() {
+  if (!sbConfigured()) throw new Error('Not connected.');
+  const shareKey = getOrCreateShareKey();
+  try {
+    await sb.rpc('web_sync_push_snapshot', {
+      p_share_key: shareKey,
+      p_profile: getProfile(),
+      p_theme: localStorage.getItem('wft_theme') || 'dark',
+      p_skin: localStorage.getItem('wft_skin') || 'default',
+    });
+  } catch (e) { /* best effort — profile/theme just won't update until next successful sync */ }
+  try {
+    await sb.rpc('web_sync_push_logs', { p_share_key: shareKey, p_entries: dateMapToEntries(getLogs()) });
+  } catch (e) { /* best effort */ }
+  try {
+    await sb.rpc('web_sync_push_reviews', { p_share_key: shareKey, p_entries: dateMapToEntries(getReviews()) });
+  } catch (e) { /* best effort */ }
+  try {
+    await sb.rpc('web_sync_push_daily_reviews', { p_share_key: shareKey, p_entries: dateMapToEntries(getDailyReviews()) });
+  } catch (e) { /* best effort */ }
+  localStorage.setItem('wft_web_sync_last_at', String(Date.now()));
+}
+
+function initWebSyncSettings() {
+  const toggle = document.getElementById('webSyncEnabled');
+  const fields = document.getElementById('webSyncFields');
+  const pinInput = document.getElementById('webSyncPinInput');
+  const setPinBtn = document.getElementById('btnWebSyncSetPin');
+  const syncNowBtn = document.getElementById('btnWebSyncNow');
+  const statusEl = document.getElementById('webSyncStatus');
+  if (!toggle || !fields) return;
+
+  const renderStatus = () => {
+    const lastAt = localStorage.getItem('wft_web_sync_last_at');
+    statusEl.textContent = lastAt
+      ? `Last synced ${new Date(Number(lastAt)).toLocaleString()}`
+      : 'Not synced yet.';
+  };
+
+  const enabled = localStorage.getItem('wft_web_sync_enabled') === '1';
+  toggle.checked = enabled;
+  fields.hidden = !enabled;
+  renderStatus();
+
+  toggle.addEventListener('change', async () => {
+    if (toggle.checked) {
+      fields.hidden = false;
+      pinInput.focus();
+    } else {
+      toggle.checked = true; // stays checked until a PIN is actually set/disabled below
+      fields.hidden = false;
+    }
+  });
+
+  setPinBtn.addEventListener('click', async () => {
+    const pin = pinInput.value.trim();
+    if (pin.length < 6) { showRestToast('PIN must be at least 6 characters.'); return; }
+    try {
+      await enableWebSync(pin);
+      localStorage.setItem('wft_web_sync_enabled', '1');
+      pinInput.value = '';
+      showRestToast('Web sync enabled — tap Sync Now to upload your data.');
+    } catch (e) { showRestToast('Could not set PIN — try again.'); }
+  });
+
+  syncNowBtn.addEventListener('click', async () => {
+    if (localStorage.getItem('wft_web_sync_enabled') !== '1') {
+      showRestToast('Set a PIN first to enable web sync.');
+      return;
+    }
+    syncNowBtn.disabled = true;
+    try {
+      await pushWebSyncSnapshot();
+      renderStatus();
+      showRestToast('Synced to Web Dashboard.');
+    } catch (e) {
+      showRestToast('Sync failed — check your connection and try again.');
+    } finally {
+      syncNowBtn.disabled = false;
+    }
+  });
+
+  const disableBtn = document.getElementById('btnWebSyncDisable');
+  if (disableBtn) {
+    disableBtn.addEventListener('click', async () => {
+      try {
+        await disableWebSync();
+        localStorage.setItem('wft_web_sync_enabled', '0');
+        toggle.checked = false;
+        fields.hidden = true;
+        showRestToast('Web sync disabled — your Digital ID can no longer sign in on the web until you set a new PIN.');
+      } catch (e) { showRestToast('Could not disable web sync — try again.'); }
+    });
+  }
 }
 
 // Wires a "tap card to reveal an explainer hint" interaction — used by the

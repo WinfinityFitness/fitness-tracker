@@ -1949,6 +1949,29 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
     </div>
 
     <div class="sheet-section">
+      <p class="field-group-heading">Web Dashboard Sync</p>
+      <p class="hint">Uploads your full history (training, nutrition, sleep, measurements — everything in your local logs) so you can sign in with your Digital ID at wellness.winfinityfitness.com and see your real data on a desktop dashboard. Nothing is uploaded automatically — you choose when to sync.</p>
+      <div class="theme-toggle-row">
+        <span>Enable web sync</span>
+        <label class="switch">
+          <input type="checkbox" id="webSyncEnabled">
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+        </label>
+      </div>
+      <div id="webSyncFields" hidden>
+        <label class="field">
+          <span>Sync PIN (at least 6 characters — you'll type this on the web dashboard along with your Digital ID)</span>
+          <input type="password" id="webSyncPinInput" minlength="6" autocomplete="off">
+        </label>
+        <button type="button" class="btn btn--sm" id="btnWebSyncSetPin">Set PIN &amp; enable sync</button>
+        <button type="button" class="btn btn--sm btn--primary" id="btnWebSyncNow">Sync Now</button>
+        <p class="hint hint--sm" id="webSyncStatus">Not synced yet.</p>
+        <button type="button" class="btn btn--sm btn--danger" id="btnWebSyncDisable">Disable web sync</button>
+        <p class="hint hint--sm">Disabling locks the web dashboard sign-in without deleting your already-synced history — set a new PIN any time to pick it back up.</p>
+      </div>
+    </div>
+
+    <div class="sheet-section">
       <p class="field-group-heading">App Update</p>
       <p class="hint">Current version: <span id="settingsAppVersion">–</span></p>
       <p class="update-available-note" id="updateAvailableNote" hidden>🆕 New update available — <span id="updateAvailableVersion"></span></p>
@@ -3215,13 +3238,18 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
     <div class="wds-gate-card">
       <img class="wds-gate-logo" src="icons/icon-512.png" alt="">
       <h1 class="wds-gate-title">WINFINITY <span>NEXUS</span></h1>
-      <p class="wds-gate-sub">Sign in with your Digital ID to view your dashboard.</p>
+      <p class="wds-gate-sub">Sign in with your Digital ID and sync PIN to view your dashboard.</p>
       <label class="wds-gate-field">
         <span>Digital ID</span>
-        <input type="text" id="wdsDigitalIdInput" placeholder="e.g. WF-7741-ALPHA" autocomplete="off" spellcheck="false">
+        <input type="text" id="wdsDigitalIdInput" placeholder="e.g. WF-7741ZQ" autocomplete="off" spellcheck="false">
+      </label>
+      <label class="wds-gate-field">
+        <span>Sync PIN</span>
+        <input type="password" id="wdsPinInput" placeholder="Set in the app: Settings → Web Dashboard Sync" autocomplete="off">
       </label>
       <button type="button" class="wds-gate-btn" id="wdsSignInBtn">Enter Command Center</button>
-      <p class="wds-gate-note">Preview build — dashboard shown below uses sample data while cloud sync for real per-operator records is still in development.</p>
+      <p class="wds-gate-error" id="wdsGateError" hidden></p>
+      <p class="wds-gate-note">Enable Web Dashboard Sync in the app's Settings first (sets your PIN and uploads your data), then sign in here with the same Digital ID + PIN.</p>
     </div>
   </div>
 
@@ -3283,55 +3311,55 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
         <div class="wds-grid wds-grid--status">
 
           <div class="wds-card wds-card--gauge">
-            <h3 class="wds-card-title">Readiness Index</h3>
-            <div class="wds-gauge" style="--pct:84;">
-              <span class="wds-gauge-value">84<small>%</small></span>
+            <h3 class="wds-card-title">Consistency Index</h3>
+            <div class="wds-gauge" id="wdsConsistencyGauge" style="--pct:0;">
+              <span class="wds-gauge-value" id="wdsConsistencyValue">–<small>%</small></span>
             </div>
-            <p class="wds-card-foot wds-foot-good">Primed for a high-output session</p>
+            <p class="wds-card-foot" id="wdsConsistencyFoot">No data yet</p>
           </div>
 
           <div class="wds-card wds-card--protocol">
             <div class="wds-protocol-head">
-              <h3 class="wds-card-title">Active Protocol</h3>
-              <span class="wds-pill wds-pill--cyan">SPARTAN</span>
+              <h3 class="wds-card-title">Fitness Mode</h3>
+              <span class="wds-pill wds-pill--cyan" id="wdsProtocolPill">–</span>
             </div>
-            <p class="wds-protocol-name">Hypertrophy Block 2.0</p>
-            <div class="wds-progress"><div class="wds-progress-fill" style="width:63%"></div></div>
+            <p class="wds-protocol-name" id="wdsProtocolName">Logging consistency toward next tier</p>
+            <div class="wds-progress"><div class="wds-progress-fill" id="wdsProtocolBar" style="width:0%"></div></div>
             <div class="wds-protocol-meta">
-              <span>Week 5 of 8</span>
-              <span>63% complete</span>
+              <span id="wdsProtocolMetaLeft">0 of 0 days</span>
+              <span id="wdsProtocolMetaRight">0% complete</span>
             </div>
           </div>
 
           <div class="wds-tile-row">
             <div class="wds-tile">
               <span class="wds-tile-label">Sleep</span>
-              <span class="wds-tile-value">7h 42m</span>
-              <span class="wds-tile-sub wds-foot-good">+18m vs avg</span>
+              <span class="wds-tile-value" id="wdsTileSleepValue">–</span>
+              <span class="wds-tile-sub" id="wdsTileSleepSub"></span>
             </div>
             <div class="wds-tile">
               <span class="wds-tile-label">Hydration</span>
-              <span class="wds-tile-value">2.1L</span>
-              <span class="wds-tile-sub wds-foot-warning">70% of target</span>
+              <span class="wds-tile-value" id="wdsTileHydrationValue">–</span>
+              <span class="wds-tile-sub" id="wdsTileHydrationSub"></span>
             </div>
             <div class="wds-tile">
               <span class="wds-tile-label">Steps</span>
-              <span class="wds-tile-value">8,240</span>
-              <span class="wds-tile-sub wds-foot-good">On pace</span>
+              <span class="wds-tile-value" id="wdsTileStepsValue">–</span>
+              <span class="wds-tile-sub" id="wdsTileStepsSub"></span>
             </div>
             <div class="wds-tile">
               <span class="wds-tile-label">Mental Load</span>
-              <span class="wds-tile-value">Low</span>
-              <span class="wds-tile-sub wds-foot-good">Stress 2/10</span>
+              <span class="wds-tile-value" id="wdsTileStressValue">–</span>
+              <span class="wds-tile-sub" id="wdsTileStressSub"></span>
             </div>
           </div>
 
           <div class="wds-card wds-card--chart wds-card--wide">
             <div class="wds-card-head">
-              <h3 class="wds-card-title">Performance Velocity</h3>
-              <span class="wds-card-sub">Last 14 days</span>
+              <h3 class="wds-card-title">Weight Trend</h3>
+              <span class="wds-card-sub" id="wdsWeightChartSub">Last 90 days</span>
             </div>
-            <svg class="wds-linechart" viewBox="0 0 560 160" preserveAspectRatio="none">
+            <svg class="wds-linechart" viewBox="0 0 560 160" preserveAspectRatio="none" id="wdsWeightChartSvg">
               <defs>
                 <linearGradient id="wdsAreaFillStatus" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stop-color="var(--cyan)" stop-opacity="0.35"/>
@@ -3343,18 +3371,19 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
                 <line x1="0" y1="80" x2="560" y2="80"/>
                 <line x1="0" y1="130" x2="560" y2="130"/>
               </g>
-              <path d="M0,120 C40,110 60,90 100,88 C140,86 160,60 200,58 C240,56 260,75 300,70 C340,65 360,40 400,36 C440,32 460,50 500,42 C520,38 545,30 560,26 L560,160 L0,160 Z" fill="url(#wdsAreaFillStatus)"/>
-              <path d="M0,120 C40,110 60,90 100,88 C140,86 160,60 200,58 C240,56 260,75 300,70 C340,65 360,40 400,36 C440,32 460,50 500,42 C520,38 545,30 560,26" fill="none" stroke="var(--cyan)" stroke-width="2.5" stroke-linecap="round"/>
-              <circle cx="560" cy="26" r="4.5" fill="var(--cyan)"/>
+              <path id="wdsWeightChartArea" d="" fill="url(#wdsAreaFillStatus)"/>
+              <path id="wdsWeightChartLine" d="" fill="none" stroke="var(--cyan)" stroke-width="2.5" stroke-linecap="round"/>
+              <circle id="wdsWeightChartDot" cx="0" cy="0" r="4.5" fill="var(--cyan)" visibility="hidden"/>
             </svg>
+            <p class="hint hint--sm" id="wdsWeightChartEmpty" hidden>No weight entries logged yet.</p>
           </div>
 
           <div class="wds-card wds-card--teaser">
-            <img class="wds-teaser-img" src="icons/mode-demigod.png" alt="">
+            <img class="wds-teaser-img" id="wdsNextModeImg" src="icons/mode-demigod.png" alt="">
             <div class="wds-teaser-body">
-              <span class="wds-pill wds-pill--locked">LOCKED</span>
-              <h3 class="wds-card-title">Next Phase: Demi-God</h3>
-              <p class="wds-card-sub">Unlocks Body Fat % tracking and Custom Habit Protocols once Spartan consistency targets are met.</p>
+              <span class="wds-pill wds-pill--locked" id="wdsNextModePill">LOCKED</span>
+              <h3 class="wds-card-title" id="wdsNextModeTitle">Next Phase</h3>
+              <p class="wds-card-sub" id="wdsNextModeDesc"></p>
             </div>
           </div>
 
@@ -3367,72 +3396,54 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
 
           <div class="wds-card wds-card--hero wds-card--wide">
             <div class="wds-hero-body">
-              <span class="wds-pill wds-pill--cyan">TODAY</span>
-              <h2 class="wds-hero-title">Push Day — Upper Hypertrophy</h2>
-              <p class="wds-card-sub">6 exercises · est. volume 9,400 kg · ~52 min</p>
-              <button type="button" class="wds-gate-btn wds-hero-btn">Begin Session</button>
+              <span class="wds-pill wds-pill--cyan">THIS WEEK</span>
+              <h2 class="wds-hero-title" id="wdsHeroTitle">Training summary</h2>
+              <p class="wds-card-sub" id="wdsHeroSub">–</p>
             </div>
           </div>
 
           <div class="wds-card wds-card--gauge">
             <h3 class="wds-card-title">Fatigue Level</h3>
-            <div class="wds-gauge wds-gauge--warning" style="--pct:38;">
-              <span class="wds-gauge-value">38<small>%</small></span>
+            <div class="wds-gauge wds-gauge--warning" id="wdsFatigueGauge" style="--pct:0;">
+              <span class="wds-gauge-value" id="wdsFatigueValue">–<small>%</small></span>
             </div>
-            <p class="wds-card-foot wds-foot-good">Well recovered</p>
+            <p class="wds-card-foot" id="wdsFatigueFoot">No data yet</p>
           </div>
 
           <div class="wds-card wds-card--chart">
-            <h3 class="wds-card-title">Weekly Volume</h3>
-            <div class="wds-bars">
-              <div class="wds-bar-col"><div class="wds-bar" style="height:52%"></div><span>M</span></div>
-              <div class="wds-bar-col"><div class="wds-bar" style="height:78%"></div><span>T</span></div>
-              <div class="wds-bar-col"><div class="wds-bar" style="height:34%"></div><span>W</span></div>
-              <div class="wds-bar-col"><div class="wds-bar" style="height:91%"></div><span>T</span></div>
-              <div class="wds-bar-col"><div class="wds-bar" style="height:60%"></div><span>F</span></div>
-              <div class="wds-bar-col"><div class="wds-bar wds-bar--today" style="height:70%"></div><span>S</span></div>
-              <div class="wds-bar-col"><div class="wds-bar wds-bar--future" style="height:20%"></div><span>S</span></div>
-            </div>
+            <h3 class="wds-card-title">Recent Volume</h3>
+            <div class="wds-bars" id="wdsVolumeBars"></div>
+            <p class="hint hint--sm" id="wdsVolumeEmpty" hidden>No completed training sessions logged yet.</p>
           </div>
 
           <div class="wds-card wds-card--wide">
             <h3 class="wds-card-title">This Week</h3>
-            <div class="wds-weekstrip">
-              <div class="wds-weekday wds-weekday--push"><span>Mon</span><strong>Push</strong></div>
-              <div class="wds-weekday wds-weekday--pull"><span>Tue</span><strong>Pull</strong></div>
-              <div class="wds-weekday wds-weekday--rest"><span>Wed</span><strong>Rest</strong></div>
-              <div class="wds-weekday wds-weekday--legs"><span>Thu</span><strong>Legs</strong></div>
-              <div class="wds-weekday wds-weekday--push wds-weekday--active"><span>Fri</span><strong>Push</strong></div>
-              <div class="wds-weekday wds-weekday--cardio"><span>Sat</span><strong>Cardio</strong></div>
-              <div class="wds-weekday wds-weekday--rest"><span>Sun</span><strong>Rest</strong></div>
-            </div>
+            <div class="wds-weekstrip" id="wdsWeekstrip"></div>
           </div>
 
           <div class="wds-card wds-card--list wds-card--wide">
-            <h3 class="wds-card-title">Protocol Forecast</h3>
-            <ul class="wds-forecast-list">
-              <li><span class="wds-forecast-dot wds-foot-good"></span> Bench press trending +2.5kg next session</li>
-              <li><span class="wds-forecast-dot wds-foot-warning"></span> Shoulder volume approaching weekly cap</li>
-              <li><span class="wds-forecast-dot wds-foot-good"></span> Deload window recommended in 3 weeks</li>
+            <h3 class="wds-card-title">This Week's Reflection</h3>
+            <ul class="wds-forecast-list" id="wdsReflectionList">
+              <li><span class="wds-forecast-dot"></span> No weekly review logged yet this week.</li>
             </ul>
           </div>
 
           <div class="wds-tile-row wds-tile-row--wide">
             <div class="wds-tile">
-              <span class="wds-tile-label">Power Output</span>
-              <span class="wds-tile-value">412W</span>
+              <span class="wds-tile-label">Volume This Week</span>
+              <span class="wds-tile-value" id="wdsTileVolumeValue">–</span>
             </div>
             <div class="wds-tile">
-              <span class="wds-tile-label">HR Variability</span>
-              <span class="wds-tile-value">61ms</span>
+              <span class="wds-tile-label">Heaviest Set</span>
+              <span class="wds-tile-value" id="wdsTileHeaviestValue">–</span>
             </div>
             <div class="wds-tile">
-              <span class="wds-tile-label">Rep Velocity</span>
-              <span class="wds-tile-value">0.48 m/s</span>
+              <span class="wds-tile-label">Longest Run</span>
+              <span class="wds-tile-value" id="wdsTileLongestRunValue">–</span>
             </div>
             <div class="wds-tile">
-              <span class="wds-tile-label">VO2 Projected</span>
-              <span class="wds-tile-value">46.2</span>
+              <span class="wds-tile-label">Fastest Pace</span>
+              <span class="wds-tile-value" id="wdsTileFastestPaceValue">–</span>
             </div>
           </div>
 
@@ -3447,48 +3458,46 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
             <h3 class="wds-card-title">Daily Fuel Status</h3>
             <div class="wds-macro-row">
               <div class="wds-macro">
-                <div class="wds-macro-head"><span>Protein</span><span>142 / 180g</span></div>
-                <div class="wds-progress"><div class="wds-progress-fill" style="width:79%;background:var(--cyan)"></div></div>
+                <div class="wds-macro-head"><span>Protein</span><span id="wdsMacroProteinText">– / –g</span></div>
+                <div class="wds-progress"><div class="wds-progress-fill" id="wdsMacroProteinBar" style="width:0%;background:var(--cyan)"></div></div>
               </div>
               <div class="wds-macro">
-                <div class="wds-macro-head"><span>Carbs</span><span>210 / 260g</span></div>
-                <div class="wds-progress"><div class="wds-progress-fill" style="width:81%;background:var(--violet)"></div></div>
+                <div class="wds-macro-head"><span>Carbs</span><span id="wdsMacroCarbsText">– / –g</span></div>
+                <div class="wds-progress"><div class="wds-progress-fill" id="wdsMacroCarbsBar" style="width:0%;background:var(--violet)"></div></div>
               </div>
               <div class="wds-macro">
-                <div class="wds-macro-head"><span>Fat</span><span>58 / 75g</span></div>
-                <div class="wds-progress"><div class="wds-progress-fill" style="width:77%;background:var(--magenta)"></div></div>
+                <div class="wds-macro-head"><span>Fat</span><span id="wdsMacroFatText">– / –g</span></div>
+                <div class="wds-progress"><div class="wds-progress-fill" id="wdsMacroFatBar" style="width:0%;background:var(--magenta)"></div></div>
               </div>
             </div>
           </div>
 
           <div class="wds-card wds-card--gauge">
             <h3 class="wds-card-title">Fluid Levels</h3>
-            <div class="wds-gauge" style="--pct:70;">
-              <span class="wds-gauge-value">2.1<small>L</small></span>
+            <div class="wds-gauge" id="wdsFluidGauge" style="--pct:0;">
+              <span class="wds-gauge-value" id="wdsFluidValue">–<small>L</small></span>
             </div>
-            <p class="wds-card-foot wds-foot-warning">0.9L to target</p>
+            <p class="wds-card-foot" id="wdsFluidFoot"></p>
           </div>
 
           <div class="wds-card wds-card--list">
-            <h3 class="wds-card-title">Recent Fuel Logs</h3>
-            <ul class="wds-fuel-list">
-              <li><span>Grilled chicken &amp; rice</span><span>612 kcal</span></li>
-              <li><span>Protein shake</span><span>240 kcal</span></li>
-              <li><span>Greek yogurt &amp; berries</span><span>190 kcal</span></li>
-              <li><span>Oats &amp; peanut butter</span><span>410 kcal</span></li>
+            <h3 class="wds-card-title">Today's Meals</h3>
+            <ul class="wds-fuel-list" id="wdsFuelList">
+              <li><span>No meals logged today.</span></li>
             </ul>
           </div>
 
           <div class="wds-card">
             <h3 class="wds-card-title">Hunger State</h3>
-            <div class="wds-slider-track"><div class="wds-slider-fill" style="width:35%"></div><div class="wds-slider-knob" style="left:35%"></div></div>
+            <div class="wds-slider-track"><div class="wds-slider-fill" id="wdsHungerFill" style="width:0%"></div><div class="wds-slider-knob" id="wdsHungerKnob" style="left:0%"></div></div>
             <div class="wds-slider-labels"><span>Satisfied</span><span>Neutral</span><span>Ravenous</span></div>
+            <p class="hint hint--sm" id="wdsHungerEmpty" hidden>Not logged today.</p>
           </div>
 
           <div class="wds-card wds-card--chart wds-card--wide">
             <div class="wds-card-head">
-              <h3 class="wds-card-title">Metabolic Velocity</h3>
-              <span class="wds-card-sub">Last 14 days</span>
+              <h3 class="wds-card-title">Calorie Trend</h3>
+              <span class="wds-card-sub">Last 30 days</span>
             </div>
             <svg class="wds-linechart" viewBox="0 0 560 160" preserveAspectRatio="none">
               <defs>
@@ -3502,17 +3511,18 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
                 <line x1="0" y1="80" x2="560" y2="80"/>
                 <line x1="0" y1="130" x2="560" y2="130"/>
               </g>
-              <path d="M0,90 C50,95 70,110 110,105 C150,100 170,70 210,65 C250,60 270,80 310,78 C350,76 370,50 410,45 C450,40 470,55 510,48 C530,44 545,35 560,30 L560,160 L0,160 Z" fill="url(#wdsAreaFillNutrition)"/>
-              <path d="M0,90 C50,95 70,110 110,105 C150,100 170,70 210,65 C250,60 270,80 310,78 C350,76 370,50 410,45 C450,40 470,55 510,48 C530,44 545,35 560,30" fill="none" stroke="var(--violet)" stroke-width="2.5" stroke-linecap="round"/>
-              <circle cx="560" cy="30" r="4.5" fill="var(--violet)"/>
+              <path id="wdsCalorieChartArea" d="" fill="url(#wdsAreaFillNutrition)"/>
+              <path id="wdsCalorieChartLine" d="" fill="none" stroke="var(--violet)" stroke-width="2.5" stroke-linecap="round"/>
+              <circle id="wdsCalorieChartDot" cx="0" cy="0" r="4.5" fill="var(--violet)" visibility="hidden"/>
             </svg>
+            <p class="hint hint--sm" id="wdsCalorieChartEmpty" hidden>No nutrition entries logged yet.</p>
           </div>
 
           <div class="wds-tile-row wds-tile-row--wide">
-            <div class="wds-tile"><span class="wds-tile-label">Calories</span><span class="wds-tile-value">1,840</span></div>
-            <div class="wds-tile"><span class="wds-tile-label">Fiber</span><span class="wds-tile-value">24g</span></div>
-            <div class="wds-tile"><span class="wds-tile-label">Sodium</span><span class="wds-tile-value">1,920mg</span></div>
-            <div class="wds-tile"><span class="wds-tile-label">Meals Logged</span><span class="wds-tile-value">4 / 5</span></div>
+            <div class="wds-tile"><span class="wds-tile-label">Calories</span><span class="wds-tile-value" id="wdsTileCaloriesValue">–</span></div>
+            <div class="wds-tile"><span class="wds-tile-label">Fiber</span><span class="wds-tile-value" id="wdsTileFiberValue">–</span></div>
+            <div class="wds-tile"><span class="wds-tile-label">Sodium</span><span class="wds-tile-value" id="wdsTileSodiumValue">–</span></div>
+            <div class="wds-tile"><span class="wds-tile-label">Meals Logged</span><span class="wds-tile-value" id="wdsTileMealsValue">–</span></div>
           </div>
 
         </div>
@@ -3523,19 +3533,15 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
         <div class="wds-grid wds-grid--bio">
 
           <div class="wds-card wds-card--chart">
-            <h3 class="wds-card-title">Sleep Architecture</h3>
-            <div class="wds-bars wds-bars--sleep">
-              <div class="wds-bar-col"><div class="wds-bar" style="height:20%;background:var(--surface-2)"></div><span>Deep</span></div>
-              <div class="wds-bar-col"><div class="wds-bar" style="height:45%;background:var(--cyan-dim)"></div><span>Light</span></div>
-              <div class="wds-bar-col"><div class="wds-bar" style="height:30%;background:var(--violet)"></div><span>REM</span></div>
-              <div class="wds-bar-col"><div class="wds-bar" style="height:8%;background:var(--critical)"></div><span>Awake</span></div>
-            </div>
+            <h3 class="wds-card-title">Sleep Quality</h3>
+            <div class="wds-bars wds-bars--sleep" id="wdsSleepBars"></div>
+            <p class="hint hint--sm" id="wdsSleepEmpty" hidden>No sleep entries logged yet.</p>
           </div>
 
           <div class="wds-card wds-card--chart wds-card--wide">
             <div class="wds-card-head">
-              <h3 class="wds-card-title">Stress &amp; HRV Trend</h3>
-              <span class="wds-card-sub">Last 14 days</span>
+              <h3 class="wds-card-title">Stress &amp; Fatigue Trend</h3>
+              <span class="wds-card-sub">Last 30 days</span>
             </div>
             <svg class="wds-linechart" viewBox="0 0 560 160" preserveAspectRatio="none">
               <defs>
@@ -3549,26 +3555,27 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
                 <line x1="0" y1="80" x2="560" y2="80"/>
                 <line x1="0" y1="130" x2="560" y2="130"/>
               </g>
-              <path d="M0,60 C40,70 60,50 100,55 C140,60 160,95 200,100 C240,105 260,75 300,68 C340,61 360,42 400,40 C440,38 460,60 500,52 C520,48 545,38 560,35 L560,160 L0,160 Z" fill="url(#wdsAreaFillBio)"/>
-              <path d="M0,60 C40,70 60,50 100,55 C140,60 160,95 200,100 C240,105 260,75 300,68 C340,61 360,42 400,40 C440,38 460,60 500,52 C520,48 545,38 560,35" fill="none" stroke="var(--magenta)" stroke-width="2.5" stroke-linecap="round"/>
-              <circle cx="560" cy="35" r="4.5" fill="var(--magenta)"/>
+              <path id="wdsStressChartArea" d="" fill="url(#wdsAreaFillBio)"/>
+              <path id="wdsStressChartLine" d="" fill="none" stroke="var(--magenta)" stroke-width="2.5" stroke-linecap="round"/>
+              <path id="wdsFatigueChartLine" d="" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-dasharray="4 3"/>
             </svg>
+            <p class="hint hint--sm" id="wdsStressChartEmpty" hidden>No stress/fatigue entries logged yet.</p>
           </div>
 
           <div class="wds-card wds-card--list wds-card--wide">
             <h3 class="wds-card-title">Bio-Markers</h3>
             <div class="wds-marker-row">
               <div class="wds-macro">
-                <div class="wds-macro-head"><span>Resting Heart Rate</span><span>54 bpm</span></div>
-                <div class="wds-progress"><div class="wds-progress-fill" style="width:62%;background:var(--good)"></div></div>
+                <div class="wds-macro-head"><span>Body Fat %</span><span id="wdsMarkerBodyFatText">–</span></div>
+                <div class="wds-progress"><div class="wds-progress-fill" id="wdsMarkerBodyFatBar" style="width:0%;background:var(--cyan)"></div></div>
               </div>
               <div class="wds-macro">
-                <div class="wds-macro-head"><span>Body Fat %</span><span>14.2%</span></div>
-                <div class="wds-progress"><div class="wds-progress-fill" style="width:45%;background:var(--cyan)"></div></div>
+                <div class="wds-macro-head"><span>Weight Progress</span><span id="wdsMarkerWeightProgressText">–</span></div>
+                <div class="wds-progress"><div class="wds-progress-fill" id="wdsMarkerWeightProgressBar" style="width:0%;background:var(--good)"></div></div>
               </div>
               <div class="wds-macro">
-                <div class="wds-macro-head"><span>Recovery Score</span><span>81%</span></div>
-                <div class="wds-progress"><div class="wds-progress-fill" style="width:81%;background:var(--good)"></div></div>
+                <div class="wds-macro-head"><span>Habit Completion (Today)</span><span id="wdsMarkerHabitText">–</span></div>
+                <div class="wds-progress"><div class="wds-progress-fill" id="wdsMarkerHabitBar" style="width:0%;background:var(--violet)"></div></div>
               </div>
             </div>
           </div>
@@ -3576,10 +3583,9 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
           <div class="wds-card wds-card--teaser wds-card--wide">
             <img class="wds-teaser-img" src="icons/mode-spartan.png" alt="">
             <div class="wds-teaser-body">
-              <span class="wds-pill wds-pill--cyan">INSIGHT</span>
-              <h3 class="wds-card-title">Circadian Optimization</h3>
-              <p class="wds-card-sub">Your last 3 best-recovered days followed a 22:30 wind-down. Shifting tonight's cutoff 20 minutes earlier may improve tomorrow's readiness.</p>
-              <button type="button" class="wds-mini-btn">View Sleep Plan</button>
+              <span class="wds-pill wds-pill--cyan">THIS WEEK'S WIN</span>
+              <h3 class="wds-card-title" id="wdsWinTitle">No weekly review yet</h3>
+              <p class="wds-card-sub" id="wdsWinDesc">Fill in Weekend Log's "Wins" field in the app to see it here.</p>
             </div>
           </div>
 
@@ -3592,55 +3598,26 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
 
           <div class="wds-card wds-card--list">
             <h3 class="wds-card-title">Global Leaderboard</h3>
-            <ol class="wds-lb-list">
-              <li><span class="wds-lb-rank">1</span><span class="wds-lb-name">Ironclad_Maya</span><span class="wds-lb-score">982</span></li>
-              <li><span class="wds-lb-rank">2</span><span class="wds-lb-name">Titan_Reyes</span><span class="wds-lb-score">947</span></li>
-              <li><span class="wds-lb-rank">3</span><span class="wds-lb-name">Nova_Kade</span><span class="wds-lb-score">915</span></li>
-              <li class="wds-lb-self"><span class="wds-lb-rank">4</span><span class="wds-lb-name" id="wdsNexusSelfName">You</span><span class="wds-lb-score">889</span></li>
-              <li><span class="wds-lb-rank">5</span><span class="wds-lb-name">Echo_Rin</span><span class="wds-lb-score">861</span></li>
+            <ol class="wds-lb-list" id="wdsLbList">
+              <li><span>Loading…</span></li>
             </ol>
           </div>
 
           <div class="wds-card wds-card--feed">
             <h3 class="wds-card-title">Global Feed</h3>
-            <div class="wds-feed">
-              <div class="wds-feed-post">
-                <span class="wds-user-avatar wds-user-avatar--sm">T</span>
-                <div class="wds-feed-body">
-                  <p><strong>Titan_Reyes</strong> <span class="wds-feed-time">12m</span></p>
-                  <p>New PR on deadlift today — 180kg for a triple. Spartan protocol is paying off. 🔥</p>
-                  <div class="wds-feed-actions"><span>♥ 14</span><span>💬 3</span></div>
-                </div>
-              </div>
-              <div class="wds-feed-post">
-                <span class="wds-user-avatar wds-user-avatar--sm">N</span>
-                <div class="wds-feed-body">
-                  <p><strong>Nova_Kade</strong> <span class="wds-feed-time">41m</span></p>
-                  <p>Anyone else's hydration tanking this week? Struggling to hit target with the heat.</p>
-                  <div class="wds-feed-actions"><span>♥ 6</span><span>💬 5</span></div>
-                </div>
-              </div>
-              <div class="wds-feed-post">
-                <span class="wds-user-avatar wds-user-avatar--sm">E</span>
-                <div class="wds-feed-body">
-                  <p><strong>Echo_Rin</strong> <span class="wds-feed-time">2h</span></p>
-                  <p>Finished a 10K outdoor run this morning, pace 5:12/km. Route sketch looked great on the widget 👌</p>
-                  <div class="wds-feed-actions"><span>♥ 22</span><span>💬 8</span></div>
-                </div>
-              </div>
+            <div class="wds-feed" id="wdsFeedList">
+              <p class="hint hint--sm">Loading…</p>
             </div>
             <div class="wds-feed-compose">
-              <input type="text" placeholder="Share something with Nexus…" disabled>
+              <input type="text" placeholder="Post from the app's Nexus tab to join the conversation" disabled>
               <button type="button" class="wds-mini-btn" disabled>Post</button>
             </div>
           </div>
 
           <div class="wds-card wds-card--list">
-            <h3 class="wds-card-title">Spotlight</h3>
-            <ul class="wds-spotlight-list">
-              <li><span class="wds-user-avatar wds-user-avatar--sm">I</span><span>Ironclad_Maya hit a 90-day logging streak</span></li>
-              <li><span class="wds-user-avatar wds-user-avatar--sm">T</span><span>Titan_Reyes reached Demi-God tier</span></li>
-              <li><span class="wds-user-avatar wds-user-avatar--sm">E</span><span>Echo_Rin completed a 42km ultra route</span></li>
+            <h3 class="wds-card-title">Recently Active</h3>
+            <ul class="wds-spotlight-list" id="wdsRecentActiveList">
+              <li><span>Loading…</span></li>
             </ul>
           </div>
 
