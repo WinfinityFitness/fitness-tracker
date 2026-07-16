@@ -30,7 +30,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=25.0">
+<link rel="stylesheet" href="style.css?v=26.0">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3415,32 +3415,34 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
       <!-- ===================== CENTER: Facebook-style feed ===================== -->
       <div class="wds-uni-col wds-uni-center">
 
-        <div class="wds-card">
-          <div class="wds-card-head">
-            <h3 class="wds-card-title" style="margin:0;">My Day</h3>
-            <button type="button" class="wds-mini-btn" id="btnWdsAddStory">+ Add</button>
-          </div>
-          <div class="wds-myday-row" id="wdsMydayRow">
-            <p class="empty-note">Loading…</p>
-          </div>
-        </div>
-
-        <!-- Story composer — posting to My Day (disappears after 24h). -->
-        <div class="wds-story-overlay" id="wdsStoryComposerOverlay" hidden>
-          <div class="wds-story-modal">
+        <!-- Story composer — full-screen, phone-portrait "create story" flow:
+             pick Text or Photo up top, snap straight to the device's own
+             gallery/camera picker (a real in-page gallery grid isn't
+             something a website can read — this hands off to the OS picker
+             instead, plus a dedicated camera shortcut bottom-right). -->
+        <div class="wds-story-overlay wds-story-overlay--create" id="wdsStoryComposerOverlay" hidden>
+          <div class="wds-story-modal wds-story-create">
             <div class="wds-story-modal-head">
-              <strong>Add to Your Day</strong>
+              <strong>Create Your Day</strong>
               <button type="button" class="wds-icon-btn" id="btnWdsStoryComposerClose" aria-label="Close">✕</button>
             </div>
-            <textarea id="wdsStoryComposerInput" rows="3" maxlength="500" placeholder="Share a moment…"></textarea>
-            <div class="wds-composer-pending-image" id="wdsStoryComposerPendingImage" hidden>
-              <img id="wdsStoryComposerPendingImagePreview" alt="">
-              <button type="button" id="btnWdsStoryComposerImageRemove" aria-label="Remove image">✕</button>
+            <div class="wds-story-widget-row" id="wdsStoryWidgetRow">
+              <button type="button" class="wds-story-widget-btn" id="btnWdsStoryModeText" data-story-mode="text"><span class="wds-story-widget-icon">Aa</span>Text</button>
+              <button type="button" class="wds-story-widget-btn" id="btnWdsStoryModePhoto" data-story-mode="photo"><span class="wds-story-widget-icon">🖼</span>Photo</button>
             </div>
+            <div class="wds-story-create-canvas" id="wdsStoryCreateCanvas">
+              <p class="empty-note" id="wdsStoryCreateHint">Choose Text or Photo above to start your story.</p>
+              <div class="wds-composer-pending-image" id="wdsStoryComposerPendingImage" hidden>
+                <img id="wdsStoryComposerPendingImagePreview" alt="">
+                <button type="button" id="btnWdsStoryComposerImageRemove" aria-label="Remove image">✕</button>
+              </div>
+              <textarea id="wdsStoryComposerInput" rows="3" maxlength="500" placeholder="Share a moment…" hidden></textarea>
+              <button type="button" class="wds-story-camera-fab" id="btnWdsStoryCameraFab" aria-label="Take a photo">📷</button>
+            </div>
+            <input type="file" id="wdsStoryComposerImageInput" accept="image/*" hidden>
+            <input type="file" id="wdsStoryComposerCameraInput" accept="image/*" capture="environment" hidden>
             <div class="wds-composer-actions">
-              <button type="button" class="wds-composer-action-btn" id="btnWdsStoryComposerAttach">📷 Photo</button>
-              <input type="file" id="wdsStoryComposerImageInput" accept="image/*" hidden>
-              <button type="button" class="wds-composer-action-btn wds-composer-post-btn" id="btnWdsStoryComposerPost">Share</button>
+              <button type="button" class="wds-composer-action-btn wds-composer-post-btn" id="btnWdsStoryComposerPost">Share to Your Day</button>
             </div>
             <p class="hint hint--sm">Disappears automatically after 24 hours.</p>
             <p class="wds-gate-error" id="wdsStoryComposerError" hidden></p>
@@ -3472,6 +3474,9 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
               </div>
               <p class="wds-gate-error" id="wdsComposerError" hidden></p>
             </div>
+          </div>
+          <div class="wds-myday-row" id="wdsMydayRow">
+            <p class="empty-note">Loading…</p>
           </div>
         </div>
 
@@ -3514,10 +3519,10 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
   </div>
 </div>
 
-<script src="config.js?v=25.0"></script>
+<script src="config.js?v=26.0"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=25.0"></script>
+<script src="app.js?v=26.0"></script>
 </body>
 </html>

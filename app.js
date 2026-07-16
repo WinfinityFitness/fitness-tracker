@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.25.0';
+const APP_VERSION = 'WF_SYS_V.26.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -348,30 +348,50 @@ function initDesktopShell() {
   });
   initWdsFeed();
 
-  // My Day — story composer (text + optional image, "+ Add" button and the
-  // ring itself when it's your own with no active story), story viewer
-  // (tapping any ring with an active story), and the unsend button inside
-  // the viewer (delegated, since its content is rebuilt per story).
-  const storyComposerOverlay = document.getElementById('wdsStoryComposerOverlay');
+  // My Day — full-screen story composer. Pick Text or Photo up top; Photo
+  // hands off straight to the device's own gallery/camera picker (a page
+  // can't read a user's photo library directly, so that OS picker IS the
+  // "gallery grid" here) and a dedicated camera-shutter FAB jumps straight
+  // to the camera. Also wires the story viewer and its unsend button.
   const storyComposerInput = document.getElementById('wdsStoryComposerInput');
   const storyComposerPostBtn = document.getElementById('btnWdsStoryComposerPost');
-  const storyComposerAttachBtn = document.getElementById('btnWdsStoryComposerAttach');
   const storyComposerImageInput = document.getElementById('wdsStoryComposerImageInput');
+  const storyComposerCameraInput = document.getElementById('wdsStoryComposerCameraInput');
   const storyComposerPendingImage = document.getElementById('wdsStoryComposerPendingImage');
   const storyComposerPendingImagePreview = document.getElementById('wdsStoryComposerPendingImagePreview');
   const storyComposerImageRemoveBtn = document.getElementById('btnWdsStoryComposerImageRemove');
   const storyComposerCloseBtn = document.getElementById('btnWdsStoryComposerClose');
   const storyComposerErrorEl = document.getElementById('wdsStoryComposerError');
+  const storyCreateCanvas = document.getElementById('wdsStoryCreateCanvas');
+  const storyCreateHint = document.getElementById('wdsStoryCreateHint');
+  const storyModeTextBtn = document.getElementById('btnWdsStoryModeText');
+  const storyModePhotoBtn = document.getElementById('btnWdsStoryModePhoto');
+  const storyCameraFab = document.getElementById('btnWdsStoryCameraFab');
   let wdsPendingStoryImageDataUrl = null;
+  let wdsStoryMode = null;
 
+  const setWdsStoryMode = (mode) => {
+    wdsStoryMode = mode;
+    storyModeTextBtn.classList.toggle('is-active', mode === 'text');
+    storyModePhotoBtn.classList.toggle('is-active', mode === 'photo');
+    storyCreateCanvas.classList.toggle('wds-story-create-canvas--text', mode === 'text');
+    storyCreateCanvas.classList.toggle('wds-story-create-canvas--photo', mode === 'photo');
+    storyCreateHint.hidden = !!mode;
+    storyComposerInput.hidden = !mode;
+    if (mode === 'text') storyComposerInput.focus();
+  };
   const clearWdsPendingStoryImage = () => {
     wdsPendingStoryImageDataUrl = null;
     storyComposerPendingImage.hidden = true;
     storyComposerImageInput.value = '';
+    storyComposerCameraInput.value = '';
   };
-  storyComposerAttachBtn.addEventListener('click', () => storyComposerImageInput.click());
-  storyComposerImageInput.addEventListener('change', () => {
-    const file = storyComposerImageInput.files[0];
+  const resetWdsStoryComposer = () => {
+    storyComposerInput.value = '';
+    clearWdsPendingStoryImage();
+    setWdsStoryMode(null);
+  };
+  const handleStoryImageFile = (file) => {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
@@ -380,13 +400,15 @@ function initDesktopShell() {
       storyComposerPendingImage.hidden = false;
     };
     reader.readAsDataURL(file);
-  });
-  storyComposerImageRemoveBtn.addEventListener('click', clearWdsPendingStoryImage);
-  storyComposerCloseBtn.addEventListener('click', () => {
-    wdsCloseStoryComposer();
-    storyComposerInput.value = '';
-    clearWdsPendingStoryImage();
-  });
+    setWdsStoryMode('photo');
+  };
+  storyModeTextBtn.addEventListener('click', () => setWdsStoryMode('text'));
+  storyModePhotoBtn.addEventListener('click', () => storyComposerImageInput.click());
+  storyComposerImageInput.addEventListener('change', () => handleStoryImageFile(storyComposerImageInput.files[0]));
+  storyComposerCameraInput.addEventListener('change', () => handleStoryImageFile(storyComposerCameraInput.files[0]));
+  storyCameraFab.addEventListener('click', () => storyComposerCameraInput.click());
+  storyComposerImageRemoveBtn.addEventListener('click', () => { clearWdsPendingStoryImage(); setWdsStoryMode(null); });
+  storyComposerCloseBtn.addEventListener('click', () => { wdsCloseStoryComposer(); resetWdsStoryComposer(); });
   storyComposerPostBtn.addEventListener('click', async () => {
     if (storyComposerErrorEl) storyComposerErrorEl.hidden = true;
     if (!wdsRemoteData || !wdsRemoteData.shareKey || !sbConfigured()) {
@@ -400,9 +422,8 @@ function initDesktopShell() {
     try {
       const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
       await postFeedStory(text, image, wdsRemoteData.shareKey, codeName);
-      storyComposerInput.value = '';
-      clearWdsPendingStoryImage();
       wdsCloseStoryComposer();
+      resetWdsStoryComposer();
       await refreshWdsMyday();
     } catch (e) {
       if (storyComposerErrorEl) { storyComposerErrorEl.textContent = 'Could not post: ' + ((e && e.message) || 'unknown error') + '. Try again.'; storyComposerErrorEl.hidden = false; }
@@ -410,12 +431,11 @@ function initDesktopShell() {
     finally { storyComposerPostBtn.disabled = false; }
   });
 
-  document.getElementById('btnWdsAddStory').addEventListener('click', wdsOpenStoryComposer);
   document.getElementById('wdsMydayRow').addEventListener('click', e => {
-    const item = e.target.closest('.wds-myday-item');
-    if (!item) return;
-    if (item.dataset.action === 'add-story') { wdsOpenStoryComposer(); return; }
-    const storyId = Number(item.dataset.storyId);
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    if (target.dataset.action === 'add-story') { resetWdsStoryComposer(); wdsOpenStoryComposer(); return; }
+    const storyId = Number(target.dataset.storyId);
     if (storyId) wdsOpenStoryViewer(storyId);
   });
   document.getElementById('btnWdsStoryViewerClose').addEventListener('click', wdsCloseStoryViewer);
@@ -777,14 +797,26 @@ function renderWdsMyday() {
   const el = document.getElementById('wdsMydayRow');
   if (!el) return;
   const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+  const myName = (wdsRemoteData && wdsRemoteData.profile && wdsRemoteData.profile.name) || (wdsRemoteData && wdsRemoteData.publicId) || '?';
   const mine = wdsActiveStories.find(s => s.share_key === myShareKey);
   const others = wdsActiveStories.filter(s => s.share_key !== myShareKey);
-  const youRingClass = mine ? 'wds-myday-ring wds-myday-ring--has-story' : 'wds-myday-ring wds-myday-ring--you';
-  const youAvatar = mine ? escapeHtml((mine.code_name || '?').charAt(0).toUpperCase()) : '+';
-  const youItem = `<div class="wds-myday-item" data-action="${mine ? 'view-story' : 'add-story'}" data-story-id="${mine ? mine.id : ''}"><div class="${youRingClass}"><div class="wds-myday-avatar">${youAvatar}</div></div><span>Your Day</span></div>`;
+
+  const initial = (name) => escapeHtml((name || '?').trim().charAt(0).toUpperCase() || '?');
+  const thumbHtml = (s) => s.image_url
+    ? `<img class="wds-myday-thumb-img" src="${escapeHtml(s.image_url)}" alt="">`
+    : `<div class="wds-myday-thumb-text">${escapeHtml((s.message || '').slice(0, 60))}</div>`;
+
+  // "Your Day" is a single tile: your own profile-picture look when you
+  // have no active story (tap to create one), or your actual story
+  // preview once you do (tap to view; the "+" badge still lets you add
+  // another without leaving the row).
+  const youItem = mine
+    ? `<div class="wds-myday-item wds-myday-item--has-story" data-action="view-story" data-story-id="${mine.id}">${thumbHtml(mine)}<span class="wds-myday-avatar-badge">${initial(myName)}</span><span class="wds-myday-add-badge" data-action="add-story">+</span><span class="wds-myday-name">Your Day</span></div>`
+    : `<div class="wds-myday-item wds-myday-item--create" data-action="add-story"><div class="wds-myday-create-avatar">${initial(myName)}</div><span class="wds-myday-add-badge">+</span><span class="wds-myday-name">Your Day</span></div>`;
+
   const otherItems = others.map(s => {
     const name = s.code_name || '?';
-    return `<div class="wds-myday-item" data-action="view-story" data-story-id="${s.id}"><div class="wds-myday-ring wds-myday-ring--has-story"><div class="wds-myday-avatar">${escapeHtml(name.charAt(0).toUpperCase())}</div></div><span>${escapeHtml(name)}</span></div>`;
+    return `<div class="wds-myday-item wds-myday-item--has-story" data-action="view-story" data-story-id="${s.id}">${thumbHtml(s)}<span class="wds-myday-avatar-badge">${initial(name)}</span><span class="wds-myday-name">${escapeHtml(name)}</span></div>`;
   }).join('');
   el.innerHTML = youItem + otherItems;
 }
