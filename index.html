@@ -30,7 +30,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=26.0">
+<link rel="stylesheet" href="style.css?v=27.0">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3458,6 +3458,9 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
         </div>
 
         <div class="wds-card">
+          <div class="wds-myday-row" id="wdsMydayRow">
+            <p class="empty-note">Loading…</p>
+          </div>
           <div class="wds-composer">
             <span class="wds-user-avatar" id="wdsComposerAvatar">–</span>
             <div class="wds-composer-box">
@@ -3474,9 +3477,6 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
               </div>
               <p class="wds-gate-error" id="wdsComposerError" hidden></p>
             </div>
-          </div>
-          <div class="wds-myday-row" id="wdsMydayRow">
-            <p class="empty-note">Loading…</p>
           </div>
         </div>
 
@@ -3519,10 +3519,10 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
   </div>
 </div>
 
-<script src="config.js?v=26.0"></script>
+<script src="config.js?v=27.0"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=26.0"></script>
+<script src="app.js?v=27.0"></script>
 </body>
 </html>

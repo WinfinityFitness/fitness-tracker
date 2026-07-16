@@ -4922,7 +4922,7 @@ html.wf-desktop-shell body { overflow-x: auto; }
    gradient+text as a live preview, with the poster's name pinned at the
    bottom. A dashed empty card means "no story yet, tap to add"; a solid
    border means an active story, tap to view it. */
-.wds-myday-row { display: flex; gap: 10px; overflow-x: auto; padding: 2px 2px 4px; margin-top: 14px; }
+.wds-myday-row { display: flex; gap: 10px; overflow-x: auto; padding: 2px 2px 4px; margin-bottom: 14px; }
 .wds-myday-item {
   position: relative; flex-shrink: 0; width: 92px; height: 148px; border-radius: 12px;
   overflow: hidden; cursor: pointer; background: var(--surface-2); border: 2px solid var(--border-soft);
