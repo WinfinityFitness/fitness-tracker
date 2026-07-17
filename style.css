@@ -4890,9 +4890,8 @@ html.wf-desktop-shell #wdsShell {
 .wds-icon-btn.is-spinning svg { animation: wds-spin 0.7s linear infinite; }
 @keyframes wds-spin { to { transform: rotate(360deg); } }
 .wds-bell-badge {
-  position: absolute; top: -3px; right: -3px; background: var(--critical); color: #fff;
-  font-size: 0.6rem; font-weight: 700; border-radius: 50%; width: 15px; height: 15px;
-  display: grid; place-items: center; font-family: var(--font-mono);
+  position: absolute; top: 2px; right: 2px; background: var(--good);
+  border-radius: 50%; width: 9px; height: 9px; border: 1.5px solid var(--surface-1);
 }
 .wds-notif-pop {
   position: absolute; top: 42px; right: 44px; width: 260px; background: var(--surface-1);
@@ -5063,11 +5062,10 @@ html.wf-desktop-shell body { overflow-x: auto; }
 .wds-uni-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .wds-uni-left, .wds-uni-right { position: sticky; top: 84px; max-height: calc(100vh - 100px); overflow-y: auto; }
 .wds-uni-right { display: flex; flex-direction: column; }
-/* Notifications is now the only card in the right column (Global Chat
-   moved to the bottom of the left column) — let it grow to fill the
-   column's full sticky height instead of leaving empty space below it. */
-.wds-uni-right .wds-notif-card { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-.wds-uni-right .wds-notif-card #wdsNotifList { flex: 1; overflow-y: auto; }
+/* The Nexus Leaderboard is now the only card in the right column (the
+   separate Notifications card was removed — the bell icon's own dropdown
+   covers that) — let it grow to fill the column's full sticky height. */
+.wds-uni-right .wds-leaderboard-card { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
 /* Global Chat — fixed to the bottom-left of the viewport (outside the
    normal column flow entirely, like the popups/contact-rail), always
    visible while scrolling. Minimizes to just its header bar. */
@@ -5327,8 +5325,6 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
   background: var(--gradient-bar); border: none; border-radius: 50%; width: 30px; height: 30px;
   color: #060a0d; font-weight: 800; cursor: pointer; flex-shrink: 0;
 }
-
-.wds-notif-card #wdsNotifList { display: flex; flex-direction: column; }
 
 @media (max-width: 1400px) {
   .wds-unified { grid-template-columns: 22% 1fr 26%; }

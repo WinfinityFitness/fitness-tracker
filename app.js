@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.0.0';
+const APP_VERSION = 'WF_SYS_V.1.0.1';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -744,15 +744,12 @@ function initDesktopShell() {
     }
   });
   // Friend-request Accept/Decline buttons render inline inside a
-  // notification item, in both the popover and the persistent list.
-  [document.getElementById('wdsNotifPop'), document.getElementById('wdsNotifList')].forEach(el => {
-    if (!el) return;
-    el.addEventListener('click', e => {
-      const acceptBtn = e.target.closest('[data-accept-friend]');
-      if (acceptBtn) { wdsRespondFriendRequest(acceptBtn.dataset.acceptFriend, true); return; }
-      const declineBtn = e.target.closest('[data-decline-friend]');
-      if (declineBtn) { wdsRespondFriendRequest(declineBtn.dataset.declineFriend, false); }
-    });
+  // notification item in the bell dropdown.
+  notifPop.addEventListener('click', e => {
+    const acceptBtn = e.target.closest('[data-accept-friend]');
+    if (acceptBtn) { wdsRespondFriendRequest(acceptBtn.dataset.acceptFriend, true); return; }
+    const declineBtn = e.target.closest('[data-decline-friend]');
+    if (declineBtn) { wdsRespondFriendRequest(declineBtn.dataset.declineFriend, false); }
   });
 
   // Friends card — "+ Add Friend" reveals a Digital ID input; Send calls
@@ -1984,7 +1981,9 @@ function renderWdsNotifications() {
 
   const history = wdsLoadNotifHistory();
   const unreadCount = history.filter(n => !n.read).length;
-  badge.textContent = String(unreadCount);
+  // Plain dot, not a count — the badge just signals "something's new,"
+  // cleared the moment the bell dropdown (the only place notifications
+  // render now) is opened, via wdsMarkAllNotificationsRead below.
   badge.hidden = unreadCount === 0;
 
   // Unread first (newest first), then read history sunk below — nothing
@@ -1994,10 +1993,7 @@ function renderWdsNotifications() {
     return new Date(b.createdAt) - new Date(a.createdAt);
   });
   const itemHtml = n => `<div class="wds-notif-item${n.read ? ' is-read' : ''}"><p style="margin:0;"><strong>${escapeHtml(n.title)}</strong> — ${escapeHtml(n.body)}</p>${n.actionsHtml ? `<div class="wds-notif-item-actions">${n.actionsHtml}</div>` : ''}</div>`;
-  const html = sorted.length ? sorted.map(itemHtml).join('') : '<p class="wds-notif-item">No notifications.</p>';
-  pop.innerHTML = html;
-  const list = document.getElementById('wdsNotifList');
-  if (list) list.innerHTML = sorted.length ? sorted.map(itemHtml).join('') : '<p class="empty-note">No notifications.</p>';
+  pop.innerHTML = sorted.length ? sorted.map(itemHtml).join('') : '<p class="wds-notif-item">No notifications.</p>';
 }
 
 // Discord/Slack-style link preview — no video hosting of our own, just
