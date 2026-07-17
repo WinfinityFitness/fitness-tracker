@@ -1,0 +1,17 @@
+{
+  "name": "Winfinity Wellness Dashboard",
+  "short_name": "Wellness",
+  "description": "Desktop-style command center for your Winfinity Fitness Tracker data — dashboard, Nexus Feed, chat, and your profile.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#060a0d",
+  "theme_color": "#060a0d",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

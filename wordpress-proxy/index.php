@@ -98,4 +98,18 @@ foreach (preg_split('/\r\n/', $result['rawHeaders']) as $line) {
 }
 header('Cache-Control: no-store, must-revalidate');
 
-echo $result['body'];
+$body = $result['body'];
+// Swap in a wellness-specific manifest for HTML responses only, so
+// "Add to Home Screen"/"Install" on this domain installs as its own app
+// ("Winfinity Wellness Dashboard", manifest-wellness.webmanifest) instead
+// of reusing the mobile app's own manifest.webmanifest — installing both
+// would otherwise put two identically-named/-iconed shortcuts on the same
+// home screen with no way to tell them apart.
+if ($result['contentType'] && stripos($result['contentType'], 'text/html') !== false) {
+    $body = str_replace(
+        '<link rel="manifest" href="manifest.webmanifest">',
+        '<link rel="manifest" href="manifest-wellness.webmanifest">',
+        $body
+    );
+}
+echo $body;

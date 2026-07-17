@@ -5292,9 +5292,13 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
 .wds-profile-cover {
   height: 440px; background: var(--gradient-bar); background-size: cover; background-position: center;
   position: relative; display: flex; align-items: flex-start; justify-content: space-between; padding: 14px;
-  overflow: hidden; touch-action: none;
+  overflow: hidden;
 }
-.wds-profile-cover--repositioning { cursor: grab; }
+/* touch-action:none only while actually repositioning — applied to the
+   whole cover unconditionally, it was suppressing tap/click gesture
+   synthesis for every child on touch devices, including the "Edit Cover
+   Photo" button itself (that's what broke it opening the file picker). */
+.wds-profile-cover--repositioning { cursor: grab; touch-action: none; }
 .wds-profile-cover--repositioning:active { cursor: grabbing; }
 .wds-profile-cover-error { max-width: 900px; margin: 8px auto 0; padding: 0 24px; box-sizing: border-box; }
 .wds-profile-cover-hint {
