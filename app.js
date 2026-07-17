@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.36.0';
+const APP_VERSION = 'WF_SYS_V.37.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -49,6 +49,23 @@ const isDesktopShellSite = location.hostname === DESKTOP_SHELL_HOST;
 // targets, body fat %, etc.) against a signed-in operator's real remote data
 // without touching any of those functions' call sites.
 let wdsRemoteData = null;
+
+// Desktop Messenger-style chat (DMs + group chatrooms) — reuses the exact
+// same chat_rooms/chat_room_members tables and RPCs (start_dm_by_name,
+// create_chat_room, invite_to_chat_room, leave_chat_room, delete_chat_room,
+// kick_chat_room_member) the mobile app's own group-chat feature already
+// uses, just with new wds*-prefixed state so it never collides with
+// mobile's own currentChatRoomId/chatRoomMeta globals (Global Chat itself
+// is untouched — it still runs on the pre-existing refreshWdsChat() path).
+let wdsChatRoomMeta = {}; // roomId -> {name, isDm, createdByKey, joinedByMe, lastMessage, lastMessageAt}
+let wdsChatLastRead = {}; // roomId -> ISO timestamp, persisted below
+try { wdsChatLastRead = JSON.parse(localStorage.getItem('wft_web_chat_last_read')) || {}; } catch (e) { wdsChatLastRead = {}; }
+function wdsSaveChatLastRead() { localStorage.setItem('wft_web_chat_last_read', JSON.stringify(wdsChatLastRead)); }
+let wdsOpenChatPopupIds = [];
+let wdsChatListTab = 'all';
+let wdsChatListSearchText = '';
+let wdsNewGroupInviteIds = [];
+let wdsChatUserMenuTarget = null;
 
 // Preview build: the dashboard below is illustrative/sample data, not real
 // per-operator records — full per-operator data needs a real cloud-sync
@@ -663,17 +680,6 @@ function initDesktopShell() {
     if (listEl) listEl.innerHTML = '<p class="empty-note">Friend requests are coming soon.</p>';
   });
 
-  // Refresh — re-fetches the signed-in account's data (dashboard doesn't
-  // auto-poll; only chat does), reusing the same remembered session
-  // credentials the reload-resume path below uses.
-  const refreshBtn = document.getElementById('wdsRefreshBtn');
-  refreshBtn.addEventListener('click', async () => {
-    const id = sessionStorage.getItem(SESSION_ID_KEY);
-    const pin = sessionStorage.getItem(SESSION_PIN_KEY);
-    if (!id || !pin) return;
-    refreshBtn.classList.add('is-spinning');
-    try { await enterDashboard(id, pin); } finally { refreshBtn.classList.remove('is-spinning'); }
-  });
 
   // Menu tab — sign out (duplicate of the topnav button, for convenience)
   // and a local-only theme toggle (does not touch the synced profile).
@@ -700,6 +706,162 @@ function initDesktopShell() {
     if (!notifPop.hidden && !notifPop.contains(e.target) && e.target !== bellBtn) {
       notifPop.hidden = true;
     }
+  });
+
+  // Chats panel — opened from the header chat icon (replaces the old
+  // manual refresh button; the dashboard still auto-refreshes every 2min).
+  const chatListBtn = document.getElementById('wdsChatListBtn');
+  const chatListPop = document.getElementById('wdsChatListPop');
+  chatListBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    chatListPop.hidden = !chatListPop.hidden;
+    if (!chatListPop.hidden) refreshWdsChatRooms();
+  });
+  document.addEventListener('click', e => {
+    if (!chatListPop.hidden && !chatListPop.contains(e.target) && e.target !== chatListBtn) {
+      chatListPop.hidden = true;
+    }
+  });
+  ['btnWdsChatTabAll', 'btnWdsChatTabUnread', 'btnWdsChatTabGroups'].forEach(id => {
+    const btn = document.getElementById(id);
+    btn.addEventListener('click', () => {
+      wdsChatListTab = btn.dataset.tab;
+      document.querySelectorAll('.wds-chat-list-tab').forEach(t => t.classList.toggle('is-active', t.id === id));
+      renderWdsChatListPanel();
+    });
+  });
+  document.getElementById('wdsChatListSearch').addEventListener('input', e => {
+    wdsChatListSearchText = e.target.value;
+    renderWdsChatListPanel();
+  });
+  document.getElementById('wdsChatListItems').addEventListener('click', async e => {
+    const acceptEl = e.target.closest('[data-accept-invite]');
+    if (acceptEl) {
+      if (!wdsRemoteData) return;
+      await sb.from('chat_room_members').update({ status: 'joined' }).eq('room_id', acceptEl.dataset.acceptInvite).eq('share_key', wdsRemoteData.shareKey);
+      await refreshWdsChatRooms();
+      return;
+    }
+    const declineEl = e.target.closest('[data-decline-invite]');
+    if (declineEl) {
+      if (!wdsRemoteData) return;
+      await sb.from('chat_room_members').delete().eq('room_id', declineEl.dataset.declineInvite).eq('share_key', wdsRemoteData.shareKey);
+      await refreshWdsChatRooms();
+      return;
+    }
+    const item = e.target.closest('[data-room-id]');
+    if (item) { wdsOpenChatPopup(item.dataset.roomId); chatListPop.hidden = true; }
+  });
+
+  // New Group Chatroom composer.
+  const newGroupOverlay = document.getElementById('wdsNewGroupOverlay');
+  const newGroupErrorEl = document.getElementById('wdsNewGroupError');
+  function wdsRenderNewGroupChips() {
+    const container = document.getElementById('wdsNewGroupChips');
+    container.innerHTML = wdsNewGroupInviteIds.map(id => `<span class="invite-chip">${escapeHtml(id)}<button type="button" data-remove-id="${escapeHtml(id)}" aria-label="Remove">✕</button></span>`).join('');
+    container.querySelectorAll('[data-remove-id]').forEach(btn => {
+      btn.addEventListener('click', () => { wdsNewGroupInviteIds = wdsNewGroupInviteIds.filter(id => id !== btn.dataset.removeId); wdsRenderNewGroupChips(); });
+    });
+  }
+  document.getElementById('btnWdsNewGroup').addEventListener('click', () => {
+    chatListPop.hidden = true;
+    document.getElementById('wdsNewGroupName').value = '';
+    document.getElementById('wdsNewGroupInviteInput').value = '';
+    wdsNewGroupInviteIds = [];
+    wdsRenderNewGroupChips();
+    newGroupErrorEl.hidden = true;
+    newGroupOverlay.hidden = false;
+  });
+  document.getElementById('btnWdsNewGroupClose').addEventListener('click', () => { newGroupOverlay.hidden = true; });
+  bindOverlayBackdropClose(newGroupOverlay, () => { newGroupOverlay.hidden = true; });
+  const wdsAddNewGroupInvitee = () => {
+    const input = document.getElementById('wdsNewGroupInviteInput');
+    const id = input.value.trim().toUpperCase();
+    if (id && !wdsNewGroupInviteIds.includes(id)) { wdsNewGroupInviteIds.push(id); wdsRenderNewGroupChips(); }
+    input.value = '';
+  };
+  document.getElementById('btnWdsNewGroupAddInvitee').addEventListener('click', wdsAddNewGroupInvitee);
+  document.getElementById('wdsNewGroupInviteInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); wdsAddNewGroupInvitee(); } });
+  document.getElementById('btnWdsNewGroupCreate').addEventListener('click', async () => {
+    newGroupErrorEl.hidden = true;
+    const name = document.getElementById('wdsNewGroupName').value.trim();
+    if (!name) { newGroupErrorEl.textContent = 'Enter a group name.'; newGroupErrorEl.hidden = false; return; }
+    if (!wdsRemoteData) return;
+    try {
+      const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
+      const { data, error } = await sb.rpc('create_chat_room', {
+        p_name: name, p_creator_key: wdsRemoteData.shareKey, p_creator_name: codeName, p_invitee_ids: wdsNewGroupInviteIds,
+      });
+      if (error) throw error;
+      newGroupOverlay.hidden = true;
+      await refreshWdsChatRooms();
+      wdsOpenChatPopup(data);
+    } catch (e) {
+      newGroupErrorEl.textContent = 'Could not create group: ' + ((e && e.message) || 'unknown error');
+      newGroupErrorEl.hidden = false;
+    }
+  });
+
+  // Floating popup windows — delegated since they're created dynamically.
+  const chatPopupsWrap = document.getElementById('wdsChatPopupsWrap');
+  chatPopupsWrap.addEventListener('click', async e => {
+    const closeBtn = e.target.closest('[data-close-popup]');
+    if (closeBtn) { wdsCloseChatPopup(closeBtn.dataset.closePopup); return; }
+    const lightboxImg = e.target.closest('[data-lightbox]');
+    if (lightboxImg) { e.stopPropagation(); openChatLightbox(lightboxImg.dataset.lightbox); return; }
+    const nameEl = e.target.closest('[data-dm-name]');
+    if (nameEl) { wdsOpenChatUserMenu(nameEl.dataset.dmName, e.clientX, e.clientY); return; }
+    const sendBtn = e.target.closest('[data-popup-send]');
+    if (sendBtn) {
+      const roomId = sendBtn.dataset.popupSend;
+      const input = chatPopupsWrap.querySelector(`[data-popup-input="${roomId}"]`);
+      if (!input || !input.value.trim() || !wdsRemoteData) return;
+      const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
+      const text = input.value;
+      input.value = '';
+      try {
+        await postChatMessage(text, null, wdsRemoteData.shareKey, codeName, roomId);
+        await wdsRefreshChatPopup(roomId);
+        await refreshWdsChatRooms();
+      } catch (err) { /* best effort */ }
+    }
+  });
+  chatPopupsWrap.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.matches('[data-popup-input]')) {
+      const roomId = e.target.dataset.popupInput;
+      const sendBtn = chatPopupsWrap.querySelector(`[data-popup-send="${roomId}"]`);
+      if (sendBtn) sendBtn.click();
+    }
+  });
+
+  // Per-user chat context menu — shared by Global Chat and every popup.
+  const chatUserMenu = document.getElementById('wdsChatUserMenu');
+  document.getElementById('btnWdsChatUserDm').addEventListener('click', () => {
+    const target = wdsChatUserMenuTarget;
+    wdsCloseChatUserMenu();
+    wdsStartDM(target);
+  });
+  document.getElementById('btnWdsChatUserInvite').addEventListener('click', () => {
+    wdsRenderChatUserMenuGroups();
+    document.getElementById('wdsChatUserMenuMain').hidden = true;
+    document.getElementById('wdsChatUserMenuGroups').hidden = false;
+  });
+  document.getElementById('wdsChatUserMenuGroups').addEventListener('click', e => {
+    const btn = e.target.closest('[data-invite-room]');
+    if (btn) { wdsInviteUserToRoom(wdsChatUserMenuTarget, btn.dataset.inviteRoom); wdsCloseChatUserMenu(); }
+  });
+  document.getElementById('btnWdsChatUserCopyId').addEventListener('click', () => {
+    wdsCopyChatUserDigitalId(wdsChatUserMenuTarget);
+    wdsCloseChatUserMenu();
+  });
+  document.addEventListener('click', e => {
+    if (!chatUserMenu.hidden && !chatUserMenu.contains(e.target) && !e.target.closest('[data-dm-name]')) wdsCloseChatUserMenu();
+  });
+
+  // Global Chat's own sender names open the same context menu.
+  document.getElementById('wdsChatList').addEventListener('click', e => {
+    const nameEl = e.target.closest('[data-dm-name]');
+    if (nameEl) { e.stopPropagation(); wdsOpenChatUserMenu(nameEl.dataset.dmName, e.clientX, e.clientY); }
   });
 
   // A Digital ID + PIN entered earlier in this browser tab's session
@@ -1122,6 +1284,249 @@ async function refreshWdsChat() {
   }
 }
 
+// ---------------------------------------------------------------------
+// Desktop Messenger-style chat — DMs and group chatrooms, layered on top
+// of the exact same backend the mobile app's group-chat feature uses
+// (see the module-level wdsChat* state declared near wdsRemoteData).
+// Global Chat itself is untouched by any of this.
+// ---------------------------------------------------------------------
+
+function wdsChatThreadList() {
+  return Object.entries(wdsChatRoomMeta)
+    .filter(([id, m]) => m.isDm || m.joinedByMe)
+    .map(([id, m]) => Object.assign({ id }, m))
+    .sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
+}
+function wdsIsRoomUnread(roomId, meta) {
+  if (!meta.lastMessageAt) return false;
+  const lastRead = wdsChatLastRead[roomId];
+  return !lastRead || new Date(meta.lastMessageAt) > new Date(lastRead);
+}
+
+async function refreshWdsChatRooms() {
+  if (!wdsRemoteData) return;
+  const myShareKey = wdsRemoteData.shareKey;
+  try {
+    sb.rpc('cleanup_stale_solo_rooms').catch(() => {});
+    const { data: memberRows } = await sb.from('chat_room_members').select('room_id, status').eq('share_key', myShareKey);
+    const roomIds = (memberRows || []).map(r => r.room_id);
+    if (!roomIds.length) { wdsChatRoomMeta = {}; renderWdsChatListPanel(); return; }
+
+    const { data: rooms } = await sb.from('chat_rooms').select('id, name, is_dm, created_by_key').in('id', roomIds);
+    const dmRoomIds = (rooms || []).filter(r => r.is_dm).map(r => r.id);
+    const dmMembersByRoom = {};
+    if (dmRoomIds.length) {
+      const { data: dmMembers } = await sb.from('chat_room_members').select('room_id, share_key, code_name').in('room_id', dmRoomIds);
+      (dmMembers || []).forEach(m => { (dmMembersByRoom[m.room_id] = dmMembersByRoom[m.room_id] || []).push(m); });
+    }
+
+    // Last message per room, for the thread-list preview text — fetched
+    // as one query (newest first) and reduced client-side to the first
+    // (i.e. newest) row per room_id, same trick used for My Day/feed data
+    // elsewhere in this file.
+    const { data: recentMsgs } = await sb.from('chat_messages')
+      .select('room_id, message, image_url, deleted, created_at')
+      .in('room_id', roomIds)
+      .order('created_at', { ascending: false })
+      .limit(300);
+    const lastMsgByRoom = {};
+    (recentMsgs || []).forEach(m => { if (!lastMsgByRoom[m.room_id]) lastMsgByRoom[m.room_id] = m; });
+
+    const meta = {};
+    (rooms || []).forEach(r => {
+      const memberRow = (memberRows || []).find(mr => mr.room_id === r.id);
+      let name = r.name;
+      if (r.is_dm) {
+        const other = (dmMembersByRoom[r.id] || []).find(m => m.share_key !== myShareKey);
+        if (other) name = other.code_name;
+      }
+      const last = lastMsgByRoom[r.id];
+      meta[r.id] = {
+        name, isDm: r.is_dm, createdByKey: r.created_by_key,
+        joinedByMe: memberRow ? memberRow.status === 'joined' : false,
+        lastMessage: last ? (last.deleted ? 'Message unsent' : (last.image_url ? '📷 Photo' : last.message)) : '',
+        lastMessageAt: last ? last.created_at : null,
+      };
+    });
+    wdsChatRoomMeta = meta;
+  } catch (e) { /* best effort */ }
+  renderWdsChatListPanel();
+}
+
+function renderWdsChatListPanel() {
+  const listEl = document.getElementById('wdsChatListItems');
+  const badge = document.getElementById('wdsChatListBadge');
+  if (!listEl) return;
+  let threads = wdsChatThreadList();
+  const unreadCount = threads.filter(t => wdsIsRoomUnread(t.id, t)).length;
+  if (badge) { badge.textContent = String(unreadCount); badge.hidden = unreadCount === 0; }
+
+  const pending = Object.entries(wdsChatRoomMeta).filter(([id, m]) => !m.isDm && !m.joinedByMe);
+  const pendingHtml = pending.length ? `<div class="wds-chat-thread-item" style="cursor:default;">
+      <div class="wds-chat-thread-avatar wds-chat-thread-avatar--group">👥</div>
+      <div class="wds-chat-thread-body">
+        <div class="wds-chat-thread-name">${pending.length} group invite${pending.length === 1 ? '' : 's'}</div>
+        <div class="wds-chat-thread-preview">${pending.map(([id, m]) =>
+          `<span data-accept-invite="${id}" style="text-decoration:underline;cursor:pointer;margin-right:8px;">${escapeHtml(m.name)}: Accept</span><span data-decline-invite="${id}" style="text-decoration:underline;cursor:pointer;color:var(--critical);">Decline</span>`
+        ).join(' · ')}</div>
+      </div>
+    </div>` : '';
+
+  if (wdsChatListTab === 'unread') threads = threads.filter(t => wdsIsRoomUnread(t.id, t));
+  else if (wdsChatListTab === 'groups') threads = threads.filter(t => !t.isDm);
+  const q = wdsChatListSearchText.trim().toLowerCase();
+  if (q) threads = threads.filter(t => (t.name || '').toLowerCase().includes(q));
+
+  if (!threads.length && !pendingHtml) { listEl.innerHTML = '<p class="empty-note">No conversations yet.</p>'; return; }
+  listEl.innerHTML = pendingHtml + threads.map(t => {
+    const unread = wdsIsRoomUnread(t.id, t);
+    const initial = escapeHtml((t.name || '?').charAt(0).toUpperCase());
+    return `<div class="wds-chat-thread-item${unread ? ' is-unread' : ''}" data-room-id="${t.id}">
+      <div class="wds-chat-thread-avatar${t.isDm ? '' : ' wds-chat-thread-avatar--group'}">${t.isDm ? initial : '👥'}</div>
+      <div class="wds-chat-thread-body">
+        <div class="wds-chat-thread-name">${escapeHtml(t.name || 'Unknown')}${unread ? '<span class="wds-chat-thread-dot"></span>' : ''}</div>
+        <div class="wds-chat-thread-preview">${escapeHtml(t.lastMessage || 'No messages yet')}</div>
+      </div>
+      <span class="wds-chat-thread-time">${t.lastMessageAt ? wdsRelativeTime(t.lastMessageAt) : ''}</span>
+    </div>`;
+  }).join('');
+}
+
+async function wdsFetchRoomMessages(roomId) {
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await sb.from('chat_messages')
+    .select('id, code_name, message, image_url, created_at, deleted, sender_share_key')
+    .eq('room_id', roomId)
+    .gte('created_at', cutoff)
+    .order('created_at', { ascending: false })
+    .limit(50);
+  if (error) throw error;
+  return (data || []).slice().reverse();
+}
+
+function wdsRenderChatPopupMessages(roomId, messages) {
+  const popup = document.querySelector(`.wds-chat-popup[data-room-id="${roomId}"]`);
+  if (!popup) return;
+  const listEl = popup.querySelector('.wds-chat-popup-list');
+  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+  const meta = wdsChatRoomMeta[roomId] || {};
+  if (!messages.length) { listEl.innerHTML = '<p class="empty-note">No messages yet. Say hi!</p>'; return; }
+  listEl.innerHTML = messages.map(m => {
+    const isOwn = !!myShareKey && String(m.sender_share_key).trim().toLowerCase() === String(myShareKey).trim().toLowerCase();
+    const showName = !isOwn && !meta.isDm;
+    const time = new Date(m.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    const bodyHtml = m.deleted
+      ? `<span class="chat-msg chat-msg-unsent">Unsent a message</span>`
+      : `${m.image_url ? `<img class="chat-msg-image" src="${escapeHtml(m.image_url)}" alt="" data-lightbox="${escapeHtml(m.image_url)}">` : ''}<span class="chat-msg">${escapeHtml(m.message)}</span>`;
+    return `<div class="chat-row ${isOwn ? 'chat-row--own' : 'chat-row--other'}">
+      ${showName ? `<span class="chat-name" data-dm-name="${escapeHtml(m.code_name || 'Anonymous')}" style="cursor:pointer;">${escapeHtml(m.code_name || 'Anonymous')}</span>` : ''}
+      <div class="chat-bubble">${bodyHtml}<span class="chat-time">${time}</span></div>
+    </div>`;
+  }).join('');
+  listEl.scrollTop = listEl.scrollHeight;
+}
+
+async function wdsRefreshChatPopup(roomId) {
+  const popup = document.querySelector(`.wds-chat-popup[data-room-id="${roomId}"]`);
+  if (!popup) return;
+  try {
+    const messages = await wdsFetchRoomMessages(roomId);
+    wdsRenderChatPopupMessages(roomId, messages);
+  } catch (e) {
+    popup.querySelector('.wds-chat-popup-list').innerHTML = '<p class="empty-note">Could not load messages.</p>';
+  }
+}
+
+async function wdsOpenChatPopup(roomId) {
+  if (!wdsRemoteData || !roomId) return;
+  let popup = document.querySelector(`.wds-chat-popup[data-room-id="${roomId}"]`);
+  if (!popup) {
+    const meta = wdsChatRoomMeta[roomId] || { name: 'Chat' };
+    popup = document.createElement('div');
+    popup.className = 'wds-chat-popup';
+    popup.dataset.roomId = roomId;
+    popup.innerHTML = `
+      <div class="wds-chat-popup-head">
+        <strong>${escapeHtml(meta.name || 'Chat')}</strong>
+        <button type="button" class="wds-chat-popup-close" data-close-popup="${roomId}" aria-label="Close">✕</button>
+      </div>
+      <div class="wds-chat-popup-list"><p class="empty-note">Loading…</p></div>
+      <div class="wds-chat-popup-input-row">
+        <input type="text" placeholder="Aa" maxlength="280" data-popup-input="${roomId}">
+        <button type="button" class="wds-mini-btn" data-popup-send="${roomId}">Send</button>
+      </div>`;
+    const wrap = document.getElementById('wdsChatPopupsWrap');
+    if (wrap) wrap.appendChild(popup);
+    if (!wdsOpenChatPopupIds.includes(roomId)) wdsOpenChatPopupIds.push(roomId);
+  }
+  wdsChatLastRead[roomId] = new Date().toISOString();
+  wdsSaveChatLastRead();
+  await wdsRefreshChatPopup(roomId);
+  renderWdsChatListPanel();
+}
+function wdsCloseChatPopup(roomId) {
+  const popup = document.querySelector(`.wds-chat-popup[data-room-id="${roomId}"]`);
+  if (popup) popup.remove();
+  wdsOpenChatPopupIds = wdsOpenChatPopupIds.filter(id => id !== roomId);
+}
+
+function wdsCloseChatUserMenu() {
+  const menu = document.getElementById('wdsChatUserMenu');
+  if (menu) menu.hidden = true;
+  const groups = document.getElementById('wdsChatUserMenuGroups');
+  const main = document.getElementById('wdsChatUserMenuMain');
+  if (groups) groups.hidden = true;
+  if (main) main.hidden = false;
+}
+function wdsOpenChatUserMenu(name, x, y) {
+  wdsChatUserMenuTarget = name;
+  const menu = document.getElementById('wdsChatUserMenu');
+  if (!menu) return;
+  document.getElementById('wdsChatUserMenuName').textContent = name;
+  document.getElementById('wdsChatUserMenuGroups').hidden = true;
+  document.getElementById('wdsChatUserMenuMain').hidden = false;
+  menu.hidden = false;
+  const menuWidth = 220;
+  menu.style.left = Math.max(8, Math.min(x, window.innerWidth - menuWidth - 12)) + 'px';
+  menu.style.top = Math.max(8, Math.min(y, window.innerHeight - 160)) + 'px';
+}
+async function wdsStartDM(otherName) {
+  if (!wdsRemoteData) return;
+  const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
+  try {
+    const { data, error } = await sb.rpc('start_dm_by_name', {
+      p_my_key: wdsRemoteData.shareKey, p_my_name: codeName, p_other_name: otherName,
+    });
+    if (error || !data) return;
+    await refreshWdsChatRooms();
+    wdsOpenChatPopup(data);
+  } catch (e) { /* best effort */ }
+}
+function wdsRenderChatUserMenuGroups() {
+  const container = document.getElementById('wdsChatUserMenuGroups');
+  if (!container) return;
+  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+  const myGroups = Object.entries(wdsChatRoomMeta).filter(([id, m]) => !m.isDm && m.createdByKey === myShareKey);
+  if (!myGroups.length) { container.innerHTML = '<p class="empty-note">You haven\'t created a group yet.</p>'; return; }
+  container.innerHTML = myGroups.map(([id, m]) => `<button type="button" class="chat-room-menu-item" data-invite-room="${id}">${escapeHtml(m.name)}</button>`).join('');
+}
+async function wdsInviteUserToRoom(name, roomId) {
+  if (!wdsRemoteData) return;
+  try {
+    const { data: lb } = await sb.from('leaderboard').select('public_id').eq('code_name', name).limit(1).maybeSingle();
+    if (!lb || !lb.public_id) return;
+    await sb.rpc('invite_to_chat_room', { p_room_id: roomId, p_inviter_key: wdsRemoteData.shareKey, p_invitee_ids: [lb.public_id] });
+    await refreshWdsChatRooms();
+  } catch (e) { /* best effort */ }
+}
+async function wdsCopyChatUserDigitalId(name) {
+  try {
+    const { data: lb } = await sb.from('leaderboard').select('public_id').eq('code_name', name).limit(1).maybeSingle();
+    if (!lb || !lb.public_id) return;
+    await navigator.clipboard.writeText(lb.public_id);
+  } catch (e) { /* best effort */ }
+}
+
 // Real notification content — replaces the original mock list. Covers
 // today's logging status, a low-hydration nudge (afternoon-onward), hitting
 // the current mode-progress target, and unread Nexus messages (tracked via
@@ -1289,7 +1694,7 @@ function renderWdsChatMessages(messages, receipts) {
     const row = document.createElement('div');
     row.className = 'chat-row ' + (isOwn ? 'chat-row--own' : 'chat-row--other');
     const time = new Date(m.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-    const nameHtml = !isOwn ? `<span class="chat-name">${escapeHtml(m.code_name || 'Anonymous')}</span>` : '';
+    const nameHtml = !isOwn ? `<span class="chat-name" data-dm-name="${escapeHtml(m.code_name || 'Anonymous')}" style="cursor:pointer;">${escapeHtml(m.code_name || 'Anonymous')}</span>` : '';
     const myReaction = (m.reactions || []).find(r => r.share_key === myShareKey);
     const imageHtml = (!m.deleted && m.image_url) ? `<img class="chat-msg-image" src="${m.image_url}" alt="Shared photo" data-lightbox="${m.image_url}">` : '';
     const videoHtml = m.deleted ? '' : wdsExtractVideoEmbed(m.message);
@@ -11369,7 +11774,12 @@ async function fetchChatMessages() {
 // real signed-in account (wdsRemoteData.shareKey / profile name) instead of
 // this device's own local identity — every mobile call site omits them and
 // gets the exact same behavior as before.
-async function postChatMessage(text, imageDataUrl, shareKeyOverride, codeNameOverride) {
+// roomIdOverride lets a caller target a SPECIFIC room explicitly (the
+// desktop Messenger popups do this) without touching the shared
+// currentChatRoomId global mobile's own room switcher uses — passing
+// undefined (every pre-existing call site) preserves the old behavior
+// exactly.
+async function postChatMessage(text, imageDataUrl, shareKeyOverride, codeNameOverride, roomIdOverride) {
   const trimmed = text.trim().slice(0, 280);
   if (!trimmed && !imageDataUrl) return;
 
@@ -11380,7 +11790,7 @@ async function postChatMessage(text, imageDataUrl, shareKeyOverride, codeNameOve
     code_name: codeNameOverride || effectiveLeaderboardName(),
     message: trimmed,
     image_url: imageUrl,
-    room_id: currentChatRoomId || null,
+    room_id: roomIdOverride !== undefined ? roomIdOverride : (currentChatRoomId || null),
     sender_share_key: shareKeyOverride || getOrCreateShareKey(),
   });
   if (error) throw error;
