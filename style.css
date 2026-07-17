@@ -1818,6 +1818,14 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .chat-row--other { align-self: flex-start; align-items: flex-start; }
 .chat-name { display: block; color: var(--cyan); font-weight: 700; font-size: 0.6rem; margin: 0 0 2px 8px; }
 .chat-name-link { cursor: pointer; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 2px; }
+/* Bubble + timestamp sit side by side, time OUTSIDE the bubble on the
+   inner edge (opposite whichever side the bubble itself hugs) — own
+   messages hug the right, so their time sits just to the LEFT of the
+   bubble; received messages hug the left, so their time sits to the
+   RIGHT. Same DOM order (bubble then time) for both; row-reverse on the
+   own variant is what flips the visual side without duplicating markup. */
+.chat-bubble-line { display: flex; align-items: flex-end; gap: 5px; max-width: 100%; }
+.chat-row--own .chat-bubble-line { flex-direction: row-reverse; }
 .chat-bubble {
   position: relative;
   display: inline-flex;
@@ -1833,7 +1841,7 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .chat-row--other .chat-bubble { border-color: var(--violet); border-bottom-left-radius: 3px; }
 .chat-msg { color: var(--text-primary); font-size: 0.78rem; line-height: 1.35; word-break: break-word; }
 .chat-msg-unsent { font-style: italic; color: var(--text-muted); }
-.chat-time { font-family: var(--font-mono); font-size: 0.56rem; color: var(--text-muted); flex: none; white-space: nowrap; }
+.chat-time { font-family: var(--font-mono); font-size: 0.56rem; color: var(--text-muted); flex: none; white-space: nowrap; padding-bottom: 4px; }
 /* "Seen by" row — desktop-only, under the most recent message only. */
 .wds-chat-seen-row { display: flex; align-self: flex-end; margin: 2px 4px 0 0; }
 .wds-chat-seen-avatar {
@@ -4984,8 +4992,9 @@ html.wf-desktop-shell #wdsShell {
   background: transparent; border: 1px solid var(--border-soft); color: var(--text-secondary);
   font-size: 0.68rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
   padding: 9px 16px; border-radius: 20px; cursor: pointer; font-family: var(--font-display);
-  white-space: nowrap;
+  white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;
 }
+.wds-logout-icon { flex-shrink: 0; }
 .wds-logout-btn:hover { color: var(--text-primary); border-color: var(--border); background: var(--surface-2); }
 
 /* ---------- Main / grid ---------- */
@@ -5278,6 +5287,23 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
 
 @media (max-width: 1400px) {
   .wds-unified { grid-template-columns: 22% 1fr 26%; }
+}
+
+/* Mobile view of the desktop wellness dashboard — feed-only, no
+   horizontal scroll. The stats/notifications columns are desktop
+   furniture that doesn't fit a phone screen; only the center feed makes
+   sense there. */
+@media (max-width: 860px) {
+  html.wf-desktop-shell body { overflow-x: hidden; }
+  .wds-unified {
+    display: block; min-width: 0; max-width: 100%; margin: 0; padding: 12px 8px 40px;
+  }
+  .wds-uni-left, .wds-uni-right { display: none; }
+  .wds-uni-center { width: 100%; }
+  .wds-topnav-brand span { display: none; }
+  .wds-logout-label { display: none; }
+  .wds-logout-btn { padding: 9px; border-radius: 50%; }
+  .wds-global-chat-fixed { left: 8px; width: calc(100vw - 16px); }
 }
 
 .wds-card {

@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.44.0';
+const APP_VERSION = 'WF_SYS_V.45.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -209,6 +209,7 @@ function initDesktopShell() {
   }));
 
   signOutBtn.addEventListener('click', () => {
+    if (!confirm('Log out?')) return;
     sessionStorage.removeItem(SESSION_ID_KEY);
     sessionStorage.removeItem(SESSION_PIN_KEY);
     wdsRemoteData = null;
@@ -775,11 +776,21 @@ function initDesktopShell() {
   // Chats panel — opened from the header chat icon (replaces the old
   // manual refresh button; the dashboard still auto-refreshes every 2min).
   // Global Chat minimize toggle — collapses the fixed bottom-left widget
-  // down to a small globe-icon button in the same corner.
+  // down to a small globe-icon button in the same corner. On narrow
+  // (mobile) viewports it also starts minimized by default, opens
+  // full-width, and auto-closes on an outside click — matching how the
+  // DM/group popups already behave there, instead of permanently
+  // occupying the screen the way it does on desktop.
+  const WDS_MOBILE_BREAKPOINT = 860;
+  const isWdsMobileViewport = () => window.innerWidth <= WDS_MOBILE_BREAKPOINT;
   const globalChatFixed = document.getElementById('wdsGlobalChatFixed');
   const globalChatMinimizeBtn = document.getElementById('btnWdsGlobalChatMinimize');
   const globalChatCollapsedIcon = document.getElementById('wdsGlobalChatCollapsedIcon');
   if (globalChatFixed && globalChatMinimizeBtn && globalChatCollapsedIcon) {
+    if (isWdsMobileViewport()) {
+      globalChatFixed.hidden = true;
+      globalChatCollapsedIcon.hidden = false;
+    }
     globalChatMinimizeBtn.addEventListener('click', () => {
       globalChatFixed.hidden = true;
       globalChatCollapsedIcon.hidden = false;
@@ -787,6 +798,12 @@ function initDesktopShell() {
     globalChatCollapsedIcon.addEventListener('click', () => {
       globalChatFixed.hidden = false;
       globalChatCollapsedIcon.hidden = true;
+    });
+    document.addEventListener('click', e => {
+      if (isWdsMobileViewport() && !globalChatFixed.hidden && !globalChatFixed.contains(e.target) && e.target !== globalChatCollapsedIcon) {
+        globalChatFixed.hidden = true;
+        globalChatCollapsedIcon.hidden = false;
+      }
     });
   }
 
@@ -1513,7 +1530,10 @@ function wdsRenderChatPopupMessages(roomId, messages) {
       : `${m.image_url ? `<img class="chat-msg-image" src="${escapeHtml(m.image_url)}" alt="" data-lightbox="${escapeHtml(m.image_url)}">` : ''}<span class="chat-msg">${escapeHtml(m.message)}</span>`;
     return `<div class="chat-row ${isOwn ? 'chat-row--own' : 'chat-row--other'}">
       ${showName ? `<span class="chat-name" data-dm-name="${escapeHtml(m.code_name || 'Anonymous')}" style="cursor:pointer;">${escapeHtml(m.code_name || 'Anonymous')}</span>` : ''}
-      <div class="chat-bubble">${bodyHtml}<span class="chat-time">${time}</span></div>
+      <div class="chat-bubble-line">
+        <div class="chat-bubble">${bodyHtml}</div>
+        <span class="chat-time">${time}</span>
+      </div>
     </div>`;
   }).join('');
   listEl.scrollTop = listEl.scrollHeight;
@@ -1832,15 +1852,15 @@ function renderWdsChatMessages(messages, receipts) {
     const imageHtml = (!m.deleted && m.image_url) ? `<img class="chat-msg-image" src="${m.image_url}" alt="Shared photo" data-lightbox="${m.image_url}">` : '';
     const videoHtml = m.deleted ? '' : wdsExtractVideoEmbed(m.message);
     const bubbleInner = m.deleted
-      ? `<span class="chat-msg chat-msg-unsent">Unsent a message</span><span class="chat-time">${time}</span>`
-      : `${imageHtml}<span class="chat-msg">${escapeHtml(m.message)}</span>${videoHtml}<span class="chat-time">${time}</span>`;
+      ? `<span class="chat-msg chat-msg-unsent">Unsent a message</span>`
+      : `${imageHtml}<span class="chat-msg">${escapeHtml(m.message)}</span>${videoHtml}`;
     const counts = aggregateReactions(m.reactions);
     const totalReactions = (m.reactions || []).length;
     const reactionsHtml = Object.keys(counts).length
       ? `<div class="chat-reactions"><span class="chat-reaction-pill${myReaction ? ' is-mine' : ''}">${Object.keys(counts).join('')}${totalReactions > 1 ? ' ' + totalReactions : ''}</span></div>`
       : '';
     const bubbleClass = 'chat-bubble' + (imageHtml ? ' chat-bubble--has-image' : videoHtml ? ' chat-bubble--has-video' : '');
-    row.innerHTML = `${nameHtml}<div class="${bubbleClass}" data-msg-id="${m.id}" data-deleted="${m.deleted ? 1 : 0}" data-own="${isOwn ? 1 : 0}" data-my-reaction="${myReaction ? myReaction.emoji : ''}">${bubbleInner}${reactionsHtml}</div>`;
+    row.innerHTML = `${nameHtml}<div class="chat-bubble-line"><div class="${bubbleClass}" data-msg-id="${m.id}" data-deleted="${m.deleted ? 1 : 0}" data-own="${isOwn ? 1 : 0}" data-my-reaction="${myReaction ? myReaction.emoji : ''}">${bubbleInner}${reactionsHtml}</div><span class="chat-time">${time}</span></div>`;
     list.appendChild(row);
   });
   list.querySelectorAll('[data-lightbox]').forEach(img => img.addEventListener('click', e => {
@@ -14640,8 +14660,8 @@ function renderChatMessages(messages) {
     const myReaction = (m.reactions || []).find(r => r.share_key === myShareKey);
     const imageHtml = (!m.deleted && m.image_url) ? `<img class="chat-msg-image" src="${m.image_url}" alt="Shared photo" data-lightbox="${m.image_url}">` : '';
     const bubbleInner = m.deleted
-      ? `<span class="chat-msg chat-msg-unsent">Unsent a message</span><span class="chat-time">${time}</span>`
-      : `${imageHtml}<span class="chat-msg">${escapeHtml(m.message)}</span><span class="chat-time">${time}</span>`;
+      ? `<span class="chat-msg chat-msg-unsent">Unsent a message</span>`
+      : `${imageHtml}<span class="chat-msg">${escapeHtml(m.message)}</span>`;
     const counts = aggregateReactions(m.reactions);
     const totalReactions = (m.reactions || []).length;
     // One small combined badge (all distinct emojis + total count) rather
@@ -14651,7 +14671,7 @@ function renderChatMessages(messages) {
       ? `<div class="chat-reactions"><span class="chat-reaction-pill${myReaction ? ' is-mine' : ''}">${Object.keys(counts).join('')}${totalReactions > 1 ? ' ' + totalReactions : ''}</span></div>`
       : '';
     const bubbleClass = 'chat-bubble' + (imageHtml ? ' chat-bubble--has-image' : '');
-    row.innerHTML = `${nameHtml}<div class="${bubbleClass}" data-msg-id="${m.id}" data-deleted="${m.deleted ? 1 : 0}" data-own="${isOwn ? 1 : 0}" data-my-reaction="${myReaction ? myReaction.emoji : ''}">${bubbleInner}${reactionsHtml}</div>`;
+    row.innerHTML = `${nameHtml}<div class="chat-bubble-line"><div class="${bubbleClass}" data-msg-id="${m.id}" data-deleted="${m.deleted ? 1 : 0}" data-own="${isOwn ? 1 : 0}" data-my-reaction="${myReaction ? myReaction.emoji : ''}">${bubbleInner}${reactionsHtml}</div><span class="chat-time">${time}</span></div>`;
     list.appendChild(row);
   });
   list.querySelectorAll('[data-dm-name]').forEach(el => {
