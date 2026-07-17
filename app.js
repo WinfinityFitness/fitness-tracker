@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.43.0';
+const APP_VERSION = 'WF_SYS_V.44.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -687,13 +687,20 @@ function initDesktopShell() {
     const tile = e.target.closest('.wds-profile-grid-tile');
     if (tile) { profileViewListBtn.click(); }
   });
-
-  // Friends — the add-friend backend (requests/accept) isn't built yet;
-  // this is the card shell so the layout is ready for it.
-  const addFriendBtn = document.getElementById('btnWdsProfileAddFriend');
-  if (addFriendBtn) addFriendBtn.addEventListener('click', () => {
-    const listEl = document.getElementById('wdsProfileFriendsList');
-    if (listEl) listEl.innerHTML = '<p class="empty-note">Friend requests are coming soon.</p>';
+  document.getElementById('wdsProfilePostsList').addEventListener('change', async e => {
+    const select = e.target.closest('[data-action="set-visibility"]');
+    if (!select || !wdsRemoteData) return;
+    const postId = Number(select.dataset.postId);
+    const cached = wdsProfilePostsCache.find(p => p.id === postId);
+    const prev = cached ? cached.visibility : 'public';
+    select.disabled = true;
+    try {
+      await sb.rpc('set_feed_post_visibility', { p_post_id: postId, p_share_key: wdsRemoteData.shareKey, p_visibility: select.value });
+      if (cached) cached.visibility = select.value;
+    } catch (err) {
+      select.value = prev || 'public';
+    }
+    finally { select.disabled = false; }
   });
 
 
@@ -723,6 +730,47 @@ function initDesktopShell() {
       notifPop.hidden = true;
     }
   });
+  // Friend-request Accept/Decline buttons render inline inside a
+  // notification item, in both the popover and the persistent list.
+  [document.getElementById('wdsNotifPop'), document.getElementById('wdsNotifList')].forEach(el => {
+    if (!el) return;
+    el.addEventListener('click', e => {
+      const acceptBtn = e.target.closest('[data-accept-friend]');
+      if (acceptBtn) { wdsRespondFriendRequest(acceptBtn.dataset.acceptFriend, true); return; }
+      const declineBtn = e.target.closest('[data-decline-friend]');
+      if (declineBtn) { wdsRespondFriendRequest(declineBtn.dataset.declineFriend, false); }
+    });
+  });
+
+  // Friends card — "+ Add Friend" reveals a Digital ID input; Send calls
+  // send_friend_request.
+  const addFriendBtn = document.getElementById('btnWdsProfileAddFriend');
+  const addFriendRow = document.getElementById('wdsAddFriendRow');
+  const addFriendInput = document.getElementById('wdsAddFriendInput');
+  const addFriendErrorEl = document.getElementById('wdsAddFriendError');
+  const sendFriendReqBtn = document.getElementById('btnWdsSendFriendRequest');
+  if (addFriendBtn && addFriendRow && sendFriendReqBtn) {
+    addFriendBtn.addEventListener('click', () => {
+      addFriendRow.hidden = !addFriendRow.hidden;
+      if (!addFriendRow.hidden) addFriendInput.focus();
+    });
+    const sendRequest = async () => {
+      const id = addFriendInput.value.trim().toUpperCase();
+      if (addFriendErrorEl) addFriendErrorEl.hidden = true;
+      if (!id) return;
+      sendFriendReqBtn.disabled = true;
+      try {
+        await wdsSendFriendRequest(id);
+        addFriendInput.value = '';
+        addFriendRow.hidden = true;
+      } catch (e) {
+        if (addFriendErrorEl) { addFriendErrorEl.textContent = (e && e.message) || 'Could not send friend request.'; addFriendErrorEl.hidden = false; }
+      }
+      finally { sendFriendReqBtn.disabled = false; }
+    };
+    sendFriendReqBtn.addEventListener('click', sendRequest);
+    addFriendInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendRequest(); } });
+  }
 
   // Chats panel — opened from the header chat icon (replaces the old
   // manual refresh button; the dashboard still auto-refreshes every 2min).
@@ -1018,6 +1066,7 @@ function renderWdsDashboard() {
   renderWdsBio();
   renderWdsNexus().catch(() => {});
   refreshWdsFeed().catch(() => {});
+  refreshWdsFriendRequests().catch(() => {});
   renderWdsMenu();
   renderWdsNotifications();
 }
@@ -1632,16 +1681,17 @@ function wdsLoadNotifHistory() {
 function wdsSaveNotifHistory(list) {
   localStorage.setItem(WDS_NOTIF_HISTORY_KEY, JSON.stringify(list.slice(0, WDS_NOTIF_HISTORY_MAX)));
 }
-function wdsPushNotification(id, title, body) {
+function wdsPushNotification(id, title, body, actionsHtml) {
   const list = wdsLoadNotifHistory();
   const existing = list.find(n => n.id === id);
   if (existing) {
     if (existing.body === body) return; // nothing actually changed
     existing.body = body;
+    existing.actionsHtml = actionsHtml || null;
     existing.createdAt = new Date().toISOString();
     existing.read = false;
   } else {
-    list.unshift({ id, title, body, createdAt: new Date().toISOString(), read: false });
+    list.unshift({ id, title, body, actionsHtml: actionsHtml || null, createdAt: new Date().toISOString(), read: false });
   }
   wdsSaveNotifHistory(list);
 }
@@ -1735,7 +1785,7 @@ function renderWdsNotifications() {
     if (a.read !== b.read) return a.read ? 1 : -1;
     return new Date(b.createdAt) - new Date(a.createdAt);
   });
-  const itemHtml = n => `<p class="wds-notif-item${n.read ? ' is-read' : ''}"><strong>${escapeHtml(n.title)}</strong> — ${escapeHtml(n.body)}</p>`;
+  const itemHtml = n => `<div class="wds-notif-item${n.read ? ' is-read' : ''}"><p style="margin:0;"><strong>${escapeHtml(n.title)}</strong> — ${escapeHtml(n.body)}</p>${n.actionsHtml ? `<div class="wds-notif-item-actions">${n.actionsHtml}</div>` : ''}</div>`;
   const html = sorted.length ? sorted.map(itemHtml).join('') : '<p class="wds-notif-item">No notifications.</p>';
   pop.innerHTML = html;
   const list = document.getElementById('wdsNotifList');
@@ -1914,12 +1964,15 @@ function stopWdsChatPolling() {
 // ---------------------------------------------------------------------
 async function fetchFeedPosts() {
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  const { data, error } = await sb.from('feed_posts')
-    .select('id, share_key, code_name, message, image_url, link_preview, deleted, created_at')
-    .eq('deleted', false)
-    .gte('created_at', cutoff)
-    .order('created_at', { ascending: false })
-    .limit(30);
+  // get_visible_feed_posts (not a plain table select) applies visibility
+  // (public/friends/only_me) server-side against the signed-in viewer —
+  // see supabase_friends_and_visibility_migration.sql for why this is an
+  // RPC rather than an RLS policy (no real per-request auth to check
+  // "who's asking" against).
+  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+  const { data, error } = await sb.rpc('get_visible_feed_posts', {
+    p_viewer_share_key: myShareKey, p_cutoff: cutoff, p_limit: 30,
+  });
   if (error) throw error;
   const posts = data || [];
   const ids = posts.map(p => p.id);
@@ -2157,7 +2210,7 @@ function renderFeedPosts(posts) {
 async function fetchFeedPostsByUser(shareKey) {
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await sb.from('feed_posts')
-    .select('id, share_key, code_name, message, image_url, link_preview, deleted, created_at')
+    .select('id, share_key, code_name, message, image_url, link_preview, deleted, created_at, visibility')
     .eq('share_key', shareKey)
     .eq('deleted', false)
     .gte('created_at', cutoff)
@@ -2220,7 +2273,13 @@ function renderWdsProfilePosts() {
         <div class="wds-post-head">
           <span class="wds-post-avatar">${escapeHtml((p.code_name || '?').charAt(0).toUpperCase())}</span>
           <div class="wds-post-meta"><strong>${escapeHtml(p.code_name || 'Anonymous')}</strong><span>${wdsRelativeTime(p.created_at)}</span></div>
-          ${wdsProfileManageMode ? `<button type="button" class="wds-post-unsend-btn" data-action="remove-post" data-post-id="${p.id}">Remove</button>` : ''}
+          ${wdsProfileManageMode ? `
+            <select class="wds-post-visibility-select" data-action="set-visibility" data-post-id="${p.id}">
+              <option value="public"${p.visibility === 'public' || !p.visibility ? ' selected' : ''}>🌐 Public</option>
+              <option value="friends"${p.visibility === 'friends' ? ' selected' : ''}>👥 Friends</option>
+              <option value="only_me"${p.visibility === 'only_me' ? ' selected' : ''}>🔒 Only Me</option>
+            </select>
+            <button type="button" class="wds-post-unsend-btn" data-action="remove-post" data-post-id="${p.id}">Remove</button>` : ''}
         </div>
         ${p.message ? `<p class="wds-post-body">${wdsLinkifyText(p.message)}</p>` : ''}
         ${imageHtml}${videoHtml}${linkPreviewHtml}
@@ -2280,6 +2339,76 @@ async function refreshWdsProfilePosts() {
   }
 }
 
+// ---------------------------------------------------------------------
+// Friends — request/accept/decline by Digital ID, reusing leaderboard's
+// public_id lookup + the new avatar_data_url column for the "profile
+// photo" the user asked the friends list to show.
+// ---------------------------------------------------------------------
+async function refreshWdsFriendsList() {
+  const listEl = document.getElementById('wdsProfileFriendsList');
+  if (!listEl || !wdsRemoteData) return;
+  try {
+    const { data, error } = await sb.rpc('list_friends', { p_share_key: wdsRemoteData.shareKey });
+    if (error) throw error;
+    if (!data || !data.length) { listEl.innerHTML = '<p class="empty-note">No friends yet.</p>'; return; }
+    listEl.innerHTML = data.map(f => `
+      <div class="wds-friend-item">
+        <span class="wds-friend-avatar"${f.avatar_data_url ? ` style="background-image:url(${escapeHtml(f.avatar_data_url)});"` : ''}>${f.avatar_data_url ? '' : escapeHtml((f.code_name || '?').charAt(0).toUpperCase())}</span>
+        <span class="wds-friend-name">${escapeHtml(f.code_name || 'Unknown')}</span>
+      </div>`).join('');
+  } catch (e) {
+    listEl.innerHTML = '<p class="empty-note">Could not load friends.</p>';
+  }
+}
+
+// New pending requests get pushed into the same notification history as
+// posts/comments/stories — first pass just seeds the "seen" set silently,
+// same baseline-then-diff pattern used there, so existing requests don't
+// flood the history the moment the dashboard first loads.
+let wdsNotifFriendReqBaselineSet = false;
+const wdsNotifSeenFriendReqIds = new Set();
+
+async function refreshWdsFriendRequests() {
+  if (!wdsRemoteData) return;
+  try {
+    const { data, error } = await sb.rpc('list_pending_friend_requests', { p_share_key: wdsRemoteData.shareKey });
+    if (error) throw error;
+    const isFirstPass = !wdsNotifFriendReqBaselineSet;
+    (data || []).forEach(r => {
+      const isNew = !wdsNotifSeenFriendReqIds.has(r.requester_share_key);
+      wdsNotifSeenFriendReqIds.add(r.requester_share_key);
+      if (!isFirstPass && isNew) {
+        const name = escapeHtml(r.code_name || 'Someone');
+        wdsPushNotification(
+          `friend-request:${r.requester_share_key}`,
+          'Friend Request',
+          `${name} wants to be friends.`,
+          `<button type="button" class="wds-mini-btn" data-accept-friend="${r.requester_share_key}">Accept</button>
+           <button type="button" class="wds-mini-btn" data-decline-friend="${r.requester_share_key}">Decline</button>`
+        );
+      }
+    });
+    wdsNotifFriendReqBaselineSet = true;
+    renderWdsNotifications();
+  } catch (e) { /* best effort */ }
+}
+
+async function wdsSendFriendRequest(digitalId) {
+  if (!wdsRemoteData) throw new Error('Not signed in.');
+  const { error } = await sb.rpc('send_friend_request', { p_share_key: wdsRemoteData.shareKey, p_target_public_id: digitalId });
+  if (error) throw error;
+}
+
+async function wdsRespondFriendRequest(requesterShareKey, accept) {
+  if (!wdsRemoteData) return;
+  try {
+    await sb.rpc('respond_friend_request', { p_share_key: wdsRemoteData.shareKey, p_requester_share_key: requesterShareKey, p_accept: accept });
+    wdsNotifSeenFriendReqIds.delete(requesterShareKey);
+    await refreshWdsFriendRequests();
+    if (accept) await refreshWdsFriendsList();
+  } catch (e) { /* best effort */ }
+}
+
 // Render/show only — no history mutation. Used both by the click-driven
 // open (which also pushes a URL, see openWdsProfilePage below) and by the
 // popstate handler (which must NOT push another entry on top of the one
@@ -2291,6 +2420,7 @@ async function wdsShowProfilePage() {
   page.hidden = false;
   renderWdsProfileHeader();
   await refreshWdsProfilePosts();
+  await refreshWdsFriendsList();
 }
 function wdsHideProfilePage() {
   const page = document.getElementById('wdsProfilePage');
@@ -4936,6 +5066,18 @@ function initEntityPhotoUpload() {
   const autoSyncIfEnabled = async () => {
     if (localStorage.getItem('wft_web_sync_enabled') !== '1') return;
     try { await pushWebSyncSnapshot(); } catch (e) { /* best effort — Sync Now still works as a fallback */ }
+    // Also mirror the photo onto leaderboard's public-safe avatar column —
+    // the private profile blob (pushed above) never leaves web_sync_accounts,
+    // but Friends cards/feed avatars need SOMETHING public to show for
+    // other people, not just initials.
+    if (sbConfigured()) {
+      try {
+        await sb.rpc('set_leaderboard_avatar', {
+          p_share_key: getOrCreateShareKey(),
+          p_avatar_data_url: (getProfile() || {}).photoDataUrl || null,
+        });
+      } catch (e) { /* best effort */ }
+    }
   };
   input.addEventListener('change', async () => {
     const file = input.files[0];

@@ -4894,6 +4894,16 @@ html.wf-desktop-shell #wdsShell {
 .wds-chat-thread-item {
   display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-radius: 8px; cursor: pointer;
 }
+/* Friends list / friend-request cards (Profile Page + notifications). */
+.wds-friend-item { display: flex; align-items: center; gap: 10px; padding: 6px; }
+.wds-friend-avatar {
+  width: 36px; height: 36px; border-radius: 50%; background: var(--gradient-bar); color: #060a0d;
+  font-weight: 700; font-size: 0.9rem; display: grid; place-items: center; flex-shrink: 0;
+  background-size: cover; background-position: center;
+}
+.wds-friend-name { flex: 1; font-size: 0.82rem; color: var(--text-primary); font-weight: 600; }
+.wds-friend-actions { display: flex; gap: 6px; }
+.wds-notif-item-actions { display: flex; gap: 8px; margin-top: 6px; }
 .wds-chat-thread-item:hover { background: var(--surface-2); }
 .wds-chat-thread-avatar {
   width: 40px; height: 40px; border-radius: 50%; background: var(--gradient-bar); color: #060a0d;
@@ -5211,6 +5221,10 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
 .wds-post-meta span { font-size: 0.68rem; color: var(--text-muted); font-family: var(--font-mono); }
 .wds-post-unsend-btn { background: none; border: none; color: var(--text-muted); font-size: 0.68rem; cursor: pointer; padding: 4px 8px; }
 .wds-post-unsend-btn:hover { color: var(--critical); }
+.wds-post-visibility-select {
+  background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 6px;
+  color: var(--text-secondary); font-size: 0.68rem; padding: 3px 4px; margin-right: 4px;
+}
 .wds-post-body { font-size: 0.86rem; color: var(--text-secondary); line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
 .wds-post-body a { color: var(--cyan); text-decoration: none; }
 .wds-post-body a:hover { text-decoration: underline; }
