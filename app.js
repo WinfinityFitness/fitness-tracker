@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.29.0';
+const APP_VERSION = 'WF_SYS_V.30.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -456,6 +456,118 @@ function initDesktopShell() {
       wdsCloseStoryViewer();
       await refreshWdsMyday();
     } catch (e2) { btn.disabled = false; }
+  });
+
+  // Profile Page — cover photo, its own composer (mirrors the main feed
+  // composer, just posting straight to the global feed like any other
+  // post), and the Filters/Manage/List-Grid controls over the post list.
+  const profileCoverInput = document.getElementById('wdsProfileCoverInput');
+  document.getElementById('btnWdsProfileCoverEdit').addEventListener('click', () => profileCoverInput.click());
+  profileCoverInput.addEventListener('change', async () => {
+    const file = profileCoverInput.files[0];
+    profileCoverInput.value = '';
+    if (!file || !wdsRemoteData) return;
+    try {
+      const dataUrl = await resizeCoverImage(file);
+      const p = Object.assign({}, wdsRemoteData.profile, { coverPhotoDataUrl: dataUrl });
+      await wdsPushProfileUpdate(p);
+      wdsRemoteData.profile = p;
+      renderWdsProfileHeader();
+    } catch (e) { /* best effort — cover just won't update until the next successful save */ }
+  });
+
+  const profileComposerInput = document.getElementById('wdsProfileComposerInput');
+  const profileComposerPostBtn = document.getElementById('btnWdsProfileComposerPost');
+  const profileComposerAttachBtn = document.getElementById('btnWdsProfileComposerAttach');
+  const profileComposerImageInput = document.getElementById('wdsProfileComposerImageInput');
+  const profileComposerPendingImage = document.getElementById('wdsProfileComposerPendingImage');
+  const profileComposerPendingImagePreview = document.getElementById('wdsProfileComposerPendingImagePreview');
+  const profileComposerImageRemoveBtn = document.getElementById('btnWdsProfileComposerImageRemove');
+  const profileComposerErrorEl = document.getElementById('wdsProfileComposerError');
+  let wdsPendingProfilePostImageDataUrl = null;
+  const clearWdsPendingProfilePostImage = () => {
+    wdsPendingProfilePostImageDataUrl = null;
+    profileComposerPendingImage.hidden = true;
+    profileComposerImageInput.value = '';
+  };
+  profileComposerAttachBtn.addEventListener('click', () => profileComposerImageInput.click());
+  profileComposerImageInput.addEventListener('change', () => {
+    const file = profileComposerImageInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      wdsPendingProfilePostImageDataUrl = reader.result;
+      profileComposerPendingImagePreview.src = wdsPendingProfilePostImageDataUrl;
+      profileComposerPendingImage.hidden = false;
+    };
+    reader.readAsDataURL(file);
+  });
+  profileComposerImageRemoveBtn.addEventListener('click', clearWdsPendingProfilePostImage);
+  profileComposerPostBtn.addEventListener('click', async () => {
+    if (profileComposerErrorEl) profileComposerErrorEl.hidden = true;
+    if (!wdsRemoteData || !wdsRemoteData.shareKey || !sbConfigured()) {
+      if (profileComposerErrorEl) { profileComposerErrorEl.textContent = 'Not signed in — try refreshing the page.'; profileComposerErrorEl.hidden = false; }
+      return;
+    }
+    const text = profileComposerInput.value;
+    const image = wdsPendingProfilePostImageDataUrl;
+    if (!text.trim() && !image) return;
+    profileComposerPostBtn.disabled = true;
+    try {
+      const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
+      await postFeedPost(text, image, wdsRemoteData.shareKey, codeName, null);
+      profileComposerInput.value = '';
+      clearWdsPendingProfilePostImage();
+      await refreshWdsProfilePosts();
+    } catch (e) {
+      if (profileComposerErrorEl) { profileComposerErrorEl.textContent = 'Could not post: ' + ((e && e.message) || 'unknown error') + '. Try again.'; profileComposerErrorEl.hidden = false; }
+    }
+    finally { profileComposerPostBtn.disabled = false; }
+  });
+
+  const profileFiltersBtn = document.getElementById('btnWdsProfileFilters');
+  profileFiltersBtn.addEventListener('click', () => {
+    wdsProfilePostsSort = wdsProfilePostsSort === 'newest' ? 'oldest' : 'newest';
+    profileFiltersBtn.textContent = wdsProfilePostsSort === 'newest' ? '⇅ Filters: Newest' : '⇅ Filters: Oldest';
+    renderWdsProfilePosts();
+  });
+  const profileManageBtn = document.getElementById('btnWdsProfileManage');
+  profileManageBtn.addEventListener('click', () => {
+    wdsProfileManageMode = !wdsProfileManageMode;
+    profileManageBtn.classList.toggle('is-active', wdsProfileManageMode);
+    renderWdsProfilePosts();
+  });
+  const profileViewListBtn = document.getElementById('btnWdsProfileViewList');
+  const profileViewGridBtn = document.getElementById('btnWdsProfileViewGrid');
+  [profileViewListBtn, profileViewGridBtn].forEach(btn => {
+    btn.addEventListener('click', () => {
+      wdsProfilePostsView = btn.dataset.view;
+      profileViewListBtn.classList.toggle('is-active', wdsProfilePostsView === 'list');
+      profileViewGridBtn.classList.toggle('is-active', wdsProfilePostsView === 'grid');
+      renderWdsProfilePosts();
+    });
+  });
+  document.getElementById('wdsProfilePostsList').addEventListener('click', async e => {
+    const removeBtn = e.target.closest('[data-action="remove-post"]');
+    if (removeBtn) {
+      if (!wdsRemoteData || !wdsRemoteData.shareKey) return;
+      removeBtn.disabled = true;
+      try {
+        await unsendFeedPost(Number(removeBtn.dataset.postId), wdsRemoteData.shareKey);
+        await refreshWdsProfilePosts();
+      } catch (err) { removeBtn.disabled = false; }
+      return;
+    }
+    const tile = e.target.closest('.wds-profile-grid-tile');
+    if (tile) { profileViewListBtn.click(); }
+  });
+
+  // Friends — the add-friend backend (requests/accept) isn't built yet;
+  // this is the card shell so the layout is ready for it.
+  const addFriendBtn = document.getElementById('btnWdsProfileAddFriend');
+  if (addFriendBtn) addFriendBtn.addEventListener('click', () => {
+    const listEl = document.getElementById('wdsProfileFriendsList');
+    if (listEl) listEl.innerHTML = '<p class="empty-note">Friend requests are coming soon.</p>';
   });
 
   // Refresh — re-fetches the signed-in account's data (dashboard doesn't
@@ -1380,19 +1492,48 @@ async function fetchFeedPostsByUser(shareKey) {
   return posts;
 }
 
-function renderWdsProfilePosts(posts) {
+// List view shows full cards (same building blocks as the main feed, minus
+// the interactive like/comment controls this read-mostly view doesn't
+// need); Grid view shows plain thumbnail tiles, Facebook's "Photos" tab
+// convention. Manage mode reveals a Remove button per card/tile — off by
+// default since these are always the signed-in user's own posts and a
+// stray tap shouldn't delete one.
+let wdsProfilePostsCache = [];
+let wdsProfilePostsView = 'list';
+let wdsProfilePostsSort = 'newest';
+let wdsProfileManageMode = false;
+
+function renderWdsProfilePosts() {
   const list = document.getElementById('wdsProfilePostsList');
   if (!list) return;
-  if (!posts.length) { list.innerHTML = '<p class="empty-note">No posts yet.</p>'; return; }
+  const posts = wdsProfilePostsSort === 'oldest' ? wdsProfilePostsCache.slice().reverse() : wdsProfilePostsCache;
+  if (!posts.length) { list.className = 'wds-feed-list'; list.innerHTML = '<p class="empty-note">No posts yet.</p>'; return; }
+
+  if (wdsProfilePostsView === 'grid') {
+    list.className = 'wds-profile-posts-grid';
+    list.innerHTML = posts.map(p => {
+      const thumb = p.image_url
+        ? `<img src="${escapeHtml(p.image_url)}" alt="">`
+        : `<div class="wds-profile-grid-text">${escapeHtml((p.message || '').slice(0, 80))}</div>`;
+      return `<div class="wds-profile-grid-tile" data-post-id="${p.id}">
+        ${thumb}
+        ${wdsProfileManageMode ? `<button type="button" class="wds-post-unsend-btn" data-action="remove-post" data-post-id="${p.id}" style="position:absolute;top:6px;right:6px;">Remove</button>` : ''}
+      </div>`;
+    }).join('');
+    return;
+  }
+
+  list.className = 'wds-feed-list';
   list.innerHTML = posts.map(p => {
     const imageHtml = p.image_url ? `<img class="wds-post-image" src="${escapeHtml(p.image_url)}" alt="">` : '';
     const videoHtml = wdsExtractVideoEmbed(p.message);
     const linkPreviewHtml = videoHtml ? '' : wdsBuildLinkPreviewHtml(p.link_preview);
     return `
-      <div class="wds-card wds-feed-post">
+      <div class="wds-card wds-feed-post" data-post-id="${p.id}">
         <div class="wds-post-head">
           <span class="wds-post-avatar">${escapeHtml((p.code_name || '?').charAt(0).toUpperCase())}</span>
           <div class="wds-post-meta"><strong>${escapeHtml(p.code_name || 'Anonymous')}</strong><span>${wdsRelativeTime(p.created_at)}</span></div>
+          ${wdsProfileManageMode ? `<button type="button" class="wds-post-unsend-btn" data-action="remove-post" data-post-id="${p.id}">Remove</button>` : ''}
         </div>
         ${p.message ? `<p class="wds-post-body">${wdsLinkifyText(p.message)}</p>` : ''}
         ${imageHtml}${videoHtml}${linkPreviewHtml}
@@ -1412,6 +1553,9 @@ function renderWdsProfileHeader() {
   const mode = getFitnessMode();
   document.getElementById('wdsProfilePageSubtitle').textContent = `${MODE_LABEL[mode] || mode} • Digital ID ${wdsRemoteData.publicId}`;
   wdsSetAvatarVisual(document.getElementById('wdsProfilePageAvatar'), profile.photoDataUrl, displayName.trim().charAt(0).toUpperCase());
+  const coverEl = document.getElementById('wdsProfileCover');
+  if (coverEl) coverEl.style.backgroundImage = profile.coverPhotoDataUrl ? `url(${profile.coverPhotoDataUrl})` : '';
+  wdsSetAvatarVisual(document.getElementById('wdsProfileComposerAvatar'), profile.photoDataUrl, displayName.trim().charAt(0).toUpperCase());
 
   const memberSince = profile.startDate ? new Date(profile.startDate).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) : '—';
   document.getElementById('wdsProfileDetailList').innerHTML = `
@@ -1434,20 +1578,25 @@ function renderWdsProfileHeader() {
   document.getElementById('wdsProfileWeightBar').style.width = stats.progressPct != null ? Math.min(100, Math.abs(stats.progressPct) * 5) + '%' : '0%';
 }
 
+async function refreshWdsProfilePosts() {
+  const listEl = document.getElementById('wdsProfilePostsList');
+  if (!listEl || !wdsRemoteData) return;
+  listEl.innerHTML = '<p class="empty-note">Loading…</p>';
+  try {
+    wdsProfilePostsCache = await fetchFeedPostsByUser(wdsRemoteData.shareKey);
+    renderWdsProfilePosts();
+  } catch (e) {
+    listEl.innerHTML = '<p class="empty-note">Could not load posts.</p>';
+  }
+}
+
 async function openWdsProfilePage() {
   if (!wdsRemoteData) return;
   const page = document.getElementById('wdsProfilePage');
   if (!page) return;
   page.hidden = false;
   renderWdsProfileHeader();
-  const listEl = document.getElementById('wdsProfilePostsList');
-  listEl.innerHTML = '<p class="empty-note">Loading…</p>';
-  try {
-    const posts = await fetchFeedPostsByUser(wdsRemoteData.shareKey);
-    renderWdsProfilePosts(posts);
-  } catch (e) {
-    listEl.innerHTML = '<p class="empty-note">Could not load posts.</p>';
-  }
+  await refreshWdsProfilePosts();
 }
 function closeWdsProfilePage() {
   const page = document.getElementById('wdsProfilePage');
@@ -3966,6 +4115,34 @@ function resizeAvatarImage(file) {
         const canvas = document.createElement('canvas');
         canvas.width = AVATAR_DIM; canvas.height = AVATAR_DIM;
         canvas.getContext('2d').drawImage(img, sx, sy, side, side, 0, 0, AVATAR_DIM, AVATAR_DIM);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// Profile cover photo — center-cropped to a fixed 4:1 banner aspect ratio
+// (rather than squared like the avatar) so it fills the cover strip
+// cleanly regardless of the source photo's own proportions.
+function resizeCoverImage(file) {
+  const TARGET_W = 1200, TARGET_H = 300;
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read that file.'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Could not read that image.'));
+      img.onload = () => {
+        const targetRatio = TARGET_W / TARGET_H;
+        const srcRatio = img.width / img.height;
+        let sx, sy, sw, sh;
+        if (srcRatio > targetRatio) { sh = img.height; sw = sh * targetRatio; sx = (img.width - sw) / 2; sy = 0; }
+        else { sw = img.width; sh = sw / targetRatio; sx = 0; sy = (img.height - sh) / 2; }
+        const canvas = document.createElement('canvas');
+        canvas.width = TARGET_W; canvas.height = TARGET_H;
+        canvas.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, TARGET_W, TARGET_H);
         resolve(canvas.toDataURL('image/jpeg', 0.85));
       };
       img.src = reader.result;
@@ -11015,6 +11192,23 @@ async function disableWebSync() {
 // a few thousand day-rows a year) that re-sending everything is simpler and
 // safe. Best-effort per call, same pattern as pushLeaderboardEntry, so one
 // failing piece doesn't block the others.
+// Desktop-shell counterpart to pushWebSyncSnapshot() above — that function
+// reads getOrCreateShareKey()/getProfile()/localStorage theme, all
+// mobile-context assumptions that don't hold inside the wellness dashboard
+// (wdsRemoteData is the source of truth there, not this browser's own
+// localStorage). Used by profile-editing controls on the desktop Profile
+// Page (cover photo, etc.) to persist a profile change back to Supabase.
+async function wdsPushProfileUpdate(profile) {
+  if (!wdsRemoteData || !sbConfigured()) throw new Error('Not connected.');
+  const { error } = await sb.rpc('web_sync_push_snapshot', {
+    p_share_key: wdsRemoteData.shareKey,
+    p_profile: profile,
+    p_theme: wdsRemoteData.theme,
+    p_skin: wdsRemoteData.skin,
+  });
+  if (error) throw error;
+}
+
 async function pushWebSyncSnapshot() {
   if (!sbConfigured()) throw new Error('Not connected.');
   const shareKey = getOrCreateShareKey();

@@ -30,7 +30,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=29.0">
+<link rel="stylesheet" href="style.css?v=30.0">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3532,8 +3532,10 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
        A full-screen overlay standing in for a real routed page (this is a
        static single-page app), with its own Back control. -->
   <div class="wds-profile-page" id="wdsProfilePage" hidden>
-    <div class="wds-profile-cover">
+    <div class="wds-profile-cover" id="wdsProfileCover">
       <button type="button" class="wds-profile-back" id="btnWdsProfileBack">← Back to Dashboard</button>
+      <button type="button" class="wds-profile-cover-edit" id="btnWdsProfileCoverEdit">🖼 Edit Cover Photo</button>
+      <input type="file" id="wdsProfileCoverInput" accept="image/*" hidden>
     </div>
     <div class="wds-profile-header">
       <div class="wds-profile-avatar" id="wdsProfilePageAvatar">–</div>
@@ -3561,20 +3563,56 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
             </div>
           </div>
         </div>
+        <div class="wds-card">
+          <div class="wds-card-head">
+            <h3 class="wds-card-title" style="margin:0;">Friends</h3>
+            <button type="button" class="wds-mini-btn" id="btnWdsProfileAddFriend">+ Add Friend</button>
+          </div>
+          <div id="wdsProfileFriendsList"><p class="empty-note">No friends yet.</p></div>
+        </div>
       </div>
       <div class="wds-profile-main">
-        <h3 class="wds-card-title">Posts</h3>
+        <div class="wds-card">
+          <div class="wds-composer">
+            <span class="wds-user-avatar" id="wdsProfileComposerAvatar">–</span>
+            <div class="wds-composer-box">
+              <textarea class="wds-composer-input" id="wdsProfileComposerInput" rows="2" maxlength="2000" placeholder="What's on your mind?"></textarea>
+              <div class="wds-composer-pending-image" id="wdsProfileComposerPendingImage" hidden>
+                <img id="wdsProfileComposerPendingImagePreview" alt="">
+                <button type="button" id="btnWdsProfileComposerImageRemove" aria-label="Remove image">✕</button>
+              </div>
+              <div class="wds-composer-actions">
+                <button type="button" class="wds-composer-action-btn" id="btnWdsProfileComposerAttach">📷 Photo</button>
+                <input type="file" id="wdsProfileComposerImageInput" accept="image/*" hidden>
+                <button type="button" class="wds-composer-action-btn wds-composer-post-btn" id="btnWdsProfileComposerPost">Post</button>
+              </div>
+              <p class="wds-gate-error" id="wdsProfileComposerError" hidden></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="wds-profile-posts-head">
+          <h3 class="wds-card-title" style="margin:0;">Posts</h3>
+          <div class="wds-profile-posts-controls">
+            <button type="button" class="wds-mini-btn" id="btnWdsProfileFilters">⇅ Filters: Newest</button>
+            <button type="button" class="wds-mini-btn" id="btnWdsProfileManage">⚙ Manage posts</button>
+          </div>
+        </div>
+        <div class="wds-profile-view-toggle">
+          <button type="button" class="wds-profile-view-btn is-active" id="btnWdsProfileViewList" data-view="list">☰ List view</button>
+          <button type="button" class="wds-profile-view-btn" id="btnWdsProfileViewGrid" data-view="grid">▦ Grid view</button>
+        </div>
+
         <div id="wdsProfilePostsList" class="wds-feed-list"><p class="empty-note">Loading…</p></div>
       </div>
     </div>
-    <div class="chat-reaction-menu" id="wdsProfileReactionMenu" hidden></div>
   </div>
 </div>
 
-<script src="config.js?v=29.0"></script>
+<script src="config.js?v=30.0"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=29.0"></script>
+<script src="app.js?v=30.0"></script>
 </body>
 </html>
