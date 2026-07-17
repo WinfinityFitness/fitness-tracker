@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.37.0';
+const APP_VERSION = 'WF_SYS_V.38.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -540,6 +540,8 @@ function initDesktopShell() {
       wdsPendingCoverDataUrl = null;
       profileCoverEl.classList.remove('wds-profile-cover--repositioning');
       profileCoverHint.hidden = true;
+      profileCoverEditBtn.classList.remove('wds-icon-btn');
+      profileCoverEditBtn.classList.add('wds-profile-cover-edit');
       profileCoverEditBtn.textContent = '🖼 Edit Cover Photo';
     } catch (e) {
       if (profileCoverErrorEl) { profileCoverErrorEl.textContent = 'Could not save: ' + ((e && e.message) || 'unknown error') + '. Try again.'; profileCoverErrorEl.hidden = false; }
@@ -561,7 +563,13 @@ function initDesktopShell() {
       wdsCoverRepositioning = true;
       profileCoverEl.classList.add('wds-profile-cover--repositioning');
       profileCoverHint.hidden = false;
-      profileCoverEditBtn.textContent = '💾 Save Position';
+      // Icon-only, matching the plain-stroke style of the other topnav
+      // icon buttons (wds-icon-btn) instead of a colored emoji+label.
+      profileCoverEditBtn.classList.remove('wds-profile-cover-edit');
+      profileCoverEditBtn.classList.add('wds-icon-btn');
+      profileCoverEditBtn.setAttribute('aria-label', 'Save cover position');
+      profileCoverEditBtn.title = 'Save cover position';
+      profileCoverEditBtn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>';
     } catch (e) {
       if (profileCoverErrorEl) { profileCoverErrorEl.textContent = 'Could not read that photo: ' + ((e && e.message) || 'unknown error') + '.'; profileCoverErrorEl.hidden = false; }
     }
@@ -572,6 +580,14 @@ function initDesktopShell() {
   let coverDragStartPos = 50;
   profileCoverEl.addEventListener('pointerdown', e => {
     if (!wdsCoverRepositioning) return;
+    // A pointerdown that started on a button (Save, Back) bubbles up to
+    // the cover div same as one on the bare background — without this
+    // guard, setPointerCapture below hijacks the click that would
+    // otherwise fire on that button right after, since capture redirects
+    // the subsequent pointerup/click to the capturing element instead of
+    // the original target. This is what made "Save Position" (and, before
+    // the touch-action fix, "Edit Cover Photo") not respond to clicks.
+    if (e.target.closest('button')) return;
     coverDragStartY = e.clientY;
     coverDragStartPos = wdsPendingCoverPosY;
     profileCoverEl.setPointerCapture(e.pointerId);

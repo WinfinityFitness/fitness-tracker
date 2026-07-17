@@ -5378,6 +5378,10 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
   align-self: flex-end; background: rgba(5,10,14,0.55); border: 1px solid rgba(255,255,255,0.25); color: #fff;
   border-radius: 8px; padding: 8px 14px; font-size: 0.8rem; cursor: pointer;
 }
+/* Save-position state swaps to a plain icon button (matches the topnav's
+   own minimalist stroke-icon style) instead of a colored emoji+label. */
+.wds-profile-cover .wds-icon-btn { align-self: flex-end; background: rgba(5,10,14,0.55); border-color: rgba(255,255,255,0.25); color: #fff; }
+.wds-profile-cover .wds-icon-btn:hover { color: var(--cyan); }
 /* Header shares the body's max-width/padding so the avatar's left edge
    lines up exactly with the sidebar cards below it. */
 .wds-profile-header {
