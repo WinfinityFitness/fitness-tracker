@@ -1,6 +1,6 @@
 {
-  "name": "Winfinity Wellness Dashboard",
-  "short_name": "Wellness",
+  "name": "Winfinity Nexus",
+  "short_name": "Nexus",
   "description": "Desktop-style command center for your Winfinity Fitness Tracker data — dashboard, Nexus Feed, chat, and your profile.",
   "start_url": "./index.html",
   "scope": "./",

@@ -23,6 +23,11 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- iOS Safari's "Add to Home Screen" prefers this over the manifest's
+     own name/short_name for the home-screen label — wordpress-proxy/
+     swaps it to "Winfinity Nexus" for the wellness dashboard domain,
+     same as it already does for the manifest link below. -->
+<meta name="apple-mobile-web-app-title" content="Winfinity">
 <!-- ?v= is a cache-busting query tied to APP_VERSION (bump alongside it and
      CACHE_NAME on every deploy) — a hosting-side CDN in front of the
      wellness.winfinityfitness.com reverse proxy was caching style.css/app.js
@@ -30,7 +35,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.0.5">
+<link rel="stylesheet" href="style.css?v=1.0.6">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3794,10 +3799,10 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
   </div>
 </div>
 
-<script src="config.js?v=1.0.5"></script>
+<script src="config.js?v=1.0.6"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.0.5"></script>
+<script src="app.js?v=1.0.6"></script>
 </body>
 </html>

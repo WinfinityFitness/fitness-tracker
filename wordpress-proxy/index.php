@@ -99,16 +99,28 @@ foreach (preg_split('/\r\n/', $result['rawHeaders']) as $line) {
 header('Cache-Control: no-store, must-revalidate');
 
 $body = $result['body'];
-// Swap in a wellness-specific manifest for HTML responses only, so
+// Swap in wellness-specific branding for HTML responses only, so
 // "Add to Home Screen"/"Install" on this domain installs as its own app
-// ("Winfinity Wellness Dashboard", manifest-wellness.webmanifest) instead
-// of reusing the mobile app's own manifest.webmanifest — installing both
-// would otherwise put two identically-named/-iconed shortcuts on the same
-// home screen with no way to tell them apart.
+// ("Winfinity Nexus", manifest-wellness.webmanifest) instead of reusing
+// the mobile app's own name/manifest — installing both would otherwise
+// put two identically-named/-iconed shortcuts on the same home screen
+// with no way to tell them apart. The title tag and
+// apple-mobile-web-app-title cover Android/desktop and iOS Safari's home
+// screen naming respectively; the manifest link covers the rest.
 if ($result['contentType'] && stripos($result['contentType'], 'text/html') !== false) {
     $body = str_replace(
         '<link rel="manifest" href="manifest.webmanifest">',
         '<link rel="manifest" href="manifest-wellness.webmanifest">',
+        $body
+    );
+    $body = str_replace(
+        '<title>Winfinity Tracker</title>',
+        '<title>Winfinity Nexus</title>',
+        $body
+    );
+    $body = str_replace(
+        '<meta name="apple-mobile-web-app-title" content="Winfinity">',
+        '<meta name="apple-mobile-web-app-title" content="Winfinity Nexus">',
         $body
     );
 }
