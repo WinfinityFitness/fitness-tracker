@@ -5060,6 +5060,20 @@ html.wf-desktop-shell #wdsShell {
 }
 html.wf-desktop-shell body { overflow-x: auto; }
 .wds-uni-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+/* Facebook-style icon strip above the composer (Home/Reels/Marketplace/
+   Groups/Games). Sits in normal flow at the top of the center column, so
+   it inherits .wds-uni-col's own gap instead of needing its own margins. */
+.wds-nexus-icon-tabs {
+  display: flex; justify-content: space-around; background: var(--surface-1);
+  border: 1px solid var(--border-soft); border-radius: 10px; padding: 4px 6px;
+}
+.wds-nexus-icon-tab {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  padding: 10px 0; background: none; border: none; border-bottom: 2px solid transparent;
+  color: var(--text-secondary); cursor: pointer;
+}
+.wds-nexus-icon-tab:hover { color: var(--text-primary); }
+.wds-nexus-icon-tab.is-active { color: var(--cyan); border-bottom-color: var(--cyan); }
 .wds-uni-left, .wds-uni-right { position: sticky; top: 84px; max-height: calc(100vh - 100px); overflow-y: auto; }
 .wds-uni-right { display: flex; flex-direction: column; }
 /* The Nexus Leaderboard is now the only card in the right column (the

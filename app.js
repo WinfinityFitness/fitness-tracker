@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.0.1';
+const APP_VERSION = 'WF_SYS_V.1.0.2';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -892,6 +892,30 @@ function initDesktopShell() {
     e.stopPropagation();
     chatListPop.hidden = !chatListPop.hidden;
     if (!chatListPop.hidden) refreshWdsChatRooms();
+  });
+
+  // Icon strip above the composer. Home is the feed itself — just marks
+  // itself active, nothing to navigate to. Groups opens the real Chats
+  // panel already filtered to group chatrooms (the closest existing
+  // equivalent). Reels/Marketplace/Games have no backing feature in this
+  // app yet, so they surface that honestly instead of doing nothing.
+  const nexusIconTabs = document.getElementById('wdsNexusIconTabs');
+  if (nexusIconTabs) nexusIconTabs.addEventListener('click', e => {
+    const tabBtn = e.target.closest('[data-nexus-tab]');
+    if (!tabBtn) return;
+    const tab = tabBtn.dataset.nexusTab;
+    if (tab === 'home') {
+      nexusIconTabs.querySelectorAll('.wds-nexus-icon-tab').forEach(t => t.classList.toggle('is-active', t === tabBtn));
+      return;
+    }
+    if (tab === 'groups') {
+      chatListPop.hidden = false;
+      refreshWdsChatRooms();
+      const groupsTabBtn = document.getElementById('btnWdsChatTabGroups');
+      if (groupsTabBtn) groupsTabBtn.click();
+      return;
+    }
+    showRestToast(`${tabBtn.title} is coming soon.`);
   });
   document.addEventListener('click', e => {
     if (!chatListPop.hidden && !chatListPop.contains(e.target) && e.target !== chatListBtn) {
