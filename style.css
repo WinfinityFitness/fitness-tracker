@@ -5290,7 +5290,7 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
   background: var(--bg-body, var(--surface-1)); overflow-y: auto;
 }
 .wds-profile-cover {
-  height: 220px; background: var(--gradient-bar); background-size: cover; background-position: center;
+  height: 440px; background: var(--gradient-bar); background-size: cover; background-position: center;
   position: relative; display: flex; align-items: flex-start; justify-content: space-between; padding: 14px;
   overflow: hidden; touch-action: none;
 }

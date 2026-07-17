@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.33.0';
+const APP_VERSION = 'WF_SYS_V.34.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -497,7 +497,22 @@ function initDesktopShell() {
         coverPhotoDataUrl: wdsPendingCoverDataUrl, coverPhotoPosY: wdsPendingCoverPosY,
       });
       await wdsPushProfileUpdate(p);
-      wdsRemoteData.profile = p;
+      // web_sync_push_snapshot returning without error doesn't guarantee
+      // the write actually stuck (e.g. an RLS/grant edge case would still
+      // report success client-side) — re-fetch straight from the RPC the
+      // dashboard itself uses and compare, so "Save" only ever claims
+      // success once the server confirms it. This is what was missing
+      // before: the button always looked successful even when it wasn't.
+      const id = sessionStorage.getItem(SESSION_ID_KEY);
+      const pin = sessionStorage.getItem(SESSION_PIN_KEY);
+      const { data: verifyData, error: verifyError } = await sb.rpc('web_sync_get_dashboard', {
+        p_public_id: id, p_pin: pin, p_days: 1,
+      });
+      if (verifyError) throw verifyError;
+      if (!verifyData || !verifyData.profile || verifyData.profile.coverPhotoDataUrl !== wdsPendingCoverDataUrl) {
+        throw new Error('Save did not verify — the server still has the old cover photo.');
+      }
+      wdsRemoteData.profile = verifyData.profile;
       // Only exit repositioning mode on a CONFIRMED save — if it failed,
       // the pending image/position stays live so the user can just hit
       // Save again instead of silently losing their edit on the next
