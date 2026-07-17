@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.39.0';
+const APP_VERSION = 'WF_SYS_V.40.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -3949,7 +3949,12 @@ function initSetupForm() {
 
     const extraHabits = Array.from(document.querySelectorAll('.extraHabitInput')).map(i => i.value.trim());
 
-    const profile = {
+    // Merged onto the EXISTING profile, not built from scratch — this form
+    // only has fields for a subset of the profile object. Building fresh
+    // was silently dropping anything set outside this form (photoDataUrl
+    // from Entity Identity's own photo upload, most notably) every time
+    // this form was saved.
+    const profile = Object.assign({}, getProfile(), {
       name: document.getElementById('setupName').value.trim(),
       weightUnit, heightUnit, heightCm,
       gender: document.getElementById('setupGender').value,
@@ -3968,7 +3973,7 @@ function initSetupForm() {
       healthStatus: document.getElementById('setupHealthStatus').value,
       stepGoal: parseInt(document.getElementById('setupStepGoal').value, 10) || 8000,
       extraHabits,
-    };
+    });
     saveProfile(profile);
     document.getElementById('setupSaveNote').textContent = 'Saved.';
     setTimeout(() => { document.getElementById('setupSaveNote').textContent = ''; }, 2000);
