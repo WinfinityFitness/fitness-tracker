@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.38.0';
+const APP_VERSION = 'WF_SYS_V.39.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -835,12 +835,16 @@ function initDesktopShell() {
       const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
       const text = input.value;
       input.value = '';
+      wdsChatPopupLastActive[roomId] = Date.now();
       try {
         await postChatMessage(text, null, wdsRemoteData.shareKey, codeName, roomId);
         await wdsRefreshChatPopup(roomId);
         await refreshWdsChatRooms();
       } catch (err) { /* best effort */ }
+      return;
     }
+    const popupEl = e.target.closest('.wds-chat-popup');
+    if (popupEl) wdsChatPopupLastActive[popupEl.dataset.roomId] = Date.now();
   });
   chatPopupsWrap.addEventListener('keydown', e => {
     if (e.key === 'Enter' && e.target.matches('[data-popup-input]')) {
@@ -848,6 +852,13 @@ function initDesktopShell() {
       const sendBtn = chatPopupsWrap.querySelector(`[data-popup-send="${roomId}"]`);
       if (sendBtn) sendBtn.click();
     }
+  });
+
+  // Right-edge contact rail — click a DM/group avatar to open (or bring
+  // back an evicted) popup.
+  document.getElementById('wdsChatContactRail').addEventListener('click', e => {
+    const avatar = e.target.closest('[data-room-id]');
+    if (avatar) wdsOpenChatPopup(avatar.dataset.roomId);
   });
 
   // Per-user chat context menu — shared by Global Chat and every popup.
@@ -1370,6 +1381,7 @@ async function refreshWdsChatRooms() {
 }
 
 function renderWdsChatListPanel() {
+  renderWdsChatContactRail();
   const listEl = document.getElementById('wdsChatListItems');
   const badge = document.getElementById('wdsChatListBadge');
   if (!listEl) return;
@@ -1453,10 +1465,27 @@ async function wdsRefreshChatPopup(roomId) {
   }
 }
 
+// Facebook caps how many chat popups stay expanded at once (2 here) —
+// opening a third evicts the least-recently-active one back down to just
+// its icon in the contact rail, rather than piling up open windows.
+const WDS_MAX_OPEN_CHAT_POPUPS = 2;
+let wdsChatPopupLastActive = {}; // roomId -> timestamp (ms)
+
+function wdsEvictOldestChatPopupIfNeeded(exceptRoomId) {
+  const open = Array.from(document.querySelectorAll('.wds-chat-popup')).map(el => el.dataset.roomId);
+  if (open.length < WDS_MAX_OPEN_CHAT_POPUPS) return;
+  const candidates = open.filter(id => id !== exceptRoomId);
+  if (!candidates.length) return;
+  candidates.sort((a, b) => (wdsChatPopupLastActive[a] || 0) - (wdsChatPopupLastActive[b] || 0));
+  wdsCloseChatPopup(candidates[0]);
+}
+
 async function wdsOpenChatPopup(roomId) {
   if (!wdsRemoteData || !roomId) return;
+  wdsChatPopupLastActive[roomId] = Date.now();
   let popup = document.querySelector(`.wds-chat-popup[data-room-id="${roomId}"]`);
   if (!popup) {
+    wdsEvictOldestChatPopupIfNeeded(roomId);
     const meta = wdsChatRoomMeta[roomId] || { name: 'Chat' };
     popup = document.createElement('div');
     popup.className = 'wds-chat-popup';
@@ -1479,11 +1508,33 @@ async function wdsOpenChatPopup(roomId) {
   wdsSaveChatLastRead();
   await wdsRefreshChatPopup(roomId);
   renderWdsChatListPanel();
+  renderWdsChatContactRail();
 }
 function wdsCloseChatPopup(roomId) {
   const popup = document.querySelector(`.wds-chat-popup[data-room-id="${roomId}"]`);
   if (popup) popup.remove();
   wdsOpenChatPopupIds = wdsOpenChatPopupIds.filter(id => id !== roomId);
+  renderWdsChatContactRail();
+}
+
+// Right-edge rail — every DM/group thread as a clickable avatar, doubling
+// as both "start/open a chat" and "here's the one that got minimized"
+// (an evicted popup has no separate collapsed state; its rail icon is
+// simply how you bring it back).
+function renderWdsChatContactRail() {
+  const rail = document.getElementById('wdsChatContactRail');
+  if (!rail) return;
+  const threads = wdsChatThreadList().slice(0, 12);
+  if (!threads.length) { rail.innerHTML = ''; return; }
+  const openIds = new Set(Array.from(document.querySelectorAll('.wds-chat-popup')).map(el => el.dataset.roomId));
+  rail.innerHTML = threads.map(t => {
+    const unread = wdsIsRoomUnread(t.id, t);
+    const initial = escapeHtml((t.name || '?').charAt(0).toUpperCase());
+    const isOpen = openIds.has(String(t.id));
+    return `<div class="wds-chat-contact-avatar${isOpen ? ' is-open' : ''}" data-room-id="${t.id}" title="${escapeHtml(t.name || 'Chat')}">
+      ${t.isDm ? initial : '👥'}${unread ? '<span class="wds-chat-thread-dot"></span>' : ''}
+    </div>`;
+  }).join('');
 }
 
 function wdsCloseChatUserMenu() {
