@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.31.0';
+const APP_VERSION = 'WF_SYS_V.32.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1072,6 +1072,12 @@ async function wdsMaybeMarkChatRead() {
 
 async function refreshWdsChat() {
   const listEl = document.getElementById('wdsChatList');
+  // Every poll fully rebuilds the list's innerHTML, which tears down and
+  // restarts any embedded YouTube/Facebook iframe mid-playback — a video
+  // would never make it to the end since chat polls every 5s. Skip this
+  // cycle entirely while one's showing; polling resumes once it scrolls
+  // away or the message list otherwise re-renders for another reason.
+  if (listEl && listEl.querySelector('.chat-video-embed iframe')) return;
   try {
     const messages = await fetchChatMessages();
     wdsLastChatMessages = messages;
@@ -1436,6 +1442,10 @@ const wdsFeedExpandedComments = new Set();
 async function refreshWdsFeed() {
   const listEl = document.getElementById('wdsFeedList');
   if (!listEl) return;
+  // Same reasoning as refreshWdsChat's guard above — a poll-triggered
+  // rebuild would restart any playing video embed from scratch, which is
+  // exactly why a shared video never finished playing before this fix.
+  if (listEl.querySelector('.chat-video-embed iframe')) return;
   try {
     const posts = await fetchFeedPosts();
     renderFeedPosts(posts);
