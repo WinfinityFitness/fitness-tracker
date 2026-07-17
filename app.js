@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.42.0';
+const APP_VERSION = 'WF_SYS_V.43.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -727,14 +727,18 @@ function initDesktopShell() {
   // Chats panel — opened from the header chat icon (replaces the old
   // manual refresh button; the dashboard still auto-refreshes every 2min).
   // Global Chat minimize toggle — collapses the fixed bottom-left widget
-  // down to just its header bar.
+  // down to a small globe-icon button in the same corner.
   const globalChatFixed = document.getElementById('wdsGlobalChatFixed');
   const globalChatMinimizeBtn = document.getElementById('btnWdsGlobalChatMinimize');
-  if (globalChatFixed && globalChatMinimizeBtn) {
+  const globalChatCollapsedIcon = document.getElementById('wdsGlobalChatCollapsedIcon');
+  if (globalChatFixed && globalChatMinimizeBtn && globalChatCollapsedIcon) {
     globalChatMinimizeBtn.addEventListener('click', () => {
-      const nowMinimized = globalChatFixed.classList.toggle('is-minimized');
-      globalChatMinimizeBtn.textContent = nowMinimized ? '+' : '–';
-      globalChatMinimizeBtn.setAttribute('aria-label', nowMinimized ? 'Expand' : 'Minimize');
+      globalChatFixed.hidden = true;
+      globalChatCollapsedIcon.hidden = false;
+    });
+    globalChatCollapsedIcon.addEventListener('click', () => {
+      globalChatFixed.hidden = false;
+      globalChatCollapsedIcon.hidden = true;
     });
   }
 
@@ -4925,6 +4929,14 @@ function initEntityPhotoUpload() {
   const input = document.getElementById('setupPhotoInput');
   const noteEl = document.getElementById('setupPhotoNote');
   uploadBtn.addEventListener('click', () => { if (!uploadBtn.disabled) input.click(); });
+  // Web sync only ever pushes to the server when "Sync Now" is tapped —
+  // a photo saved locally otherwise never reaches the desktop dashboard
+  // until the user remembers to sync separately. Auto-push here (best
+  // effort, only when sync is already enabled) closes that gap.
+  const autoSyncIfEnabled = async () => {
+    if (localStorage.getItem('wft_web_sync_enabled') !== '1') return;
+    try { await pushWebSyncSnapshot(); } catch (e) { /* best effort — Sync Now still works as a fallback */ }
+  };
   input.addEventListener('change', async () => {
     const file = input.files[0];
     input.value = '';
@@ -4937,15 +4949,17 @@ function initEntityPhotoUpload() {
       refreshEntityPhotoUI();
       noteEl.textContent = 'Saved.';
       setTimeout(() => { noteEl.textContent = ''; }, 2000);
+      await autoSyncIfEnabled();
     } catch (e) {
       noteEl.textContent = (e && e.message) || 'Could not save that photo.';
     }
   });
-  removeBtn.addEventListener('click', () => {
+  removeBtn.addEventListener('click', async () => {
     const p = getProfile() || {};
     delete p.photoDataUrl;
     saveProfile(p);
     refreshEntityPhotoUI();
+    await autoSyncIfEnabled();
   });
 }
 
@@ -11918,12 +11932,15 @@ function dateMapToEntries(map) {
   return Object.keys(map || {}).map(date => ({ date, data: map[date] }));
 }
 
-async function enableWebSync(pin) {
+// p_old_pin only required server-side when a PIN is already set (first-
+// time setup doesn't need one, since there's nothing to prove yet).
+async function enableWebSync(pin, oldPin) {
   if (!sbConfigured()) throw new Error('Not connected.');
   await sb.rpc('web_sync_set_pin', {
     p_share_key: getOrCreateShareKey(),
     p_public_id: getOrCreatePublicId(),
     p_pin: pin,
+    p_old_pin: oldPin || null,
   }).then(({ error }) => { if (error) throw error; });
 }
 
@@ -11982,6 +11999,8 @@ async function pushWebSyncSnapshot() {
 function initWebSyncSettings() {
   const toggle = document.getElementById('webSyncEnabled');
   const fields = document.getElementById('webSyncFields');
+  const oldPinField = document.getElementById('webSyncOldPinField');
+  const oldPinInput = document.getElementById('webSyncOldPinInput');
   const pinInput = document.getElementById('webSyncPinInput');
   const setPinBtn = document.getElementById('btnWebSyncSetPin');
   const syncNowBtn = document.getElementById('btnWebSyncNow');
@@ -11994,29 +12013,41 @@ function initWebSyncSettings() {
       ? `Last synced ${new Date(Number(lastAt)).toLocaleString()}`
       : 'Not synced yet.';
   };
+  // A PIN's already been set once sync has ever been enabled — changing
+  // it from here on now requires proving the current one server-side.
+  const refreshOldPinVisibility = () => {
+    if (oldPinField) oldPinField.hidden = localStorage.getItem('wft_web_sync_enabled') !== '1';
+  };
 
   const enabled = localStorage.getItem('wft_web_sync_enabled') === '1';
   toggle.checked = enabled;
   fields.hidden = !enabled;
+  refreshOldPinVisibility();
   renderStatus();
 
   toggle.addEventListener('change', async () => {
     if (toggle.checked) {
       fields.hidden = false;
+      refreshOldPinVisibility();
       pinInput.focus();
     } else {
       toggle.checked = true; // stays checked until a PIN is actually set/disabled below
       fields.hidden = false;
+      refreshOldPinVisibility();
     }
   });
 
   setPinBtn.addEventListener('click', async () => {
     const pin = pinInput.value.trim();
+    const oldPin = oldPinInput ? oldPinInput.value.trim() : '';
     if (pin.length < 6) { showRestToast('PIN must be at least 6 characters.'); return; }
+    if (oldPinField && !oldPinField.hidden && oldPin.length < 6) { showRestToast('Enter your current PIN to change it.'); return; }
     try {
-      await enableWebSync(pin);
+      await enableWebSync(pin, oldPin);
       localStorage.setItem('wft_web_sync_enabled', '1');
       pinInput.value = '';
+      if (oldPinInput) oldPinInput.value = '';
+      refreshOldPinVisibility();
       showRestToast('Web sync enabled — tap Sync Now to upload your data.');
     } catch (e) { showRestToast('Could not set PIN — try again.'); }
   });

@@ -30,7 +30,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=42.0">
+<link rel="stylesheet" href="style.css?v=43.0">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -1976,6 +1976,10 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
         </label>
       </div>
       <div id="webSyncFields" hidden>
+        <label class="field" id="webSyncOldPinField" hidden>
+          <span>Current PIN (required to change an existing PIN)</span>
+          <input type="password" id="webSyncOldPinInput" minlength="6" autocomplete="off">
+        </label>
         <label class="field">
           <span>Sync PIN (at least 6 characters — you'll type this on the web dashboard along with your Digital ID)</span>
           <input type="password" id="webSyncPinInput" minlength="6" autocomplete="off">
@@ -3566,7 +3570,8 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
   <div class="wds-chat-contact-rail" id="wdsChatContactRail"></div>
 
   <!-- Global Chat — fixed to the bottom-left of the viewport, always
-       visible while scrolling, minimizable to just its header bar. -->
+       visible while scrolling. Minimizing swaps it for just a small
+       globe-icon button in the same spot; clicking that reopens it. -->
   <div class="wds-card wds-card--feed wds-chat-card wds-global-chat-fixed" id="wdsGlobalChatFixed">
     <div class="wds-chat-popup-head">
       <h3 class="wds-card-title" style="margin:0;">Global Chat</h3>
@@ -3588,6 +3593,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
       </div>
     </div>
   </div>
+  <button type="button" class="wds-global-chat-collapsed-icon" id="wdsGlobalChatCollapsedIcon" aria-label="Open Global Chat" title="Global Chat" hidden>🌐</button>
   <div class="chat-reaction-menu" id="wdsChatReactionMenu" hidden></div>
 
   <!-- Profile Page — opened by tapping the operator avatar in the top nav.
@@ -3673,10 +3679,10 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
   </div>
 </div>
 
-<script src="config.js?v=42.0"></script>
+<script src="config.js?v=43.0"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=42.0"></script>
+<script src="app.js?v=43.0"></script>
 </body>
 </html>
