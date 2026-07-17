@@ -16,9 +16,29 @@
 --    No client code anywhere selects share_key from leaderboard (every
 --    read only ever asks for public_id/code_name/stats), so this is a
 --    pure lockdown with zero functional impact.
+--
+--    NOTE: an earlier version of this migration tried a plain
+--    `revoke select (share_key) on leaderboard from anon;`, which did
+--    NOT work — a column-level REVOKE doesn't reliably override a
+--    pre-existing table-level `GRANT SELECT` (which implicitly covers
+--    every column, share_key included). The fix below revokes SELECT
+--    entirely first, then re-grants it column-by-column for every
+--    column EXCEPT share_key, built dynamically from the live schema so
+--    it can't drift out of sync with future columns added to this table.
 -- ---------------------------------------------------------------------
-revoke select (share_key) on leaderboard from anon;
-revoke select (share_key) on leaderboard from authenticated;
+revoke select on leaderboard from anon, authenticated;
+
+do $$
+declare
+  col text;
+begin
+  for col in
+    select column_name from information_schema.columns
+    where table_schema = 'public' and table_name = 'leaderboard' and column_name <> 'share_key'
+  loop
+    execute format('grant select (%I) on leaderboard to anon, authenticated', col);
+  end loop;
+end $$;
 
 -- ---------------------------------------------------------------------
 -- 2. chat_room_members allowed direct UPDATE/DELETE from anyone with the
@@ -29,8 +49,11 @@ revoke select (share_key) on leaderboard from authenticated;
 --    entirely. The only two things that legitimately used direct
 --    update/delete on this table (accepting/declining an invite, in both
 --    the mobile popover and the desktop Chats panel) get their own
---    ownership-checked RPCs below instead; app.js is updated in the same
---    deploy to call these instead of writing the table directly.
+--    ownership-checked RPCs below instead; app.js already calls these
+--    (deployed as WF_SYS_V.41.0) instead of writing the table directly.
+--
+--    Safe to re-run if you already ran this half successfully — DROP
+--    POLICY IF EXISTS and CREATE OR REPLACE FUNCTION are both idempotent.
 -- ---------------------------------------------------------------------
 drop policy if exists "anon update chat_room_members" on chat_room_members;
 drop policy if exists "anon delete chat_room_members" on chat_room_members;
@@ -56,3 +79,5 @@ begin
 end;
 $$;
 grant execute on function decline_chat_room_invite(uuid, uuid) to anon;
+
+notify pgrst, 'reload schema';

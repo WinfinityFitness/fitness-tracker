@@ -119,11 +119,15 @@ Deno.serve(async (req) => {
     }
     const mealMenuJsonShape = `Respond with ONLY a JSON object, no markdown, no explanation, in exactly this shape:
 {"name": string, "calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "sodium": number, "ingredients": string, "procedure": string}
-"calories"/"protein"/"carbs"/"fat"/"fiber"/"sodium" are your best nutrition estimate PER 100 GRAMS of the prepared dish (like a nutrition facts label) — if the source gives a total-dish or per-serving amount and a total/serving weight, convert to per-100g yourself. calories in kcal, protein/carbs/fat/fiber in grams, sodium in milligrams. "ingredients" is a newline-separated list of ingredients (with quantities if given). "procedure" is the numbered preparation steps as plain newline-separated text. If a field can't be determined, give your best reasonable estimate — never refuse.`;
+Keep the three text-bearing fields strictly separated — never let one field's content bleed into another, even if the source lays them out as adjacent boxes/columns on the same page:
+- "ingredients": ONLY the ingredients list (with quantities if given), one per line. No nutrition numbers, no prep steps.
+- "procedure": ONLY the preparation/cooking steps, as plain newline-separated text (numbered if the source numbers them). No ingredients list, no nutrition numbers.
+- "calories"/"protein"/"carbs"/"fat"/"fiber"/"sodium": nutrition facts PER 100 GRAMS of the prepared dish. If the source shows an explicit nutrition-facts panel/label (a box with numbers like "Calories 190", "Fat 2g", "Sodium 135mg" etc.), READ those printed values directly rather than estimating, and convert to per-100g using that panel's own stated serving size/weight if given. Only fall back to estimating from the ingredients/dish when no explicit nutrition panel is present. calories in kcal, protein/carbs/fat/fiber in grams, sodium in milligrams.
+If a field can't be determined, give your best reasonable estimate — never refuse.`;
     if (menuImage) {
       parts.push({
-        text: `Look at this photo for a fitness tracking app's prep-meal catalog. It may show a prepared dish, a printed/handwritten recipe, a cookbook page, or a food label.
-If the photo contains recipe text (ingredients and/or instructions), transcribe them faithfully. If it only shows a dish, identify it and provide a typical home recipe for it.
+        text: `Look at this photo for a fitness tracking app's prep-meal catalog. It may show a prepared dish, a printed/handwritten recipe, a cookbook page, or a food label — and may include a separate nutrition-facts panel alongside the ingredients/instructions (e.g. a recipe card with "Ingredients" and "Nutrition" boxes side by side).
+Read every piece of text in the photo and route it to the right field below — don't skip the nutrition panel if one is present, and don't mix it into the ingredients or procedure text. If the photo only shows a plated dish with no text at all, identify it and provide a typical home recipe for it.
 ${mealMenuJsonShape}`,
       });
       parts.push({ inlineData: { mimeType: menuImage.imageMimeType, data: menuImage.imageBase64 } });
@@ -167,26 +171,42 @@ All values are per 100g. calories in kcal, protein/carbs/fat/fiber in grams, sod
     });
   }
 
-  let geminiRes;
-  try {
-    geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts }],
-          generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
-        }),
-      }
-    );
-  } catch (e) {
-    return jsonResponse({ error: 'Could not reach the AI service', detail: String(e) }, 502);
+  // Gemini's hosted models occasionally return 503 "currently experiencing
+  // high demand" during load spikes — a transient, not a code, problem. A
+  // couple of short-delay retries clear most of these; if the primary
+  // model is still overloaded, gemini-2.5-flash-lite (a separate capacity
+  // pool) is tried once as a last resort before actually giving up.
+  const MODELS_TO_TRY = ['gemini-3.5-flash', 'gemini-3.5-flash', 'gemini-2.5-flash-lite'];
+  const RETRY_DELAYS_MS = [0, 800, 0];
+
+  let geminiRes, lastErrText;
+  for (let i = 0; i < MODELS_TO_TRY.length; i++) {
+    if (RETRY_DELAYS_MS[i]) await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[i]));
+    try {
+      geminiRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${MODELS_TO_TRY[i]}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts }],
+            generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
+          }),
+        }
+      );
+    } catch (e) {
+      lastErrText = String(e);
+      continue;
+    }
+    if (geminiRes.ok) break;
+    lastErrText = await geminiRes.text();
+    // Only worth retrying/falling back on capacity errors — anything else
+    // (bad request, invalid key, etc.) will just fail the same way again.
+    if (!/503|UNAVAILABLE|high demand/i.test(lastErrText)) break;
   }
 
-  if (!geminiRes.ok) {
-    const errText = await geminiRes.text();
-    return jsonResponse({ error: 'AI request failed', detail: errText }, 502);
+  if (!geminiRes || !geminiRes.ok) {
+    return jsonResponse({ error: 'AI request failed', detail: lastErrText }, 502);
   }
 
   const geminiData = await geminiRes.json();

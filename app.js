@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.47.0';
+const APP_VERSION = 'WF_SYS_V.48.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -62,6 +62,7 @@ let wdsChatLastRead = {}; // roomId -> ISO timestamp, persisted below
 try { wdsChatLastRead = JSON.parse(localStorage.getItem('wft_web_chat_last_read')) || {}; } catch (e) { wdsChatLastRead = {}; }
 function wdsSaveChatLastRead() { localStorage.setItem('wft_web_chat_last_read', JSON.stringify(wdsChatLastRead)); }
 let wdsOpenChatPopupIds = [];
+let wdsPopupPendingImages = {}; // roomId -> data URL, per-popup since several can be open at once
 let wdsChatListTab = 'all';
 let wdsChatListSearchText = '';
 let wdsNewGroupInviteIds = [];
@@ -243,9 +244,7 @@ function initDesktopShell() {
     chatPendingImage.hidden = true;
     chatImageInput.value = '';
   };
-  chatAttachBtn.addEventListener('click', () => chatImageInput.click());
-  chatImageInput.addEventListener('change', () => {
-    const file = chatImageInput.files[0];
+  const readWdsChatImageFile = file => {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
@@ -254,8 +253,17 @@ function initDesktopShell() {
       chatPendingImage.hidden = false;
     };
     reader.readAsDataURL(file);
-  });
+  };
+  chatAttachBtn.addEventListener('click', () => chatImageInput.click());
+  chatImageInput.addEventListener('change', () => readWdsChatImageFile(chatImageInput.files[0]));
   chatPendingImageRemoveBtn.addEventListener('click', clearWdsPendingChatImage);
+  // Ctrl+V a copied image straight into the message box — same pending-
+  // image slot the attach button fills, so preview/remove/send all work
+  // identically regardless of how the image got there.
+  chatInput.addEventListener('paste', e => {
+    const file = wdsGetPastedImageFile(e);
+    if (file) { e.preventDefault(); readWdsChatImageFile(file); }
+  });
 
   const sendWdsChat = async () => {
     if (!wdsRemoteData || !wdsRemoteData.shareKey || !sbConfigured()) return;
@@ -640,7 +648,8 @@ function initDesktopShell() {
     profileComposerPostBtn.disabled = true;
     try {
       const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
-      await postFeedPost(text, image, wdsRemoteData.shareKey, codeName, null);
+      const wallOwnerShareKey = wdsViewedProfile ? wdsViewedProfile.shareKey : null;
+      await postFeedPost(text, image, wdsRemoteData.shareKey, codeName, null, wallOwnerShareKey);
       profileComposerInput.value = '';
       clearWdsPendingProfilePostImage();
       await refreshWdsProfilePosts();
@@ -675,6 +684,8 @@ function initDesktopShell() {
   document.getElementById('wdsProfilePostsList').addEventListener('click', async e => {
     const lightboxImg = e.target.closest('[data-lightbox]');
     if (lightboxImg) { e.stopPropagation(); openChatLightbox(lightboxImg.dataset.lightbox); return; }
+    const nameEl = e.target.closest('[data-view-profile]');
+    if (nameEl) { e.stopPropagation(); wdsOpenOtherProfile(nameEl.dataset.viewProfile); return; }
     const removeBtn = e.target.closest('[data-action="remove-post"]');
     if (removeBtn) {
       if (!wdsRemoteData || !wdsRemoteData.shareKey || !confirm('Remove this post?')) return;
@@ -772,6 +783,48 @@ function initDesktopShell() {
     sendFriendReqBtn.addEventListener('click', sendRequest);
     addFriendInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendRequest(); } });
   }
+  document.getElementById('wdsProfileFriendsList').addEventListener('click', e => {
+    const item = e.target.closest('[data-view-profile]');
+    if (item) wdsOpenOtherProfile(item.dataset.viewProfile);
+  });
+
+  // Viewing someone else's profile (a click-through from a name/avatar)
+  // shows "+ Add Friend"/"Message" instead of your own edit tools — see
+  // renderWdsProfileHeader's isOwn branch for what toggles this row.
+  const viewedAddFriendBtn = document.getElementById('btnWdsProfileAddFriendDirect');
+  const viewedMessageBtn = document.getElementById('btnWdsProfileMessage');
+  if (viewedAddFriendBtn) viewedAddFriendBtn.addEventListener('click', async () => {
+    if (!wdsViewedProfile) return;
+    viewedAddFriendBtn.disabled = true;
+    try {
+      await wdsSendFriendRequest(wdsViewedProfile.publicId);
+      viewedAddFriendBtn.textContent = 'Request Sent';
+    } catch (e) {
+      viewedAddFriendBtn.disabled = false;
+    }
+  });
+  if (viewedMessageBtn) viewedMessageBtn.addEventListener('click', () => {
+    if (!wdsViewedProfile) return;
+    wdsStartDM(wdsViewedProfile.codeName);
+  });
+
+  // Who-can-post-on-my-wall — only visible/enabled on your own profile
+  // (renderWdsProfileHeader hides it when wdsViewedProfile is set).
+  const wallPermissionSelect = document.getElementById('wdsWallPermissionSelect');
+  if (wallPermissionSelect) wallPermissionSelect.addEventListener('change', async () => {
+    if (!wdsRemoteData) return;
+    const prev = wdsOwnWallPermission;
+    const next = wallPermissionSelect.value;
+    wallPermissionSelect.disabled = true;
+    try {
+      const { error } = await sb.rpc('set_wall_post_permission', { p_share_key: wdsRemoteData.shareKey, p_permission: next });
+      if (error) throw error;
+      wdsOwnWallPermission = next;
+    } catch (e) {
+      wallPermissionSelect.value = prev;
+    }
+    finally { wallPermissionSelect.disabled = false; }
+  });
 
   // Chats panel — opened from the header chat icon (replaces the old
   // manual refresh button; the dashboard still auto-refreshes every 2min).
@@ -901,6 +954,18 @@ function initDesktopShell() {
 
   // Floating popup windows — delegated since they're created dynamically.
   const chatPopupsWrap = document.getElementById('wdsChatPopupsWrap');
+  const readWdsPopupImageFile = (roomId, file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      wdsPopupPendingImages[roomId] = reader.result;
+      const preview = chatPopupsWrap.querySelector(`[data-popup-pending-image-preview="${roomId}"]`);
+      const wrap = chatPopupsWrap.querySelector(`[data-popup-pending-image="${roomId}"]`);
+      if (preview) preview.src = reader.result;
+      if (wrap) wrap.hidden = false;
+    };
+    reader.readAsDataURL(file);
+  };
   chatPopupsWrap.addEventListener('click', async e => {
     const closeBtn = e.target.closest('[data-close-popup]');
     if (closeBtn) { wdsCloseChatPopup(closeBtn.dataset.closePopup); return; }
@@ -908,17 +973,40 @@ function initDesktopShell() {
     if (lightboxImg) { e.stopPropagation(); openChatLightbox(lightboxImg.dataset.lightbox); return; }
     const nameEl = e.target.closest('[data-dm-name]');
     if (nameEl) { wdsOpenChatUserMenu(nameEl.dataset.dmName, e.clientX, e.clientY); return; }
+    const attachBtn = e.target.closest('[data-popup-attach]');
+    if (attachBtn) {
+      const roomId = attachBtn.dataset.popupAttach;
+      const fileInput = chatPopupsWrap.querySelector(`[data-popup-image-input="${roomId}"]`);
+      if (fileInput) fileInput.click();
+      return;
+    }
+    const removeImgBtn = e.target.closest('[data-popup-remove-image]');
+    if (removeImgBtn) {
+      const roomId = removeImgBtn.dataset.popupRemoveImage;
+      delete wdsPopupPendingImages[roomId];
+      const wrap = chatPopupsWrap.querySelector(`[data-popup-pending-image="${roomId}"]`);
+      if (wrap) wrap.hidden = true;
+      const fileInput = chatPopupsWrap.querySelector(`[data-popup-image-input="${roomId}"]`);
+      if (fileInput) fileInput.value = '';
+      return;
+    }
     const sendBtn = e.target.closest('[data-popup-send]');
     if (sendBtn) {
       const roomId = sendBtn.dataset.popupSend;
       const input = chatPopupsWrap.querySelector(`[data-popup-input="${roomId}"]`);
-      if (!input || !input.value.trim() || !wdsRemoteData) return;
+      const image = wdsPopupPendingImages[roomId] || null;
+      if (!input || (!input.value.trim() && !image) || !wdsRemoteData) return;
       const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
       const text = input.value;
       input.value = '';
+      delete wdsPopupPendingImages[roomId];
+      const pendingWrap = chatPopupsWrap.querySelector(`[data-popup-pending-image="${roomId}"]`);
+      if (pendingWrap) pendingWrap.hidden = true;
+      const fileInput = chatPopupsWrap.querySelector(`[data-popup-image-input="${roomId}"]`);
+      if (fileInput) fileInput.value = '';
       wdsChatPopupLastActive[roomId] = Date.now();
       try {
-        await postChatMessage(text, null, wdsRemoteData.shareKey, codeName, roomId);
+        await postChatMessage(text, image, wdsRemoteData.shareKey, codeName, roomId);
         await wdsRefreshChatPopup(roomId);
         await refreshWdsChatRooms();
       } catch (err) { /* best effort */ }
@@ -927,6 +1015,16 @@ function initDesktopShell() {
     const popupEl = e.target.closest('.wds-chat-popup');
     if (popupEl) wdsChatPopupLastActive[popupEl.dataset.roomId] = Date.now();
   });
+  chatPopupsWrap.addEventListener('change', e => {
+    const fileInput = e.target.closest('[data-popup-image-input]');
+    if (fileInput) readWdsPopupImageFile(fileInput.dataset.popupImageInput, fileInput.files[0]);
+  });
+  chatPopupsWrap.addEventListener('paste', e => {
+    const input = e.target.closest('[data-popup-input]');
+    if (!input) return;
+    const file = wdsGetPastedImageFile(e);
+    if (file) { e.preventDefault(); readWdsPopupImageFile(input.dataset.popupInput, file); }
+  });
   chatPopupsWrap.addEventListener('keydown', e => {
     if (e.key === 'Enter' && e.target.matches('[data-popup-input]')) {
       const roomId = e.target.dataset.popupInput;
@@ -934,6 +1032,17 @@ function initDesktopShell() {
       if (sendBtn) sendBtn.click();
     }
   });
+
+  // Full-size image lightbox (used by chat photos and feed post photos
+  // alike) — clicking the backdrop or the ✕ minimizes it back to the
+  // preview; clicking the image itself is a no-op (stopPropagation) so it
+  // doesn't close on the very click that's meant to view it.
+  const wdsLightbox = document.getElementById('chatLightbox');
+  if (wdsLightbox) {
+    wdsLightbox.addEventListener('click', closeChatLightbox);
+    document.getElementById('chatLightboxImg').addEventListener('click', e => e.stopPropagation());
+    document.getElementById('chatLightboxClose').addEventListener('click', closeChatLightbox);
+  }
 
   // Right-edge contact rail — click a DM/group avatar to open (or bring
   // back an evicted) popup.
@@ -1084,8 +1193,36 @@ function renderWdsDashboard() {
   renderWdsNexus().catch(() => {});
   refreshWdsFeed().catch(() => {});
   refreshWdsFriendRequests().catch(() => {});
+  refreshWdsLeaderboardList().catch(() => {});
   renderWdsMenu();
   renderWdsNotifications();
+}
+
+// Third-column sidebar widget, under Notifications — the same public
+// leaderboard data the mobile app's own Nexus tab shows (pullLeaderboard,
+// unchanged), just condensed to a single top-10 list ranked by
+// Conscientiousness Score (the one metric every synced operator has,
+// unlike steps/volume/run pace which only some log) instead of the
+// mobile tab's six separate per-metric rankings.
+async function refreshWdsLeaderboardList() {
+  const listEl = document.getElementById('wdsLeaderboardList');
+  if (!listEl || !sbConfigured()) return;
+  try {
+    const rows = await pullLeaderboard();
+    const ranked = rows.filter(r => r.conscientious_score != null)
+      .sort((a, b) => b.conscientious_score - a.conscientious_score)
+      .slice(0, 10);
+    if (!ranked.length) { listEl.innerHTML = '<p class="empty-note">No Nexus data yet.</p>'; return; }
+    listEl.innerHTML = ranked.map((r, i) => `
+      <div class="wds-leaderboard-row">
+        <span class="wds-leaderboard-rank">${i + 1}</span>
+        <span class="wds-friend-avatar">${escapeHtml((r.code_name || '?').charAt(0).toUpperCase())}</span>
+        <span class="wds-friend-name">${escapeHtml(r.code_name || 'Anonymous')}</span>
+        <span class="wds-leaderboard-score">${r.conscientious_score}%</span>
+      </div>`).join('');
+  } catch (e) {
+    listEl.innerHTML = '<p class="empty-note">Could not load Nexus leaderboard.</p>';
+  }
 }
 
 function renderWdsMenu() {
@@ -1581,7 +1718,13 @@ async function wdsOpenChatPopup(roomId) {
         <button type="button" class="wds-chat-popup-close" data-close-popup="${roomId}" aria-label="Close">✕</button>
       </div>
       <div class="wds-chat-popup-list"><p class="empty-note">Loading…</p></div>
+      <div class="wds-chat-popup-pending-image" hidden data-popup-pending-image="${roomId}">
+        <img alt="" data-popup-pending-image-preview="${roomId}">
+        <button type="button" data-popup-remove-image="${roomId}" aria-label="Remove image">✕</button>
+      </div>
       <div class="wds-chat-popup-input-row">
+        <button type="button" class="wds-chat-popup-attach-btn" data-popup-attach="${roomId}" aria-label="Attach image">📎</button>
+        <input type="file" accept="image/*" hidden data-popup-image-input="${roomId}">
         <input type="text" placeholder="Aa" maxlength="280" data-popup-input="${roomId}">
         <button type="button" class="wds-mini-btn" data-popup-send="${roomId}">Send</button>
       </div>`;
@@ -1599,6 +1742,7 @@ function wdsCloseChatPopup(roomId) {
   const popup = document.querySelector(`.wds-chat-popup[data-room-id="${roomId}"]`);
   if (popup) popup.remove();
   wdsOpenChatPopupIds = wdsOpenChatPopupIds.filter(id => id !== roomId);
+  delete wdsPopupPendingImages[roomId];
   renderWdsChatContactRail();
 }
 
@@ -2020,11 +2164,24 @@ async function fetchFeedPosts() {
   return posts;
 }
 
-async function postFeedPost(text, imageDataUrl, shareKey, codeName, linkPreview) {
+async function postFeedPost(text, imageDataUrl, shareKey, codeName, linkPreview, wallOwnerShareKey) {
   const trimmed = text.trim().slice(0, 2000);
   if (!trimmed && !imageDataUrl) return;
   let imageUrl = null;
   if (imageDataUrl) imageUrl = await uploadChatImage(imageDataUrl, shareKey);
+  // A "wall post" — posted on someone else's profile, not your own — can't
+  // be a plain insert: whether it's even allowed depends on that operator's
+  // wall_post_permission, which (like feed visibility) only a server-side
+  // RPC can check. Posting on your own wall stays a direct insert exactly
+  // as before.
+  if (wallOwnerShareKey && wallOwnerShareKey !== shareKey) {
+    const { error } = await sb.rpc('create_wall_post', {
+      p_poster_share_key: shareKey, p_owner_share_key: wallOwnerShareKey, p_code_name: codeName,
+      p_message: trimmed, p_image_url: imageUrl, p_link_preview: linkPreview || null,
+    });
+    if (error) throw error;
+    return;
+  }
   const { error } = await sb.from('feed_posts').insert({
     share_key: shareKey, code_name: codeName, message: trimmed, image_url: imageUrl, link_preview: linkPreview || null,
   });
@@ -2186,9 +2343,9 @@ function renderFeedPosts(posts) {
       const canRemove = !!myShareKey && c.share_key === myShareKey;
       const cMyLike = (c.likes || []).find(l => l.share_key === myShareKey);
       return `<div class="wds-post-comment" data-comment-id="${c.id}">
-        <span class="wds-post-comment-avatar">${escapeHtml((c.code_name || '?').charAt(0).toUpperCase())}</span>
+        <span class="wds-post-comment-avatar" data-view-profile="${escapeHtml(c.share_key)}">${escapeHtml((c.code_name || '?').charAt(0).toUpperCase())}</span>
         <div class="wds-post-comment-body">
-          <div class="wds-post-comment-bubble"><strong>${escapeHtml(c.code_name || 'Anonymous')}</strong><span>${escapeHtml(c.message)}</span></div>
+          <div class="wds-post-comment-bubble"><strong data-view-profile="${escapeHtml(c.share_key)}">${escapeHtml(c.code_name || 'Anonymous')}</strong><span>${escapeHtml(c.message)}</span></div>
           <div class="wds-post-comment-actions">
             <button type="button" class="wds-comment-action-btn${cMyLike ? ' is-liked' : ''}" data-action="like-comment" data-current-emoji="${cMyLike ? cMyLike.emoji : ''}">${wdsReactionButtonHtml(c.likes, myShareKey)}</button>
             ${wdsReactionSummaryHtml(c.likes)}
@@ -2201,8 +2358,8 @@ function renderFeedPosts(posts) {
     return `
       <div class="wds-card wds-feed-post" data-post-id="${p.id}">
         <div class="wds-post-head">
-          <span class="wds-post-avatar">${escapeHtml((p.code_name || '?').charAt(0).toUpperCase())}</span>
-          <div class="wds-post-meta"><strong>${escapeHtml(p.code_name || 'Anonymous')}</strong><span>${wdsRelativeTime(p.created_at)}</span></div>
+          <span class="wds-post-avatar" data-view-profile="${escapeHtml(p.share_key)}">${escapeHtml((p.code_name || '?').charAt(0).toUpperCase())}</span>
+          <div class="wds-post-meta"><strong data-view-profile="${escapeHtml(p.share_key)}">${escapeHtml(p.code_name || 'Anonymous')}</strong><span>${wdsRelativeTime(p.created_at)}</span></div>
           ${isOwn ? `<button type="button" class="wds-post-unsend-btn" data-action="unsend-post">Remove</button>` : ''}
         </div>
         ${bodyHtml}
@@ -2229,13 +2386,16 @@ function renderFeedPosts(posts) {
 // plumbing the main feed has.
 async function fetchFeedPostsByUser(shareKey) {
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  const { data, error } = await sb.from('feed_posts')
-    .select('id, share_key, code_name, message, image_url, link_preview, deleted, created_at, visibility')
-    .eq('share_key', shareKey)
-    .eq('deleted', false)
-    .gte('created_at', cutoff)
-    .order('created_at', { ascending: false })
-    .limit(30);
+  // get_visible_feed_posts (not a plain table select) applies visibility
+  // (public/friends/only_me) server-side against the signed-in viewer, and
+  // its p_author_share_key filter matches both this operator's own posts
+  // AND wall posts other people left on their profile — see
+  // supabase_profile_view_and_wall_migration.sql. A raw table select here
+  // would leak friends-only/only-me posts to anyone who knows the share_key.
+  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+  const { data, error } = await sb.rpc('get_visible_feed_posts', {
+    p_viewer_share_key: myShareKey, p_cutoff: cutoff, p_limit: 30, p_author_share_key: shareKey,
+  });
   if (error) throw error;
   const posts = data || [];
   const ids = posts.map(p => p.id);
@@ -2262,6 +2422,11 @@ let wdsProfilePostsCache = [];
 let wdsProfilePostsView = 'list';
 let wdsProfilePostsSort = 'newest';
 let wdsProfileManageMode = false;
+// null = the Profile Page currently shows the signed-in operator's own
+// profile; otherwise {shareKey, publicId, codeName, avatarDataUrl} for
+// whichever other operator's name/avatar was clicked.
+let wdsViewedProfile = null;
+let wdsOwnWallPermission = 'friends';
 
 function renderWdsProfilePosts() {
   const list = document.getElementById('wdsProfilePostsList');
@@ -2291,8 +2456,8 @@ function renderWdsProfilePosts() {
     return `
       <div class="wds-card wds-feed-post" data-post-id="${p.id}">
         <div class="wds-post-head">
-          <span class="wds-post-avatar">${escapeHtml((p.code_name || '?').charAt(0).toUpperCase())}</span>
-          <div class="wds-post-meta"><strong>${escapeHtml(p.code_name || 'Anonymous')}</strong><span>${wdsRelativeTime(p.created_at)}</span></div>
+          <span class="wds-post-avatar" data-view-profile="${escapeHtml(p.share_key)}">${escapeHtml((p.code_name || '?').charAt(0).toUpperCase())}</span>
+          <div class="wds-post-meta"><strong data-view-profile="${escapeHtml(p.share_key)}">${escapeHtml(p.code_name || 'Anonymous')}</strong><span>${wdsRelativeTime(p.created_at)}</span></div>
           ${wdsProfileManageMode ? `
             <select class="wds-post-visibility-select" data-action="set-visibility" data-post-id="${p.id}">
               <option value="public"${p.visibility === 'public' || !p.visibility ? ' selected' : ''}>🌐 Public</option>
@@ -2313,38 +2478,71 @@ function renderWdsProfilePosts() {
 }
 
 function renderWdsProfileHeader() {
-  const profile = wdsRemoteData.profile || {};
-  const displayName = profile.name || wdsRemoteData.publicId;
+  const isOwn = !wdsViewedProfile;
+  const profile = isOwn ? (wdsRemoteData.profile || {}) : {};
+  const displayName = isOwn ? (profile.name || wdsRemoteData.publicId) : (wdsViewedProfile.codeName || wdsViewedProfile.publicId);
+  const publicId = isOwn ? wdsRemoteData.publicId : wdsViewedProfile.publicId;
+  const photoDataUrl = isOwn ? profile.photoDataUrl : wdsViewedProfile.avatarDataUrl;
   document.getElementById('wdsProfilePageName').textContent = displayName;
-  const mode = getFitnessMode();
-  document.getElementById('wdsProfilePageSubtitle').textContent = `${MODE_LABEL[mode] || mode} • Digital ID ${wdsRemoteData.publicId}`;
-  wdsSetAvatarVisual(document.getElementById('wdsProfilePageAvatar'), profile.photoDataUrl, displayName.trim().charAt(0).toUpperCase());
+  wdsSetAvatarVisual(document.getElementById('wdsProfilePageAvatar'), photoDataUrl, displayName.trim().charAt(0).toUpperCase());
   const coverEl = document.getElementById('wdsProfileCover');
   if (coverEl) {
-    coverEl.style.backgroundImage = profile.coverPhotoDataUrl ? `url(${profile.coverPhotoDataUrl})` : '';
-    coverEl.style.backgroundPosition = `center ${profile.coverPhotoPosY != null ? profile.coverPhotoPosY : 50}%`;
+    coverEl.style.backgroundImage = (isOwn && profile.coverPhotoDataUrl) ? `url(${profile.coverPhotoDataUrl})` : '';
+    coverEl.style.backgroundPosition = `center ${(isOwn && profile.coverPhotoPosY != null) ? profile.coverPhotoPosY : 50}%`;
   }
-  wdsSetAvatarVisual(document.getElementById('wdsProfileComposerAvatar'), profile.photoDataUrl, displayName.trim().charAt(0).toUpperCase());
+  // The composer avatar always shows the SIGNED-IN operator, since they're
+  // the one who'd be posting — whether that's on their own wall or (when
+  // wdsViewedProfile is set) someone else's.
+  const myName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
+  wdsSetAvatarVisual(document.getElementById('wdsProfileComposerAvatar'), wdsRemoteData.profile && wdsRemoteData.profile.photoDataUrl, myName.trim().charAt(0).toUpperCase());
+  const composerInputEl = document.getElementById('wdsProfileComposerInput');
+  if (composerInputEl) composerInputEl.placeholder = isOwn ? "What's on your mind?" : `Write something on ${displayName.split(' ')[0]}'s timeline…`;
 
-  const memberSince = profile.startDate ? new Date(profile.startDate).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) : '—';
-  document.getElementById('wdsProfileDetailList').innerHTML = `
-    <li><span>Digital ID</span><strong>${escapeHtml(wdsRemoteData.publicId)}</strong></li>
-    <li><span>Gender</span><strong>${profile.gender === 'female' ? 'Female' : 'Male'}</strong></li>
-    <li><span>Age</span><strong>${profile.age || '—'}</strong></li>
-    <li><span>Fitness Mode</span><strong>${escapeHtml(MODE_LABEL[mode] || mode)}</strong></li>
-    <li><span>Member Since</span><strong>${escapeHtml(memberSince)}</strong></li>
-  `;
+  const coverEditBtn = document.getElementById('btnWdsProfileCoverEdit');
+  if (coverEditBtn) coverEditBtn.hidden = !isOwn;
+  const viewedActionsEl = document.getElementById('wdsProfileViewedActions');
+  if (viewedActionsEl) viewedActionsEl.hidden = isOwn;
+  const wallPermissionLabel = document.getElementById('wdsWallPermissionLabel');
+  if (wallPermissionLabel) wallPermissionLabel.hidden = !isOwn;
+  const manageBtn = document.getElementById('btnWdsProfileManage');
+  if (manageBtn) manageBtn.hidden = !isOwn;
+  const bioMarkersCard = document.getElementById('wdsProfileBodyFatText');
+  const bioMarkersCardEl = bioMarkersCard ? bioMarkersCard.closest('.wds-card') : null;
+  if (bioMarkersCardEl) bioMarkersCardEl.hidden = !isOwn;
 
-  // Same calc as the dashboard's own Bio-Markers card (renderWdsBio).
-  const today = todayISO();
-  const bodyFatEntry = findLastBodyFatEntry(today);
-  const bodyFatPct = bodyFatEntry ? computeBodyFatJP7(bodyFatEntry.skinfolds, profile.age, profile.gender) : null;
-  document.getElementById('wdsProfileBodyFatText').textContent = bodyFatPct != null ? bodyFatPct.toFixed(1) + '%' : '–';
-  document.getElementById('wdsProfileBodyFatBar').style.width = bodyFatPct != null ? Math.min(100, bodyFatPct * 2) + '%' : '0%';
+  if (isOwn) {
+    const mode = getFitnessMode();
+    document.getElementById('wdsProfilePageSubtitle').textContent = `${MODE_LABEL[mode] || mode} • Digital ID ${publicId}`;
+    const memberSince = profile.startDate ? new Date(profile.startDate).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) : '—';
+    document.getElementById('wdsProfileDetailList').innerHTML = `
+      <li><span>Digital ID</span><strong>${escapeHtml(publicId)}</strong></li>
+      <li><span>Gender</span><strong>${profile.gender === 'female' ? 'Female' : 'Male'}</strong></li>
+      <li><span>Age</span><strong>${profile.age || '—'}</strong></li>
+      <li><span>Fitness Mode</span><strong>${escapeHtml(MODE_LABEL[mode] || mode)}</strong></li>
+      <li><span>Member Since</span><strong>${escapeHtml(memberSince)}</strong></li>
+    `;
 
-  const stats = computeLeaderboardStats();
-  document.getElementById('wdsProfileWeightText').textContent = stats.progress != null ? `${stats.progress > 0 ? '+' : ''}${stats.progress}${stats.weightUnit}` : '–';
-  document.getElementById('wdsProfileWeightBar').style.width = stats.progressPct != null ? Math.min(100, Math.abs(stats.progressPct) * 5) + '%' : '0%';
+    // Same calc as the dashboard's own Bio-Markers card (renderWdsBio).
+    const today = todayISO();
+    const bodyFatEntry = findLastBodyFatEntry(today);
+    const bodyFatPct = bodyFatEntry ? computeBodyFatJP7(bodyFatEntry.skinfolds, profile.age, profile.gender) : null;
+    document.getElementById('wdsProfileBodyFatText').textContent = bodyFatPct != null ? bodyFatPct.toFixed(1) + '%' : '–';
+    document.getElementById('wdsProfileBodyFatBar').style.width = bodyFatPct != null ? Math.min(100, bodyFatPct * 2) + '%' : '0%';
+
+    const stats = computeLeaderboardStats();
+    document.getElementById('wdsProfileWeightText').textContent = stats.progress != null ? `${stats.progress > 0 ? '+' : ''}${stats.progress}${stats.weightUnit}` : '–';
+    document.getElementById('wdsProfileWeightBar').style.width = stats.progressPct != null ? Math.min(100, Math.abs(stats.progressPct) * 5) + '%' : '0%';
+
+    const wallSelect = document.getElementById('wdsWallPermissionSelect');
+    if (wallSelect) wallSelect.value = wdsOwnWallPermission || 'friends';
+  } else {
+    // Private/self-only data (age, gender, body fat, weight progress) has
+    // no server-side source for anyone but the signed-in operator — see
+    // get_public_profile_by_share_key, which deliberately only returns
+    // name/avatar/Digital ID. Personal Details is trimmed to just that.
+    document.getElementById('wdsProfilePageSubtitle').textContent = `Digital ID ${publicId}`;
+    document.getElementById('wdsProfileDetailList').innerHTML = `<li><span>Digital ID</span><strong>${escapeHtml(publicId)}</strong></li>`;
+  }
 }
 
 async function refreshWdsProfilePosts() {
@@ -2352,7 +2550,8 @@ async function refreshWdsProfilePosts() {
   if (!listEl || !wdsRemoteData) return;
   listEl.innerHTML = '<p class="empty-note">Loading…</p>';
   try {
-    wdsProfilePostsCache = await fetchFeedPostsByUser(wdsRemoteData.shareKey);
+    const shareKey = wdsViewedProfile ? wdsViewedProfile.shareKey : wdsRemoteData.shareKey;
+    wdsProfilePostsCache = await fetchFeedPostsByUser(shareKey);
     renderWdsProfilePosts();
   } catch (e) {
     listEl.innerHTML = '<p class="empty-note">Could not load posts.</p>';
@@ -2364,15 +2563,16 @@ async function refreshWdsProfilePosts() {
 // public_id lookup + the new avatar_data_url column for the "profile
 // photo" the user asked the friends list to show.
 // ---------------------------------------------------------------------
-async function refreshWdsFriendsList() {
+async function refreshWdsFriendsList(targetShareKey) {
   const listEl = document.getElementById('wdsProfileFriendsList');
   if (!listEl || !wdsRemoteData) return;
+  const shareKey = targetShareKey || wdsRemoteData.shareKey;
   try {
-    const { data, error } = await sb.rpc('list_friends', { p_share_key: wdsRemoteData.shareKey });
+    const { data, error } = await sb.rpc('list_friends', { p_share_key: shareKey });
     if (error) throw error;
     if (!data || !data.length) { listEl.innerHTML = '<p class="empty-note">No friends yet.</p>'; return; }
     listEl.innerHTML = data.map(f => `
-      <div class="wds-friend-item">
+      <div class="wds-friend-item" data-view-profile="${escapeHtml(f.share_key)}">
         <span class="wds-friend-avatar"${f.avatar_data_url ? ` style="background-image:url(${escapeHtml(f.avatar_data_url)});"` : ''}>${f.avatar_data_url ? '' : escapeHtml((f.code_name || '?').charAt(0).toUpperCase())}</span>
         <span class="wds-friend-name">${escapeHtml(f.code_name || 'Unknown')}</span>
       </div>`).join('');
@@ -2432,32 +2632,62 @@ async function wdsRespondFriendRequest(requesterShareKey, accept) {
 // Render/show only — no history mutation. Used both by the click-driven
 // open (which also pushes a URL, see openWdsProfilePage below) and by the
 // popstate handler (which must NOT push another entry on top of the one
-// the browser is already navigating to/from).
-async function wdsShowProfilePage() {
+// the browser is already navigating to/from). Pass a share_key to view
+// that operator's profile instead of your own (e.g. clicking a name on a
+// feed post) — omit it, or pass your own share_key, for the normal
+// self-profile view.
+async function wdsShowProfilePage(targetShareKey) {
   if (!wdsRemoteData) return;
   const page = document.getElementById('wdsProfilePage');
   if (!page) return;
+  const isOwn = !targetShareKey || targetShareKey === wdsRemoteData.shareKey;
+  try {
+    const { data, error } = await sb.rpc('get_public_profile_by_share_key', { p_share_key: isOwn ? wdsRemoteData.shareKey : targetShareKey });
+    if (error) throw error;
+    const row = (data && data[0]) || null;
+    if (isOwn) {
+      wdsViewedProfile = null;
+      wdsOwnWallPermission = (row && row.wall_post_permission) || 'friends';
+    } else {
+      if (!row) return; // no such operator (or they've never synced) — nothing to show
+      wdsViewedProfile = { shareKey: targetShareKey, publicId: row.public_id, codeName: row.code_name, avatarDataUrl: row.avatar_data_url };
+    }
+  } catch (e) {
+    if (!isOwn) return;
+    wdsViewedProfile = null;
+  }
   page.hidden = false;
   renderWdsProfileHeader();
   await refreshWdsProfilePosts();
-  await refreshWdsFriendsList();
+  await refreshWdsFriendsList(isOwn ? null : targetShareKey);
 }
 function wdsHideProfilePage() {
   const page = document.getElementById('wdsProfilePage');
   if (page) page.hidden = true;
+  wdsViewedProfile = null;
 }
 
 // Cosmetic/shareable URL only — wellness.winfinityfitness.com is a static
 // single-page app with no real server-side router, so a fresh load of
 // this path depends on wordpress-proxy/index.php falling back to
 // index.html for unrecognized paths (see that file's own comments). This
-// only ever reflects the SIGNED-IN user's own Digital ID; there's no
-// support yet for viewing another operator's profile by URL.
+// only ever reflects the SIGNED-IN user's own Digital ID — viewing another
+// operator's profile (wdsOpenOtherProfile below) is a same-page overlay
+// swap, deliberately not reflected in the URL, so Back always lands you
+// on your own dashboard/profile rather than a stranger's.
 async function openWdsProfilePage() {
   if (!wdsRemoteData) return;
   const targetPath = '/' + wdsRemoteData.publicId;
   if (location.pathname !== targetPath) history.pushState({ wdsProfile: true }, '', targetPath);
   await wdsShowProfilePage();
+}
+// Click a name/avatar anywhere (feed post, comment, friend list) to view
+// that operator's profile. Reuses the same overlay as your own Profile
+// Page — renderWdsProfileHeader/refreshWdsProfilePosts branch on
+// wdsViewedProfile to show only their public info and hide edit tools.
+async function wdsOpenOtherProfile(shareKey) {
+  if (!wdsRemoteData || !shareKey || shareKey === wdsRemoteData.shareKey) { await openWdsProfilePage(); return; }
+  await wdsShowProfilePage(shareKey);
 }
 function closeWdsProfilePage() {
   if (location.pathname !== '/') history.pushState({ wdsProfile: false }, '', '/');
@@ -2477,6 +2707,8 @@ function initWdsFeed() {
   list.addEventListener('click', async e => {
     const lightboxImg = e.target.closest('[data-lightbox]');
     if (lightboxImg) { e.stopPropagation(); openChatLightbox(lightboxImg.dataset.lightbox); return; }
+    const nameEl = e.target.closest('[data-view-profile]');
+    if (nameEl) { e.stopPropagation(); wdsOpenOtherProfile(nameEl.dataset.viewProfile); return; }
     const card = e.target.closest('.wds-feed-post');
     if (!card) return;
     const postId = Number(card.dataset.postId);
@@ -12056,6 +12288,17 @@ async function postChatMessage(text, imageDataUrl, shareKeyOverride, codeNameOve
   if (error) throw error;
 }
 
+// Pulls the first pasted image (if any) out of a clipboard paste event —
+// shared by Global Chat, DM/group popups, and anywhere else that wants
+// Ctrl+V-to-attach instead of only a file-picker button.
+function wdsGetPastedImageFile(e) {
+  const items = (e.clipboardData && e.clipboardData.items) || [];
+  for (const item of items) {
+    if (item.type && item.type.startsWith('image/')) return item.getAsFile();
+  }
+  return null;
+}
+
 async function uploadChatImage(dataUrl, shareKeyOverride) {
   const blob = await (await fetch(dataUrl)).blob();
   const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
@@ -15232,6 +15475,8 @@ function initLeaderboard() {
   });
   document.getElementById('btnChatPendingImageRemove').addEventListener('click', clearPendingChatImage);
   document.getElementById('chatLightbox').addEventListener('click', closeChatLightbox);
+  document.getElementById('chatLightboxImg').addEventListener('click', e => e.stopPropagation());
+  document.getElementById('chatLightboxClose').addEventListener('click', closeChatLightbox);
 
   document.getElementById('btnChatRefresh').addEventListener('click', async () => {
     const refreshBtn = document.getElementById('btnChatRefresh');

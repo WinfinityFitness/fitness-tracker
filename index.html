@@ -30,7 +30,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=47.0">
+<link rel="stylesheet" href="style.css?v=48.0">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -1178,6 +1178,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
     </div>
 
     <div class="chat-lightbox" id="chatLightbox" hidden>
+      <button type="button" class="chat-lightbox-close" id="chatLightboxClose" aria-label="Close">✕</button>
       <img id="chatLightboxImg" alt="">
     </div>
 
@@ -3526,6 +3527,11 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
           <div id="wdsNotifList"><p class="empty-note">No notifications.</p></div>
         </div>
 
+        <div class="wds-card wds-leaderboard-card">
+          <h3 class="wds-card-title">Nexus Leaderboard</h3>
+          <div id="wdsLeaderboardList"><p class="empty-note">Loading…</p></div>
+        </div>
+
       </div>
 
     </main>
@@ -3616,6 +3622,10 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
         <h2 id="wdsProfilePageName">Operator</h2>
         <p id="wdsProfilePageSubtitle">—</p>
       </div>
+      <div class="wds-profile-viewed-actions" id="wdsProfileViewedActions" hidden>
+        <button type="button" class="btn btn--sm" id="btnWdsProfileAddFriendDirect">+ Add Friend</button>
+        <button type="button" class="btn btn--sm" id="btnWdsProfileMessage">💬 Message</button>
+      </div>
     </div>
     <div class="wds-profile-body">
       <div class="wds-profile-side">
@@ -3672,6 +3682,15 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
         <div class="wds-profile-posts-head">
           <h3 class="wds-card-title" style="margin:0;">Posts</h3>
           <div class="wds-profile-posts-controls">
+            <label class="wds-wall-permission-label" id="wdsWallPermissionLabel" hidden>
+              Who can post on my wall:
+              <select id="wdsWallPermissionSelect">
+                <option value="anyone">🌐 Anyone</option>
+                <option value="friends_of_friends">🤝 Friends of Friends</option>
+                <option value="friends" selected>👥 Friends</option>
+                <option value="only_me">🔒 Only Me</option>
+              </select>
+            </label>
             <button type="button" class="wds-mini-btn" id="btnWdsProfileFilters">⇅ Filters: Newest</button>
             <button type="button" class="wds-mini-btn" id="btnWdsProfileManage">⚙ Manage posts</button>
           </div>
@@ -3687,10 +3706,10 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
   </div>
 </div>
 
-<script src="config.js?v=47.0"></script>
+<script src="config.js?v=48.0"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=47.0"></script>
+<script src="app.js?v=48.0"></script>
 </body>
 </html>
