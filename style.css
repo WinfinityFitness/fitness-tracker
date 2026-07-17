@@ -4928,15 +4928,17 @@ html.wf-desktop-shell #wdsShell {
 .wds-friend-actions { display: flex; gap: 6px; }
 .wds-notif-item-actions { display: flex; gap: 8px; margin-top: 6px; }
 
-/* Nexus Leaderboard — 3rd column sidebar, below Notifications. */
+/* Nexus Leaderboard — 3rd column sidebar, below Notifications. Same
+   .rank-list/.rank-row markup mobile's own Nexus tab uses (via
+   renderRankList), just under compact section headers instead of full
+   .chart-card wrappers since this is a narrow sidebar, not a whole tab. */
 .wds-leaderboard-card { margin-top: 14px; }
-.wds-leaderboard-row { display: flex; align-items: center; gap: 10px; padding: 6px; }
-.wds-leaderboard-rank {
-  width: 20px; flex-shrink: 0; text-align: center; font-size: 0.78rem; font-weight: 700; color: var(--text-secondary);
+.wds-lb-section-head {
+  display: flex; align-items: center; justify-content: space-between; margin: 14px 0 6px;
+  font-size: 0.76rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--text-secondary);
 }
-.wds-leaderboard-row .wds-friend-avatar { width: 30px; height: 30px; font-size: 0.78rem; }
-.wds-leaderboard-row .wds-friend-name { font-size: 0.78rem; }
-.wds-leaderboard-score { font-size: 0.78rem; font-weight: 700; color: var(--cyan); flex-shrink: 0; }
+.wds-lb-section-head:first-of-type { margin-top: 4px; }
+.wds-leaderboard-card .rank-expand-btn { background: none; border: none; color: var(--cyan); cursor: pointer; font-size: 0.85rem; }
 .wds-chat-thread-item:hover { background: var(--surface-2); }
 .wds-chat-thread-avatar {
   width: 40px; height: 40px; border-radius: 50%; background: var(--gradient-bar); color: #060a0d;
@@ -4971,7 +4973,7 @@ html.wf-desktop-shell #wdsShell {
 .wds-chat-popup-list { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
 .wds-chat-popup-input-row { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--border-soft); flex-shrink: 0; }
 .wds-chat-popup-input-row input {
-  flex: 1; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 16px;
+  flex: 1; min-width: 0; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 16px;
   padding: 7px 12px; color: var(--text-primary); font-size: 0.78rem;
 }
 .wds-chat-popup-attach-btn {
@@ -5578,10 +5580,18 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
 .wds-chat-list { max-height: 320px; }
 .wds-feed-compose { display: flex; gap: 8px; margin-top: 10px; padding-top: 0; border-top: none; }
 .wds-feed-compose input {
-  flex: 1; padding: 9px 12px; border-radius: 6px; border: 1px solid var(--border-soft);
+  flex: 1; min-width: 0; padding: 9px 12px; border-radius: 6px; border: 1px solid var(--border-soft);
   background: var(--surface-2); color: var(--text-secondary); font-family: var(--font-display); font-size: 0.82rem;
 }
 .wds-feed-compose input:disabled, .wds-feed-compose button:disabled { opacity: 0.5; cursor: not-allowed; }
+/* .wds-mini-btn's default margin-top (meant for standalone buttons below
+   other content) misaligns it inside a flex input row — and without a
+   fixed shrink behavior it could still get squeezed by a long placeholder
+   in a narrow popup. Neutralize both, scoped to just these two chat send
+   rows (Global Chat's own row uses .wds-feed-compose; DM/group popups use
+   .wds-chat-popup-input-row) so it doesn't touch .wds-mini-btn elsewhere. */
+.wds-feed-compose .wds-mini-btn,
+.wds-chat-popup-input-row .wds-mini-btn { margin-top: 0; flex-shrink: 0; }
 
 .wds-spotlight-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
 .wds-spotlight-list li { display: flex; align-items: center; gap: 10px; font-size: 0.8rem; color: var(--text-secondary); }

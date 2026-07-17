@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.48.0';
+const APP_VERSION = 'WF_SYS_V.49.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -67,6 +67,7 @@ let wdsChatListTab = 'all';
 let wdsChatListSearchText = '';
 let wdsNewGroupInviteIds = [];
 let wdsChatUserMenuTarget = null;
+let wdsChatUserMenuTargetKey = null;
 
 // Preview build: the dashboard below is illustrative/sample data, not real
 // per-operator records — full per-operator data needs a real cloud-sync
@@ -972,7 +973,7 @@ function initDesktopShell() {
     const lightboxImg = e.target.closest('[data-lightbox]');
     if (lightboxImg) { e.stopPropagation(); openChatLightbox(lightboxImg.dataset.lightbox); return; }
     const nameEl = e.target.closest('[data-dm-name]');
-    if (nameEl) { wdsOpenChatUserMenu(nameEl.dataset.dmName, e.clientX, e.clientY); return; }
+    if (nameEl) { wdsOpenChatUserMenu(nameEl.dataset.dmName, e.clientX, e.clientY, nameEl.dataset.dmKey); return; }
     const attachBtn = e.target.closest('[data-popup-attach]');
     if (attachBtn) {
       const roomId = attachBtn.dataset.popupAttach;
@@ -1053,6 +1054,11 @@ function initDesktopShell() {
 
   // Per-user chat context menu — shared by Global Chat and every popup.
   const chatUserMenu = document.getElementById('wdsChatUserMenu');
+  document.getElementById('btnWdsChatUserProfile').addEventListener('click', () => {
+    const targetKey = wdsChatUserMenuTargetKey;
+    wdsCloseChatUserMenu();
+    if (targetKey) wdsOpenOtherProfile(targetKey);
+  });
   document.getElementById('btnWdsChatUserDm').addEventListener('click', () => {
     const target = wdsChatUserMenuTarget;
     wdsCloseChatUserMenu();
@@ -1078,7 +1084,7 @@ function initDesktopShell() {
   // Global Chat's own sender names open the same context menu.
   document.getElementById('wdsChatList').addEventListener('click', e => {
     const nameEl = e.target.closest('[data-dm-name]');
-    if (nameEl) { e.stopPropagation(); wdsOpenChatUserMenu(nameEl.dataset.dmName, e.clientX, e.clientY); }
+    if (nameEl) { e.stopPropagation(); wdsOpenChatUserMenu(nameEl.dataset.dmName, e.clientX, e.clientY, nameEl.dataset.dmKey); }
   });
 
   // A Digital ID + PIN entered earlier in this browser tab's session
@@ -1198,31 +1204,36 @@ function renderWdsDashboard() {
   renderWdsNotifications();
 }
 
-// Third-column sidebar widget, under Notifications — the same public
-// leaderboard data the mobile app's own Nexus tab shows (pullLeaderboard,
-// unchanged), just condensed to a single top-10 list ranked by
-// Conscientiousness Score (the one metric every synced operator has,
-// unlike steps/volume/run pace which only some log) instead of the
-// mobile tab's six separate per-metric rankings.
+// Third-column sidebar widget, under Notifications — the exact same six
+// per-metric rankings as the mobile app's own Nexus tab (same
+// pullLeaderboard/dedupeRankRows/renderRankList helpers, just targeting
+// wdsLb*-prefixed containers instead of mobile's lb* ones so this never
+// touches the mobile DOM).
 async function refreshWdsLeaderboardList() {
-  const listEl = document.getElementById('wdsLeaderboardList');
-  if (!listEl || !sbConfigured()) return;
+  const emptyNoteEl = document.getElementById('wdsLbEmptyNote');
+  if (!emptyNoteEl || !sbConfigured()) return;
   try {
     const rows = await pullLeaderboard();
-    const ranked = rows.filter(r => r.conscientious_score != null)
-      .sort((a, b) => b.conscientious_score - a.conscientious_score)
-      .slice(0, 10);
-    if (!ranked.length) { listEl.innerHTML = '<p class="empty-note">No Nexus data yet.</p>'; return; }
-    listEl.innerHTML = ranked.map((r, i) => `
-      <div class="wds-leaderboard-row">
-        <span class="wds-leaderboard-rank">${i + 1}</span>
-        <span class="wds-friend-avatar">${escapeHtml((r.code_name || '?').charAt(0).toUpperCase())}</span>
-        <span class="wds-friend-name">${escapeHtml(r.code_name || 'Anonymous')}</span>
-        <span class="wds-leaderboard-score">${r.conscientious_score}%</span>
-      </div>`).join('');
-  } catch (e) {
-    listEl.innerHTML = '<p class="empty-note">Could not load Nexus leaderboard.</p>';
-  }
+    emptyNoteEl.hidden = rows.length > 0;
+
+    const bySteps = dedupeRankRows(rows.filter(r => r.steps != null), (a, b) => a.steps > b.steps).sort((a, b) => b.steps - a.steps);
+    renderRankList('wdsLbStepsRanking', bySteps, { formatValue: r => r.steps >= 1000 ? (r.steps / 1000).toFixed(1) + 'k' : String(r.steps) });
+
+    const byVolume = dedupeRankRows(rows.filter(r => r.volume_lifted != null), (a, b) => a.volume_lifted > b.volume_lifted).sort((a, b) => b.volume_lifted - a.volume_lifted);
+    renderRankList('wdsLbVolumeRanking', byVolume, { formatValue: r => round0(r.volume_lifted) + ' ' + (r.volume_unit || 'kg') });
+
+    const byProgress = dedupeRankRows(rows.filter(r => r.weight_progress_pct != null), (a, b) => a.weight_progress_pct < b.weight_progress_pct).sort((a, b) => a.weight_progress_pct - b.weight_progress_pct);
+    renderRankList('wdsLbBioRanking', byProgress, { formatValue: r => (r.weight_progress_pct > 0 ? '+' : '') + r.weight_progress_pct + '%' });
+
+    const byFurthestRun = dedupeRankRows(rows.filter(r => r.furthest_run_km != null), (a, b) => a.furthest_run_km > b.furthest_run_km).sort((a, b) => b.furthest_run_km - a.furthest_run_km);
+    renderRankList('wdsLbFurthestRunRanking', byFurthestRun, { formatValue: r => round2(r.furthest_run_km) + ' km' });
+
+    const byFastestRun = dedupeRankRows(rows.filter(r => r.fastest_run_pace_sec != null), (a, b) => a.fastest_run_pace_sec < b.fastest_run_pace_sec).sort((a, b) => a.fastest_run_pace_sec - b.fastest_run_pace_sec);
+    renderRankList('wdsLbFastestRunRanking', byFastestRun, { formatValue: r => formatPaceSecPerUnit(r.fastest_run_pace_sec) + ' /km' });
+
+    const byConscientious = dedupeRankRows(rows.filter(r => r.conscientious_score != null), (a, b) => a.conscientious_score > b.conscientious_score).sort((a, b) => b.conscientious_score - a.conscientious_score);
+    renderRankList('wdsLbConscientiousRanking', byConscientious, { formatValue: r => r.conscientious_score + '%' });
+  } catch (e) { /* best effort */ }
 }
 
 function renderWdsMenu() {
@@ -1666,7 +1677,7 @@ function wdsRenderChatPopupMessages(roomId, messages) {
       ? `<span class="chat-msg chat-msg-unsent">Unsent a message</span>`
       : `${m.image_url ? `<img class="chat-msg-image" src="${escapeHtml(m.image_url)}" alt="" data-lightbox="${escapeHtml(m.image_url)}">` : ''}<span class="chat-msg">${escapeHtml(m.message)}</span>`;
     return `<div class="chat-row ${isOwn ? 'chat-row--own' : 'chat-row--other'}">
-      ${showName ? `<span class="chat-name" data-dm-name="${escapeHtml(m.code_name || 'Anonymous')}" style="cursor:pointer;">${escapeHtml(m.code_name || 'Anonymous')}</span>` : ''}
+      ${showName ? `<span class="chat-name" data-dm-name="${escapeHtml(m.code_name || 'Anonymous')}" data-dm-key="${escapeHtml(m.sender_share_key || '')}" style="cursor:pointer;">${escapeHtml(m.code_name || 'Anonymous')}</span>` : ''}
       <div class="chat-bubble-line">
         <div class="chat-bubble">${bodyHtml}</div>
         <span class="chat-time">${time}</span>
@@ -1774,13 +1785,18 @@ function wdsCloseChatUserMenu() {
   if (groups) groups.hidden = true;
   if (main) main.hidden = false;
 }
-function wdsOpenChatUserMenu(name, x, y) {
+function wdsOpenChatUserMenu(name, x, y, shareKey) {
   wdsChatUserMenuTarget = name;
+  wdsChatUserMenuTargetKey = shareKey || null;
   const menu = document.getElementById('wdsChatUserMenu');
   if (!menu) return;
   document.getElementById('wdsChatUserMenuName').textContent = name;
   document.getElementById('wdsChatUserMenuGroups').hidden = true;
   document.getElementById('wdsChatUserMenuMain').hidden = false;
+  // Only a synced desktop operator (has a share_key, not just a display
+  // name) has a viewable profile — mobile-only senders never do.
+  const profileBtn = document.getElementById('btnWdsChatUserProfile');
+  if (profileBtn) profileBtn.hidden = !wdsChatUserMenuTargetKey;
   menu.hidden = false;
   const menuWidth = 220;
   menu.style.left = Math.max(8, Math.min(x, window.innerWidth - menuWidth - 12)) + 'px';
@@ -1991,7 +2007,7 @@ function renderWdsChatMessages(messages, receipts) {
     const row = document.createElement('div');
     row.className = 'chat-row ' + (isOwn ? 'chat-row--own' : 'chat-row--other');
     const time = new Date(m.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-    const nameHtml = !isOwn ? `<span class="chat-name" data-dm-name="${escapeHtml(m.code_name || 'Anonymous')}" style="cursor:pointer;">${escapeHtml(m.code_name || 'Anonymous')}</span>` : '';
+    const nameHtml = !isOwn ? `<span class="chat-name" data-dm-name="${escapeHtml(m.code_name || 'Anonymous')}" data-dm-key="${escapeHtml(m.sender_share_key || '')}" style="cursor:pointer;">${escapeHtml(m.code_name || 'Anonymous')}</span>` : '';
     const myReaction = (m.reactions || []).find(r => r.share_key === myShareKey);
     const imageHtml = (!m.deleted && m.image_url) ? `<img class="chat-msg-image" src="${m.image_url}" alt="Shared photo" data-lightbox="${m.image_url}">` : '';
     const videoHtml = m.deleted ? '' : wdsExtractVideoEmbed(m.message);

@@ -30,7 +30,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=48.0">
+<link rel="stylesheet" href="style.css?v=49.0">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3529,7 +3529,43 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
 
         <div class="wds-card wds-leaderboard-card">
           <h3 class="wds-card-title">Nexus Leaderboard</h3>
-          <div id="wdsLeaderboardList"><p class="empty-note">Loading…</p></div>
+          <p class="empty-note" id="wdsLbEmptyNote" hidden>No Nexus data yet.</p>
+
+          <div class="wds-lb-section-head">
+            <span>Steps Ranking</span>
+            <button type="button" class="rank-expand-btn" data-target="wdsLbStepsRanking" aria-label="Show top 10" title="Show top 10" hidden>⤢</button>
+          </div>
+          <div class="rank-list" id="wdsLbStepsRanking"></div>
+
+          <div class="wds-lb-section-head">
+            <span>Training Volume</span>
+            <button type="button" class="rank-expand-btn" data-target="wdsLbVolumeRanking" aria-label="Show top 10" title="Show top 10" hidden>⤢</button>
+          </div>
+          <div class="rank-list" id="wdsLbVolumeRanking"></div>
+
+          <div class="wds-lb-section-head">
+            <span>Bio-Adaptation</span>
+            <button type="button" class="rank-expand-btn" data-target="wdsLbBioRanking" aria-label="Show top 10" title="Show top 10" hidden>⤢</button>
+          </div>
+          <div class="rank-list" id="wdsLbBioRanking"></div>
+
+          <div class="wds-lb-section-head">
+            <span>Furthest Run</span>
+            <button type="button" class="rank-expand-btn" data-target="wdsLbFurthestRunRanking" aria-label="Show top 10" title="Show top 10" hidden>⤢</button>
+          </div>
+          <div class="rank-list" id="wdsLbFurthestRunRanking"></div>
+
+          <div class="wds-lb-section-head">
+            <span>Fastest Run</span>
+            <button type="button" class="rank-expand-btn" data-target="wdsLbFastestRunRanking" aria-label="Show top 10" title="Show top 10" hidden>⤢</button>
+          </div>
+          <div class="rank-list" id="wdsLbFastestRunRanking"></div>
+
+          <div class="wds-lb-section-head">
+            <span>Conscientious</span>
+            <button type="button" class="rank-expand-btn" data-target="wdsLbConscientiousRanking" aria-label="Show top 10" title="Show top 10" hidden>⤢</button>
+          </div>
+          <div class="rank-list" id="wdsLbConscientiousRanking"></div>
         </div>
 
       </div>
@@ -3565,6 +3601,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
   <div class="chat-user-menu" id="wdsChatUserMenu" hidden>
     <div id="wdsChatUserMenuMain">
       <p class="chat-user-menu-name" id="wdsChatUserMenuName"></p>
+      <button type="button" class="chat-room-menu-item" id="btnWdsChatUserProfile" hidden>Open Profile</button>
       <button type="button" class="chat-room-menu-item" id="btnWdsChatUserDm">Send Direct Message</button>
       <button type="button" class="chat-room-menu-item" id="btnWdsChatUserInvite">Invite to Group Chat</button>
       <button type="button" class="chat-room-menu-item" id="btnWdsChatUserCopyId">Copy Digital ID</button>
@@ -3680,7 +3717,6 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
         </div>
 
         <div class="wds-profile-posts-head">
-          <h3 class="wds-card-title" style="margin:0;">Posts</h3>
           <div class="wds-profile-posts-controls">
             <label class="wds-wall-permission-label" id="wdsWallPermissionLabel" hidden>
               Who can post on my wall:
@@ -3706,10 +3742,10 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
   </div>
 </div>
 
-<script src="config.js?v=48.0"></script>
+<script src="config.js?v=49.0"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=48.0"></script>
+<script src="app.js?v=49.0"></script>
 </body>
 </html>
