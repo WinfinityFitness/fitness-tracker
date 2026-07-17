@@ -30,7 +30,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=32.0">
+<link rel="stylesheet" href="style.css?v=33.0">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3538,6 +3538,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
       <button type="button" class="wds-profile-cover-edit" id="btnWdsProfileCoverEdit">🖼 Edit Cover Photo</button>
       <input type="file" id="wdsProfileCoverInput" accept="image/*" hidden>
     </div>
+    <p class="wds-gate-error wds-profile-cover-error" id="wdsProfileCoverError" hidden></p>
     <div class="wds-profile-header">
       <div class="wds-profile-avatar" id="wdsProfilePageAvatar">–</div>
       <div class="wds-profile-identity">
@@ -3610,10 +3611,10 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
   </div>
 </div>
 
-<script src="config.js?v=32.0"></script>
+<script src="config.js?v=33.0"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=32.0"></script>
+<script src="app.js?v=33.0"></script>
 </body>
 </html>

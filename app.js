@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.32.0';
+const APP_VERSION = 'WF_SYS_V.33.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -485,10 +485,12 @@ function initDesktopShell() {
   let wdsPendingCoverDataUrl = null;
   let wdsPendingCoverPosY = 50;
 
+  const profileCoverErrorEl = document.getElementById('wdsProfileCoverError');
   profileCoverEditBtn.addEventListener('click', async () => {
     if (!wdsCoverRepositioning) { profileCoverInput.click(); return; }
     // Currently repositioning — this click is "Save".
     if (!wdsRemoteData) return;
+    if (profileCoverErrorEl) profileCoverErrorEl.hidden = true;
     profileCoverEditBtn.disabled = true;
     try {
       const p = Object.assign({}, wdsRemoteData.profile, {
@@ -496,20 +498,29 @@ function initDesktopShell() {
       });
       await wdsPushProfileUpdate(p);
       wdsRemoteData.profile = p;
-    } catch (e) { /* best effort — position just won't persist until the next successful save */ }
-    finally {
-      profileCoverEditBtn.disabled = false;
+      // Only exit repositioning mode on a CONFIRMED save — if it failed,
+      // the pending image/position stays live so the user can just hit
+      // Save again instead of silently losing their edit on the next
+      // refresh (this is exactly the bug being fixed here: the button
+      // used to always reset to "success" state even when the save
+      // itself had thrown).
       wdsCoverRepositioning = false;
       wdsPendingCoverDataUrl = null;
       profileCoverEl.classList.remove('wds-profile-cover--repositioning');
       profileCoverHint.hidden = true;
       profileCoverEditBtn.textContent = '🖼 Edit Cover Photo';
+    } catch (e) {
+      if (profileCoverErrorEl) { profileCoverErrorEl.textContent = 'Could not save: ' + ((e && e.message) || 'unknown error') + '. Try again.'; profileCoverErrorEl.hidden = false; }
+    }
+    finally {
+      profileCoverEditBtn.disabled = false;
     }
   });
   profileCoverInput.addEventListener('change', async () => {
     const file = profileCoverInput.files[0];
     profileCoverInput.value = '';
     if (!file || !wdsRemoteData) return;
+    if (profileCoverErrorEl) profileCoverErrorEl.hidden = true;
     try {
       wdsPendingCoverDataUrl = await resizeCoverImageFull(file);
       wdsPendingCoverPosY = 50;
@@ -519,7 +530,9 @@ function initDesktopShell() {
       profileCoverEl.classList.add('wds-profile-cover--repositioning');
       profileCoverHint.hidden = false;
       profileCoverEditBtn.textContent = '💾 Save Position';
-    } catch (e) { /* best effort */ }
+    } catch (e) {
+      if (profileCoverErrorEl) { profileCoverErrorEl.textContent = 'Could not read that photo: ' + ((e && e.message) || 'unknown error') + '.'; profileCoverErrorEl.hidden = false; }
+    }
   });
   // Vertical-only drag (Facebook's own cover-reposition affordance is
   // vertical-only too — the image already fills the width via cover-fit).
@@ -611,6 +624,8 @@ function initDesktopShell() {
     });
   });
   document.getElementById('wdsProfilePostsList').addEventListener('click', async e => {
+    const lightboxImg = e.target.closest('[data-lightbox]');
+    if (lightboxImg) { e.stopPropagation(); openChatLightbox(lightboxImg.dataset.lightbox); return; }
     const removeBtn = e.target.closest('[data-action="remove-post"]');
     if (removeBtn) {
       if (!wdsRemoteData || !wdsRemoteData.shareKey || !confirm('Remove this post?')) return;
@@ -662,6 +677,7 @@ function initDesktopShell() {
     notifPop.hidden = !notifPop.hidden;
     if (!notifPop.hidden) {
       localStorage.setItem('wft_web_nexus_last_seen', new Date().toISOString());
+      wdsMarkAllNotificationsRead();
       renderWdsNotifications();
     }
   });
@@ -968,6 +984,7 @@ async function refreshWdsMyday() {
   try {
     wdsActiveStories = await fetchActiveStories();
     renderWdsMyday();
+    wdsProcessStoriesForNotifications(wdsActiveStories);
   } catch (e) {
     el.innerHTML = '<p class="empty-note">Could not load My Day.</p>';
   }
@@ -1095,26 +1112,106 @@ async function refreshWdsChat() {
 // the current mode-progress target, and unread Nexus messages (tracked via
 // a last-seen timestamp, cleared whenever the bell is opened or the Nexus
 // tab becomes active).
+// Notification history — persisted across renders (and page reloads) in
+// localStorage instead of the old approach, which recomputed a fresh
+// transient list every render and simply lost anything that stopped being
+// true (e.g. "Nothing logged yet today" vanished outright the moment you
+// logged something). Entries are never deleted; reading them just sinks
+// them below the still-unread ones, newest first within each group. Each
+// entry has a stable id so re-triggering the same condition (e.g. the same
+// day's hydration nudge) updates in place instead of duplicating.
+const WDS_NOTIF_HISTORY_KEY = 'wft_web_notif_history';
+const WDS_NOTIF_HISTORY_MAX = 150;
+
+function wdsLoadNotifHistory() {
+  try { return JSON.parse(localStorage.getItem(WDS_NOTIF_HISTORY_KEY)) || []; } catch (e) { return []; }
+}
+function wdsSaveNotifHistory(list) {
+  localStorage.setItem(WDS_NOTIF_HISTORY_KEY, JSON.stringify(list.slice(0, WDS_NOTIF_HISTORY_MAX)));
+}
+function wdsPushNotification(id, title, body) {
+  const list = wdsLoadNotifHistory();
+  const existing = list.find(n => n.id === id);
+  if (existing) {
+    if (existing.body === body) return; // nothing actually changed
+    existing.body = body;
+    existing.createdAt = new Date().toISOString();
+    existing.read = false;
+  } else {
+    list.unshift({ id, title, body, createdAt: new Date().toISOString(), read: false });
+  }
+  wdsSaveNotifHistory(list);
+}
+function wdsMarkAllNotificationsRead() {
+  const list = wdsLoadNotifHistory();
+  list.forEach(n => { n.read = true; });
+  wdsSaveNotifHistory(list);
+}
+
+// New posts/comments/stories from OTHER users get pushed into the same
+// history. The very first fetch after sign-in only seeds the "seen" sets
+// silently — without that guard, every pre-existing post/comment/story
+// would look "new" the moment the feed first loads and flood the history.
+let wdsNotifFeedBaselineSet = false;
+const wdsNotifSeenPostIds = new Set();
+const wdsNotifSeenCommentIds = new Set();
+let wdsNotifStoryBaselineSet = false;
+const wdsNotifSeenStoryIds = new Set();
+
+function wdsProcessFeedForNotifications(posts) {
+  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+  const isFirstPass = !wdsNotifFeedBaselineSet;
+  (posts || []).forEach(p => {
+    const isNewPost = !wdsNotifSeenPostIds.has(p.id);
+    wdsNotifSeenPostIds.add(p.id);
+    if (!isFirstPass && isNewPost && !p.deleted && p.share_key !== myShareKey) {
+      wdsPushNotification(`post:${p.id}`, 'New Post', `${p.code_name || 'Someone'} shared a new post.`);
+    }
+    (p.comments || []).forEach(c => {
+      const isNewComment = !wdsNotifSeenCommentIds.has(c.id);
+      wdsNotifSeenCommentIds.add(c.id);
+      if (!isFirstPass && isNewComment && !c.deleted && myShareKey && p.share_key === myShareKey && c.share_key !== myShareKey) {
+        wdsPushNotification(`comment:${c.id}`, 'New Comment', `${c.code_name || 'Someone'} commented on your post.`);
+      }
+    });
+  });
+  wdsNotifFeedBaselineSet = true;
+  renderWdsNotifications();
+}
+
+function wdsProcessStoriesForNotifications(stories) {
+  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+  const isFirstPass = !wdsNotifStoryBaselineSet;
+  (stories || []).forEach(s => {
+    const isNew = !wdsNotifSeenStoryIds.has(s.id);
+    wdsNotifSeenStoryIds.add(s.id);
+    if (!isFirstPass && isNew && s.share_key !== myShareKey) {
+      wdsPushNotification(`story:${s.id}`, 'New Story', `${s.code_name || 'Someone'} added to My Day.`);
+    }
+  });
+  wdsNotifStoryBaselineSet = true;
+  renderWdsNotifications();
+}
+
 function renderWdsNotifications() {
   const pop = document.getElementById('wdsNotifPop');
   const badge = document.getElementById('wdsBellBadge');
   if (!pop || !badge) return;
-  const items = [];
   const today = todayISO();
   const entry = getLogs()[today];
 
   const hasLoggedToday = !!(entry && (entry.weightKg != null || entry.steps != null || (entry.exercises && entry.exercises.length) || entry.calories != null));
-  if (!hasLoggedToday) items.push({ title: 'Today', body: 'Nothing logged yet today.' });
+  if (!hasLoggedToday) wdsPushNotification(`today-log:${today}`, 'Today', 'Nothing logged yet today.');
 
   const waterTarget = effectiveWaterTargetML(today);
   const waterNow = (entry && entry.water) || 0;
   if (waterTarget && new Date().getHours() >= 15 && waterNow / waterTarget < 0.5) {
-    items.push({ title: 'Hydration', body: `Trending low today — ${Math.round((waterNow / waterTarget) * 100)}% of target.` });
+    wdsPushNotification(`hydration:${today}`, 'Hydration', `Trending low today — ${Math.round((waterNow / waterTarget) * 100)}% of target.`);
   }
 
   const mp = getModeProgress();
   if (mp.target && mp.completeCount >= mp.target) {
-    items.push({ title: 'Consistency', body: `You've hit your logging target this cycle (${mp.completeCount}/${mp.target}).` });
+    wdsPushNotification('consistency', 'Consistency', `You've hit your logging target this cycle (${mp.completeCount}/${mp.target}).`);
   }
 
   const lastSeen = localStorage.getItem('wft_web_nexus_last_seen');
@@ -1122,16 +1219,24 @@ function renderWdsNotifications() {
   const unread = wdsLastChatMessages.filter(m =>
     !m.deleted && m.sender_share_key !== myShareKey && (!lastSeen || new Date(m.created_at) > new Date(lastSeen))
   );
-  if (unread.length) items.push({ title: 'Nexus', body: `${unread.length} new message${unread.length === 1 ? '' : 's'} in Global Chat.` });
+  if (unread.length) wdsPushNotification('chat-unread', 'Nexus', `${unread.length} new message${unread.length === 1 ? '' : 's'} in Global Chat.`);
 
-  badge.textContent = String(items.length);
-  badge.hidden = items.length === 0;
-  const html = items.length
-    ? items.map(it => `<p class="wds-notif-item"><strong>${escapeHtml(it.title)}</strong> — ${escapeHtml(it.body)}</p>`).join('')
-    : '<p class="wds-notif-item">No notifications.</p>';
+  const history = wdsLoadNotifHistory();
+  const unreadCount = history.filter(n => !n.read).length;
+  badge.textContent = String(unreadCount);
+  badge.hidden = unreadCount === 0;
+
+  // Unread first (newest first), then read history sunk below — nothing
+  // is ever removed from the list, just demoted once it's been seen.
+  const sorted = history.slice().sort((a, b) => {
+    if (a.read !== b.read) return a.read ? 1 : -1;
+    return new Date(b.createdAt) - new Date(a.createdAt);
+  });
+  const itemHtml = n => `<p class="wds-notif-item${n.read ? ' is-read' : ''}"><strong>${escapeHtml(n.title)}</strong> — ${escapeHtml(n.body)}</p>`;
+  const html = sorted.length ? sorted.map(itemHtml).join('') : '<p class="wds-notif-item">No notifications.</p>';
   pop.innerHTML = html;
   const list = document.getElementById('wdsNotifList');
-  if (list) list.innerHTML = items.length ? html : '<p class="empty-note">No notifications.</p>';
+  if (list) list.innerHTML = sorted.length ? sorted.map(itemHtml).join('') : '<p class="empty-note">No notifications.</p>';
 }
 
 // Discord/Slack-style link preview — no video hosting of our own, just
@@ -1161,8 +1266,11 @@ function renderWdsChatMessages(messages, receipts) {
   messages.forEach(m => {
     // Ownership by share_key (the real signed-in identity), not code_name —
     // more correct than the mobile render's name-based check for this
-    // purpose, since two people could share a display name.
-    const isOwn = !!myShareKey && m.sender_share_key === myShareKey;
+    // purpose, since two people could share a display name. Compared
+    // case-insensitively/trimmed — a UUID is logically the same value
+    // regardless of casing, but a strict === would treat two differently-
+    // cased representations of the same key as different senders.
+    const isOwn = !!myShareKey && String(m.sender_share_key).trim().toLowerCase() === String(myShareKey).trim().toLowerCase();
     const row = document.createElement('div');
     row.className = 'chat-row ' + (isOwn ? 'chat-row--own' : 'chat-row--other');
     const time = new Date(m.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
@@ -1305,6 +1413,7 @@ async function fetchFeedPosts() {
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await sb.from('feed_posts')
     .select('id, share_key, code_name, message, image_url, link_preview, deleted, created_at')
+    .eq('deleted', false)
     .gte('created_at', cutoff)
     .order('created_at', { ascending: false })
     .limit(30);
@@ -1449,6 +1558,7 @@ async function refreshWdsFeed() {
   try {
     const posts = await fetchFeedPosts();
     renderFeedPosts(posts);
+    wdsProcessFeedForNotifications(posts);
   } catch (e) {
     listEl.innerHTML = '<p class="empty-note">Could not load the feed.</p>';
   }
@@ -1479,6 +1589,10 @@ function wdsReactionSummaryHtml(likes) {
   return `<div class="wds-reaction-summary">${top ? `<span class="wds-reaction-cluster">${top}</span>` : ''}<span>${total}</span></div>`;
 }
 
+// Removed posts never reach here at all — fetchFeedPosts() filters
+// deleted=false at the query level, same as chat where an unsent message
+// (unlike a removed post) intentionally leaves a "message was unsent"
+// tombstone behind. A feed post just disappears outright.
 function renderFeedPosts(posts) {
   const list = document.getElementById('wdsFeedList');
   if (!posts.length) { list.innerHTML = '<p class="empty-note">No posts yet. Be the first to share something!</p>'; return; }
@@ -1487,12 +1601,10 @@ function renderFeedPosts(posts) {
     const isOwn = !!myShareKey && p.share_key === myShareKey;
     const myLike = (p.likes || []).find(l => l.share_key === myShareKey);
     const comments = (p.comments || []).filter(c => !c.deleted);
-    const imageHtml = (!p.deleted && p.image_url) ? `<img class="wds-post-image" src="${p.image_url}" alt="">` : '';
-    const videoHtml = p.deleted ? '' : wdsExtractVideoEmbed(p.message);
-    const linkPreviewHtml = (!p.deleted && !videoHtml) ? wdsBuildLinkPreviewHtml(p.link_preview) : '';
-    const bodyHtml = p.deleted
-      ? `<p class="wds-post-body is-unsent">This post was removed.</p>`
-      : `${p.message ? `<p class="wds-post-body">${wdsLinkifyText(p.message)}</p>` : ''}${imageHtml}${videoHtml}${linkPreviewHtml}`;
+    const imageHtml = p.image_url ? `<img class="wds-post-image" src="${p.image_url}" alt="" data-lightbox="${escapeHtml(p.image_url)}">` : '';
+    const videoHtml = wdsExtractVideoEmbed(p.message);
+    const linkPreviewHtml = videoHtml ? '' : wdsBuildLinkPreviewHtml(p.link_preview);
+    const bodyHtml = `${p.message ? `<p class="wds-post-body">${wdsLinkifyText(p.message)}</p>` : ''}${imageHtml}${videoHtml}${linkPreviewHtml}`;
     const expanded = wdsFeedExpandedComments.has(p.id);
     const commentsHtml = comments.map(c => {
       const canRemove = !!myShareKey && c.share_key === myShareKey;
@@ -1511,14 +1623,13 @@ function renderFeedPosts(posts) {
       </div>`;
     }).join('');
     return `
-      <div class="wds-card wds-feed-post" data-post-id="${p.id}" data-deleted="${p.deleted ? 1 : 0}">
+      <div class="wds-card wds-feed-post" data-post-id="${p.id}">
         <div class="wds-post-head">
           <span class="wds-post-avatar">${escapeHtml((p.code_name || '?').charAt(0).toUpperCase())}</span>
           <div class="wds-post-meta"><strong>${escapeHtml(p.code_name || 'Anonymous')}</strong><span>${wdsRelativeTime(p.created_at)}</span></div>
-          ${isOwn && !p.deleted ? `<button type="button" class="wds-post-unsend-btn" data-action="unsend-post">Remove</button>` : ''}
+          ${isOwn ? `<button type="button" class="wds-post-unsend-btn" data-action="unsend-post">Remove</button>` : ''}
         </div>
         ${bodyHtml}
-        ${!p.deleted ? `
         ${wdsReactionSummaryHtml(p.likes)}
         <div class="wds-post-actions">
           <button type="button" class="wds-post-action-btn${myLike ? ' is-liked' : ''}" data-action="like" data-current-emoji="${myLike ? myLike.emoji : ''}">${wdsReactionButtonHtml(p.likes, myShareKey)}</button>
@@ -1530,7 +1641,7 @@ function renderFeedPosts(posts) {
             <input type="text" placeholder="Write a comment…" maxlength="500">
             <button type="button" data-action="send-comment">➤</button>
           </div>
-        </div>` : ''}
+        </div>
       </div>`;
   }).join('');
 }
@@ -1598,7 +1709,7 @@ function renderWdsProfilePosts() {
 
   list.className = 'wds-feed-list';
   list.innerHTML = posts.map(p => {
-    const imageHtml = p.image_url ? `<img class="wds-post-image" src="${escapeHtml(p.image_url)}" alt="">` : '';
+    const imageHtml = p.image_url ? `<img class="wds-post-image" src="${escapeHtml(p.image_url)}" alt="" data-lightbox="${escapeHtml(p.image_url)}">` : '';
     const videoHtml = wdsExtractVideoEmbed(p.message);
     const linkPreviewHtml = videoHtml ? '' : wdsBuildLinkPreviewHtml(p.link_preview);
     return `
@@ -1711,6 +1822,8 @@ function initWdsFeed() {
   if (!list) return;
 
   list.addEventListener('click', async e => {
+    const lightboxImg = e.target.closest('[data-lightbox]');
+    if (lightboxImg) { e.stopPropagation(); openChatLightbox(lightboxImg.dataset.lightbox); return; }
     const card = e.target.closest('.wds-feed-post');
     if (!card) return;
     const postId = Number(card.dataset.postId);
@@ -4250,7 +4363,12 @@ function resizeAvatarImage(file) {
 // separately as profile.coverPhotoPosY (0-100) and applied via CSS
 // background-position, same idea as Facebook's cover-photo repositioning.
 function resizeCoverImageFull(file) {
-  const MAX_W = 1600;
+  // Capped lower than the original 1600px/0.85 — that combination could
+  // push the base64 payload (this rides inside the same profile jsonb
+  // blob as the avatar photo, sent as a single RPC argument) large enough
+  // to fail silently against a request-size limit, which is exactly what
+  // made "Save Position" look like it worked but never actually persisted.
+  const MAX_W = 960;
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('Could not read that file.'));
@@ -4263,7 +4381,7 @@ function resizeCoverImageFull(file) {
         const canvas = document.createElement('canvas');
         canvas.width = width; canvas.height = height;
         canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.85));
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
       };
       img.src = reader.result;
     };

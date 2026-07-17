@@ -5296,6 +5296,7 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
 }
 .wds-profile-cover--repositioning { cursor: grab; }
 .wds-profile-cover--repositioning:active { cursor: grabbing; }
+.wds-profile-cover-error { max-width: 900px; margin: 8px auto 0; padding: 0 24px; box-sizing: border-box; }
 .wds-profile-cover-hint {
   position: absolute; left: 50%; top: 14px; transform: translateX(-50%); margin: 0;
   background: rgba(5,10,14,0.55); color: #fff; border-radius: 8px; padding: 6px 12px; font-size: 0.74rem;
