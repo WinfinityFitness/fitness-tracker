@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.35.0';
+const APP_VERSION = 'WF_SYS_V.36.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
