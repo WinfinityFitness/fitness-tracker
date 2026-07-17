@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.0.4';
+const APP_VERSION = 'WF_SYS_V.1.0.5';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -491,13 +491,18 @@ function initDesktopShell() {
   });
   document.getElementById('wdsStoryViewerContent').addEventListener('click', async e => {
     const btn = e.target.closest('#btnWdsUnsendStory');
-    if (!btn || !wdsRemoteData || !wdsRemoteData.shareKey) return;
-    btn.disabled = true;
-    try {
-      await unsendFeedStory(Number(btn.dataset.storyId), wdsRemoteData.shareKey);
-      wdsCloseStoryViewer();
-      await refreshWdsMyday();
-    } catch (e2) { btn.disabled = false; }
+    if (btn) {
+      if (!wdsRemoteData || !wdsRemoteData.shareKey) return;
+      btn.disabled = true;
+      try {
+        await unsendFeedStory(Number(btn.dataset.storyId), wdsRemoteData.shareKey);
+        wdsCloseStoryViewer();
+        await refreshWdsMyday();
+      } catch (e2) { btn.disabled = false; }
+      return;
+    }
+    const tapZone = e.target.closest('[data-story-tap]');
+    if (tapZone) wdsAdvanceStory(tapZone.dataset.storyTap === 'prev' ? -1 : 1);
   });
 
   // Profile Page — cover photo (choose → drag to reposition → Save), its
@@ -1403,8 +1408,10 @@ async function renderWdsNexus() {
 // disappears after 24 hours; expiry is enforced server-side in the
 // feed_stories SELECT policy itself (created_at >= now() - 24h), so an
 // expired story just stops coming back from the query — nothing to clean
-// up client-side. One ring per person, showing their single most recent
-// active story (no per-user story carousel in this pass).
+// up client-side. Every active story is kept (not just the newest per
+// person) — the ring still shows one tile per person, but opening it
+// plays through that person's whole set in order, then chains into the
+// next person's, same as Facebook/Instagram Stories.
 // ---------------------------------------------------------------------
 async function fetchActiveStories() {
   const { data, error } = await sb.from('feed_stories')
@@ -1413,14 +1420,25 @@ async function fetchActiveStories() {
     .order('created_at', { ascending: false })
     .limit(100);
   if (error) throw error;
-  const seen = new Set();
-  const result = [];
-  (data || []).forEach(s => {
-    if (seen.has(s.share_key)) return;
-    seen.add(s.share_key);
-    result.push(s);
+  return data || [];
+}
+
+// Groups the flat, newest-first story list into one entry per person
+// (ring order = that person's most recent story, newest first), with
+// each person's own stories sorted oldest-first so playback runs in the
+// order they were actually posted.
+function wdsGroupStoriesByUser(stories) {
+  const order = [];
+  const byKey = {};
+  stories.forEach(s => {
+    if (!byKey[s.share_key]) { byKey[s.share_key] = []; order.push(s.share_key); }
+    byKey[s.share_key].push(s);
   });
-  return result;
+  return order.map(key => ({
+    shareKey: key,
+    codeName: byKey[key][0].code_name,
+    stories: byKey[key].slice().reverse(),
+  }));
 }
 
 async function postFeedStory(text, imageDataUrl, shareKey, codeName) {
@@ -1438,11 +1456,13 @@ async function unsendFeedStory(storyId, shareKey) {
 }
 
 let wdsActiveStories = [];
+let wdsStoryGroups = []; // [{shareKey, codeName, stories: [oldest...newest]}], ring order = most-recent-first
 async function refreshWdsMyday() {
   const el = document.getElementById('wdsMydayRow');
   if (!el) return;
   try {
     wdsActiveStories = await fetchActiveStories();
+    wdsStoryGroups = wdsGroupStoriesByUser(wdsActiveStories);
     renderWdsMyday();
     wdsProcessStoriesForNotifications(wdsActiveStories);
   } catch (e) {
@@ -1456,10 +1476,13 @@ function renderWdsMyday() {
   const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
   const myName = (wdsRemoteData && wdsRemoteData.profile && wdsRemoteData.profile.name) || (wdsRemoteData && wdsRemoteData.publicId) || '?';
   const myPhoto = wdsRemoteData && wdsRemoteData.profile && wdsRemoteData.profile.photoDataUrl;
-  const mine = wdsActiveStories.find(s => s.share_key === myShareKey);
-  const others = wdsActiveStories.filter(s => s.share_key !== myShareKey);
+  const mineGroup = wdsStoryGroups.find(g => g.shareKey === myShareKey);
+  const otherGroups = wdsStoryGroups.filter(g => g.shareKey !== myShareKey);
 
   const initial = (name) => escapeHtml((name || '?').trim().charAt(0).toUpperCase() || '?');
+  // Ring preview always shows that person's newest story's thumbnail —
+  // tapping it still starts playback from their OLDEST active one (see
+  // wdsOpenStoryViewer), matching Instagram/Facebook's own convention.
   const thumbHtml = (s) => s.image_url
     ? `<img class="wds-myday-thumb-img" src="${escapeHtml(s.image_url)}" alt="">`
     : `<div class="wds-myday-thumb-text">${escapeHtml((s.message || '').slice(0, 60))}</div>`;
@@ -1471,32 +1494,65 @@ function renderWdsMyday() {
     : `<div class="wds-myday-create-avatar">${initial(myName)}</div>`;
 
   // "Your Day" is a single tile: your own profile-picture look when you
-  // have no active story (tap to create one), or your actual story
+  // have no active story (tap to create one), or your newest story's
   // preview once you do (tap to view; the "+" badge still lets you add
   // another without leaving the row).
-  const youItem = mine
-    ? `<div class="wds-myday-item wds-myday-item--has-story" data-action="view-story" data-story-id="${mine.id}">${thumbHtml(mine)}${myAvatarBadge}<span class="wds-myday-add-badge" data-action="add-story">+</span><span class="wds-myday-name">Your Day</span></div>`
+  const mineNewest = mineGroup ? mineGroup.stories[mineGroup.stories.length - 1] : null;
+  const youItem = mineNewest
+    ? `<div class="wds-myday-item wds-myday-item--has-story" data-action="view-story" data-story-id="${mineGroup.stories[0].id}">${thumbHtml(mineNewest)}${myAvatarBadge}<span class="wds-myday-add-badge" data-action="add-story">+</span><span class="wds-myday-name">Your Day</span></div>`
     : `<div class="wds-myday-item wds-myday-item--create" data-action="add-story">${myCreateAvatar}<span class="wds-myday-add-badge">+</span><span class="wds-myday-name">Your Day</span></div>`;
 
-  const otherItems = others.map(s => {
-    const name = s.code_name || '?';
-    return `<div class="wds-myday-item wds-myday-item--has-story" data-action="view-story" data-story-id="${s.id}">${thumbHtml(s)}<span class="wds-myday-avatar-badge">${initial(name)}</span><span class="wds-myday-name">${escapeHtml(name)}</span></div>`;
+  const otherItems = otherGroups.map(g => {
+    const name = g.codeName || '?';
+    const newest = g.stories[g.stories.length - 1];
+    return `<div class="wds-myday-item wds-myday-item--has-story" data-action="view-story" data-story-id="${g.stories[0].id}">${thumbHtml(newest)}<span class="wds-myday-avatar-badge">${initial(name)}</span><span class="wds-myday-name">${escapeHtml(name)}</span></div>`;
   }).join('');
   el.innerHTML = youItem + otherItems;
 }
 
+// Facebook/Instagram-style story playback: auto-advances every 5s through
+// the current person's stories (oldest to newest), then chains into the
+// next person's ring, closing the viewer after the last group. Tapping
+// the right/left half of the content jumps forward/back immediately.
+const WDS_STORY_DURATION_MS = 5000;
+let wdsStoryGroupIdx = 0;
+let wdsStoryLocalIdx = 0;
+let wdsStoryTimer = null;
+
 function wdsOpenStoryViewer(storyId) {
-  const story = wdsActiveStories.find(s => s.id === storyId);
+  for (let g = 0; g < wdsStoryGroups.length; g++) {
+    const li = wdsStoryGroups[g].stories.findIndex(s => s.id === storyId);
+    if (li !== -1) { wdsStoryGroupIdx = g; wdsStoryLocalIdx = li; break; }
+  }
   const overlay = document.getElementById('wdsStoryViewerOverlay');
+  if (!overlay) return;
+  overlay.hidden = false;
+  wdsRenderCurrentStory();
+}
+
+function wdsRenderCurrentStory() {
+  clearTimeout(wdsStoryTimer);
   const content = document.getElementById('wdsStoryViewerContent');
-  if (!story || !overlay || !content) return;
+  if (!content) return;
+  const group = wdsStoryGroups[wdsStoryGroupIdx];
+  const story = group && group.stories[wdsStoryLocalIdx];
+  if (!story) { wdsCloseStoryViewer(); return; }
+
   const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
   const isOwn = !!myShareKey && story.share_key === myShareKey;
   const mediaHtml = story.image_url
     ? `<img class="wds-story-content-image" src="${escapeHtml(story.image_url)}" alt="">`
     : `<div class="wds-story-content-text">${escapeHtml(story.message || '')}</div>`;
+  // One progress segment per story in THIS person's set — already-viewed
+  // segments filled solid, the current one animates its own fill over
+  // the 5s window, upcoming ones stay empty.
+  const progressHtml = group.stories.map((s, i) => `
+    <div class="wds-story-progress-seg">
+      <div class="wds-story-progress-fill${i < wdsStoryLocalIdx ? ' is-complete' : ''}${i === wdsStoryLocalIdx ? ' is-active' : ''}"></div>
+    </div>`).join('');
   content.innerHTML = `
     <div class="wds-story-content">
+      <div class="wds-story-progress-row">${progressHtml}</div>
       <div class="wds-story-content-head">
         <span class="wds-post-avatar">${escapeHtml((story.code_name || '?').charAt(0).toUpperCase())}</span>
         <div><strong>${escapeHtml(story.code_name || 'Anonymous')}</strong><span>${wdsRelativeTime(story.created_at)}</span></div>
@@ -1504,10 +1560,35 @@ function wdsOpenStoryViewer(storyId) {
       ${mediaHtml}
       ${story.image_url && story.message ? `<p class="wds-post-body" style="padding:10px 14px;color:#fff;">${escapeHtml(story.message)}</p>` : ''}
       ${isOwn ? `<div class="wds-story-content-actions"><button type="button" class="wds-post-unsend-btn" id="btnWdsUnsendStory" data-story-id="${story.id}">Remove</button></div>` : ''}
+      <div class="wds-story-tap-zone wds-story-tap-zone--left" data-story-tap="prev"></div>
+      <div class="wds-story-tap-zone wds-story-tap-zone--right" data-story-tap="next"></div>
     </div>`;
-  overlay.hidden = false;
+  wdsStoryTimer = setTimeout(() => wdsAdvanceStory(1), WDS_STORY_DURATION_MS);
 }
-function wdsCloseStoryViewer() { const overlay = document.getElementById('wdsStoryViewerOverlay'); if (overlay) overlay.hidden = true; }
+
+function wdsAdvanceStory(delta) {
+  const group = wdsStoryGroups[wdsStoryGroupIdx];
+  if (!group) { wdsCloseStoryViewer(); return; }
+  wdsStoryLocalIdx += delta;
+  if (wdsStoryLocalIdx >= group.stories.length) {
+    wdsStoryGroupIdx += 1;
+    wdsStoryLocalIdx = 0;
+    if (wdsStoryGroupIdx >= wdsStoryGroups.length) { wdsCloseStoryViewer(); return; }
+  } else if (wdsStoryLocalIdx < 0) {
+    if (wdsStoryGroupIdx === 0) { wdsStoryLocalIdx = 0; }
+    else {
+      wdsStoryGroupIdx -= 1;
+      wdsStoryLocalIdx = wdsStoryGroups[wdsStoryGroupIdx].stories.length - 1;
+    }
+  }
+  wdsRenderCurrentStory();
+}
+
+function wdsCloseStoryViewer() {
+  clearTimeout(wdsStoryTimer);
+  const overlay = document.getElementById('wdsStoryViewerOverlay');
+  if (overlay) overlay.hidden = true;
+}
 function wdsOpenStoryComposer() {
   const overlay = document.getElementById('wdsStoryComposerOverlay');
   const errorEl = document.getElementById('wdsStoryComposerError');
