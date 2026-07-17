@@ -30,7 +30,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.0.2">
+<link rel="stylesheet" href="style.css?v=1.0.4">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3684,13 +3684,6 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
       </div>
       <div class="wds-profile-own-actions" id="wdsProfileOwnActions" hidden>
         <button type="button" class="wds-profile-action-btn wds-profile-action-btn--primary" id="btnWdsProfileAddStory">+ Add to Story</button>
-        <button type="button" class="wds-profile-action-btn" id="btnWdsProfileEditProfile">✏ Edit Profile</button>
-        <div class="wds-profile-action-more">
-          <button type="button" class="wds-profile-action-btn wds-profile-action-btn--icon" id="btnWdsProfileMoreActions" aria-label="More options">▾</button>
-          <div class="wds-profile-action-menu" id="wdsProfileActionMenu" hidden>
-            <button type="button" id="btnWdsProfileCopyLink">Copy Profile Link</button>
-          </div>
-        </div>
       </div>
     </div>
     <div class="wds-profile-body">
@@ -3723,6 +3716,36 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
           </div>
           <p class="wds-gate-error" id="wdsAddFriendError" hidden></p>
           <div id="wdsProfileFriendsList"><p class="empty-note">No friends yet.</p></div>
+        </div>
+
+        <!-- Same gauge/chart visuals as the dashboard's Status tab (own
+             data only — hidden when viewing another operator's profile,
+             same as the Bio-Markers card above). -->
+        <div class="wds-card wds-card--gauge" id="wdsProfileConsistencyCard">
+          <h3 class="wds-card-title">Consistency Index</h3>
+          <div class="wds-gauge wds-gauge--mini" id="wdsProfileConsistencyGauge" style="--pct:0;">
+            <span class="wds-gauge-value" id="wdsProfileConsistencyValue">–<small>%</small></span>
+          </div>
+          <p class="wds-card-foot" id="wdsProfileConsistencyFoot">No data yet</p>
+        </div>
+
+        <div class="wds-card wds-card--chart" id="wdsProfileWeightTrendCard">
+          <div class="wds-card-head">
+            <h3 class="wds-card-title">Weight Trend</h3>
+            <span class="wds-card-sub">90d</span>
+          </div>
+          <svg class="wds-linechart wds-linechart--mini" viewBox="0 0 560 160" preserveAspectRatio="none" id="wdsProfileWeightChartSvg">
+            <defs>
+              <linearGradient id="wdsAreaFillProfile" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="var(--cyan)" stop-opacity="0.35"/>
+                <stop offset="100%" stop-color="var(--cyan)" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path id="wdsProfileWeightChartArea" d="" fill="url(#wdsAreaFillProfile)"/>
+            <path id="wdsProfileWeightChartLine" d="" fill="none" stroke="var(--cyan)" stroke-width="2.5" stroke-linecap="round"/>
+            <circle id="wdsProfileWeightChartDot" cx="0" cy="0" r="4.5" fill="var(--cyan)" visibility="hidden"/>
+          </svg>
+          <p class="hint hint--sm" id="wdsProfileWeightChartEmpty" hidden>No weight entries logged yet.</p>
         </div>
       </div>
       <div class="wds-profile-main">
@@ -3771,10 +3794,10 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
   </div>
 </div>
 
-<script src="config.js?v=1.0.2"></script>
+<script src="config.js?v=1.0.4"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.0.2"></script>
+<script src="app.js?v=1.0.4"></script>
 </body>
 </html>

@@ -1829,19 +1829,23 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
    own variant is what flips the visual side without duplicating markup. */
 .chat-bubble-line { display: flex; align-items: flex-end; gap: 5px; max-width: 100%; }
 .chat-row--own .chat-bubble-line { flex-direction: row-reverse; }
+/* Filled, rounded "pill" bubbles (Messenger's own format/sizing) instead
+   of the previous outlined/transparent HUD-style box — own messages fill
+   with the theme's own gradient, received messages fill with a neutral
+   surface, rather than importing Messenger's blue/gray. */
 .chat-bubble {
   position: relative;
   display: inline-flex;
   align-items: baseline;
   gap: 6px;
   max-width: 100%;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 5px 9px;
-  background: transparent;
+  border: none;
+  border-radius: 18px;
+  padding: 8px 13px;
 }
-.chat-row--own .chat-bubble { border-color: var(--cyan); border-bottom-right-radius: 3px; }
-.chat-row--other .chat-bubble { border-color: var(--violet); border-bottom-left-radius: 3px; }
+.chat-row--own .chat-bubble { background: var(--gradient-bar); border-bottom-right-radius: 4px; }
+.chat-row--own .chat-msg { color: #060a0d; }
+.chat-row--other .chat-bubble { background: var(--surface-2); border-bottom-left-radius: 4px; }
 .chat-msg { color: var(--text-primary); font-size: 0.78rem; line-height: 1.35; word-break: break-word; }
 .chat-msg-unsent { font-style: italic; color: var(--text-muted); }
 .chat-time { font-family: var(--font-mono); font-size: 0.56rem; color: var(--text-muted); flex: none; white-space: nowrap; padding-bottom: 4px; }
@@ -1943,7 +1947,12 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .chat-lightbox {
   position: fixed;
   inset: 0;
-  z-index: 500;
+  /* #wdsShell (the desktop dashboard) sits at z-index 999999 and covers
+     the whole viewport — without outranking it here, the lightbox was
+     genuinely opening (hidden was correctly cleared) but rendered
+     completely underneath the shell, invisible on the desktop site even
+     though it worked fine on mobile (no #wdsShell there to compete with). */
+  z-index: 1000000;
   background: rgba(0, 4, 6, 0.92);
   display: flex;
   align-items: center;
@@ -4963,25 +4972,31 @@ html.wf-desktop-shell #wdsShell {
 }
 .wds-chat-popup {
   width: 300px; height: 400px; background: var(--surface-1); border: 1px solid var(--border-soft);
-  border-radius: 10px 10px 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,0.4); display: flex; flex-direction: column;
+  border-radius: 14px 14px 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,0.4); display: flex; flex-direction: column;
   pointer-events: auto; overflow: hidden;
 }
 .wds-chat-popup-head {
-  display: flex; align-items: center; justify-content: space-between; padding: 10px 12px;
+  display: flex; align-items: center; gap: 8px; padding: 9px 12px;
   border-bottom: 1px solid var(--border-soft); background: var(--surface-2); flex-shrink: 0;
 }
-.wds-chat-popup-head strong { font-size: 0.82rem; color: var(--text-primary); }
-.wds-chat-popup-close { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1rem; }
+.wds-chat-popup-head-avatar {
+  width: 30px; height: 30px; border-radius: 50%; background: var(--gradient-bar); color: #060a0d;
+  font-weight: 800; font-size: 0.78rem; display: grid; place-items: center; flex-shrink: 0;
+}
+.wds-chat-popup-head strong, .wds-chat-popup-head h3 { flex: 1; font-size: 0.82rem; color: var(--text-primary); }
+.wds-chat-popup-close { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.05rem; }
+.wds-chat-popup-close:hover { color: var(--cyan); }
 .wds-chat-popup-list { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
-.wds-chat-popup-input-row { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--border-soft); flex-shrink: 0; }
+.wds-chat-popup-input-row { display: flex; align-items: center; gap: 6px; padding: 8px; border-top: 1px solid var(--border-soft); flex-shrink: 0; }
 .wds-chat-popup-input-row input {
-  flex: 1; min-width: 0; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 16px;
-  padding: 7px 12px; color: var(--text-primary); font-size: 0.78rem;
+  flex: 1; min-width: 0; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 18px;
+  padding: 8px 13px; color: var(--text-primary); font-size: 0.78rem;
 }
 .wds-chat-popup-attach-btn {
-  width: 28px; height: 28px; flex: none; background: none; border: none;
-  color: var(--text-secondary); cursor: pointer; font-size: 0.9rem;
+  width: 30px; height: 30px; flex: none; border-radius: 50%; background: none; border: none;
+  color: var(--cyan); cursor: pointer; font-size: 0.95rem; display: grid; place-items: center;
 }
+.wds-chat-popup-attach-btn:hover { background: var(--surface-2); }
 .wds-chat-popup-pending-image {
   display: flex; align-items: center; gap: 8px; padding: 8px 8px 0; flex-shrink: 0;
 }
@@ -5537,33 +5552,20 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
 }
 .wds-profile-identity p { margin: 0; font-size: 0.82rem; color: var(--text-secondary); }
 .wds-profile-viewed-actions { display: flex; gap: 8px; padding-bottom: 8px; margin-left: auto; }
-/* Own-profile action row — "+ Add to Story"/"Edit Profile"/more, bottom-
-   aligned with .wds-profile-identity by the header's own flex
-   align-items:flex-end, so it naturally lands level with the subtitle
-   line (Fitness Mode • Digital ID) without any extra positioning here. */
-.wds-profile-own-actions { display: flex; gap: 8px; padding-bottom: 8px; margin-left: auto; position: relative; }
+/* Own-profile action row — "+ Add to Story", bottom-aligned with
+   .wds-profile-identity by the header's own flex align-items:flex-end,
+   so it naturally lands level with the subtitle line (Fitness Mode •
+   Digital ID) without any extra positioning here. */
+.wds-profile-own-actions { display: flex; gap: 8px; padding-bottom: 8px; margin-left: auto; }
 .wds-profile-action-btn {
   display: flex; align-items: center; gap: 6px; border-radius: 8px; border: 1px solid var(--border-soft);
   background: var(--surface-2); color: var(--text-primary); font-size: 0.82rem; font-weight: 600;
   padding: 9px 14px; cursor: pointer; white-space: nowrap;
 }
-.wds-profile-action-btn:hover { background: var(--surface-3, var(--surface-2)); }
 .wds-profile-action-btn--primary {
   background: var(--gradient-bar); color: #060a0d; border-color: transparent;
 }
 .wds-profile-action-btn--primary:hover { filter: brightness(1.08); }
-.wds-profile-action-btn--icon { padding: 9px 12px; }
-.wds-profile-action-more { position: relative; }
-.wds-profile-action-menu {
-  position: absolute; top: calc(100% + 6px); right: 0; z-index: 20; min-width: 170px;
-  background: var(--surface-1); border: 1px solid var(--border-soft); border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.35); padding: 6px; display: flex; flex-direction: column;
-}
-.wds-profile-action-menu button {
-  background: none; border: none; text-align: left; padding: 8px 10px; border-radius: 6px;
-  color: var(--text-primary); font-size: 0.8rem; cursor: pointer;
-}
-.wds-profile-action-menu button:hover { background: var(--surface-2); }
 @media (max-width: 720px) {
   .wds-profile-own-actions, .wds-profile-viewed-actions { margin-left: 0; }
 }
@@ -5580,7 +5582,11 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
 .wds-profile-detail-list li { display: flex; justify-content: space-between; font-size: 0.82rem; color: var(--text-secondary); gap: 10px; }
 .wds-profile-detail-list li strong { color: var(--text-primary); font-weight: 600; text-align: right; }
 .wds-profile-main { display: flex; flex-direction: column; gap: 16px; }
-.wds-profile-posts-head { display: flex; align-items: center; justify-content: space-between; }
+/* Right-edge-aligned to match the composer card's own 20px inner padding
+   (.wds-card padding: 18px 20px) above it — this row sits bare in
+   .wds-profile-main with no padding of its own, so without matching that
+   inset here its buttons would overshoot past the Post button's edge. */
+.wds-profile-posts-head { display: flex; align-items: center; justify-content: flex-end; padding-right: 20px; }
 .wds-profile-posts-controls { display: flex; gap: 8px; align-items: center; }
 .wds-wall-permission-label {
   display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--text-secondary);
