@@ -1736,6 +1736,18 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   margin: 0 0 4px;
 }
 
+/* ---------------- Entity Identity photo ---------------- */
+.entity-photo-row { display: flex; gap: 14px; align-items: center; margin-bottom: 16px; }
+.entity-photo-avatar {
+  width: 64px; height: 64px; border-radius: 50%; background: var(--gradient-bar); color: #060a0d;
+  font-weight: 700; font-size: 1.3rem; display: grid; place-items: center; flex-shrink: 0;
+  background-size: cover; background-position: center;
+}
+.entity-photo-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.entity-photo-actions .btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+#setupPhotoLockHint { margin: 0; max-width: 220px; }
+#setupPhotoNote { margin: 0; }
+
 /* ---------------- Rank list (Nexus) ---------------- */
 .rank-list { display: flex; flex-direction: column; gap: 6px; }
 .rank-expand-btn {

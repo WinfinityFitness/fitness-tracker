@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.27.0';
+const APP_VERSION = 'WF_SYS_V.28.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -131,7 +131,7 @@ function initDesktopShell() {
     modeIconImgEl.src = MODE_ICON[mode] || MODE_ICON.beginner;
     modeIconEl.title = MODE_LABEL[mode] || mode;
     const composerAvatarEl = document.getElementById('wdsComposerAvatar');
-    if (composerAvatarEl) composerAvatarEl.textContent = displayName.trim().charAt(0).toUpperCase();
+    wdsSetAvatarVisual(composerAvatarEl, wdsRemoteData.profile && wdsRemoteData.profile.photoDataUrl, displayName.trim().charAt(0).toUpperCase());
     const composerInputEl = document.getElementById('wdsComposerInput');
     if (composerInputEl) composerInputEl.placeholder = `What's on your mind, ${displayName.split(' ')[0]}?`;
     renderWdsDashboard();
@@ -798,6 +798,7 @@ function renderWdsMyday() {
   if (!el) return;
   const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
   const myName = (wdsRemoteData && wdsRemoteData.profile && wdsRemoteData.profile.name) || (wdsRemoteData && wdsRemoteData.publicId) || '?';
+  const myPhoto = wdsRemoteData && wdsRemoteData.profile && wdsRemoteData.profile.photoDataUrl;
   const mine = wdsActiveStories.find(s => s.share_key === myShareKey);
   const others = wdsActiveStories.filter(s => s.share_key !== myShareKey);
 
@@ -805,14 +806,20 @@ function renderWdsMyday() {
   const thumbHtml = (s) => s.image_url
     ? `<img class="wds-myday-thumb-img" src="${escapeHtml(s.image_url)}" alt="">`
     : `<div class="wds-myday-thumb-text">${escapeHtml((s.message || '').slice(0, 60))}</div>`;
+  const myAvatarBadge = myPhoto
+    ? `<span class="wds-myday-avatar-badge" style="background-image:url(${escapeHtml(myPhoto)});background-size:cover;background-position:center;"></span>`
+    : `<span class="wds-myday-avatar-badge">${initial(myName)}</span>`;
+  const myCreateAvatar = myPhoto
+    ? `<div class="wds-myday-create-avatar" style="background-image:url(${escapeHtml(myPhoto)});background-size:cover;background-position:center;"></div>`
+    : `<div class="wds-myday-create-avatar">${initial(myName)}</div>`;
 
   // "Your Day" is a single tile: your own profile-picture look when you
   // have no active story (tap to create one), or your actual story
   // preview once you do (tap to view; the "+" badge still lets you add
   // another without leaving the row).
   const youItem = mine
-    ? `<div class="wds-myday-item wds-myday-item--has-story" data-action="view-story" data-story-id="${mine.id}">${thumbHtml(mine)}<span class="wds-myday-avatar-badge">${initial(myName)}</span><span class="wds-myday-add-badge" data-action="add-story">+</span><span class="wds-myday-name">Your Day</span></div>`
-    : `<div class="wds-myday-item wds-myday-item--create" data-action="add-story"><div class="wds-myday-create-avatar">${initial(myName)}</div><span class="wds-myday-add-badge">+</span><span class="wds-myday-name">Your Day</span></div>`;
+    ? `<div class="wds-myday-item wds-myday-item--has-story" data-action="view-story" data-story-id="${mine.id}">${thumbHtml(mine)}${myAvatarBadge}<span class="wds-myday-add-badge" data-action="add-story">+</span><span class="wds-myday-name">Your Day</span></div>`
+    : `<div class="wds-myday-item wds-myday-item--create" data-action="add-story">${myCreateAvatar}<span class="wds-myday-add-badge">+</span><span class="wds-myday-name">Your Day</span></div>`;
 
   const otherItems = others.map(s => {
     const name = s.code_name || '?';
@@ -3012,6 +3019,7 @@ function updateHealthStatusOptions() {
 
 function loadSetupForm() {
   const p = getProfile();
+  refreshEntityPhotoUI();
   if (!p) { renderExtraHabitFields({ extraHabits: [] }); return; }
   document.getElementById('setupName').value = p.name || '';
   document.getElementById('setupWeightUnit').value = p.weightUnit || 'kg';
@@ -3824,9 +3832,93 @@ function initMeasureEntryOverlay() {
 
 function initEntityIdentityOverlay() {
   const overlay = document.getElementById('entityIdentityOverlay');
-  document.getElementById('btnOpenEntityIdentity').addEventListener('click', () => { overlay.hidden = false; });
+  document.getElementById('btnOpenEntityIdentity').addEventListener('click', () => { overlay.hidden = false; refreshEntityPhotoUI(); });
   document.getElementById('btnCloseEntityIdentity').addEventListener('click', () => { overlay.hidden = true; });
   bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
+}
+
+// Entity Identity profile photo — center-cropped to a small square JPEG so
+// it stays cheap to store in localStorage and in the synced profile blob.
+// Locked until the auto-seeded 7-day sample data is gone (isDemoDataActive)
+// so a brand-new user isn't personalizing a profile that's about to be
+// wiped by "Clear all data" or the 7-day demo-expiry sweep.
+function resizeAvatarImage(file) {
+  const AVATAR_DIM = 320;
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read that file.'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Could not read that image.'));
+      img.onload = () => {
+        const side = Math.min(img.width, img.height);
+        const sx = (img.width - side) / 2;
+        const sy = (img.height - side) / 2;
+        const canvas = document.createElement('canvas');
+        canvas.width = AVATAR_DIM; canvas.height = AVATAR_DIM;
+        canvas.getContext('2d').drawImage(img, sx, sy, side, side, 0, 0, AVATAR_DIM, AVATAR_DIM);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function wdsSetAvatarVisual(el, photoDataUrl, initial) {
+  if (!el) return;
+  if (photoDataUrl) {
+    el.style.backgroundImage = `url(${photoDataUrl})`;
+    el.textContent = '';
+  } else {
+    el.style.backgroundImage = '';
+    el.textContent = initial || '–';
+  }
+}
+
+function refreshEntityPhotoUI() {
+  const preview = document.getElementById('setupPhotoPreview');
+  const uploadBtn = document.getElementById('btnSetupPhotoUpload');
+  const removeBtn = document.getElementById('btnSetupPhotoRemove');
+  const lockHint = document.getElementById('setupPhotoLockHint');
+  if (!preview) return;
+  const p = getProfile();
+  const initial = ((p && p.name) || '').trim().charAt(0).toUpperCase() || '–';
+  wdsSetAvatarVisual(preview, p && p.photoDataUrl, initial);
+  removeBtn.hidden = !(p && p.photoDataUrl);
+  const locked = isDemoDataActive();
+  uploadBtn.disabled = locked;
+  lockHint.hidden = !locked;
+}
+
+function initEntityPhotoUpload() {
+  const uploadBtn = document.getElementById('btnSetupPhotoUpload');
+  const removeBtn = document.getElementById('btnSetupPhotoRemove');
+  const input = document.getElementById('setupPhotoInput');
+  const noteEl = document.getElementById('setupPhotoNote');
+  uploadBtn.addEventListener('click', () => { if (!uploadBtn.disabled) input.click(); });
+  input.addEventListener('change', async () => {
+    const file = input.files[0];
+    input.value = '';
+    if (!file) return;
+    try {
+      const dataUrl = await resizeAvatarImage(file);
+      const p = getProfile() || {};
+      p.photoDataUrl = dataUrl;
+      saveProfile(p);
+      refreshEntityPhotoUI();
+      noteEl.textContent = 'Saved.';
+      setTimeout(() => { noteEl.textContent = ''; }, 2000);
+    } catch (e) {
+      noteEl.textContent = (e && e.message) || 'Could not save that photo.';
+    }
+  });
+  removeBtn.addEventListener('click', () => {
+    const p = getProfile() || {};
+    delete p.photoDataUrl;
+    saveProfile(p);
+    refreshEntityPhotoUI();
+  });
 }
 
 /* ---------------------------------------------------------------- */
@@ -15192,6 +15284,7 @@ safeInit(initTermsOfService, 'initTermsOfService');
 safeInit(initPRBoardOverlay, 'initPRBoardOverlay');
 safeInit(initMeasureEntryOverlay, 'initMeasureEntryOverlay');
 safeInit(initEntityIdentityOverlay, 'initEntityIdentityOverlay');
+safeInit(initEntityPhotoUpload, 'initEntityPhotoUpload');
 safeInit(initDateTimeWidget, 'initDateTimeWidget');
 safeInit(initTimezonePicker, 'initTimezonePicker');
 safeInit(initWeatherWidget, 'initWeatherWidget');
