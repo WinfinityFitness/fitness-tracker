@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.49.0';
+const APP_VERSION = 'WF_SYS_V.1.0.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -807,6 +807,34 @@ function initDesktopShell() {
   if (viewedMessageBtn) viewedMessageBtn.addEventListener('click', () => {
     if (!wdsViewedProfile) return;
     wdsStartDM(wdsViewedProfile.codeName);
+  });
+
+  // Own-profile action row (+ Add to Story / Edit Profile / more) — only
+  // shown when wdsViewedProfile is null (renderWdsProfileHeader toggles
+  // this). "Edit Profile" reuses the existing cover-photo edit control
+  // (the only real profile-editing affordance this app has today) rather
+  // than a separate dedicated editor.
+  const addStoryBtn = document.getElementById('btnWdsProfileAddStory');
+  if (addStoryBtn) addStoryBtn.addEventListener('click', () => { resetWdsStoryComposer(); wdsOpenStoryComposer(); });
+  const editProfileBtn = document.getElementById('btnWdsProfileEditProfile');
+  if (editProfileBtn) editProfileBtn.addEventListener('click', () => { document.getElementById('btnWdsProfileCoverEdit').click(); });
+  const moreActionsBtn = document.getElementById('btnWdsProfileMoreActions');
+  const actionMenu = document.getElementById('wdsProfileActionMenu');
+  if (moreActionsBtn && actionMenu) {
+    moreActionsBtn.addEventListener('click', e => { e.stopPropagation(); actionMenu.hidden = !actionMenu.hidden; });
+    document.addEventListener('click', e => {
+      if (!actionMenu.hidden && !actionMenu.contains(e.target) && e.target !== moreActionsBtn) actionMenu.hidden = true;
+    });
+  }
+  const copyLinkBtn = document.getElementById('btnWdsProfileCopyLink');
+  if (copyLinkBtn) copyLinkBtn.addEventListener('click', async () => {
+    if (actionMenu) actionMenu.hidden = true;
+    if (!wdsRemoteData) return;
+    const url = `${location.origin}/${wdsRemoteData.publicId}`;
+    try {
+      if (navigator.clipboard) await navigator.clipboard.writeText(url);
+      showRestToast('Profile link copied!');
+    } catch (e) { /* best effort */ }
   });
 
   // Who-can-post-on-my-wall — only visible/enabled on your own profile
@@ -2518,6 +2546,8 @@ function renderWdsProfileHeader() {
   if (coverEditBtn) coverEditBtn.hidden = !isOwn;
   const viewedActionsEl = document.getElementById('wdsProfileViewedActions');
   if (viewedActionsEl) viewedActionsEl.hidden = isOwn;
+  const ownActionsEl = document.getElementById('wdsProfileOwnActions');
+  if (ownActionsEl) ownActionsEl.hidden = !isOwn;
   const wallPermissionLabel = document.getElementById('wdsWallPermissionLabel');
   if (wallPermissionLabel) wallPermissionLabel.hidden = !isOwn;
   const manageBtn = document.getElementById('btnWdsProfileManage');
