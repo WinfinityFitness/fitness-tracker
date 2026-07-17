@@ -3984,7 +3984,17 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 [data-skin="sovereign-core"] select,
 [data-skin="sovereign-core"] textarea {
   background: var(--bg) !important;
+  color: var(--text-primary) !important;
   border: none !important;
+  border-bottom: 1px solid var(--cyan-dim) !important;
+}
+/* Sync PIN fields specifically get a white box (not just visible text on
+   the theme's own dark background) — easy to mistake for empty/disabled
+   otherwise, and this is a security-relevant field worth making obvious. */
+[data-skin="sovereign-core"] #webSyncPinInput,
+[data-skin="sovereign-core"] #webSyncOldPinInput {
+  background: #ffffff !important;
+  color: #111111 !important;
   border-bottom: 1px solid var(--cyan-dim) !important;
 }
 [data-skin="sovereign-core"] input:focus,
