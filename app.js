@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.40.0';
+const APP_VERSION = 'WF_SYS_V.41.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -754,14 +754,14 @@ function initDesktopShell() {
     const acceptEl = e.target.closest('[data-accept-invite]');
     if (acceptEl) {
       if (!wdsRemoteData) return;
-      await sb.from('chat_room_members').update({ status: 'joined' }).eq('room_id', acceptEl.dataset.acceptInvite).eq('share_key', wdsRemoteData.shareKey);
+      await sb.rpc('accept_chat_room_invite', { p_room_id: acceptEl.dataset.acceptInvite, p_share_key: wdsRemoteData.shareKey });
       await refreshWdsChatRooms();
       return;
     }
     const declineEl = e.target.closest('[data-decline-invite]');
     if (declineEl) {
       if (!wdsRemoteData) return;
-      await sb.from('chat_room_members').delete().eq('room_id', declineEl.dataset.declineInvite).eq('share_key', wdsRemoteData.shareKey);
+      await sb.rpc('decline_chat_room_invite', { p_room_id: declineEl.dataset.declineInvite, p_share_key: wdsRemoteData.shareKey });
       await refreshWdsChatRooms();
       return;
     }
@@ -14397,16 +14397,10 @@ function renderInvitesPopover(invitedRows) {
       // error even if the filter matched nothing, which would otherwise
       // look exactly like a stuck/unresponsive button.
       const roomId = btn.dataset.acceptRoom;
-      const { data, error } = await sb.from('chat_room_members')
-        .update({ status: 'joined' }).eq('room_id', roomId).eq('share_key', shareKey).select();
+      const { data: joined, error } = await sb.rpc('accept_chat_room_invite', { p_room_id: roomId, p_share_key: shareKey });
       if (error) { showRestToast('Could not accept invite: ' + error.message); btn.disabled = false; return; }
-      if (!data || !data.length) {
-        // Diagnostic: is there a row for this room at all (any share_key/status)?
-        const { data: anyRows } = await sb.from('chat_room_members').select('share_key, status').eq('room_id', roomId);
-        const detail = (anyRows && anyRows.length)
-          ? `room has ${anyRows.length} member row(s), none for this share_key`
-          : 'room has zero member rows';
-        showRestToast(`Accept failed — room ${roomId.slice(0, 8)}…, key ${(shareKey || 'none').slice(0, 8)}…: ${detail}.`);
+      if (!joined) {
+        showRestToast(`Accept failed — no matching invite for room ${roomId.slice(0, 8)}…. Try Refresh first.`);
         btn.disabled = false;
         return;
       }
@@ -14418,10 +14412,9 @@ function renderInvitesPopover(invitedRows) {
     btn.addEventListener('click', async () => {
       btn.disabled = true;
       const shareKey = localStorage.getItem('wft_lb_share_key');
-      const { data, error } = await sb.from('chat_room_members')
-        .delete().eq('room_id', btn.dataset.declineRoom).eq('share_key', shareKey).select();
+      const { data: declined, error } = await sb.rpc('decline_chat_room_invite', { p_room_id: btn.dataset.declineRoom, p_share_key: shareKey });
       if (error) { showRestToast('Could not decline invite: ' + error.message); btn.disabled = false; return; }
-      if (!data || !data.length) {
+      if (!declined) {
         showRestToast('Could not decline — no matching invite found. Try Refresh first.');
         btn.disabled = false;
         return;
