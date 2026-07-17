@@ -5004,7 +5004,21 @@ html.wf-desktop-shell body { overflow-x: auto; }
    column's full sticky height instead of leaving empty space below it. */
 .wds-uni-right .wds-notif-card { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .wds-uni-right .wds-notif-card #wdsNotifList { flex: 1; overflow-y: auto; }
-.wds-uni-left .wds-chat-card { display: flex; flex-direction: column; }
+/* Global Chat — fixed to the bottom-left of the viewport (outside the
+   normal column flow entirely, like the popups/contact-rail), always
+   visible while scrolling. Minimizes to just its header bar. */
+.wds-global-chat-fixed {
+  position: fixed; left: 16px; bottom: 0; z-index: 258; width: 300px;
+  border-radius: 10px 10px 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,0.4);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.wds-global-chat-fixed .wds-chat-popup-head { flex-shrink: 0; cursor: default; }
+.wds-global-chat-body { display: flex; flex-direction: column; padding: 12px; gap: 8px; max-height: 60vh; overflow: hidden; }
+.wds-global-chat-fixed.is-minimized .wds-global-chat-body { display: none; }
+.wds-global-chat-fixed.is-minimized { width: 220px; }
+@media (max-width: 900px) {
+  .wds-global-chat-fixed { left: 4px; width: calc(50vw - 8px); }
+}
 
 .wds-gauge--mini { width: 76px; height: 76px; }
 .wds-gauge--mini .wds-gauge-value { font-size: 1.05rem; }
@@ -5462,7 +5476,7 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
 .wds-feed-body strong { color: var(--text-primary); }
 .wds-feed-time { color: var(--text-muted); font-size: 0.72rem; margin-left: 6px; }
 .wds-feed-actions { display: flex; gap: 14px; font-size: 0.74rem; color: var(--text-muted); }
-.wds-chat-list { max-height: 480px; }
+.wds-chat-list { max-height: 320px; }
 .wds-feed-compose { display: flex; gap: 8px; margin-top: 10px; padding-top: 0; border-top: none; }
 .wds-feed-compose input {
   flex: 1; padding: 9px 12px; border-radius: 6px; border: 1px solid var(--border-soft);

@@ -30,7 +30,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=41.0">
+<link rel="stylesheet" href="style.css?v=42.0">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3434,24 +3434,6 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
           <button type="button" class="wds-logout-btn" id="btnWdsMenuSignOut" style="margin-top:12px;display:block;">Log Out</button>
         </div>
 
-        <div class="wds-card wds-card--feed wds-chat-card">
-          <h3 class="wds-card-title">Global Chat</h3>
-          <div class="chat-list wds-chat-list" id="wdsChatList">
-            <p class="empty-note">Loading…</p>
-          </div>
-          <div class="chat-pending-image" id="wdsChatPendingImage" hidden>
-            <img id="wdsChatPendingImagePreview" alt="">
-            <button type="button" id="btnWdsChatPendingImageRemove" aria-label="Remove image">✕</button>
-          </div>
-          <div class="chat-input-row wds-feed-compose">
-            <button type="button" class="btn btn--sm chat-attach-btn" id="btnWdsChatAttachImage" aria-label="Attach image">📎</button>
-            <input type="file" id="wdsChatImageInput" accept="image/*" hidden>
-            <input type="text" id="wdsChatInput" placeholder="Message Nexus…" maxlength="280">
-            <button type="button" class="wds-mini-btn" id="btnWdsChatSend">Send</button>
-          </div>
-        </div>
-        <div class="chat-reaction-menu" id="wdsChatReactionMenu" hidden></div>
-
       </div>
 
       <!-- ===================== CENTER: Facebook-style feed ===================== -->
@@ -3583,6 +3565,31 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
   <div class="wds-chat-popups-wrap" id="wdsChatPopupsWrap"></div>
   <div class="wds-chat-contact-rail" id="wdsChatContactRail"></div>
 
+  <!-- Global Chat — fixed to the bottom-left of the viewport, always
+       visible while scrolling, minimizable to just its header bar. -->
+  <div class="wds-card wds-card--feed wds-chat-card wds-global-chat-fixed" id="wdsGlobalChatFixed">
+    <div class="wds-chat-popup-head">
+      <h3 class="wds-card-title" style="margin:0;">Global Chat</h3>
+      <button type="button" class="wds-chat-popup-close" id="btnWdsGlobalChatMinimize" aria-label="Minimize">–</button>
+    </div>
+    <div class="wds-global-chat-body" id="wdsGlobalChatBody">
+      <div class="chat-list wds-chat-list" id="wdsChatList">
+        <p class="empty-note">Loading…</p>
+      </div>
+      <div class="chat-pending-image" id="wdsChatPendingImage" hidden>
+        <img id="wdsChatPendingImagePreview" alt="">
+        <button type="button" id="btnWdsChatPendingImageRemove" aria-label="Remove image">✕</button>
+      </div>
+      <div class="chat-input-row wds-feed-compose">
+        <button type="button" class="btn btn--sm chat-attach-btn" id="btnWdsChatAttachImage" aria-label="Attach image">📎</button>
+        <input type="file" id="wdsChatImageInput" accept="image/*" hidden>
+        <input type="text" id="wdsChatInput" placeholder="Message Nexus…" maxlength="280">
+        <button type="button" class="wds-mini-btn" id="btnWdsChatSend">Send</button>
+      </div>
+    </div>
+  </div>
+  <div class="chat-reaction-menu" id="wdsChatReactionMenu" hidden></div>
+
   <!-- Profile Page — opened by tapping the operator avatar in the top nav.
        A full-screen overlay standing in for a real routed page (this is a
        static single-page app), with its own Back control. -->
@@ -3666,10 +3673,10 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
   </div>
 </div>
 
-<script src="config.js?v=41.0"></script>
+<script src="config.js?v=42.0"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=41.0"></script>
+<script src="app.js?v=42.0"></script>
 </body>
 </html>

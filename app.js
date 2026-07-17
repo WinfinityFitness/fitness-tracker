@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.41.0';
+const APP_VERSION = 'WF_SYS_V.42.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -726,6 +726,18 @@ function initDesktopShell() {
 
   // Chats panel — opened from the header chat icon (replaces the old
   // manual refresh button; the dashboard still auto-refreshes every 2min).
+  // Global Chat minimize toggle — collapses the fixed bottom-left widget
+  // down to just its header bar.
+  const globalChatFixed = document.getElementById('wdsGlobalChatFixed');
+  const globalChatMinimizeBtn = document.getElementById('btnWdsGlobalChatMinimize');
+  if (globalChatFixed && globalChatMinimizeBtn) {
+    globalChatMinimizeBtn.addEventListener('click', () => {
+      const nowMinimized = globalChatFixed.classList.toggle('is-minimized');
+      globalChatMinimizeBtn.textContent = nowMinimized ? '+' : '–';
+      globalChatMinimizeBtn.setAttribute('aria-label', nowMinimized ? 'Expand' : 'Minimize');
+    });
+  }
+
   const chatListBtn = document.getElementById('wdsChatListBtn');
   const chatListPop = document.getElementById('wdsChatListPop');
   chatListBtn.addEventListener('click', e => {
