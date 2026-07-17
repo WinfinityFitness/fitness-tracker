@@ -30,7 +30,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=28.0">
+<link rel="stylesheet" href="style.css?v=29.0">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3527,12 +3527,54 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
 
     </main>
   </div>
+
+  <!-- Profile Page — opened by tapping the operator avatar in the top nav.
+       A full-screen overlay standing in for a real routed page (this is a
+       static single-page app), with its own Back control. -->
+  <div class="wds-profile-page" id="wdsProfilePage" hidden>
+    <div class="wds-profile-cover">
+      <button type="button" class="wds-profile-back" id="btnWdsProfileBack">← Back to Dashboard</button>
+    </div>
+    <div class="wds-profile-header">
+      <div class="wds-profile-avatar" id="wdsProfilePageAvatar">–</div>
+      <div class="wds-profile-identity">
+        <h2 id="wdsProfilePageName">Operator</h2>
+        <p id="wdsProfilePageSubtitle">—</p>
+      </div>
+    </div>
+    <div class="wds-profile-body">
+      <div class="wds-profile-side">
+        <div class="wds-card">
+          <h3 class="wds-card-title">Personal Details</h3>
+          <ul class="wds-profile-detail-list" id="wdsProfileDetailList"></ul>
+        </div>
+        <div class="wds-card">
+          <h3 class="wds-card-title">Bio-Markers</h3>
+          <div class="wds-marker-row">
+            <div class="wds-macro">
+              <div class="wds-macro-head"><span>Body Fat %</span><span id="wdsProfileBodyFatText">–</span></div>
+              <div class="wds-progress"><div class="wds-progress-fill" id="wdsProfileBodyFatBar" style="width:0%;background:var(--cyan)"></div></div>
+            </div>
+            <div class="wds-macro">
+              <div class="wds-macro-head"><span>Weight Progress</span><span id="wdsProfileWeightText">–</span></div>
+              <div class="wds-progress"><div class="wds-progress-fill" id="wdsProfileWeightBar" style="width:0%;"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="wds-profile-main">
+        <h3 class="wds-card-title">Posts</h3>
+        <div id="wdsProfilePostsList" class="wds-feed-list"><p class="empty-note">Loading…</p></div>
+      </div>
+    </div>
+    <div class="chat-reaction-menu" id="wdsProfileReactionMenu" hidden></div>
+  </div>
 </div>
 
-<script src="config.js?v=28.0"></script>
+<script src="config.js?v=29.0"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=28.0"></script>
+<script src="app.js?v=29.0"></script>
 </body>
 </html>

@@ -4879,9 +4879,11 @@ html.wf-desktop-shell #wdsShell {
 .wds-user-mode-icon {
   width: 34px; height: 34px; border-radius: 50%; background: var(--surface-2);
   border: 1px solid var(--border); display: grid; place-items: center; padding: 5px;
-  box-sizing: border-box; flex-shrink: 0;
+  box-sizing: border-box; flex-shrink: 0; cursor: pointer;
 }
 .wds-user-mode-icon img { width: 100%; height: 100%; object-fit: contain; }
+.wds-user-mode-icon--photo { padding: 0; border-color: var(--accent); }
+.wds-user-mode-icon--photo img { object-fit: cover; border-radius: 50%; }
 .wds-user-avatar--sm { width: 26px; height: 26px; font-size: 0.72rem; flex-shrink: 0; }
 .wds-user-meta { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.3; }
 .wds-user-label { font-size: 0.62rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
@@ -5273,6 +5275,41 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
 .wds-slider-labels { display: flex; justify-content: space-between; font-size: 0.68rem; color: var(--text-muted); }
 
 .wds-marker-row { display: flex; flex-direction: column; gap: 14px; }
+
+/* Profile Page — full-screen overlay standing in for a routed page. */
+.wds-profile-page {
+  position: fixed; inset: 0; z-index: 150; background: var(--bg-body, var(--surface-1));
+  overflow-y: auto;
+}
+.wds-profile-cover {
+  height: 160px; background: var(--gradient-bar); position: relative;
+  display: flex; align-items: flex-start; padding: 14px;
+}
+.wds-profile-back {
+  background: rgba(5,10,14,0.55); border: 1px solid rgba(255,255,255,0.25); color: #fff;
+  border-radius: 8px; padding: 8px 14px; font-size: 0.8rem; cursor: pointer;
+}
+.wds-profile-header {
+  display: flex; align-items: flex-end; gap: 18px; padding: 0 24px; margin-top: -46px;
+}
+.wds-profile-avatar {
+  width: 112px; height: 112px; border-radius: 50%; background: var(--gradient-bar); color: #060a0d;
+  font-weight: 800; font-size: 2.4rem; display: grid; place-items: center; flex-shrink: 0;
+  border: 4px solid var(--surface-1); background-size: cover; background-position: center;
+}
+.wds-profile-identity { padding-bottom: 8px; }
+.wds-profile-identity h2 { margin: 0 0 2px; font-size: 1.3rem; color: var(--text-primary); }
+.wds-profile-identity p { margin: 0; font-size: 0.82rem; color: var(--text-secondary); }
+.wds-profile-body {
+  display: grid; grid-template-columns: 280px 1fr; gap: 20px; max-width: 900px; margin: 24px auto; padding: 0 24px;
+}
+.wds-profile-side { display: flex; flex-direction: column; gap: 16px; }
+.wds-profile-detail-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.wds-profile-detail-list li { display: flex; justify-content: space-between; font-size: 0.82rem; color: var(--text-secondary); gap: 10px; }
+.wds-profile-detail-list li strong { color: var(--text-primary); font-weight: 600; text-align: right; }
+@media (max-width: 720px) {
+  .wds-profile-body { grid-template-columns: 1fr; }
+}
 
 /* Nexus */
 .wds-lb-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }

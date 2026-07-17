@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.28.0';
+const APP_VERSION = 'WF_SYS_V.29.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -79,6 +79,9 @@ function initDesktopShell() {
   const operatorNameEl = document.getElementById('wdsOperatorName');
   const modeIconEl = document.getElementById('wdsUserModeIcon');
   const modeIconImgEl = document.getElementById('wdsUserModeIconImg');
+  modeIconEl.addEventListener('click', openWdsProfilePage);
+  const profileBackBtn = document.getElementById('btnWdsProfileBack');
+  if (profileBackBtn) profileBackBtn.addEventListener('click', closeWdsProfilePage);
 
   const SESSION_ID_KEY = 'wds_operator_id';
   const SESSION_PIN_KEY = 'wds_operator_pin';
@@ -128,8 +131,10 @@ function initDesktopShell() {
     const displayName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || cleanId;
     operatorNameEl.textContent = displayName;
     const mode = getFitnessMode();
-    modeIconImgEl.src = MODE_ICON[mode] || MODE_ICON.beginner;
-    modeIconEl.title = MODE_LABEL[mode] || mode;
+    const myPhoto = wdsRemoteData.profile && wdsRemoteData.profile.photoDataUrl;
+    modeIconImgEl.src = myPhoto || MODE_ICON[mode] || MODE_ICON.beginner;
+    modeIconEl.classList.toggle('wds-user-mode-icon--photo', !!myPhoto);
+    modeIconEl.title = myPhoto ? 'View profile' : (MODE_LABEL[mode] || mode);
     const composerAvatarEl = document.getElementById('wdsComposerAvatar');
     wdsSetAvatarVisual(composerAvatarEl, wdsRemoteData.profile && wdsRemoteData.profile.photoDataUrl, displayName.trim().charAt(0).toUpperCase());
     const composerInputEl = document.getElementById('wdsComposerInput');
@@ -1343,6 +1348,110 @@ function renderFeedPosts(posts) {
         </div>` : ''}
       </div>`;
   }).join('');
+}
+
+// Profile Page — a dedicated fetch (not the capped 30-most-recent-global
+// fetchFeedPosts()) so an active user's own older posts aren't crowded out
+// by everyone else's newer ones. Comments are counted, not fetched in full,
+// since the profile view only needs a count, not the composer/reaction
+// plumbing the main feed has.
+async function fetchFeedPostsByUser(shareKey) {
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await sb.from('feed_posts')
+    .select('id, share_key, code_name, message, image_url, link_preview, deleted, created_at')
+    .eq('share_key', shareKey)
+    .eq('deleted', false)
+    .gte('created_at', cutoff)
+    .order('created_at', { ascending: false })
+    .limit(30);
+  if (error) throw error;
+  const posts = data || [];
+  const ids = posts.map(p => p.id);
+  if (ids.length) {
+    const [{ data: likes }, { data: comments }] = await Promise.all([
+      sb.from('feed_post_likes').select('post_id, share_key, emoji').in('post_id', ids),
+      sb.from('feed_post_comments').select('id, post_id').eq('deleted', false).in('post_id', ids),
+    ]);
+    const likesByPost = {}, commentCountByPost = {};
+    (likes || []).forEach(l => { (likesByPost[l.post_id] = likesByPost[l.post_id] || []).push(l); });
+    (comments || []).forEach(c => { commentCountByPost[c.post_id] = (commentCountByPost[c.post_id] || 0) + 1; });
+    posts.forEach(p => { p.likes = likesByPost[p.id] || []; p.commentCount = commentCountByPost[p.id] || 0; });
+  }
+  return posts;
+}
+
+function renderWdsProfilePosts(posts) {
+  const list = document.getElementById('wdsProfilePostsList');
+  if (!list) return;
+  if (!posts.length) { list.innerHTML = '<p class="empty-note">No posts yet.</p>'; return; }
+  list.innerHTML = posts.map(p => {
+    const imageHtml = p.image_url ? `<img class="wds-post-image" src="${escapeHtml(p.image_url)}" alt="">` : '';
+    const videoHtml = wdsExtractVideoEmbed(p.message);
+    const linkPreviewHtml = videoHtml ? '' : wdsBuildLinkPreviewHtml(p.link_preview);
+    return `
+      <div class="wds-card wds-feed-post">
+        <div class="wds-post-head">
+          <span class="wds-post-avatar">${escapeHtml((p.code_name || '?').charAt(0).toUpperCase())}</span>
+          <div class="wds-post-meta"><strong>${escapeHtml(p.code_name || 'Anonymous')}</strong><span>${wdsRelativeTime(p.created_at)}</span></div>
+        </div>
+        ${p.message ? `<p class="wds-post-body">${wdsLinkifyText(p.message)}</p>` : ''}
+        ${imageHtml}${videoHtml}${linkPreviewHtml}
+        ${wdsReactionSummaryHtml(p.likes)}
+        <div class="wds-post-actions">
+          <span class="wds-post-action-btn" style="cursor:default;">${(p.likes || []).length} reactions</span>
+          <span class="wds-post-action-btn" style="cursor:default;">💬 ${p.commentCount || 0} Comments</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderWdsProfileHeader() {
+  const profile = wdsRemoteData.profile || {};
+  const displayName = profile.name || wdsRemoteData.publicId;
+  document.getElementById('wdsProfilePageName').textContent = displayName;
+  const mode = getFitnessMode();
+  document.getElementById('wdsProfilePageSubtitle').textContent = `${MODE_LABEL[mode] || mode} • Digital ID ${wdsRemoteData.publicId}`;
+  wdsSetAvatarVisual(document.getElementById('wdsProfilePageAvatar'), profile.photoDataUrl, displayName.trim().charAt(0).toUpperCase());
+
+  const memberSince = profile.startDate ? new Date(profile.startDate).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) : '—';
+  document.getElementById('wdsProfileDetailList').innerHTML = `
+    <li><span>Digital ID</span><strong>${escapeHtml(wdsRemoteData.publicId)}</strong></li>
+    <li><span>Gender</span><strong>${profile.gender === 'female' ? 'Female' : 'Male'}</strong></li>
+    <li><span>Age</span><strong>${profile.age || '—'}</strong></li>
+    <li><span>Fitness Mode</span><strong>${escapeHtml(MODE_LABEL[mode] || mode)}</strong></li>
+    <li><span>Member Since</span><strong>${escapeHtml(memberSince)}</strong></li>
+  `;
+
+  // Same calc as the dashboard's own Bio-Markers card (renderWdsBio).
+  const today = todayISO();
+  const bodyFatEntry = findLastBodyFatEntry(today);
+  const bodyFatPct = bodyFatEntry ? computeBodyFatJP7(bodyFatEntry.skinfolds, profile.age, profile.gender) : null;
+  document.getElementById('wdsProfileBodyFatText').textContent = bodyFatPct != null ? bodyFatPct.toFixed(1) + '%' : '–';
+  document.getElementById('wdsProfileBodyFatBar').style.width = bodyFatPct != null ? Math.min(100, bodyFatPct * 2) + '%' : '0%';
+
+  const stats = computeLeaderboardStats();
+  document.getElementById('wdsProfileWeightText').textContent = stats.progress != null ? `${stats.progress > 0 ? '+' : ''}${stats.progress}${stats.weightUnit}` : '–';
+  document.getElementById('wdsProfileWeightBar').style.width = stats.progressPct != null ? Math.min(100, Math.abs(stats.progressPct) * 5) + '%' : '0%';
+}
+
+async function openWdsProfilePage() {
+  if (!wdsRemoteData) return;
+  const page = document.getElementById('wdsProfilePage');
+  if (!page) return;
+  page.hidden = false;
+  renderWdsProfileHeader();
+  const listEl = document.getElementById('wdsProfilePostsList');
+  listEl.innerHTML = '<p class="empty-note">Loading…</p>';
+  try {
+    const posts = await fetchFeedPostsByUser(wdsRemoteData.shareKey);
+    renderWdsProfilePosts(posts);
+  } catch (e) {
+    listEl.innerHTML = '<p class="empty-note">Could not load posts.</p>';
+  }
+}
+function closeWdsProfilePage() {
+  const page = document.getElementById('wdsProfilePage');
+  if (page) page.hidden = true;
 }
 
 function initWdsFeed() {
