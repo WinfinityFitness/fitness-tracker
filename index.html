@@ -30,7 +30,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=30.0">
+<link rel="stylesheet" href="style.css?v=31.0">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3274,7 +3274,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
   <div class="wds-dashboard" id="wdsDashboard" hidden>
 
     <header class="wds-topnav">
-      <div class="wds-topnav-brand">
+      <div class="wds-topnav-brand" id="wdsTopnavBrand" role="button" tabindex="0" title="Back to home">
         <img src="icons/icon-192.png" alt="">
         <span>WINFINITY</span>
       </div>
@@ -3534,6 +3534,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
   <div class="wds-profile-page" id="wdsProfilePage" hidden>
     <div class="wds-profile-cover" id="wdsProfileCover">
       <button type="button" class="wds-profile-back" id="btnWdsProfileBack">← Back to Dashboard</button>
+      <p class="wds-profile-cover-hint" id="wdsProfileCoverHint" hidden>Drag to reposition, then Save.</p>
       <button type="button" class="wds-profile-cover-edit" id="btnWdsProfileCoverEdit">🖼 Edit Cover Photo</button>
       <input type="file" id="wdsProfileCoverInput" accept="image/*" hidden>
     </div>
@@ -3609,10 +3610,10 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
   </div>
 </div>
 
-<script src="config.js?v=30.0"></script>
+<script src="config.js?v=31.0"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=30.0"></script>
+<script src="app.js?v=31.0"></script>
 </body>
 </html>

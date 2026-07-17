@@ -15,6 +15,37 @@
 
 $upstreamBase = 'https://winfinityfitness.github.io/fitness-tracker';
 
+function fetchUpstream($url) {
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HEADER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_MAXREDIRS, 3);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 8);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    curl_setopt($ch, CURLOPT_USERAGENT, isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : 'wellness-proxy/1.0');
+    if (!empty($_SERVER['HTTP_IF_NONE_MATCH'])) {
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['If-None-Match: ' . $_SERVER['HTTP_IF_NONE_MATCH']]);
+    }
+    $response = curl_exec($ch);
+    if ($response === false) {
+        $error = curl_error($ch);
+        curl_close($ch);
+        return ['error' => $error];
+    }
+    $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+    curl_close($ch);
+    return [
+        'httpCode' => $httpCode,
+        'contentType' => $contentType,
+        'rawHeaders' => substr($response, 0, $headerSize),
+        'body' => substr($response, $headerSize),
+    ];
+}
+
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 if ($path === '/' || $path === '' || $path === null) {
     $path = '/index.html';
@@ -22,39 +53,32 @@ if ($path === '/' || $path === '' || $path === null) {
 $query = parse_url($_SERVER['REQUEST_URI'], PHP_URL_QUERY);
 $upstreamUrl = $upstreamBase . $path . ($query ? '?' . $query : '');
 
-$ch = curl_init($upstreamUrl);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_HEADER, true);
-curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-curl_setopt($ch, CURLOPT_MAXREDIRS, 3);
-curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 8);
-curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-curl_setopt($ch, CURLOPT_USERAGENT, isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : 'wellness-proxy/1.0');
-if (!empty($_SERVER['HTTP_IF_NONE_MATCH'])) {
-    curl_setopt($ch, CURLOPT_HTTPHEADER, ['If-None-Match: ' . $_SERVER['HTTP_IF_NONE_MATCH']]);
-}
-
-$response = curl_exec($ch);
-if ($response === false) {
+$result = fetchUpstream($upstreamUrl);
+if (isset($result['error'])) {
     http_response_code(502);
     header('Content-Type: text/plain');
-    echo 'Upstream fetch failed: ' . curl_error($ch);
-    curl_close($ch);
+    echo 'Upstream fetch failed: ' . $result['error'];
     exit;
 }
 
-$headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-$contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-curl_close($ch);
+// SPA fallback: this is a static single-page app with its own client-side
+// routing (the Profile Page's shareable /<DigitalID> URL — see the
+// popstate handling in app.js). A path like that isn't a real file on
+// GitHub Pages, so it 404s upstream. Retry against index.html itself so
+// the app boots and its own JS picks the path back up from
+// location.pathname, instead of a bookmarked/refreshed profile link just
+// showing a bare 404. Only for extensionless paths — real missing assets
+// (a renamed icon, a typo'd script src) should still 404 normally.
+if ($result['httpCode'] === 404 && $path !== '/index.html' && !preg_match('/\.[a-zA-Z0-9]+$/', $path)) {
+    $fallback = fetchUpstream($upstreamBase . '/index.html');
+    if (!isset($fallback['error'])) {
+        $result = $fallback;
+    }
+}
 
-$rawHeaders = substr($response, 0, $headerSize);
-$body = substr($response, $headerSize);
-
-http_response_code($httpCode);
-if ($contentType) {
-    header('Content-Type: ' . $contentType);
+http_response_code($result['httpCode']);
+if ($result['contentType']) {
+    header('Content-Type: ' . $result['contentType']);
 }
 // Forward ETag/Last-Modified from upstream (harmless, and lets a future
 // conditional-GET optimization reuse them) but deliberately do NOT forward
@@ -67,11 +91,11 @@ if ($contentType) {
 // no-store here tells hCDN never to cache this response at all, so every
 // request re-runs this script (and its upstream fetch) fresh — the right
 // tradeoff for an app that's actively changing and has very low traffic.
-foreach (preg_split('/\r\n/', $rawHeaders) as $line) {
+foreach (preg_split('/\r\n/', $result['rawHeaders']) as $line) {
     if (stripos($line, 'ETag:') === 0 || stripos($line, 'Last-Modified:') === 0) {
         header($line);
     }
 }
 header('Cache-Control: no-store, must-revalidate');
 
-echo $body;
+echo $result['body'];

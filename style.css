@@ -1851,8 +1851,10 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   margin: 0;
   z-index: 1;
 }
-.chat-row--other .chat-reactions { right: -2px; }
-.chat-row--own .chat-reactions { left: -2px; }
+/* Always bottom-right of the bubble, own or received — matches the feed
+   post reaction summary's fixed bottom-right placement instead of
+   flipping sides by sender. */
+.chat-reactions { right: -2px; }
 .chat-reaction-pill {
   font-size: 0.58rem;
   background: var(--surface-1);
@@ -1915,6 +1917,9 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .chat-row--own .chat-bubble--has-video { align-items: flex-end; }
 .chat-video-embed { width: 260px; max-width: 100%; aspect-ratio: 16/9; border-radius: 8px; overflow: hidden; }
 .chat-video-embed iframe { width: 100%; height: 100%; border: 0; display: block; }
+/* Feed posts run full-width like an attached photo (.wds-post-image),
+   unlike the deliberately compact chat-bubble sizing above. */
+.wds-feed-post .chat-video-embed, .wds-profile-grid-tile .chat-video-embed { width: 100%; }
 .chat-msg-image {
   display: block;
   max-height: 140px;
@@ -4835,7 +4840,7 @@ html.wf-desktop-shell #wdsShell {
   padding: 14px 28px; background: var(--nav-translucent); backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border-soft); position: sticky; top: 0; z-index: 250;
 }
-.wds-topnav-brand { display: flex; align-items: center; gap: 10px; font-size: 1.05rem; letter-spacing: 0.05em; color: var(--cyan); font-weight: 800; white-space: nowrap; }
+.wds-topnav-brand { display: flex; align-items: center; gap: 10px; font-size: 1.05rem; letter-spacing: 0.05em; color: var(--cyan); font-weight: 800; white-space: nowrap; cursor: pointer; }
 .wds-topnav-brand img { width: 24px; height: 24px; flex-shrink: 0; }
 .wds-topnav-tabs { display: flex; gap: 4px; flex: 1; }
 .wds-topnav-tab {
@@ -4874,14 +4879,14 @@ html.wf-desktop-shell #wdsShell {
 .wds-user-avatar {
   width: 32px; height: 32px; border-radius: 50%; background: var(--gradient-bar);
   color: #060a0d; font-weight: 700; display: grid; place-items: center; font-size: 0.85rem;
-  flex-shrink: 0;
+  flex-shrink: 0; background-size: cover; background-position: center;
 }
 .wds-user-mode-icon {
   width: 34px; height: 34px; border-radius: 50%; background: var(--surface-2);
   border: 1px solid var(--border); display: grid; place-items: center; padding: 5px;
-  box-sizing: border-box; flex-shrink: 0; cursor: pointer;
+  box-sizing: border-box; flex-shrink: 0; cursor: pointer; overflow: hidden;
 }
-.wds-user-mode-icon img { width: 100%; height: 100%; object-fit: contain; }
+.wds-user-mode-icon img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .wds-user-mode-icon--photo { padding: 0; border-color: var(--accent); }
 .wds-user-mode-icon--photo img { object-fit: cover; border-radius: 50%; }
 .wds-user-avatar--sm { width: 26px; height: 26px; font-size: 0.72rem; flex-shrink: 0; }
@@ -5287,6 +5292,14 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
 .wds-profile-cover {
   height: 220px; background: var(--gradient-bar); background-size: cover; background-position: center;
   position: relative; display: flex; align-items: flex-start; justify-content: space-between; padding: 14px;
+  overflow: hidden; touch-action: none;
+}
+.wds-profile-cover--repositioning { cursor: grab; }
+.wds-profile-cover--repositioning:active { cursor: grabbing; }
+.wds-profile-cover-hint {
+  position: absolute; left: 50%; top: 14px; transform: translateX(-50%); margin: 0;
+  background: rgba(5,10,14,0.55); color: #fff; border-radius: 8px; padding: 6px 12px; font-size: 0.74rem;
+  pointer-events: none;
 }
 .wds-profile-back {
   background: rgba(5,10,14,0.55); border: 1px solid rgba(255,255,255,0.25); color: #fff;
@@ -5299,8 +5312,8 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
 /* Header shares the body's max-width/padding so the avatar's left edge
    lines up exactly with the sidebar cards below it. */
 .wds-profile-header {
-  display: flex; align-items: flex-end; gap: 18px;
-  max-width: 900px; margin: -58px auto 0; padding: 0 24px; box-sizing: border-box;
+  display: flex; align-items: flex-end; gap: 18px; position: relative; z-index: 1;
+  max-width: 900px; margin: -84px auto 0; padding: 0 24px; box-sizing: border-box;
 }
 .wds-profile-avatar {
   width: 128px; height: 128px; border-radius: 50%; background: var(--gradient-bar); color: #060a0d;

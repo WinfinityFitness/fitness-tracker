@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.30.0';
+const APP_VERSION = 'WF_SYS_V.31.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -82,9 +82,15 @@ function initDesktopShell() {
   modeIconEl.addEventListener('click', openWdsProfilePage);
   const profileBackBtn = document.getElementById('btnWdsProfileBack');
   if (profileBackBtn) profileBackBtn.addEventListener('click', closeWdsProfilePage);
+  const brandEl = document.getElementById('wdsTopnavBrand');
+  if (brandEl) {
+    brandEl.addEventListener('click', closeWdsProfilePage);
+    brandEl.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeWdsProfilePage(); } });
+  }
 
   const SESSION_ID_KEY = 'wds_operator_id';
   const SESSION_PIN_KEY = 'wds_operator_pin';
+  let wdsInitialRouteChecked = false;
 
   // Fetches the real synced payload via web_sync_get_dashboard, wires it up
   // as wdsRemoteData (so every calc function getProfile/getLogs/etc. already
@@ -142,6 +148,15 @@ function initDesktopShell() {
     renderWdsDashboard();
     gate.hidden = true;
     dashboard.hidden = false;
+    // Deep-link support: a bookmarked/shared /<DigitalID> URL only makes
+    // sense to check once, right after the FIRST successful sign-in — not
+    // on every 2-minute poll refresh, which would otherwise re-open the
+    // profile page out from under someone who'd since navigated away.
+    if (!wdsInitialRouteChecked) {
+      wdsInitialRouteChecked = true;
+      const path = location.pathname.replace(/^\/|\/$/g, '');
+      if (path && path.toUpperCase() === cleanId.toUpperCase()) wdsShowProfilePage();
+    }
     startWdsDashboardPolling();
     startWdsChatPolling();
     startWdsFeedPolling();
@@ -458,23 +473,71 @@ function initDesktopShell() {
     } catch (e2) { btn.disabled = false; }
   });
 
-  // Profile Page — cover photo, its own composer (mirrors the main feed
-  // composer, just posting straight to the global feed like any other
-  // post), and the Filters/Manage/List-Grid controls over the post list.
+  // Profile Page — cover photo (choose → drag to reposition → Save), its
+  // own composer (mirrors the main feed composer, just posting straight to
+  // the global feed like any other post), and the Filters/Manage/List-Grid
+  // controls over the post list.
+  const profileCoverEl = document.getElementById('wdsProfileCover');
   const profileCoverInput = document.getElementById('wdsProfileCoverInput');
-  document.getElementById('btnWdsProfileCoverEdit').addEventListener('click', () => profileCoverInput.click());
+  const profileCoverEditBtn = document.getElementById('btnWdsProfileCoverEdit');
+  const profileCoverHint = document.getElementById('wdsProfileCoverHint');
+  let wdsCoverRepositioning = false;
+  let wdsPendingCoverDataUrl = null;
+  let wdsPendingCoverPosY = 50;
+
+  profileCoverEditBtn.addEventListener('click', async () => {
+    if (!wdsCoverRepositioning) { profileCoverInput.click(); return; }
+    // Currently repositioning — this click is "Save".
+    if (!wdsRemoteData) return;
+    profileCoverEditBtn.disabled = true;
+    try {
+      const p = Object.assign({}, wdsRemoteData.profile, {
+        coverPhotoDataUrl: wdsPendingCoverDataUrl, coverPhotoPosY: wdsPendingCoverPosY,
+      });
+      await wdsPushProfileUpdate(p);
+      wdsRemoteData.profile = p;
+    } catch (e) { /* best effort — position just won't persist until the next successful save */ }
+    finally {
+      profileCoverEditBtn.disabled = false;
+      wdsCoverRepositioning = false;
+      wdsPendingCoverDataUrl = null;
+      profileCoverEl.classList.remove('wds-profile-cover--repositioning');
+      profileCoverHint.hidden = true;
+      profileCoverEditBtn.textContent = '🖼 Edit Cover Photo';
+    }
+  });
   profileCoverInput.addEventListener('change', async () => {
     const file = profileCoverInput.files[0];
     profileCoverInput.value = '';
     if (!file || !wdsRemoteData) return;
     try {
-      const dataUrl = await resizeCoverImage(file);
-      const p = Object.assign({}, wdsRemoteData.profile, { coverPhotoDataUrl: dataUrl });
-      await wdsPushProfileUpdate(p);
-      wdsRemoteData.profile = p;
-      renderWdsProfileHeader();
-    } catch (e) { /* best effort — cover just won't update until the next successful save */ }
+      wdsPendingCoverDataUrl = await resizeCoverImageFull(file);
+      wdsPendingCoverPosY = 50;
+      profileCoverEl.style.backgroundImage = `url(${wdsPendingCoverDataUrl})`;
+      profileCoverEl.style.backgroundPosition = 'center 50%';
+      wdsCoverRepositioning = true;
+      profileCoverEl.classList.add('wds-profile-cover--repositioning');
+      profileCoverHint.hidden = false;
+      profileCoverEditBtn.textContent = '💾 Save Position';
+    } catch (e) { /* best effort */ }
   });
+  // Vertical-only drag (Facebook's own cover-reposition affordance is
+  // vertical-only too — the image already fills the width via cover-fit).
+  let coverDragStartY = null;
+  let coverDragStartPos = 50;
+  profileCoverEl.addEventListener('pointerdown', e => {
+    if (!wdsCoverRepositioning) return;
+    coverDragStartY = e.clientY;
+    coverDragStartPos = wdsPendingCoverPosY;
+    profileCoverEl.setPointerCapture(e.pointerId);
+  });
+  profileCoverEl.addEventListener('pointermove', e => {
+    if (!wdsCoverRepositioning || coverDragStartY === null) return;
+    const deltaPct = ((e.clientY - coverDragStartY) / profileCoverEl.offsetHeight) * 100;
+    wdsPendingCoverPosY = Math.max(0, Math.min(100, coverDragStartPos - deltaPct));
+    profileCoverEl.style.backgroundPosition = `center ${wdsPendingCoverPosY}%`;
+  });
+  ['pointerup', 'pointercancel'].forEach(evt => profileCoverEl.addEventListener(evt, () => { coverDragStartY = null; }));
 
   const profileComposerInput = document.getElementById('wdsProfileComposerInput');
   const profileComposerPostBtn = document.getElementById('btnWdsProfileComposerPost');
@@ -550,7 +613,7 @@ function initDesktopShell() {
   document.getElementById('wdsProfilePostsList').addEventListener('click', async e => {
     const removeBtn = e.target.closest('[data-action="remove-post"]');
     if (removeBtn) {
-      if (!wdsRemoteData || !wdsRemoteData.shareKey) return;
+      if (!wdsRemoteData || !wdsRemoteData.shareKey || !confirm('Remove this post?')) return;
       removeBtn.disabled = true;
       try {
         await unsendFeedPost(Number(removeBtn.dataset.postId), wdsRemoteData.shareKey);
@@ -1554,7 +1617,10 @@ function renderWdsProfileHeader() {
   document.getElementById('wdsProfilePageSubtitle').textContent = `${MODE_LABEL[mode] || mode} • Digital ID ${wdsRemoteData.publicId}`;
   wdsSetAvatarVisual(document.getElementById('wdsProfilePageAvatar'), profile.photoDataUrl, displayName.trim().charAt(0).toUpperCase());
   const coverEl = document.getElementById('wdsProfileCover');
-  if (coverEl) coverEl.style.backgroundImage = profile.coverPhotoDataUrl ? `url(${profile.coverPhotoDataUrl})` : '';
+  if (coverEl) {
+    coverEl.style.backgroundImage = profile.coverPhotoDataUrl ? `url(${profile.coverPhotoDataUrl})` : '';
+    coverEl.style.backgroundPosition = `center ${profile.coverPhotoPosY != null ? profile.coverPhotoPosY : 50}%`;
+  }
   wdsSetAvatarVisual(document.getElementById('wdsProfileComposerAvatar'), profile.photoDataUrl, displayName.trim().charAt(0).toUpperCase());
 
   const memberSince = profile.startDate ? new Date(profile.startDate).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) : '—';
@@ -1590,7 +1656,11 @@ async function refreshWdsProfilePosts() {
   }
 }
 
-async function openWdsProfilePage() {
+// Render/show only — no history mutation. Used both by the click-driven
+// open (which also pushes a URL, see openWdsProfilePage below) and by the
+// popstate handler (which must NOT push another entry on top of the one
+// the browser is already navigating to/from).
+async function wdsShowProfilePage() {
   if (!wdsRemoteData) return;
   const page = document.getElementById('wdsProfilePage');
   if (!page) return;
@@ -1598,10 +1668,33 @@ async function openWdsProfilePage() {
   renderWdsProfileHeader();
   await refreshWdsProfilePosts();
 }
-function closeWdsProfilePage() {
+function wdsHideProfilePage() {
   const page = document.getElementById('wdsProfilePage');
   if (page) page.hidden = true;
 }
+
+// Cosmetic/shareable URL only — wellness.winfinityfitness.com is a static
+// single-page app with no real server-side router, so a fresh load of
+// this path depends on wordpress-proxy/index.php falling back to
+// index.html for unrecognized paths (see that file's own comments). This
+// only ever reflects the SIGNED-IN user's own Digital ID; there's no
+// support yet for viewing another operator's profile by URL.
+async function openWdsProfilePage() {
+  if (!wdsRemoteData) return;
+  const targetPath = '/' + wdsRemoteData.publicId;
+  if (location.pathname !== targetPath) history.pushState({ wdsProfile: true }, '', targetPath);
+  await wdsShowProfilePage();
+}
+function closeWdsProfilePage() {
+  if (location.pathname !== '/') history.pushState({ wdsProfile: false }, '', '/');
+  wdsHideProfilePage();
+}
+window.addEventListener('popstate', () => {
+  if (!wdsRemoteData) return;
+  const path = location.pathname.replace(/^\/|\/$/g, '');
+  if (path && path.toUpperCase() === wdsRemoteData.publicId.toUpperCase()) wdsShowProfilePage();
+  else wdsHideProfilePage();
+});
 
 function initWdsFeed() {
   const list = document.getElementById('wdsFeedList');
@@ -1618,7 +1711,16 @@ function initWdsFeed() {
       // don't also apply the plain-click default reaction on top of it.
       if (wdsFeedJustLongPressed) { wdsFeedJustLongPressed = false; return; }
       if (!shareKey) return;
-      try { await toggleFeedPostLike(postId, shareKey, '👍'); await refreshWdsFeed(); } catch (err) { /* best effort */ }
+      // A native double-click always fires TWO ordinary "click" events
+      // before the "dblclick" event — without this delay, those two
+      // clicks would already toggle the default 👍 on and off before the
+      // picker even opens, and could race with (and clobber) the emoji
+      // the user actually picked. Debouncing gives the dblclick handler a
+      // chance to cancel this before it ever runs.
+      clearTimeout(wdsLikeClickTimer);
+      wdsLikeClickTimer = setTimeout(async () => {
+        try { await toggleFeedPostLike(postId, shareKey, '👍'); await refreshWdsFeed(); } catch (err) { /* best effort */ }
+      }, WDS_LIKE_CLICK_DELAY_MS);
       return;
     }
     if (e.target.closest('[data-action="like-comment"]')) {
@@ -1626,7 +1728,10 @@ function initWdsFeed() {
       const commentRow = e.target.closest('[data-comment-id]');
       const commentId = commentRow ? Number(commentRow.dataset.commentId) : null;
       if (!shareKey || !commentId) return;
-      try { await toggleFeedCommentLike(commentId, shareKey, '👍'); wdsFeedExpandedComments.add(postId); await refreshWdsFeed(); } catch (err) { /* best effort */ }
+      clearTimeout(wdsLikeClickTimer);
+      wdsLikeClickTimer = setTimeout(async () => {
+        try { await toggleFeedCommentLike(commentId, shareKey, '👍'); wdsFeedExpandedComments.add(postId); await refreshWdsFeed(); } catch (err) { /* best effort */ }
+      }, WDS_LIKE_CLICK_DELAY_MS);
       return;
     }
     if (e.target.closest('[data-action="toggle-comments"]')) {
@@ -1684,6 +1789,8 @@ function initWdsFeed() {
 // .chat-bubble, and its own #wdsFeedReactionMenu popover.
 let wdsFeedReactionTarget = null; // { type: 'post'|'comment', id }
 let wdsFeedJustLongPressed = false;
+const WDS_LIKE_CLICK_DELAY_MS = 280;
+let wdsLikeClickTimer = null;
 
 function wdsCloseFeedReactionMenu() {
   const menu = document.getElementById('wdsFeedReactionMenu');
@@ -1694,6 +1801,10 @@ function wdsCloseFeedReactionMenu() {
 function wdsOpenFeedReactionMenu(btn, x, y) {
   const menu = document.getElementById('wdsFeedReactionMenu');
   if (!menu) return;
+  // Cancel any debounced default-👍 click still pending on this same Like
+  // button (see initWdsFeed) — the picker opening means the user's choice
+  // is what should apply, not a leftover plain-click toggle.
+  clearTimeout(wdsLikeClickTimer);
   const isComment = btn.dataset.action === 'like-comment';
   const id = isComment
     ? Number(btn.closest('[data-comment-id]').dataset.commentId)
@@ -4123,11 +4234,13 @@ function resizeAvatarImage(file) {
   });
 }
 
-// Profile cover photo — center-cropped to a fixed 4:1 banner aspect ratio
-// (rather than squared like the avatar) so it fills the cover strip
-// cleanly regardless of the source photo's own proportions.
-function resizeCoverImage(file) {
-  const TARGET_W = 1200, TARGET_H = 300;
+// Profile cover photo — downscaled only (never force-cropped), since the
+// user drags to choose their own vertical focal point afterward (see the
+// pointer-drag wiring in initDesktopShell). The chosen point is saved
+// separately as profile.coverPhotoPosY (0-100) and applied via CSS
+// background-position, same idea as Facebook's cover-photo repositioning.
+function resizeCoverImageFull(file) {
+  const MAX_W = 1600;
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('Could not read that file.'));
@@ -4135,14 +4248,11 @@ function resizeCoverImage(file) {
       const img = new Image();
       img.onerror = () => reject(new Error('Could not read that image.'));
       img.onload = () => {
-        const targetRatio = TARGET_W / TARGET_H;
-        const srcRatio = img.width / img.height;
-        let sx, sy, sw, sh;
-        if (srcRatio > targetRatio) { sh = img.height; sw = sh * targetRatio; sx = (img.width - sw) / 2; sy = 0; }
-        else { sw = img.width; sh = sw / targetRatio; sx = 0; sy = (img.height - sh) / 2; }
+        let { width, height } = img;
+        if (width > MAX_W) { height = Math.round(height * (MAX_W / width)); width = MAX_W; }
         const canvas = document.createElement('canvas');
-        canvas.width = TARGET_W; canvas.height = TARGET_H;
-        canvas.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, TARGET_W, TARGET_H);
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
         resolve(canvas.toDataURL('image/jpeg', 0.85));
       };
       img.src = reader.result;
