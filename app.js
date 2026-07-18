@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.0.7';
+const APP_VERSION = 'WF_SYS_V.1.0.8';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -2358,7 +2358,7 @@ function wdsLinkifyText(text) {
 // like photos and videos, unless it's a full page — just preview/title/text".
 function wdsBuildLinkPreviewHtml(preview) {
   if (!preview) return '';
-  if (preview.type === 'image') return `<img class="wds-post-image" src="${escapeHtml(preview.image || preview.url)}" alt="">`;
+  if (preview.type === 'image') return `<img class="wds-post-image" src="${escapeHtml(preview.image || preview.url)}" alt="" data-lightbox="${escapeHtml(preview.image || preview.url)}">`;
   if (preview.type === 'video') return `<video class="wds-post-image" src="${escapeHtml(preview.video || preview.url)}" controls></video>`;
   return `<a class="wds-link-preview-card" href="${escapeHtml(preview.url)}" target="_blank" rel="noopener noreferrer">
     ${preview.image ? `<img class="wds-link-preview-img" src="${escapeHtml(preview.image)}" alt="">` : ''}
