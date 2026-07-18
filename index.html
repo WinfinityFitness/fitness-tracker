@@ -35,7 +35,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.1.2">
+<link rel="stylesheet" href="style.css?v=1.1.3">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -1180,11 +1180,6 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
         <input type="text" id="lbChatInput" maxlength="280" placeholder="Transmit message…">
         <button type="button" class="btn btn--primary btn--sm" id="btnLbChatSend">➤</button>
       </div>
-    </div>
-
-    <div class="chat-lightbox" id="chatLightbox" hidden>
-      <button type="button" class="chat-lightbox-close" id="chatLightboxClose" aria-label="Close">✕</button>
-      <img id="chatLightboxImg" alt="">
     </div>
 
     <div class="chat-user-menu" id="chatUserMenu" hidden>
@@ -3835,10 +3830,25 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
   </div>
 </div>
 
-<script src="config.js?v=1.1.2"></script>
+<!-- Full-size image lightbox — used by both the mobile app's chat/feed
+     and the desktop dashboard (openChatLightbox/closeChatLightbox in
+     app.js). Lives here, as a direct child of <body>, deliberately
+     OUTSIDE both #app's tab-panel structure and #wdsShell: it used to
+     sit inside the mobile Nexus tab's <section class="tab-panel" hidden>,
+     which is always display:none on the desktop site (no mobile tab is
+     ever "active" there) — a display:none ancestor removes its entire
+     subtree from rendering, which position:fixed cannot escape, so the
+     lightbox could never actually show on the desktop dashboard no
+     matter what z-index or hidden-state logic it had. -->
+<div class="chat-lightbox" id="chatLightbox" hidden>
+  <button type="button" class="chat-lightbox-close" id="chatLightboxClose" aria-label="Close">✕</button>
+  <img id="chatLightboxImg" alt="">
+</div>
+
+<script src="config.js?v=1.1.3"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.1.2"></script>
+<script src="app.js?v=1.1.3"></script>
 </body>
 </html>
