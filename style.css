@@ -5362,13 +5362,22 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
 .wds-comment-action-btn:hover { color: var(--text-primary); }
 .wds-comment-action-btn.is-liked { color: var(--magenta); }
 .wds-reaction-cluster { font-size: 0.72rem; letter-spacing: -0.2em; }
-/* Bottom-right "who reacted" line — sits between the post body/media and
-   the Like/Comment action row, Facebook-style. */
-.wds-reaction-summary {
-  display: flex; justify-content: flex-end; align-items: center; gap: 4px;
-  font-size: 0.72rem; color: var(--text-muted); padding: 2px 2px 0;
+/* Reactions (left) + comment count (right) share one row directly under
+   the post body/media, Facebook-style — the reaction cluster is
+   clickable (opens wdsShowReactors, "who reacted with what"). */
+.wds-post-stats-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 0.72rem; color: var(--text-muted); padding: 4px 2px 0;
 }
+.wds-reaction-summary { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+.wds-reaction-summary:hover { text-decoration: underline; }
 .wds-reaction-summary .wds-reaction-cluster { font-size: 0.82rem; }
+.wds-post-comment-count { cursor: pointer; }
+.wds-post-comment-count:hover { text-decoration: underline; }
+.wds-reactor-item { display: flex; align-items: center; gap: 10px; padding: 7px 4px; }
+.wds-reactor-emoji { font-size: 1.15rem; width: 22px; text-align: center; flex-shrink: 0; }
+.wds-reactor-name { font-size: 0.82rem; color: var(--text-primary); font-weight: 600; cursor: pointer; }
+.wds-reactor-name:hover { text-decoration: underline; }
 .wds-post-comment-compose { display: flex; gap: 8px; margin-top: 2px; }
 .wds-post-comment-compose input {
   flex: 1; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 20px;

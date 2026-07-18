@@ -35,7 +35,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.0.8">
+<link rel="stylesheet" href="style.css?v=1.0.9">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3518,6 +3518,18 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
           </div>
         </div>
 
+        <!-- Who-reacted-with-what — tapping a post/comment's reaction
+             cluster opens this, listing each reactor's emoji + name. -->
+        <div class="wds-story-overlay" id="wdsReactorsOverlay" hidden>
+          <div class="wds-story-modal" style="max-width:320px;">
+            <div class="wds-story-modal-head">
+              <strong>Reactions</strong>
+              <button type="button" class="wds-icon-btn" id="btnWdsReactorsClose" aria-label="Close">✕</button>
+            </div>
+            <div id="wdsReactorsList"><p class="empty-note">Loading…</p></div>
+          </div>
+        </div>
+
         <div class="wds-card">
           <div class="wds-myday-row" id="wdsMydayRow">
             <p class="empty-note">Loading…</p>
@@ -3799,10 +3811,10 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
   </div>
 </div>
 
-<script src="config.js?v=1.0.8"></script>
+<script src="config.js?v=1.0.9"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.0.8"></script>
+<script src="app.js?v=1.0.9"></script>
 </body>
 </html>
