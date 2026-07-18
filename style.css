@@ -5279,9 +5279,12 @@ html.wf-desktop-shell body { overflow-x: auto; }
 }
 .wds-composer-input:focus { outline: none; border-color: var(--border); }
 .wds-composer-input::placeholder { color: var(--text-muted); }
-.wds-composer-pending-image { position: relative; margin-top: 10px; display: inline-block; }
-.wds-composer-pending-image img { max-height: 160px; border-radius: 8px; display: block; }
-.wds-composer-pending-image button {
+/* Multi-photo strip — one .wds-composer-pending-image-item per selected
+   image, each individually removable, wrapping onto new rows past a few. */
+.wds-composer-pending-image { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.wds-composer-pending-image-item { position: relative; }
+.wds-composer-pending-image-item img { max-height: 100px; border-radius: 8px; display: block; }
+.wds-composer-pending-image-item button {
   position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; border-radius: 50%;
   background: var(--critical); color: #fff; border: none; cursor: pointer; font-size: 0.7rem;
 }
@@ -5335,6 +5338,23 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
 .wds-post-body a:hover { text-decoration: underline; }
 .wds-post-body.is-unsent { font-style: italic; color: var(--text-muted); }
 .wds-post-image { width: 100%; max-height: 420px; object-fit: cover; border-radius: 8px; display: block; }
+/* Multi-image collage — 2 side by side, 3 as one big + two stacked, 4+ as
+   a 2x2 grid (the last tile gets a "+N" overlay past 4 photos). */
+.wds-post-gallery { display: grid; gap: 3px; border-radius: 8px; overflow: hidden; }
+.wds-post-gallery.wds-gallery-2 { grid-template-columns: 1fr 1fr; }
+.wds-post-gallery.wds-gallery-3 { grid-template-columns: 2fr 1fr; grid-template-rows: 1fr 1fr; }
+.wds-post-gallery.wds-gallery-3 .wds-gallery-tile:first-child { grid-row: span 2; }
+.wds-post-gallery.wds-gallery-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.wds-gallery-tile { position: relative; overflow: hidden; }
+.wds-post-gallery.wds-gallery-2 .wds-gallery-tile,
+.wds-post-gallery.wds-gallery-4 .wds-gallery-tile,
+.wds-post-gallery.wds-gallery-3 .wds-gallery-tile:not(:first-child) { aspect-ratio: 1; }
+.wds-post-gallery.wds-gallery-3 .wds-gallery-tile:first-child { min-height: 100%; }
+.wds-gallery-tile img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: pointer; }
+.wds-gallery-overflow {
+  position: absolute; inset: 0; background: rgba(0,0,0,0.55); color: #fff;
+  display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 700; cursor: pointer;
+}
 .wds-post-actions { display: flex; gap: 4px; border-top: 1px solid var(--border-soft); padding-top: 8px; }
 .wds-post-action-btn {
   flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
@@ -5374,10 +5394,42 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
 .wds-reaction-summary .wds-reaction-cluster { font-size: 0.82rem; }
 .wds-post-comment-count { cursor: pointer; }
 .wds-post-comment-count:hover { text-decoration: underline; }
+.wds-post-stats-right { display: flex; gap: 10px; }
+.wds-post-share-count { cursor: pointer; }
+.wds-post-share-count:hover { text-decoration: underline; }
 .wds-reactor-item { display: flex; align-items: center; gap: 10px; padding: 7px 4px; }
 .wds-reactor-emoji { font-size: 1.15rem; width: 22px; text-align: center; flex-shrink: 0; }
 .wds-reactor-name { font-size: 0.82rem; color: var(--text-primary); font-weight: 600; cursor: pointer; }
 .wds-reactor-name:hover { text-decoration: underline; }
+.wds-reactor-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border-soft); margin-bottom: 6px; overflow-x: auto; }
+.wds-reactor-tab {
+  background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-secondary);
+  padding: 7px 10px; font-size: 0.76rem; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.wds-reactor-tab.is-active { color: var(--cyan); border-bottom-color: var(--cyan); }
+
+/* Shared-post embed — quoted card under a share's own caption. */
+.wds-shared-post-embed { border: 1px solid var(--border-soft); border-radius: 8px; padding: 10px; margin-top: 4px; }
+.wds-shared-post-embed .wds-post-head { margin-bottom: 6px; }
+.wds-shared-post-missing { color: var(--text-muted); font-size: 0.8rem; font-style: italic; padding: 10px; }
+
+/* Nested comment replies — one level deep, indented under their parent. */
+.wds-post-comment--reply { margin-left: 38px; }
+.wds-post-comment-replies { display: flex; flex-direction: column; gap: 10px; margin-left: 0; margin-top: 6px; }
+.wds-comment-view-replies {
+  background: none; border: none; color: var(--text-secondary); font-size: 0.72rem; font-weight: 700;
+  cursor: pointer; margin: 4px 0 0 38px; padding: 0;
+}
+.wds-comment-view-replies:hover { color: var(--text-primary); }
+.wds-post-reply-compose { display: flex; gap: 8px; margin: 6px 0 0 38px; }
+.wds-post-reply-compose input {
+  flex: 1; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 20px;
+  padding: 6px 12px; color: var(--text-primary); font-size: 0.76rem; font-family: var(--font-display);
+}
+.wds-post-reply-compose button {
+  background: var(--gradient-bar); border: none; border-radius: 50%; width: 26px; height: 26px;
+  color: #060a0d; font-weight: 800; cursor: pointer; flex-shrink: 0;
+}
 .wds-post-comment-compose { display: flex; gap: 8px; margin-top: 2px; }
 .wds-post-comment-compose input {
   flex: 1; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 20px;

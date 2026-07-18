@@ -35,7 +35,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.0.9">
+<link rel="stylesheet" href="style.css?v=1.1.0">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3526,7 +3526,37 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
               <strong>Reactions</strong>
               <button type="button" class="wds-icon-btn" id="btnWdsReactorsClose" aria-label="Close">✕</button>
             </div>
+            <div class="wds-reactor-tabs" id="wdsReactorTabs"></div>
             <div id="wdsReactorsList"><p class="empty-note">Loading…</p></div>
+          </div>
+        </div>
+
+        <!-- Share compose — "↧ Share" on a post opens this for an
+             optional caption before reposting to your own feed. -->
+        <div class="wds-story-overlay" id="wdsShareComposeOverlay" hidden>
+          <div class="wds-story-modal" style="max-width:380px;">
+            <div class="wds-story-modal-head">
+              <strong>Share Post</strong>
+              <button type="button" class="wds-icon-btn" id="btnWdsShareComposeClose" aria-label="Close">✕</button>
+            </div>
+            <textarea class="wds-composer-input" id="wdsShareComposeInput" rows="3" maxlength="2000" placeholder="Say something about this (optional)…" style="width:100%;box-sizing:border-box;"></textarea>
+            <div id="wdsShareComposePreview"></div>
+            <div class="wds-composer-actions">
+              <button type="button" class="wds-composer-action-btn wds-composer-post-btn" id="btnWdsShareComposeSubmit">Share Now</button>
+            </div>
+            <p class="wds-gate-error" id="wdsShareComposeError" hidden></p>
+          </div>
+        </div>
+
+        <!-- "People who shared this" — tapping a post's share count opens
+             this, listing each share as its own mini post card. -->
+        <div class="wds-story-overlay" id="wdsSharersOverlay" hidden>
+          <div class="wds-story-modal" style="max-width:420px;">
+            <div class="wds-story-modal-head">
+              <strong>Shared By</strong>
+              <button type="button" class="wds-icon-btn" id="btnWdsSharersClose" aria-label="Close">✕</button>
+            </div>
+            <div id="wdsSharersList"><p class="empty-note">Loading…</p></div>
           </div>
         </div>
 
@@ -3538,14 +3568,11 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
             <span class="wds-user-avatar" id="wdsComposerAvatar">–</span>
             <div class="wds-composer-box">
               <textarea class="wds-composer-input" id="wdsComposerInput" rows="2" maxlength="2000" placeholder="What's on your mind?"></textarea>
-              <div class="wds-composer-pending-image" id="wdsComposerPendingImage" hidden>
-                <img id="wdsComposerPendingImagePreview" alt="">
-                <button type="button" id="btnWdsComposerImageRemove" aria-label="Remove image">✕</button>
-              </div>
+              <div class="wds-composer-pending-image" id="wdsComposerPendingImage" hidden></div>
               <div id="wdsComposerLinkPreview" hidden></div>
               <div class="wds-composer-actions">
                 <button type="button" class="wds-composer-action-btn" id="btnWdsComposerAttach">📷 Photo</button>
-                <input type="file" id="wdsComposerImageInput" accept="image/*" hidden>
+                <input type="file" id="wdsComposerImageInput" accept="image/*" multiple hidden>
                 <button type="button" class="wds-composer-action-btn wds-composer-post-btn" id="btnWdsComposerPost">Post</button>
               </div>
               <p class="wds-gate-error" id="wdsComposerError" hidden></p>
@@ -3771,13 +3798,10 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
             <span class="wds-user-avatar" id="wdsProfileComposerAvatar">–</span>
             <div class="wds-composer-box">
               <textarea class="wds-composer-input" id="wdsProfileComposerInput" rows="2" maxlength="2000" placeholder="What's on your mind?"></textarea>
-              <div class="wds-composer-pending-image" id="wdsProfileComposerPendingImage" hidden>
-                <img id="wdsProfileComposerPendingImagePreview" alt="">
-                <button type="button" id="btnWdsProfileComposerImageRemove" aria-label="Remove image">✕</button>
-              </div>
+              <div class="wds-composer-pending-image" id="wdsProfileComposerPendingImage" hidden></div>
               <div class="wds-composer-actions">
                 <button type="button" class="wds-composer-action-btn" id="btnWdsProfileComposerAttach">📷 Photo</button>
-                <input type="file" id="wdsProfileComposerImageInput" accept="image/*" hidden>
+                <input type="file" id="wdsProfileComposerImageInput" accept="image/*" multiple hidden>
                 <button type="button" class="wds-composer-action-btn wds-composer-post-btn" id="btnWdsProfileComposerPost">Post</button>
               </div>
               <p class="wds-gate-error" id="wdsProfileComposerError" hidden></p>
@@ -3811,10 +3835,10 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
   </div>
 </div>
 
-<script src="config.js?v=1.0.9"></script>
+<script src="config.js?v=1.1.0"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.0.9"></script>
+<script src="app.js?v=1.1.0"></script>
 </body>
 </html>

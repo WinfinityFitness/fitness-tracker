@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.0.9';
+const APP_VERSION = 'WF_SYS_V.1.1.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -292,28 +292,39 @@ function initDesktopShell() {
   const composerAttachBtn = document.getElementById('btnWdsComposerAttach');
   const composerImageInput = document.getElementById('wdsComposerImageInput');
   const composerPendingImage = document.getElementById('wdsComposerPendingImage');
-  const composerPendingImagePreview = document.getElementById('wdsComposerPendingImagePreview');
-  const composerPendingImageRemoveBtn = document.getElementById('btnWdsComposerImageRemove');
-  let wdsPendingPostImageDataUrl = null;
+  let wdsPendingPostImageDataUrls = [];
 
+  const renderWdsPendingPostImages = () => {
+    if (!wdsPendingPostImageDataUrls.length) { composerPendingImage.hidden = true; composerPendingImage.innerHTML = ''; return; }
+    composerPendingImage.hidden = false;
+    composerPendingImage.innerHTML = wdsPendingPostImageDataUrls.map((url, i) => `
+      <div class="wds-composer-pending-image-item">
+        <img src="${url}" alt="">
+        <button type="button" data-remove-pending-image="${i}" aria-label="Remove image">✕</button>
+      </div>`).join('');
+  };
   const clearWdsPendingPostImage = () => {
-    wdsPendingPostImageDataUrl = null;
-    composerPendingImage.hidden = true;
+    wdsPendingPostImageDataUrls = [];
     composerImageInput.value = '';
+    renderWdsPendingPostImages();
   };
   composerAttachBtn.addEventListener('click', () => composerImageInput.click());
+  // Multiple photos per post — each selected file reads independently, so
+  // the preview strip fills in as each finishes rather than waiting on
+  // the slowest one.
   composerImageInput.addEventListener('change', () => {
-    const file = composerImageInput.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      wdsPendingPostImageDataUrl = reader.result;
-      composerPendingImagePreview.src = wdsPendingPostImageDataUrl;
-      composerPendingImage.hidden = false;
-    };
-    reader.readAsDataURL(file);
+    Array.from(composerImageInput.files || []).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = () => { wdsPendingPostImageDataUrls.push(reader.result); renderWdsPendingPostImages(); };
+      reader.readAsDataURL(file);
+    });
   });
-  composerPendingImageRemoveBtn.addEventListener('click', clearWdsPendingPostImage);
+  composerPendingImage.addEventListener('click', e => {
+    const removeBtn = e.target.closest('[data-remove-pending-image]');
+    if (!removeBtn) return;
+    wdsPendingPostImageDataUrls.splice(Number(removeBtn.dataset.removePendingImage), 1);
+    renderWdsPendingPostImages();
+  });
 
   // Live link preview — debounced scan for the first URL as the user
   // types, skipped for YouTube/Facebook video links (those already embed
@@ -373,12 +384,12 @@ function initDesktopShell() {
       return;
     }
     const text = composerInput.value;
-    const image = wdsPendingPostImageDataUrl;
-    if (!text.trim() && !image) return;
+    const images = wdsPendingPostImageDataUrls;
+    if (!text.trim() && !images.length) return;
     composerPostBtn.disabled = true;
     try {
       const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
-      await postFeedPost(text, image, wdsRemoteData.shareKey, codeName, wdsComposerLinkPreview);
+      await postFeedPost(text, images, wdsRemoteData.shareKey, codeName, wdsComposerLinkPreview);
       composerInput.value = '';
       clearWdsPendingPostImage();
       wdsComposerPreviewUrl = null;
@@ -492,6 +503,40 @@ function initDesktopShell() {
   document.getElementById('btnWdsReactorsClose').addEventListener('click', wdsCloseReactorsOverlay);
   document.getElementById('wdsReactorsOverlay').addEventListener('click', e => {
     if (e.target.id === 'wdsReactorsOverlay') wdsCloseReactorsOverlay();
+  });
+  document.getElementById('wdsReactorTabs').addEventListener('click', e => {
+    const tabBtn = e.target.closest('[data-reactor-filter]');
+    if (!tabBtn) return;
+    wdsReactorsFilter = tabBtn.dataset.reactorFilter;
+    wdsRenderReactorTabs();
+    wdsRenderReactorsList();
+  });
+
+  document.getElementById('btnWdsSharersClose').addEventListener('click', wdsCloseSharersOverlay);
+  document.getElementById('wdsSharersOverlay').addEventListener('click', e => {
+    if (e.target.id === 'wdsSharersOverlay') wdsCloseSharersOverlay();
+  });
+
+  document.getElementById('btnWdsShareComposeClose').addEventListener('click', wdsCloseShareComposeOverlay);
+  document.getElementById('wdsShareComposeOverlay').addEventListener('click', e => {
+    if (e.target.id === 'wdsShareComposeOverlay') wdsCloseShareComposeOverlay();
+  });
+  document.getElementById('btnWdsShareComposeSubmit').addEventListener('click', async () => {
+    if (!wdsRemoteData || !wdsRemoteData.shareKey || !wdsSharingPostId) return;
+    const btn = document.getElementById('btnWdsShareComposeSubmit');
+    const input = document.getElementById('wdsShareComposeInput');
+    const errorEl = document.getElementById('wdsShareComposeError');
+    if (errorEl) errorEl.hidden = true;
+    btn.disabled = true;
+    try {
+      const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
+      await shareFeedPost(wdsRemoteData.shareKey, codeName, wdsSharingPostId, input ? input.value : '');
+      wdsCloseShareComposeOverlay();
+      await refreshWdsFeed();
+    } catch (e) {
+      if (errorEl) { errorEl.textContent = 'Could not share: ' + ((e && e.message) || 'unknown error') + '.'; errorEl.hidden = false; }
+    }
+    finally { btn.disabled = false; }
   });
   document.getElementById('wdsStoryViewerContent').addEventListener('click', async e => {
     const btn = e.target.closest('#btnWdsUnsendStory');
@@ -624,28 +669,36 @@ function initDesktopShell() {
   const profileComposerAttachBtn = document.getElementById('btnWdsProfileComposerAttach');
   const profileComposerImageInput = document.getElementById('wdsProfileComposerImageInput');
   const profileComposerPendingImage = document.getElementById('wdsProfileComposerPendingImage');
-  const profileComposerPendingImagePreview = document.getElementById('wdsProfileComposerPendingImagePreview');
-  const profileComposerImageRemoveBtn = document.getElementById('btnWdsProfileComposerImageRemove');
   const profileComposerErrorEl = document.getElementById('wdsProfileComposerError');
-  let wdsPendingProfilePostImageDataUrl = null;
+  let wdsPendingProfilePostImageDataUrls = [];
+  const renderWdsPendingProfilePostImages = () => {
+    if (!wdsPendingProfilePostImageDataUrls.length) { profileComposerPendingImage.hidden = true; profileComposerPendingImage.innerHTML = ''; return; }
+    profileComposerPendingImage.hidden = false;
+    profileComposerPendingImage.innerHTML = wdsPendingProfilePostImageDataUrls.map((url, i) => `
+      <div class="wds-composer-pending-image-item">
+        <img src="${url}" alt="">
+        <button type="button" data-remove-pending-image="${i}" aria-label="Remove image">✕</button>
+      </div>`).join('');
+  };
   const clearWdsPendingProfilePostImage = () => {
-    wdsPendingProfilePostImageDataUrl = null;
-    profileComposerPendingImage.hidden = true;
+    wdsPendingProfilePostImageDataUrls = [];
     profileComposerImageInput.value = '';
+    renderWdsPendingProfilePostImages();
   };
   profileComposerAttachBtn.addEventListener('click', () => profileComposerImageInput.click());
   profileComposerImageInput.addEventListener('change', () => {
-    const file = profileComposerImageInput.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      wdsPendingProfilePostImageDataUrl = reader.result;
-      profileComposerPendingImagePreview.src = wdsPendingProfilePostImageDataUrl;
-      profileComposerPendingImage.hidden = false;
-    };
-    reader.readAsDataURL(file);
+    Array.from(profileComposerImageInput.files || []).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = () => { wdsPendingProfilePostImageDataUrls.push(reader.result); renderWdsPendingProfilePostImages(); };
+      reader.readAsDataURL(file);
+    });
   });
-  profileComposerImageRemoveBtn.addEventListener('click', clearWdsPendingProfilePostImage);
+  profileComposerPendingImage.addEventListener('click', e => {
+    const removeBtn = e.target.closest('[data-remove-pending-image]');
+    if (!removeBtn) return;
+    wdsPendingProfilePostImageDataUrls.splice(Number(removeBtn.dataset.removePendingImage), 1);
+    renderWdsPendingProfilePostImages();
+  });
   profileComposerPostBtn.addEventListener('click', async () => {
     if (profileComposerErrorEl) profileComposerErrorEl.hidden = true;
     if (!wdsRemoteData || !wdsRemoteData.shareKey || !sbConfigured()) {
@@ -653,13 +706,13 @@ function initDesktopShell() {
       return;
     }
     const text = profileComposerInput.value;
-    const image = wdsPendingProfilePostImageDataUrl;
-    if (!text.trim() && !image) return;
+    const images = wdsPendingProfilePostImageDataUrls;
+    if (!text.trim() && !images.length) return;
     profileComposerPostBtn.disabled = true;
     try {
       const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
       const wallOwnerShareKey = wdsViewedProfile ? wdsViewedProfile.shareKey : null;
-      await postFeedPost(text, image, wdsRemoteData.shareKey, codeName, null, wallOwnerShareKey);
+      await postFeedPost(text, images, wdsRemoteData.shareKey, codeName, null, wallOwnerShareKey);
       profileComposerInput.value = '';
       clearWdsPendingProfilePostImage();
       await refreshWdsProfilePosts();
@@ -2270,13 +2323,15 @@ async function fetchFeedPosts() {
   const posts = data || [];
   const ids = posts.map(p => p.id);
   if (ids.length) {
-    const [{ data: likes }, { data: comments }] = await Promise.all([
+    const [{ data: likes }, { data: comments }, { data: shares }] = await Promise.all([
       sb.from('feed_post_likes').select('post_id, share_key, emoji, code_name').in('post_id', ids),
-      sb.from('feed_post_comments').select('id, post_id, share_key, code_name, message, deleted, created_at').in('post_id', ids).order('created_at', { ascending: true }),
+      sb.from('feed_post_comments').select('id, post_id, parent_comment_id, share_key, code_name, message, deleted, created_at').in('post_id', ids).order('created_at', { ascending: true }),
+      sb.from('feed_posts').select('shared_post_id').in('shared_post_id', ids).eq('deleted', false),
     ]);
-    const likesByPost = {}, commentsByPost = {};
+    const likesByPost = {}, commentsByPost = {}, shareCountByPost = {};
     (likes || []).forEach(l => { (likesByPost[l.post_id] = likesByPost[l.post_id] || []).push(l); });
     (comments || []).forEach(c => { (commentsByPost[c.post_id] = commentsByPost[c.post_id] || []).push(c); });
+    (shares || []).forEach(s => { shareCountByPost[s.shared_post_id] = (shareCountByPost[s.shared_post_id] || 0) + 1; });
 
     const commentIds = (comments || []).map(c => c.id);
     let commentLikesByComment = {};
@@ -2288,31 +2343,60 @@ async function fetchFeedPosts() {
     posts.forEach(p => {
       p.likes = likesByPost[p.id] || [];
       p.comments = (commentsByPost[p.id] || []).map(c => Object.assign({}, c, { likes: commentLikesByComment[c.id] || [] }));
+      p.shareCount = shareCountByPost[p.id] || 0;
     });
+
+    await wdsAttachSharedOriginals(posts);
   }
   return posts;
 }
 
+// A shared post (p.shared_post_id set) embeds the original post it points
+// to — sharing is restricted to public posts (see share_feed_post), so a
+// plain select covers every original a viewer could legally see here.
+async function wdsAttachSharedOriginals(posts) {
+  const originalIds = Array.from(new Set(posts.filter(p => p.shared_post_id).map(p => p.shared_post_id)));
+  if (!originalIds.length) return;
+  const { data } = await sb.from('feed_posts')
+    .select('id, share_key, code_name, message, image_url, image_urls, visibility, deleted, created_at')
+    .in('id', originalIds);
+  const byId = {};
+  (data || []).forEach(o => { byId[o.id] = o; });
+  posts.forEach(p => { if (p.shared_post_id) p.sharedPost = byId[p.shared_post_id] || null; });
+}
+
+// imageDataUrl accepts either a single data URL (legacy single-image
+// callers — wall posts, stories elsewhere in this file) or an array of
+// them (the main/profile composers' multi-photo picker). More than one
+// upload goes into the new image_urls array column; exactly one still
+// goes into the original image_url column so every existing read path
+// (wall posts, link previews, older posts already in the table) keeps
+// working unchanged.
 async function postFeedPost(text, imageDataUrl, shareKey, codeName, linkPreview, wallOwnerShareKey) {
   const trimmed = text.trim().slice(0, 2000);
-  if (!trimmed && !imageDataUrl) return;
-  let imageUrl = null;
-  if (imageDataUrl) imageUrl = await uploadChatImage(imageDataUrl, shareKey);
+  const images = Array.isArray(imageDataUrl) ? imageDataUrl.filter(Boolean) : (imageDataUrl ? [imageDataUrl] : []);
+  if (!trimmed && !images.length) return;
+  const uploadedUrls = [];
+  for (const dataUrl of images) uploadedUrls.push(await uploadChatImage(dataUrl, shareKey));
+  const singleImageUrl = uploadedUrls.length === 1 ? uploadedUrls[0] : null;
+  const multiImageUrls = uploadedUrls.length > 1 ? uploadedUrls : null;
   // A "wall post" — posted on someone else's profile, not your own — can't
   // be a plain insert: whether it's even allowed depends on that operator's
   // wall_post_permission, which (like feed visibility) only a server-side
   // RPC can check. Posting on your own wall stays a direct insert exactly
-  // as before.
+  // as before. Wall posts stay single-image only — that composer never
+  // offers a multi-photo picker.
   if (wallOwnerShareKey && wallOwnerShareKey !== shareKey) {
     const { error } = await sb.rpc('create_wall_post', {
       p_poster_share_key: shareKey, p_owner_share_key: wallOwnerShareKey, p_code_name: codeName,
-      p_message: trimmed, p_image_url: imageUrl, p_link_preview: linkPreview || null,
+      p_message: trimmed, p_image_url: singleImageUrl || (uploadedUrls[0] || null), p_link_preview: linkPreview || null,
     });
     if (error) throw error;
     return;
   }
   const { error } = await sb.from('feed_posts').insert({
-    share_key: shareKey, code_name: codeName, message: trimmed, image_url: imageUrl, link_preview: linkPreview || null,
+    share_key: shareKey, code_name: codeName, message: trimmed,
+    image_url: singleImageUrl, image_urls: multiImageUrls, link_preview: linkPreview || null,
   });
   if (error) throw error;
 }
@@ -2358,6 +2442,46 @@ function wdsLinkifyText(text) {
   return result;
 }
 
+// Facebook-style photo collage for a multi-image post: 2 side by side, 3
+// as one big + two stacked, 4+ as a 2x2 grid with a "+N" overlay on the
+// last tile once there are more than can be shown. A single image never
+// reaches here — renderFeedPosts falls back to the plain wds-post-image
+// element for that, unchanged from before multi-image posts existed.
+function wdsGalleryHtml(urls) {
+  if (!urls || urls.length < 2) return '';
+  const shown = urls.slice(0, 4);
+  const overflow = urls.length - shown.length;
+  const sizeClass = shown.length === 2 ? 'wds-gallery-2' : shown.length === 3 ? 'wds-gallery-3' : 'wds-gallery-4';
+  const tiles = shown.map((url, i) => {
+    const isOverflowTile = i === shown.length - 1 && overflow > 0;
+    return `<div class="wds-gallery-tile">
+      <img src="${escapeHtml(url)}" alt="" data-lightbox="${escapeHtml(url)}">
+      ${isOverflowTile ? `<span class="wds-gallery-overflow" data-lightbox="${escapeHtml(url)}">+${overflow}</span>` : ''}
+    </div>`;
+  }).join('');
+  return `<div class="wds-post-gallery ${sizeClass}">${tiles}</div>`;
+}
+
+// A share (p.shared_post_id set) is its own feed_posts row — its own
+// message is the sharer's caption, rendered normally by the caller; this
+// just builds the quoted card underneath showing who/what was shared.
+// wdsAttachSharedOriginals populates p.sharedPost; a null here means the
+// original was removed since this share was made.
+function wdsSharedPostEmbedHtml(original) {
+  if (!original) return '<div class="wds-shared-post-embed wds-shared-post-missing">This post is no longer available.</div>';
+  const galleryHtml = (original.image_urls && original.image_urls.length > 1) ? wdsGalleryHtml(original.image_urls) : '';
+  const imageHtml = (!galleryHtml && original.image_url)
+    ? `<img class="wds-post-image" src="${escapeHtml(original.image_url)}" alt="" data-lightbox="${escapeHtml(original.image_url)}">` : '';
+  return `<div class="wds-shared-post-embed">
+    <div class="wds-post-head">
+      <span class="wds-post-avatar" data-view-profile="${escapeHtml(original.share_key)}">${escapeHtml((original.code_name || '?').charAt(0).toUpperCase())}</span>
+      <div class="wds-post-meta"><strong data-view-profile="${escapeHtml(original.share_key)}">${escapeHtml(original.code_name || 'Anonymous')}</strong><span>${wdsRelativeTime(original.created_at)}</span></div>
+    </div>
+    ${original.message ? `<p class="wds-post-body">${wdsLinkifyText(original.message)}</p>` : ''}
+    ${galleryHtml}${imageHtml}
+  </div>`;
+}
+
 // Shared by the composer's live preview and the rendered post — a website
 // preview is a clickable card, an image/video URL is rendered as plain
 // media (matches how an uploaded photo already looks), per "full preview
@@ -2388,11 +2512,22 @@ async function toggleFeedCommentLike(commentId, shareKey, emoji, codeName) {
   return data;
 }
 
-async function postFeedComment(postId, text, shareKey, codeName) {
+async function postFeedComment(postId, text, shareKey, codeName, parentCommentId) {
   const trimmed = text.trim().slice(0, 500);
   if (!trimmed) return;
-  const { error } = await sb.from('feed_post_comments').insert({ post_id: postId, share_key: shareKey, code_name: codeName, message: trimmed });
+  const { error } = await sb.from('feed_post_comments').insert({
+    post_id: postId, share_key: shareKey, code_name: codeName, message: trimmed,
+    parent_comment_id: parentCommentId || null,
+  });
   if (error) throw error;
+}
+
+async function shareFeedPost(shareKey, codeName, originalPostId, message) {
+  const { data, error } = await sb.rpc('share_feed_post', {
+    p_share_key: shareKey, p_code_name: codeName, p_original_post_id: originalPostId, p_message: message || null,
+  });
+  if (error) throw error;
+  return data;
 }
 
 async function unsendFeedPost(postId, shareKey) {
@@ -2409,6 +2544,9 @@ async function unsendFeedComment(commentId, shareKey) {
 // innerHTML rebuild) unless we remember which posts had them open —
 // re-applied in renderFeedPosts below.
 const wdsFeedExpandedComments = new Set();
+// Same idea, one level down — which top-level comments have their reply
+// thread expanded.
+const wdsFeedExpandedReplies = new Set();
 
 async function refreshWdsFeed() {
   const listEl = document.getElementById('wdsFeedList');
@@ -2454,23 +2592,46 @@ function wdsReactionSummaryHtml(likes, type, id) {
   return `<div class="wds-reaction-summary" data-action="view-reactors" data-reactor-type="${type}" data-reactor-id="${id}">${top ? `<span class="wds-reaction-cluster">${top}</span>` : ''}<span>${total}</span></div>`;
 }
 
+let wdsReactorsData = [];
+let wdsReactorsFilter = 'all';
+function wdsRenderReactorTabs() {
+  const tabsEl = document.getElementById('wdsReactorTabs');
+  if (!tabsEl) return;
+  const counts = aggregateReactions(wdsReactorsData);
+  const emojis = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+  if (emojis.length <= 1) { tabsEl.innerHTML = ''; return; }
+  const allTab = `<button type="button" class="wds-reactor-tab${wdsReactorsFilter === 'all' ? ' is-active' : ''}" data-reactor-filter="all">All ${wdsReactorsData.length}</button>`;
+  const emojiTabs = emojis.map(e => `<button type="button" class="wds-reactor-tab${wdsReactorsFilter === e ? ' is-active' : ''}" data-reactor-filter="${escapeHtml(e)}">${escapeHtml(e)} ${counts[e]}</button>`).join('');
+  tabsEl.innerHTML = allTab + emojiTabs;
+}
+function wdsRenderReactorsList() {
+  const listEl = document.getElementById('wdsReactorsList');
+  if (!listEl) return;
+  const rows = wdsReactorsFilter === 'all' ? wdsReactorsData : wdsReactorsData.filter(r => r.emoji === wdsReactorsFilter);
+  if (!rows.length) { listEl.innerHTML = '<p class="empty-note">No reactions yet.</p>'; return; }
+  listEl.innerHTML = rows.map(r => `
+    <div class="wds-reactor-item">
+      <span class="wds-reactor-emoji">${escapeHtml(r.emoji || '👍')}</span>
+      <span class="wds-reactor-name" data-view-profile="${escapeHtml(r.share_key)}">${escapeHtml(r.code_name || 'Anonymous')}</span>
+    </div>`).join('');
+}
 async function wdsShowReactors(type, id) {
   const overlay = document.getElementById('wdsReactorsOverlay');
   const listEl = document.getElementById('wdsReactorsList');
   if (!overlay || !listEl) return;
   overlay.hidden = false;
+  wdsReactorsFilter = 'all';
+  wdsReactorsData = [];
+  document.getElementById('wdsReactorTabs').innerHTML = '';
   listEl.innerHTML = '<p class="empty-note">Loading…</p>';
   try {
     const table = type === 'comment' ? 'feed_comment_likes' : 'feed_post_likes';
     const column = type === 'comment' ? 'comment_id' : 'post_id';
     const { data, error } = await sb.from(table).select(`emoji, code_name, share_key`).eq(column, id);
     if (error) throw error;
-    if (!data || !data.length) { listEl.innerHTML = '<p class="empty-note">No reactions yet.</p>'; return; }
-    listEl.innerHTML = data.map(r => `
-      <div class="wds-reactor-item">
-        <span class="wds-reactor-emoji">${escapeHtml(r.emoji || '👍')}</span>
-        <span class="wds-reactor-name" data-view-profile="${escapeHtml(r.share_key)}">${escapeHtml(r.code_name || 'Anonymous')}</span>
-      </div>`).join('');
+    wdsReactorsData = data || [];
+    wdsRenderReactorTabs();
+    wdsRenderReactorsList();
   } catch (e) {
     listEl.innerHTML = '<p class="empty-note">Could not load reactions.</p>';
   }
@@ -2478,6 +2639,80 @@ async function wdsShowReactors(type, id) {
 function wdsCloseReactorsOverlay() {
   const overlay = document.getElementById('wdsReactorsOverlay');
   if (overlay) overlay.hidden = true;
+}
+
+// Sharing — reposts to the sharer's own feed (share_feed_post), with an
+// optional caption. wdsSharingPostId tracks which post the currently-open
+// compose overlay targets — set on open, read on submit.
+let wdsSharingPostId = null;
+function wdsOpenShareCompose(postId, previewHtml) {
+  wdsSharingPostId = postId;
+  const overlay = document.getElementById('wdsShareComposeOverlay');
+  const input = document.getElementById('wdsShareComposeInput');
+  const preview = document.getElementById('wdsShareComposePreview');
+  const errorEl = document.getElementById('wdsShareComposeError');
+  if (!overlay) return;
+  if (input) input.value = '';
+  if (preview) preview.innerHTML = previewHtml || '';
+  if (errorEl) errorEl.hidden = true;
+  overlay.hidden = false;
+}
+function wdsCloseShareComposeOverlay() {
+  const overlay = document.getElementById('wdsShareComposeOverlay');
+  if (overlay) overlay.hidden = true;
+  wdsSharingPostId = null;
+}
+
+async function wdsShowSharers(postId) {
+  const overlay = document.getElementById('wdsSharersOverlay');
+  const listEl = document.getElementById('wdsSharersList');
+  if (!overlay || !listEl) return;
+  overlay.hidden = false;
+  listEl.innerHTML = '<p class="empty-note">Loading…</p>';
+  try {
+    const { data, error } = await sb.from('feed_posts')
+      .select('id, share_key, code_name, message, created_at')
+      .eq('shared_post_id', postId).eq('deleted', false)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    if (!data || !data.length) { listEl.innerHTML = '<p class="empty-note">No one has shared this yet.</p>'; return; }
+    listEl.innerHTML = data.map(s => `
+      <div class="wds-reactor-item">
+        <span class="wds-post-avatar" data-view-profile="${escapeHtml(s.share_key)}" style="width:32px;height:32px;font-size:0.8rem;">${escapeHtml((s.code_name || '?').charAt(0).toUpperCase())}</span>
+        <div style="flex:1;min-width:0;">
+          <span class="wds-reactor-name" data-view-profile="${escapeHtml(s.share_key)}">${escapeHtml(s.code_name || 'Anonymous')}</span>
+          ${s.message ? `<p class="wds-post-body" style="margin:2px 0 0;">${escapeHtml(s.message)}</p>` : ''}
+        </div>
+      </div>`).join('');
+  } catch (e) {
+    listEl.innerHTML = '<p class="empty-note">Could not load shares.</p>';
+  }
+}
+function wdsCloseSharersOverlay() {
+  const overlay = document.getElementById('wdsSharersOverlay');
+  if (overlay) overlay.hidden = true;
+}
+
+// A single comment row — shared by top-level comments and their replies.
+// Replies skip the Reply action (this app nests one level deep, same as
+// most real platforms: replying to a reply just adds another flat reply
+// under the same parent instead of an ever-deepening thread).
+function wdsCommentHtml(c, myShareKey, isReply) {
+  const canRemove = !!myShareKey && c.share_key === myShareKey;
+  const cMyLike = (c.likes || []).find(l => l.share_key === myShareKey);
+  return `<div class="wds-post-comment${isReply ? ' wds-post-comment--reply' : ''}" data-comment-id="${c.id}">
+    <span class="wds-post-comment-avatar" data-view-profile="${escapeHtml(c.share_key)}">${escapeHtml((c.code_name || '?').charAt(0).toUpperCase())}</span>
+    <div class="wds-post-comment-body">
+      <div class="wds-post-comment-bubble"><strong data-view-profile="${escapeHtml(c.share_key)}">${escapeHtml(c.code_name || 'Anonymous')}</strong><span>${escapeHtml(c.message)}</span></div>
+      <div class="wds-post-comment-actions">
+        <button type="button" class="wds-comment-action-btn${cMyLike ? ' is-liked' : ''}" data-action="like-comment" data-current-emoji="${cMyLike ? cMyLike.emoji : ''}">${wdsReactionButtonHtml(c.likes, myShareKey)}</button>
+        ${wdsReactionSummaryHtml(c.likes, 'comment', c.id)}
+        <span>${wdsRelativeTime(c.created_at)}</span>
+        ${!isReply ? `<button type="button" class="wds-comment-action-btn" data-action="reply-comment" data-comment-id="${c.id}">Reply</button>` : ''}
+        ${canRemove ? `<button type="button" class="wds-comment-action-btn" data-action="unsend-comment">Remove</button>` : ''}
+      </div>
+    </div>
+  </div>`;
 }
 
 // Removed posts never reach here at all — fetchFeedPosts() filters
@@ -2490,44 +2725,53 @@ function renderFeedPosts(posts) {
   const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
   list.innerHTML = posts.map(p => {
     const isOwn = !!myShareKey && p.share_key === myShareKey;
+    const isShare = !!p.shared_post_id;
+    const canShare = !isShare ? (p.visibility === 'public' || !p.visibility) : (p.sharedPost && (p.sharedPost.visibility === 'public' || !p.sharedPost.visibility));
     const myLike = (p.likes || []).find(l => l.share_key === myShareKey);
-    const comments = (p.comments || []).filter(c => !c.deleted);
-    const imageHtml = p.image_url ? `<img class="wds-post-image" src="${p.image_url}" alt="" data-lightbox="${escapeHtml(p.image_url)}">` : '';
-    const videoHtml = wdsExtractVideoEmbed(p.message);
-    const linkPreviewHtml = videoHtml ? '' : wdsBuildLinkPreviewHtml(p.link_preview);
-    const bodyHtml = `${p.message ? `<p class="wds-post-body">${wdsLinkifyText(p.message)}</p>` : ''}${imageHtml}${videoHtml}${linkPreviewHtml}`;
+    const allComments = (p.comments || []).filter(c => !c.deleted);
+    const topComments = allComments.filter(c => !c.parent_comment_id);
+    const repliesByParent = {};
+    allComments.filter(c => c.parent_comment_id).forEach(c => { (repliesByParent[c.parent_comment_id] = repliesByParent[c.parent_comment_id] || []).push(c); });
+    const galleryHtml = (!isShare && p.image_urls && p.image_urls.length > 1) ? wdsGalleryHtml(p.image_urls) : '';
+    const imageHtml = (!isShare && !galleryHtml && p.image_url) ? `<img class="wds-post-image" src="${escapeHtml(p.image_url)}" alt="" data-lightbox="${escapeHtml(p.image_url)}">` : '';
+    const videoHtml = isShare ? '' : wdsExtractVideoEmbed(p.message);
+    const linkPreviewHtml = (isShare || videoHtml) ? '' : wdsBuildLinkPreviewHtml(p.link_preview);
+    const sharedEmbedHtml = isShare ? wdsSharedPostEmbedHtml(p.sharedPost) : '';
+    const bodyHtml = `${p.message ? `<p class="wds-post-body">${wdsLinkifyText(p.message)}</p>` : ''}${galleryHtml}${imageHtml}${videoHtml}${linkPreviewHtml}${sharedEmbedHtml}`;
     const expanded = wdsFeedExpandedComments.has(p.id);
-    const commentsHtml = comments.map(c => {
-      const canRemove = !!myShareKey && c.share_key === myShareKey;
-      const cMyLike = (c.likes || []).find(l => l.share_key === myShareKey);
-      return `<div class="wds-post-comment" data-comment-id="${c.id}">
-        <span class="wds-post-comment-avatar" data-view-profile="${escapeHtml(c.share_key)}">${escapeHtml((c.code_name || '?').charAt(0).toUpperCase())}</span>
-        <div class="wds-post-comment-body">
-          <div class="wds-post-comment-bubble"><strong data-view-profile="${escapeHtml(c.share_key)}">${escapeHtml(c.code_name || 'Anonymous')}</strong><span>${escapeHtml(c.message)}</span></div>
-          <div class="wds-post-comment-actions">
-            <button type="button" class="wds-comment-action-btn${cMyLike ? ' is-liked' : ''}" data-action="like-comment" data-current-emoji="${cMyLike ? cMyLike.emoji : ''}">${wdsReactionButtonHtml(c.likes, myShareKey)}</button>
-            ${wdsReactionSummaryHtml(c.likes, 'comment', c.id)}
-            <span>${wdsRelativeTime(c.created_at)}</span>
-            ${canRemove ? `<button type="button" class="wds-comment-action-btn" data-action="unsend-comment">Remove</button>` : ''}
-          </div>
-        </div>
-      </div>`;
+    const commentsHtml = topComments.map(c => {
+      const replies = repliesByParent[c.id] || [];
+      const repliesExpanded = wdsFeedExpandedReplies.has(c.id);
+      return `${wdsCommentHtml(c, myShareKey, false)}
+        ${replies.length ? `
+          <button type="button" class="wds-comment-view-replies" data-action="toggle-replies" data-comment-id="${c.id}">${repliesExpanded ? 'Hide replies' : `View ${replies.length} repl${replies.length === 1 ? 'y' : 'ies'}`}</button>
+          <div class="wds-post-comment-replies" ${repliesExpanded ? '' : 'hidden'}>
+            ${replies.map(r => wdsCommentHtml(r, myShareKey, true)).join('')}
+          </div>` : ''}
+        <div class="wds-post-reply-compose" data-parent-comment-id="${c.id}" hidden>
+          <input type="text" placeholder="Write a reply…" maxlength="500">
+          <button type="button" data-action="send-reply" data-parent-comment-id="${c.id}">➤</button>
+        </div>`;
     }).join('');
     return `
       <div class="wds-card wds-feed-post" data-post-id="${p.id}">
         <div class="wds-post-head">
           <span class="wds-post-avatar" data-view-profile="${escapeHtml(p.share_key)}">${escapeHtml((p.code_name || '?').charAt(0).toUpperCase())}</span>
-          <div class="wds-post-meta"><strong data-view-profile="${escapeHtml(p.share_key)}">${escapeHtml(p.code_name || 'Anonymous')}</strong><span>${wdsRelativeTime(p.created_at)}</span></div>
+          <div class="wds-post-meta"><strong data-view-profile="${escapeHtml(p.share_key)}">${escapeHtml(p.code_name || 'Anonymous')}</strong><span>${isShare ? 'shared a post • ' : ''}${wdsRelativeTime(p.created_at)}</span></div>
           ${isOwn ? `<button type="button" class="wds-post-unsend-btn" data-action="unsend-post">Remove</button>` : ''}
         </div>
         ${bodyHtml}
         <div class="wds-post-stats-row">
           ${wdsReactionSummaryHtml(p.likes, 'post', p.id)}
-          ${comments.length ? `<span class="wds-post-comment-count" data-action="toggle-comments">${comments.length} comment${comments.length === 1 ? '' : 's'}</span>` : ''}
+          <span class="wds-post-stats-right">
+            ${topComments.length ? `<span class="wds-post-comment-count" data-action="toggle-comments">${allComments.length} comment${allComments.length === 1 ? '' : 's'}</span>` : ''}
+            ${p.shareCount ? `<span class="wds-post-share-count" data-action="view-sharers" data-post-id="${p.id}">${p.shareCount} share${p.shareCount === 1 ? '' : 's'}</span>` : ''}
+          </span>
         </div>
         <div class="wds-post-actions">
           <button type="button" class="wds-post-action-btn${myLike ? ' is-liked' : ''}" data-action="like" data-current-emoji="${myLike ? myLike.emoji : ''}">${wdsReactionButtonHtml(p.likes, myShareKey)}</button>
           <button type="button" class="wds-post-action-btn" data-action="toggle-comments">💬 Comments</button>
+          ${canShare ? `<button type="button" class="wds-post-action-btn" data-action="open-share" data-post-id="${isShare ? p.shared_post_id : p.id}">↗ Share</button>` : ''}
         </div>
         <div class="wds-post-comments" ${expanded ? '' : 'hidden'}>
           ${commentsHtml}
@@ -2569,6 +2813,7 @@ async function fetchFeedPostsByUser(shareKey) {
     (likes || []).forEach(l => { (likesByPost[l.post_id] = likesByPost[l.post_id] || []).push(l); });
     (comments || []).forEach(c => { commentCountByPost[c.post_id] = (commentCountByPost[c.post_id] || 0) + 1; });
     posts.forEach(p => { p.likes = likesByPost[p.id] || []; p.commentCount = commentCountByPost[p.id] || 0; });
+    await wdsAttachSharedOriginals(posts);
   }
   return posts;
 }
@@ -2598,9 +2843,10 @@ function renderWdsProfilePosts() {
   if (wdsProfilePostsView === 'grid') {
     list.className = 'wds-profile-posts-grid';
     list.innerHTML = posts.map(p => {
-      const thumb = p.image_url
-        ? `<img src="${escapeHtml(p.image_url)}" alt="">`
-        : `<div class="wds-profile-grid-text">${escapeHtml((p.message || '').slice(0, 80))}</div>`;
+      const firstImage = (p.image_urls && p.image_urls[0]) || p.image_url || (p.sharedPost && (p.image_urls ? null : p.sharedPost.image_url));
+      const thumb = firstImage
+        ? `<img src="${escapeHtml(firstImage)}" alt="">`
+        : `<div class="wds-profile-grid-text">${escapeHtml((p.message || (p.sharedPost && p.sharedPost.message) || '').slice(0, 80))}</div>`;
       return `<div class="wds-profile-grid-tile" data-post-id="${p.id}">
         ${thumb}
         ${wdsProfileManageMode ? `<button type="button" class="wds-post-unsend-btn" data-action="remove-post" data-post-id="${p.id}" style="position:absolute;top:6px;right:6px;">Remove</button>` : ''}
@@ -2611,14 +2857,17 @@ function renderWdsProfilePosts() {
 
   list.className = 'wds-feed-list';
   list.innerHTML = posts.map(p => {
-    const imageHtml = p.image_url ? `<img class="wds-post-image" src="${escapeHtml(p.image_url)}" alt="" data-lightbox="${escapeHtml(p.image_url)}">` : '';
-    const videoHtml = wdsExtractVideoEmbed(p.message);
-    const linkPreviewHtml = videoHtml ? '' : wdsBuildLinkPreviewHtml(p.link_preview);
+    const isShare = !!p.shared_post_id;
+    const galleryHtml = (!isShare && p.image_urls && p.image_urls.length > 1) ? wdsGalleryHtml(p.image_urls) : '';
+    const imageHtml = (!isShare && !galleryHtml && p.image_url) ? `<img class="wds-post-image" src="${escapeHtml(p.image_url)}" alt="" data-lightbox="${escapeHtml(p.image_url)}">` : '';
+    const videoHtml = isShare ? '' : wdsExtractVideoEmbed(p.message);
+    const linkPreviewHtml = (isShare || videoHtml) ? '' : wdsBuildLinkPreviewHtml(p.link_preview);
+    const sharedEmbedHtml = isShare ? wdsSharedPostEmbedHtml(p.sharedPost) : '';
     return `
       <div class="wds-card wds-feed-post" data-post-id="${p.id}">
         <div class="wds-post-head">
           <span class="wds-post-avatar" data-view-profile="${escapeHtml(p.share_key)}">${escapeHtml((p.code_name || '?').charAt(0).toUpperCase())}</span>
-          <div class="wds-post-meta"><strong data-view-profile="${escapeHtml(p.share_key)}">${escapeHtml(p.code_name || 'Anonymous')}</strong><span>${wdsRelativeTime(p.created_at)}</span></div>
+          <div class="wds-post-meta"><strong data-view-profile="${escapeHtml(p.share_key)}">${escapeHtml(p.code_name || 'Anonymous')}</strong><span>${isShare ? 'shared a post • ' : ''}${wdsRelativeTime(p.created_at)}</span></div>
           ${wdsProfileManageMode ? `
             <select class="wds-post-visibility-select" data-action="set-visibility" data-post-id="${p.id}">
               <option value="public"${p.visibility === 'public' || !p.visibility ? ' selected' : ''}>🌐 Public</option>
@@ -2628,7 +2877,7 @@ function renderWdsProfilePosts() {
             <button type="button" class="wds-post-unsend-btn" data-action="remove-post" data-post-id="${p.id}">Remove</button>` : ''}
         </div>
         ${p.message ? `<p class="wds-post-body">${wdsLinkifyText(p.message)}</p>` : ''}
-        ${imageHtml}${videoHtml}${linkPreviewHtml}
+        ${galleryHtml}${imageHtml}${videoHtml}${linkPreviewHtml}${sharedEmbedHtml}
         <div class="wds-post-stats-row">
           ${wdsReactionSummaryHtml(p.likes, 'post', p.id)}
           ${p.commentCount ? `<span class="wds-post-comment-count">${p.commentCount} comment${p.commentCount === 1 ? '' : 's'}</span>` : ''}
@@ -2986,11 +3235,68 @@ function initWdsFeed() {
       } catch (err) { /* best effort */ }
       return;
     }
+    const replyBtn = e.target.closest('[data-action="reply-comment"]');
+    if (replyBtn) {
+      const box = card.querySelector(`.wds-post-reply-compose[data-parent-comment-id="${replyBtn.dataset.commentId}"]`);
+      if (box) { box.hidden = !box.hidden; if (!box.hidden) box.querySelector('input').focus(); }
+      return;
+    }
+    const toggleRepliesBtn = e.target.closest('[data-action="toggle-replies"]');
+    if (toggleRepliesBtn) {
+      const commentId = Number(toggleRepliesBtn.dataset.commentId);
+      if (wdsFeedExpandedReplies.has(commentId)) wdsFeedExpandedReplies.delete(commentId);
+      else wdsFeedExpandedReplies.add(commentId);
+      await refreshWdsFeed();
+      return;
+    }
+    const sendReplyBtn = e.target.closest('[data-action="send-reply"]');
+    if (sendReplyBtn) {
+      const parentId = Number(sendReplyBtn.dataset.parentCommentId);
+      const box = card.querySelector(`.wds-post-reply-compose[data-parent-comment-id="${parentId}"]`);
+      const input = box ? box.querySelector('input') : null;
+      if (!input || !input.value.trim() || !shareKey) return;
+      const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
+      try {
+        await postFeedComment(postId, input.value, shareKey, codeName, parentId);
+        input.value = '';
+        wdsFeedExpandedComments.add(postId);
+        wdsFeedExpandedReplies.add(parentId);
+        await refreshWdsFeed();
+      } catch (err) { /* best effort */ }
+      return;
+    }
+    const shareBtn = e.target.closest('[data-action="open-share"]');
+    if (shareBtn) {
+      // If this card is itself a share, its already-rendered embed IS the
+      // true original (Share always targets the original, never a share
+      // of a share) — reuse it instead of building a fresh preview from
+      // this card's own head/body, which would show the resharer's own
+      // caption instead of the thing actually being shared.
+      const existingEmbed = card.querySelector('.wds-shared-post-embed');
+      let previewHtml;
+      if (existingEmbed) {
+        previewHtml = existingEmbed.outerHTML;
+      } else {
+        const headHtml = card.querySelector('.wds-post-head') ? card.querySelector('.wds-post-head').outerHTML : '';
+        const bodyEl = card.querySelector('.wds-post-body');
+        const mediaEl = card.querySelector('.wds-post-image, .wds-post-gallery');
+        previewHtml = `<div class="wds-shared-post-embed">${headHtml}${bodyEl ? bodyEl.outerHTML : ''}${mediaEl ? mediaEl.outerHTML : ''}</div>`;
+      }
+      wdsOpenShareCompose(Number(shareBtn.dataset.postId), previewHtml);
+      return;
+    }
+    const sharersEl = e.target.closest('[data-action="view-sharers"]');
+    if (sharersEl) { wdsShowSharers(Number(sharersEl.dataset.postId)); return; }
   });
 
   list.addEventListener('keydown', e => {
     if (e.key === 'Enter' && e.target.matches('.wds-post-comment-compose input')) {
       const btn = e.target.closest('.wds-post-comments').querySelector('[data-action="send-comment"]');
+      if (btn) btn.click();
+    }
+    if (e.key === 'Enter' && e.target.matches('.wds-post-reply-compose input')) {
+      const box = e.target.closest('.wds-post-reply-compose');
+      const btn = box ? box.querySelector('[data-action="send-reply"]') : null;
       if (btn) btn.click();
     }
   });
