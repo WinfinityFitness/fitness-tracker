@@ -5187,6 +5187,9 @@ html.wf-desktop-shell body { overflow-x: auto; }
 }
 .wds-story-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .wds-story-modal-head strong { font-size: 0.9rem; color: var(--text-primary); }
+/* Keeps the centered title visually centered against the close button on
+   the opposite side (same width as .wds-icon-btn). */
+.wds-story-modal-head-spacer { width: 30px; height: 1px; flex-shrink: 0; }
 
 /* Story create flow — a full phone-portrait canvas, matching the native
    "Create story" pattern: widget picker up top, canvas fills the middle,
@@ -5204,30 +5207,96 @@ html.wf-desktop-shell body { overflow-x: auto; }
   border-radius: 12px; border: 1px solid var(--border-soft); background: var(--surface-2);
   color: var(--text-secondary); font-size: 0.72rem; font-weight: 600; cursor: pointer;
 }
-.wds-story-widget-btn.is-active { border-color: var(--accent); color: var(--text-primary); background: var(--surface-3, var(--surface-2)); }
 .wds-story-widget-icon { font-size: 1.15rem; }
+
+/* Background/tint swatch row — fills the whole canvas when there's no
+   photo yet; becomes a color *tint* blended over the photo once one is
+   chosen (the first, crossed-out swatch clears the tint). Same row for
+   font choices and text colors below the canvas. */
+.wds-story-bg-row, .wds-story-font-row, .wds-story-color-row {
+  display: flex; gap: 8px; overflow-x: auto; padding: 2px; flex-shrink: 0; scrollbar-width: none;
+}
+.wds-story-bg-row::-webkit-scrollbar, .wds-story-font-row::-webkit-scrollbar, .wds-story-color-row::-webkit-scrollbar { display: none; }
+.wds-story-bg-swatch {
+  flex: none; width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--border-soft); cursor: pointer; padding: 0;
+}
+.wds-story-bg-swatch.is-active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 3px var(--accent); }
+.wds-story-bg-swatch--none {
+  background: var(--surface-2) !important; display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); font-size: 0.7rem; line-height: 1;
+}
+.wds-story-photo-zoom-row { display: flex; align-items: center; gap: 8px; flex-shrink: 0; font-size: 0.8rem; }
+.wds-story-photo-zoom-row input[type="range"] { flex: 1; }
+
 .wds-story-create-canvas {
   flex: 1; position: relative; border-radius: 14px; overflow: hidden; background: var(--surface-2);
   border: 1px solid var(--border-soft); display: flex; align-items: center; justify-content: center;
 }
-.wds-story-create-canvas .empty-note { padding: 0 24px; text-align: center; }
-.wds-story-create-canvas--text { background: linear-gradient(135deg, rgba(128,105,214,0.9), rgba(51,200,204,0.75)); }
-.wds-story-create-canvas--text #wdsStoryComposerInput {
-  position: static; width: 100%; height: 100%; background: transparent; border: none; box-shadow: none;
-  font-size: 1.3rem; font-weight: 600; color: #fff; text-align: center; padding: 24px; resize: none;
+.wds-story-create-canvas .empty-note { padding: 0 24px; text-align: center; position: relative; z-index: 0; }
+
+/* Photo layer — pannable/zoomable: the image sits centered at 1x scale
+   (covering the canvas like object-fit:cover) then gets extra
+   translate+scale on top from drag/zoom-slider input, applied in
+   wdsApplyPhotoTransform (app.js). */
+.wds-story-photo-layer { position: absolute; inset: 0; overflow: hidden; touch-action: none; cursor: grab; z-index: 0; }
+.wds-story-photo-layer:active { cursor: grabbing; }
+.wds-story-photo-layer img {
+  position: absolute; top: 50%; left: 50%; width: 100%; height: 100%; object-fit: cover;
+  transform: translate(-50%, -50%); pointer-events: none;
 }
-.wds-story-create-canvas--photo #wdsStoryComposerInput {
-  position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(to top, rgba(0,0,0,0.75), transparent);
-  border: none; color: #fff; font-size: 0.86rem; padding: 24px 14px 12px; resize: none; box-shadow: none;
+.wds-story-blend-layer { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: overlay; opacity: 0.55; z-index: 1; }
+.wds-story-image-remove {
+  position: absolute; top: 10px; right: 10px; z-index: 4; width: 28px; height: 28px; border-radius: 50%;
+  background: rgba(5,10,14,0.6); color: #fff; border: none; cursor: pointer; font-size: 0.8rem;
 }
-.wds-story-create-canvas .wds-composer-pending-image {
-  position: absolute; inset: 0; margin: 0; border-radius: 0; border: none;
+
+/* Draggable/resizable/rotatable text layers. The outer .wds-story-text-item
+   only translates (stays axis-aligned) so its move/resize/rotate handles
+   stay easy to grab regardless of rotation — only .wds-story-text-inner
+   (the actual glyphs) rotates, via a separate transform on the child. */
+.wds-story-text-layers { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.wds-story-text-item {
+  position: absolute; pointer-events: none; transform: translate(-50%, -50%); max-width: 80%;
 }
-.wds-story-create-canvas .wds-composer-pending-image img { width: 100%; height: 100%; object-fit: cover; }
+.wds-story-text-inner {
+  display: inline-block; pointer-events: auto; touch-action: none; cursor: text;
+  text-align: center; line-height: 1.25; white-space: pre-wrap; word-break: break-word; outline: none;
+}
+.wds-story-text-inner:empty::before { content: 'Type something'; opacity: 0.6; }
+.wds-story-text-inner[data-style="pill"] { background: rgba(0,0,0,0.45); border-radius: 12px; padding: 0.3em 0.6em; }
+.wds-story-text-inner[data-style="outline"] { -webkit-text-stroke: 0.04em; }
+.wds-story-text-item.is-active .wds-story-text-inner { box-shadow: 0 0 0 1.5px dashed rgba(255,255,255,0.7); }
+.wds-story-text-handle {
+  display: none; position: absolute; width: 26px; height: 26px; border-radius: 50%; pointer-events: auto;
+  background: var(--accent); color: var(--surface-1); align-items: center; justify-content: center;
+  font-size: 0.8rem; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.4); z-index: 2; touch-action: none;
+}
+.wds-story-text-item.is-active .wds-story-text-handle { display: flex; }
+.wds-story-text-handle--move { top: -13px; left: -13px; cursor: move; }
+.wds-story-text-handle--resize { bottom: -13px; right: -13px; cursor: nwse-resize; }
+.wds-story-text-handle--rotate { top: -13px; right: -13px; cursor: grab; }
+
 .wds-story-camera-fab {
   position: absolute; right: 12px; bottom: 12px; width: 48px; height: 48px; border-radius: 50%;
   background: var(--accent); color: var(--surface-1); border: none; font-size: 1.25rem; cursor: pointer;
-  display: grid; place-items: center; box-shadow: 0 4px 14px rgba(0,0,0,0.4); z-index: 2;
+  display: grid; place-items: center; box-shadow: 0 4px 14px rgba(0,0,0,0.4); z-index: 4;
+}
+
+/* Font/color/style toolbar for whichever text layer is currently selected. */
+.wds-story-text-toolbar { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+.wds-story-toolbar-row { display: flex; align-items: center; gap: 8px; }
+.wds-story-font-swatch {
+  flex: none; width: 40px; height: 32px; border-radius: 8px; border: 1px solid var(--border-soft);
+  background: var(--surface-2); color: var(--text-primary); font-size: 0.95rem; cursor: pointer;
+}
+.wds-story-font-swatch.is-active { border-color: var(--accent); color: var(--accent); }
+.wds-story-color-swatch {
+  flex: none; width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0;
+}
+.wds-story-color-swatch.is-active { border-color: var(--accent); }
+.wds-story-style-btn, .wds-story-text-delete-btn {
+  flex: none; border: 1px solid var(--border-soft); border-radius: 8px; background: var(--surface-2);
+  color: var(--text-secondary); font-size: 0.72rem; padding: 6px 10px; cursor: pointer;
 }
 .wds-story-viewer { padding: 0; max-width: 380px; background: #000; }
 .wds-story-viewer-close {

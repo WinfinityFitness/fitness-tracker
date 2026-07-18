@@ -35,7 +35,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.1.4">
+<link rel="stylesheet" href="style.css?v=1.1.5">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3471,32 +3471,54 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
           </button>
         </div>
 
-        <!-- Story composer — full-screen, phone-portrait "create story" flow:
-             pick Text or Photo up top, snap straight to the device's own
-             gallery/camera picker (a real in-page gallery grid isn't
-             something a website can read — this hands off to the OS picker
-             instead, plus a dedicated camera shortcut bottom-right). -->
+        <!-- Story composer — a Canva-lite "create story" canvas: choose a
+             photo or a color/gradient background, then add one or more
+             draggable text layers (drag via the ✥ handle, resize via ⤡,
+             rotate via ↻; font/color/style come from the toolbar below the
+             canvas). On Share, the whole canvas — background + every text
+             layer — is flattened into a single PNG on an off-screen
+             <canvas> (wdsFlattenStoryToDataUrl in app.js) and posted as a
+             normal image story, so no schema change is needed: the viewer
+             already knows how to render image_url. Photo selection still
+             hands off to the device's own gallery/camera picker — a
+             website can't read a user's photo library directly. -->
         <div class="wds-story-overlay wds-story-overlay--create" id="wdsStoryComposerOverlay" hidden>
           <div class="wds-story-modal wds-story-create">
             <div class="wds-story-modal-head">
-              <strong>Create Your Day</strong>
               <button type="button" class="wds-icon-btn" id="btnWdsStoryComposerClose" aria-label="Close">✕</button>
+              <strong>Create Your Day</strong>
+              <span class="wds-story-modal-head-spacer" aria-hidden="true"></span>
             </div>
             <div class="wds-story-widget-row" id="wdsStoryWidgetRow">
-              <button type="button" class="wds-story-widget-btn" id="btnWdsStoryModeText" data-story-mode="text"><span class="wds-story-widget-icon">Aa</span>Text</button>
-              <button type="button" class="wds-story-widget-btn" id="btnWdsStoryModePhoto" data-story-mode="photo"><span class="wds-story-widget-icon">🖼</span>Photo</button>
+              <button type="button" class="wds-story-widget-btn" id="btnWdsStoryModeText"><span class="wds-story-widget-icon">Aa</span>Add text</button>
+              <button type="button" class="wds-story-widget-btn" id="btnWdsStoryModePhoto"><span class="wds-story-widget-icon">🖼</span>Photo</button>
+            </div>
+            <div class="wds-story-bg-row" id="wdsStoryBgRow"></div>
+            <div class="wds-story-photo-zoom-row" id="wdsStoryPhotoZoomRow" hidden>
+              <span aria-hidden="true">🔍</span>
+              <input type="range" id="wdsStoryPhotoZoom" min="1" max="3" step="0.01" value="1" aria-label="Zoom photo">
+              <span aria-hidden="true">🔍</span>
             </div>
             <div class="wds-story-create-canvas" id="wdsStoryCreateCanvas">
-              <p class="empty-note" id="wdsStoryCreateHint">Choose Text or Photo above to start your story.</p>
-              <div class="wds-composer-pending-image" id="wdsStoryComposerPendingImage" hidden>
-                <img id="wdsStoryComposerPendingImagePreview" alt="">
-                <button type="button" id="btnWdsStoryComposerImageRemove" aria-label="Remove image">✕</button>
+              <p class="empty-note" id="wdsStoryCreateHint">Tap Add text or Photo above to start your story.</p>
+              <div class="wds-story-photo-layer" id="wdsStoryPhotoLayer" hidden>
+                <img id="wdsStoryComposerPendingImagePreview" alt="" draggable="false">
               </div>
-              <textarea id="wdsStoryComposerInput" rows="3" maxlength="500" placeholder="Share a moment…" hidden></textarea>
+              <div class="wds-story-blend-layer" id="wdsStoryBlendLayer" hidden></div>
+              <button type="button" class="wds-story-image-remove" id="btnWdsStoryComposerImageRemove" aria-label="Remove image" hidden>✕</button>
+              <div class="wds-story-text-layers" id="wdsStoryTextLayers"></div>
               <button type="button" class="wds-story-camera-fab" id="btnWdsStoryCameraFab" aria-label="Take a photo">📷</button>
             </div>
             <input type="file" id="wdsStoryComposerImageInput" accept="image/*" hidden>
             <input type="file" id="wdsStoryComposerCameraInput" accept="image/*" capture="environment" hidden>
+            <div class="wds-story-text-toolbar" id="wdsStoryTextToolbar" hidden>
+              <div class="wds-story-font-row" id="wdsStoryFontRow"></div>
+              <div class="wds-story-toolbar-row">
+                <div class="wds-story-color-row" id="wdsStoryColorRow"></div>
+                <button type="button" class="wds-story-style-btn" id="btnWdsStoryTextStyleToggle">Plain</button>
+                <button type="button" class="wds-story-text-delete-btn" id="btnWdsStoryTextDelete" aria-label="Delete text">🗑</button>
+              </div>
+            </div>
             <div class="wds-composer-actions">
               <button type="button" class="wds-composer-action-btn wds-composer-post-btn" id="btnWdsStoryComposerPost">Share to Your Day</button>
             </div>
@@ -3845,10 +3867,10 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
   <img id="chatLightboxImg" alt="">
 </div>
 
-<script src="config.js?v=1.1.4"></script>
+<script src="config.js?v=1.1.5"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.1.4"></script>
+<script src="app.js?v=1.1.5"></script>
 </body>
 </html>

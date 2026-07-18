@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.1.4';
+const APP_VERSION = 'WF_SYS_V.1.1.5';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -406,48 +406,50 @@ function initDesktopShell() {
   });
   initWdsFeed();
 
-  // My Day — full-screen story composer. Pick Text or Photo up top; Photo
-  // hands off straight to the device's own gallery/camera picker (a page
-  // can't read a user's photo library directly, so that OS picker IS the
-  // "gallery grid" here) and a dedicated camera-shutter FAB jumps straight
-  // to the camera. Also wires the story viewer and its unsend button.
-  const storyComposerInput = document.getElementById('wdsStoryComposerInput');
+  // My Day — full-screen story composer: a background (photo or
+  // color/gradient) plus any number of draggable/resizable/rotatable text
+  // layers, flattened to one PNG on Share (see wdsFlattenStoryToDataUrl
+  // and friends, defined near the other top-level wds* story helpers).
+  // Photo hands off straight to the device's own gallery/camera picker (a
+  // page can't read a user's photo library directly, so that OS picker IS
+  // the "gallery grid" here) and a dedicated camera-shutter FAB jumps
+  // straight to the camera. Also wires the story viewer and its unsend
+  // button.
   const storyComposerPostBtn = document.getElementById('btnWdsStoryComposerPost');
   const storyComposerImageInput = document.getElementById('wdsStoryComposerImageInput');
   const storyComposerCameraInput = document.getElementById('wdsStoryComposerCameraInput');
-  const storyComposerPendingImage = document.getElementById('wdsStoryComposerPendingImage');
   const storyComposerPendingImagePreview = document.getElementById('wdsStoryComposerPendingImagePreview');
   const storyComposerImageRemoveBtn = document.getElementById('btnWdsStoryComposerImageRemove');
   const storyComposerCloseBtn = document.getElementById('btnWdsStoryComposerClose');
   const storyComposerErrorEl = document.getElementById('wdsStoryComposerError');
-  const storyCreateCanvas = document.getElementById('wdsStoryCreateCanvas');
-  const storyCreateHint = document.getElementById('wdsStoryCreateHint');
   const storyModeTextBtn = document.getElementById('btnWdsStoryModeText');
   const storyModePhotoBtn = document.getElementById('btnWdsStoryModePhoto');
   const storyCameraFab = document.getElementById('btnWdsStoryCameraFab');
-  let wdsPendingStoryImageDataUrl = null;
-  let wdsStoryMode = null;
+  const storyPhotoZoomRow = document.getElementById('wdsStoryPhotoZoomRow');
+  const storyPhotoZoomSlider = document.getElementById('wdsStoryPhotoZoom');
+  const storyPhotoLayer = document.getElementById('wdsStoryPhotoLayer');
 
-  const setWdsStoryMode = (mode) => {
-    wdsStoryMode = mode;
-    storyModeTextBtn.classList.toggle('is-active', mode === 'text');
-    storyModePhotoBtn.classList.toggle('is-active', mode === 'photo');
-    storyCreateCanvas.classList.toggle('wds-story-create-canvas--text', mode === 'text');
-    storyCreateCanvas.classList.toggle('wds-story-create-canvas--photo', mode === 'photo');
-    storyCreateHint.hidden = !!mode;
-    storyComposerInput.hidden = !mode;
-    if (mode === 'text') storyComposerInput.focus();
-  };
+  wdsBuildStoryBgRow();
+  wdsBuildStoryToolbarRows();
+
   const clearWdsPendingStoryImage = () => {
     wdsPendingStoryImageDataUrl = null;
-    storyComposerPendingImage.hidden = true;
+    document.getElementById('wdsStoryPhotoLayer').hidden = true;
+    storyComposerImageRemoveBtn.hidden = true;
+    storyPhotoZoomRow.hidden = true;
     storyComposerImageInput.value = '';
     storyComposerCameraInput.value = '';
+    wdsStoryPhotoTransform = { scale: 1, x: 0, y: 0 };
+    wdsSetStoryBg(wdsStoryBg);
+    wdsUpdateStoryHint();
   };
   const resetWdsStoryComposer = () => {
-    storyComposerInput.value = '';
+    document.getElementById('wdsStoryTextLayers').innerHTML = '';
+    wdsStoryTextItems = [];
+    wdsDeselectStoryText();
     clearWdsPendingStoryImage();
-    setWdsStoryMode(null);
+    wdsSetStoryBg(WDS_STORY_BG_SWATCHES[1]);
+    wdsUpdateStoryHint();
   };
   const handleStoryImageFile = (file) => {
     if (!file) return;
@@ -455,31 +457,69 @@ function initDesktopShell() {
     reader.onload = () => {
       wdsPendingStoryImageDataUrl = reader.result;
       storyComposerPendingImagePreview.src = wdsPendingStoryImageDataUrl;
-      storyComposerPendingImage.hidden = false;
+      document.getElementById('wdsStoryPhotoLayer').hidden = false;
+      storyComposerImageRemoveBtn.hidden = false;
+      storyPhotoZoomRow.hidden = false;
+      wdsStoryPhotoTransform = { scale: 1, x: 0, y: 0 };
+      storyPhotoZoomSlider.value = '1';
+      wdsApplyPhotoTransform();
+      wdsSetStoryBg(wdsStoryBg);
+      wdsUpdateStoryHint();
     };
     reader.readAsDataURL(file);
-    setWdsStoryMode('photo');
   };
-  storyModeTextBtn.addEventListener('click', () => setWdsStoryMode('text'));
+  storyModeTextBtn.addEventListener('click', () => wdsAddStoryText());
   storyModePhotoBtn.addEventListener('click', () => storyComposerImageInput.click());
   storyComposerImageInput.addEventListener('change', () => handleStoryImageFile(storyComposerImageInput.files[0]));
   storyComposerCameraInput.addEventListener('change', () => handleStoryImageFile(storyComposerCameraInput.files[0]));
   storyCameraFab.addEventListener('click', () => storyComposerCameraInput.click());
-  storyComposerImageRemoveBtn.addEventListener('click', () => { clearWdsPendingStoryImage(); setWdsStoryMode(null); });
+  storyComposerImageRemoveBtn.addEventListener('click', clearWdsPendingStoryImage);
   storyComposerCloseBtn.addEventListener('click', () => { wdsCloseStoryComposer(); resetWdsStoryComposer(); });
+
+  storyPhotoZoomSlider.addEventListener('input', () => {
+    wdsStoryPhotoTransform.scale = parseFloat(storyPhotoZoomSlider.value) || 1;
+    wdsApplyPhotoTransform();
+  });
+  // Pans the photo; deselects any active text layer first so a drag
+  // starting over the image doesn't also drag whatever text was selected.
+  storyPhotoLayer.addEventListener('pointerdown', e => {
+    wdsDeselectStoryText();
+    storyPhotoLayer.setPointerCapture(e.pointerId);
+    const canvas = document.getElementById('wdsStoryCreateCanvas');
+    const rect = canvas.getBoundingClientRect();
+    const startX = e.clientX, startY = e.clientY;
+    const startTx = wdsStoryPhotoTransform.x, startTy = wdsStoryPhotoTransform.y;
+    const maxOff = (wdsStoryPhotoTransform.scale - 1) / 2 + 0.15;
+    const onMove = ev => {
+      wdsStoryPhotoTransform.x = Math.min(maxOff, Math.max(-maxOff, startTx + (ev.clientX - startX) / rect.width));
+      wdsStoryPhotoTransform.y = Math.min(maxOff, Math.max(-maxOff, startTy + (ev.clientY - startY) / rect.height));
+      wdsApplyPhotoTransform();
+    };
+    const onUp = () => storyPhotoLayer.removeEventListener('pointermove', onMove);
+    storyPhotoLayer.addEventListener('pointermove', onMove);
+    storyPhotoLayer.addEventListener('pointerup', onUp, { once: true });
+    storyPhotoLayer.addEventListener('pointercancel', onUp, { once: true });
+  });
+  // Tapping empty canvas (not a text layer, the photo, or a control)
+  // deselects whichever text layer was active, hiding its handles/toolbar.
+  document.getElementById('wdsStoryCreateCanvas').addEventListener('pointerdown', e => {
+    if (e.target.closest('.wds-story-text-item, .wds-story-photo-layer, #btnWdsStoryComposerImageRemove, .wds-story-camera-fab')) return;
+    wdsDeselectStoryText();
+  });
+
   storyComposerPostBtn.addEventListener('click', async () => {
     if (storyComposerErrorEl) storyComposerErrorEl.hidden = true;
     if (!wdsRemoteData || !wdsRemoteData.shareKey || !sbConfigured()) {
       if (storyComposerErrorEl) { storyComposerErrorEl.textContent = 'Not signed in — try refreshing the page.'; storyComposerErrorEl.hidden = false; }
       return;
     }
-    const text = storyComposerInput.value;
-    const image = wdsPendingStoryImageDataUrl;
-    if (!text.trim() && !image) return;
+    const hasText = wdsStoryTextItems.some(t => t.text.trim());
+    if (!hasText && !wdsPendingStoryImageDataUrl) return;
     storyComposerPostBtn.disabled = true;
     try {
+      const flattened = await wdsFlattenStoryToDataUrl();
       const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
-      await postFeedStory(text, image, wdsRemoteData.shareKey, codeName);
+      await postFeedStory(null, flattened, wdsRemoteData.shareKey, codeName);
       wdsCloseStoryComposer();
       resetWdsStoryComposer();
       await refreshWdsMyday();
@@ -1543,6 +1583,413 @@ async function unsendFeedStory(storyId, shareKey) {
 
 let wdsActiveStories = [];
 let wdsStoryGroups = []; // [{shareKey, codeName, stories: [oldest...newest]}], ring order = most-recent-first
+
+// Story composer engine state — a single photo (pannable/zoomable) plus
+// any number of draggable/resizable/rotatable text layers, composited
+// down to one flattened PNG on Share (wdsFlattenStoryToDataUrl below).
+// Kept top-level (not inside initDesktopShell's closure) so the flatten
+// step and the drag/resize/rotate handlers — all plain top-level
+// functions, matching this file's existing wds* helper convention — can
+// read/write it directly.
+let wdsPendingStoryImageDataUrl = null;
+let wdsStoryPhotoTransform = { scale: 1, x: 0, y: 0 };
+let wdsStoryTextItems = []; // [{id, text, x, y (0-1 canvas fractions), fontSizeFrac, rotation (deg), font, color, style}]
+let wdsStoryActiveTextId = null;
+let wdsStoryTextSeq = 0;
+const WDS_STORY_BG_SWATCHES = [
+  { id: 'none',   stops: null },
+  { id: 'grad1',  stops: ['#8069D6', '#33C8CC'] },
+  { id: 'grad2',  stops: ['#FF6B6B', '#FFD166'] },
+  { id: 'grad3',  stops: ['#0F2027', '#2C5364'] },
+  { id: 'solid1', stops: ['#101820'] },
+  { id: 'solid2', stops: ['#7B2CBF'] },
+  { id: 'solid3', stops: ['#E63946'] },
+  { id: 'solid4', stops: ['#2A9D8F'] },
+];
+let wdsStoryBg = WDS_STORY_BG_SWATCHES[1];
+const WDS_STORY_TEXT_FONTS = {
+  display: "system-ui, -apple-system, 'Segoe UI', sans-serif",
+  mono: "ui-monospace, 'SFMono-Regular', Menlo, Consolas, 'Roboto Mono', monospace",
+  serif: "Georgia, 'Times New Roman', serif",
+  rounded: "'Segoe UI Rounded', 'Varela Round', system-ui, sans-serif",
+};
+const WDS_STORY_TEXT_COLORS = ['#ffffff', '#000000', '#ff5252', '#ffd166', '#33c8cc', '#8069d6', '#2ecc71', '#ff8fab'];
+const WDS_STORY_TEXT_STYLES = ['plain', 'pill', 'outline'];
+
+function wdsBgCss(bg) {
+  if (!bg || !bg.stops) return 'transparent';
+  return bg.stops.length > 1 ? `linear-gradient(135deg, ${bg.stops[0]}, ${bg.stops[1]})` : bg.stops[0];
+}
+
+// Fill mode vs tint mode: with no photo, the swatch is the whole canvas
+// background; once a photo is loaded, the same swatch instead becomes a
+// semi-transparent overlay blended on top of it ("none" clears the tint).
+function wdsSetStoryBg(bg) {
+  wdsStoryBg = bg;
+  document.querySelectorAll('#wdsStoryBgRow [data-bg]').forEach(b => b.classList.toggle('is-active', b.dataset.bg === bg.id));
+  const canvas = document.getElementById('wdsStoryCreateCanvas');
+  const blendLayer = document.getElementById('wdsStoryBlendLayer');
+  if (!canvas || !blendLayer) return;
+  if (wdsPendingStoryImageDataUrl) {
+    canvas.style.background = '';
+    if (bg.stops) { blendLayer.hidden = false; blendLayer.style.background = wdsBgCss(bg); }
+    else { blendLayer.hidden = true; }
+  } else {
+    blendLayer.hidden = true;
+    canvas.style.background = bg.stops ? wdsBgCss(bg) : '';
+  }
+}
+
+function wdsBuildStoryBgRow() {
+  const row = document.getElementById('wdsStoryBgRow');
+  if (!row) return;
+  row.innerHTML = WDS_STORY_BG_SWATCHES.map(bg => bg.id === 'none'
+    ? `<button type="button" class="wds-story-bg-swatch wds-story-bg-swatch--none" data-bg="none" aria-label="No tint">✕</button>`
+    : `<button type="button" class="wds-story-bg-swatch" data-bg="${bg.id}" style="background:${wdsBgCss(bg)}" aria-label="Background color"></button>`
+  ).join('');
+  row.addEventListener('click', e => {
+    const btn = e.target.closest('[data-bg]');
+    if (!btn) return;
+    const bg = WDS_STORY_BG_SWATCHES.find(b => b.id === btn.dataset.bg);
+    if (bg) wdsSetStoryBg(bg);
+  });
+}
+
+function wdsApplyPhotoTransform() {
+  const canvas = document.getElementById('wdsStoryCreateCanvas');
+  const img = document.getElementById('wdsStoryComposerPendingImagePreview');
+  if (!canvas || !img) return;
+  const rect = canvas.getBoundingClientRect();
+  const tx = wdsStoryPhotoTransform.x * rect.width;
+  const ty = wdsStoryPhotoTransform.y * rect.height;
+  img.style.transform = `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px)) scale(${wdsStoryPhotoTransform.scale})`;
+}
+
+function wdsUpdateStoryHint() {
+  const hint = document.getElementById('wdsStoryCreateHint');
+  if (hint) hint.hidden = !!wdsPendingStoryImageDataUrl || wdsStoryTextItems.length > 0;
+}
+
+function wdsSyncStoryTextToolbar(item) {
+  document.querySelectorAll('#wdsStoryFontRow [data-font]').forEach(b => b.classList.toggle('is-active', b.dataset.font === item.font));
+  document.querySelectorAll('#wdsStoryColorRow [data-color]').forEach(b => b.classList.toggle('is-active', b.dataset.color === item.color));
+  const styleBtn = document.getElementById('btnWdsStoryTextStyleToggle');
+  if (styleBtn) styleBtn.textContent = item.style.charAt(0).toUpperCase() + item.style.slice(1);
+}
+
+function wdsSelectStoryText(id) {
+  const layers = document.getElementById('wdsStoryTextLayers');
+  const toolbar = document.getElementById('wdsStoryTextToolbar');
+  if (!layers) return;
+  layers.querySelectorAll('.wds-story-text-item.is-active').forEach(n => n.classList.remove('is-active'));
+  wdsStoryActiveTextId = id;
+  const el = layers.querySelector(`.wds-story-text-item[data-id="${id}"]`);
+  if (el) el.classList.add('is-active');
+  const item = wdsStoryTextItems.find(t => t.id === id);
+  if (item) wdsSyncStoryTextToolbar(item);
+  if (toolbar) toolbar.hidden = !item;
+}
+
+function wdsDeselectStoryText() {
+  const layers = document.getElementById('wdsStoryTextLayers');
+  const toolbar = document.getElementById('wdsStoryTextToolbar');
+  if (layers) layers.querySelectorAll('.wds-story-text-item.is-active').forEach(n => n.classList.remove('is-active'));
+  wdsStoryActiveTextId = null;
+  if (toolbar) toolbar.hidden = true;
+}
+
+// Drag/resize/rotate all use pointer capture directly on the handle that
+// started the gesture — listeners live and die on that same element, so
+// there's no risk of leaking a document-level listener if the pointerup
+// is missed.
+function wdsWireStoryTextDrag(handle, itemEl, item, canvas) {
+  handle.addEventListener('pointerdown', e => {
+    e.preventDefault(); e.stopPropagation();
+    wdsSelectStoryText(item.id);
+    handle.setPointerCapture(e.pointerId);
+    const rect = canvas.getBoundingClientRect();
+    const startX = e.clientX, startY = e.clientY;
+    const startFracX = item.x, startFracY = item.y;
+    const onMove = ev => {
+      item.x = Math.min(1, Math.max(0, startFracX + (ev.clientX - startX) / rect.width));
+      item.y = Math.min(1, Math.max(0, startFracY + (ev.clientY - startY) / rect.height));
+      itemEl.style.left = (item.x * 100) + '%';
+      itemEl.style.top = (item.y * 100) + '%';
+    };
+    const onUp = () => handle.removeEventListener('pointermove', onMove);
+    handle.addEventListener('pointermove', onMove);
+    handle.addEventListener('pointerup', onUp, { once: true });
+    handle.addEventListener('pointercancel', onUp, { once: true });
+  });
+}
+function wdsWireStoryTextResize(handle, inner, item, canvas) {
+  handle.addEventListener('pointerdown', e => {
+    e.preventDefault(); e.stopPropagation();
+    wdsSelectStoryText(item.id);
+    handle.setPointerCapture(e.pointerId);
+    const rect = canvas.getBoundingClientRect();
+    const centerX = rect.left + item.x * rect.width;
+    const centerY = rect.top + item.y * rect.height;
+    const startDist = Math.hypot(e.clientX - centerX, e.clientY - centerY) || 1;
+    const startFrac = item.fontSizeFrac;
+    const onMove = ev => {
+      const dist = Math.hypot(ev.clientX - centerX, ev.clientY - centerY);
+      item.fontSizeFrac = Math.min(0.22, Math.max(0.025, startFrac * (dist / startDist)));
+      inner.style.fontSize = (item.fontSizeFrac * rect.height) + 'px';
+    };
+    const onUp = () => handle.removeEventListener('pointermove', onMove);
+    handle.addEventListener('pointermove', onMove);
+    handle.addEventListener('pointerup', onUp, { once: true });
+    handle.addEventListener('pointercancel', onUp, { once: true });
+  });
+}
+function wdsWireStoryTextRotate(handle, inner, item, canvas) {
+  handle.addEventListener('pointerdown', e => {
+    e.preventDefault(); e.stopPropagation();
+    wdsSelectStoryText(item.id);
+    handle.setPointerCapture(e.pointerId);
+    const rect = canvas.getBoundingClientRect();
+    const centerX = rect.left + item.x * rect.width;
+    const centerY = rect.top + item.y * rect.height;
+    const startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * 180 / Math.PI;
+    const startRotation = item.rotation;
+    const onMove = ev => {
+      const angle = Math.atan2(ev.clientY - centerY, ev.clientX - centerX) * 180 / Math.PI;
+      item.rotation = startRotation + (angle - startAngle);
+      inner.style.transform = `rotate(${item.rotation}deg)`;
+    };
+    const onUp = () => handle.removeEventListener('pointermove', onMove);
+    handle.addEventListener('pointermove', onMove);
+    handle.addEventListener('pointerup', onUp, { once: true });
+    handle.addEventListener('pointercancel', onUp, { once: true });
+  });
+}
+
+function wdsApplyStoryTextInnerStyle(inner, item, rect) {
+  inner.style.fontSize = (item.fontSizeFrac * rect.height) + 'px';
+  inner.style.color = item.color;
+  inner.style.fontFamily = WDS_STORY_TEXT_FONTS[item.font] || WDS_STORY_TEXT_FONTS.display;
+  inner.style.transform = `rotate(${item.rotation}deg)`;
+  inner.style.webkitTextStrokeColor = item.color === '#000000' ? '#ffffff' : '#000000';
+  inner.dataset.style = item.style;
+}
+
+function wdsCreateStoryTextEl(item) {
+  const canvas = document.getElementById('wdsStoryCreateCanvas');
+  const rect = canvas.getBoundingClientRect();
+  const el = document.createElement('div');
+  el.className = 'wds-story-text-item';
+  el.dataset.id = item.id;
+  el.style.left = (item.x * 100) + '%';
+  el.style.top = (item.y * 100) + '%';
+
+  const inner = document.createElement('div');
+  inner.className = 'wds-story-text-inner';
+  inner.contentEditable = 'true';
+  inner.textContent = item.text;
+  wdsApplyStoryTextInnerStyle(inner, item, rect);
+  inner.addEventListener('focus', () => wdsSelectStoryText(item.id));
+  inner.addEventListener('pointerdown', e => { e.stopPropagation(); wdsSelectStoryText(item.id); });
+  inner.addEventListener('input', () => { item.text = inner.innerText; });
+
+  const moveHandle = document.createElement('div');
+  moveHandle.className = 'wds-story-text-handle wds-story-text-handle--move';
+  moveHandle.textContent = '✥';
+  const resizeHandle = document.createElement('div');
+  resizeHandle.className = 'wds-story-text-handle wds-story-text-handle--resize';
+  resizeHandle.textContent = '⤡';
+  const rotateHandle = document.createElement('div');
+  rotateHandle.className = 'wds-story-text-handle wds-story-text-handle--rotate';
+  rotateHandle.textContent = '↻';
+
+  el.append(inner, moveHandle, resizeHandle, rotateHandle);
+  wdsWireStoryTextDrag(moveHandle, el, item, canvas);
+  wdsWireStoryTextResize(resizeHandle, inner, item, canvas);
+  wdsWireStoryTextRotate(rotateHandle, inner, item, canvas);
+  return el;
+}
+
+function wdsAddStoryText() {
+  wdsStoryTextSeq += 1;
+  const item = { id: 'txt' + wdsStoryTextSeq, text: '', x: 0.5, y: 0.5, fontSizeFrac: 0.07, rotation: 0, font: 'display', color: '#ffffff', style: 'plain' };
+  wdsStoryTextItems.push(item);
+  const layers = document.getElementById('wdsStoryTextLayers');
+  const el = wdsCreateStoryTextEl(item);
+  layers.appendChild(el);
+  wdsSelectStoryText(item.id);
+  wdsUpdateStoryHint();
+  el.querySelector('.wds-story-text-inner').focus();
+}
+
+function wdsBuildStoryToolbarRows() {
+  const fontRow = document.getElementById('wdsStoryFontRow');
+  const colorRow = document.getElementById('wdsStoryColorRow');
+  const styleBtn = document.getElementById('btnWdsStoryTextStyleToggle');
+  const deleteBtn = document.getElementById('btnWdsStoryTextDelete');
+  if (!fontRow || !colorRow || !styleBtn || !deleteBtn) return;
+
+  fontRow.innerHTML = Object.keys(WDS_STORY_TEXT_FONTS).map(key =>
+    `<button type="button" class="wds-story-font-swatch" data-font="${key}" style="font-family:${WDS_STORY_TEXT_FONTS[key]}">Aa</button>`
+  ).join('');
+  fontRow.addEventListener('click', e => {
+    const btn = e.target.closest('[data-font]');
+    const item = wdsStoryTextItems.find(t => t.id === wdsStoryActiveTextId);
+    if (!btn || !item) return;
+    item.font = btn.dataset.font;
+    const el = document.querySelector(`.wds-story-text-item[data-id="${item.id}"] .wds-story-text-inner`);
+    if (el) el.style.fontFamily = WDS_STORY_TEXT_FONTS[item.font];
+    wdsSyncStoryTextToolbar(item);
+  });
+
+  colorRow.innerHTML = WDS_STORY_TEXT_COLORS.map(c =>
+    `<button type="button" class="wds-story-color-swatch" data-color="${c}" style="background:${c}" aria-label="Text color"></button>`
+  ).join('');
+  colorRow.addEventListener('click', e => {
+    const btn = e.target.closest('[data-color]');
+    const item = wdsStoryTextItems.find(t => t.id === wdsStoryActiveTextId);
+    if (!btn || !item) return;
+    item.color = btn.dataset.color;
+    const el = document.querySelector(`.wds-story-text-item[data-id="${item.id}"] .wds-story-text-inner`);
+    if (el) { el.style.color = item.color; el.style.webkitTextStrokeColor = item.color === '#000000' ? '#ffffff' : '#000000'; }
+    wdsSyncStoryTextToolbar(item);
+  });
+
+  styleBtn.addEventListener('click', () => {
+    const item = wdsStoryTextItems.find(t => t.id === wdsStoryActiveTextId);
+    if (!item) return;
+    item.style = WDS_STORY_TEXT_STYLES[(WDS_STORY_TEXT_STYLES.indexOf(item.style) + 1) % WDS_STORY_TEXT_STYLES.length];
+    const el = document.querySelector(`.wds-story-text-item[data-id="${item.id}"] .wds-story-text-inner`);
+    if (el) el.dataset.style = item.style;
+    wdsSyncStoryTextToolbar(item);
+  });
+
+  deleteBtn.addEventListener('click', () => {
+    const item = wdsStoryTextItems.find(t => t.id === wdsStoryActiveTextId);
+    if (!item) return;
+    const el = document.querySelector(`.wds-story-text-item[data-id="${item.id}"]`);
+    if (el) el.remove();
+    wdsStoryTextItems = wdsStoryTextItems.filter(t => t.id !== item.id);
+    wdsDeselectStoryText();
+    wdsUpdateStoryHint();
+  });
+}
+
+// Flattening — the whole point of building the composer this way: rather
+// than storing structured layer data (position/rotation/font/etc.) and
+// teaching the viewer to re-render it, the finished canvas is rasterized
+// once into a plain PNG on Share, using the exact same
+// background+photo+text data the on-screen editor just used. The result
+// posts through postFeedStory exactly like an ordinary photo story —
+// same upload path, same viewer, no schema change.
+function wdsLoadImageEl(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+function wdsFillCanvasBackground(ctx, bg, w, h) {
+  if (bg && bg.stops) {
+    if (bg.stops.length > 1) {
+      const grad = ctx.createLinearGradient(0, 0, w, h);
+      grad.addColorStop(0, bg.stops[0]);
+      grad.addColorStop(1, bg.stops[1]);
+      ctx.fillStyle = grad;
+    } else {
+      ctx.fillStyle = bg.stops[0];
+    }
+  } else {
+    ctx.fillStyle = '#101820';
+  }
+  ctx.fillRect(0, 0, w, h);
+}
+function wdsRoundRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+// Contenteditable line-wrapping (via CSS max-width) isn't reflected in
+// item.text — only explicit \n presses are. Re-wrapping here by measured
+// width keeps the flattened image from overflowing with long unbroken text.
+function wdsWrapCanvasText(ctx, text, maxWidth) {
+  const lines = [];
+  text.split('\n').forEach(paragraph => {
+    const words = paragraph.split(' ');
+    let cur = '';
+    words.forEach(w => {
+      const test = cur ? cur + ' ' + w : w;
+      if (cur && ctx.measureText(test).width > maxWidth) { lines.push(cur); cur = w; }
+      else cur = test;
+    });
+    lines.push(cur);
+  });
+  return lines;
+}
+async function wdsFlattenStoryToDataUrl() {
+  const W = 720, H = 1280;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  if (wdsPendingStoryImageDataUrl) {
+    const img = await wdsLoadImageEl(wdsPendingStoryImageDataUrl);
+    const baseScale = Math.max(W / img.width, H / img.height);
+    const scale = baseScale * wdsStoryPhotoTransform.scale;
+    const drawW = img.width * scale, drawH = img.height * scale;
+    const cx = W / 2 + wdsStoryPhotoTransform.x * W;
+    const cy = H / 2 + wdsStoryPhotoTransform.y * H;
+    ctx.drawImage(img, cx - drawW / 2, cy - drawH / 2, drawW, drawH);
+    if (wdsStoryBg && wdsStoryBg.stops) {
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      ctx.globalCompositeOperation = 'overlay';
+      wdsFillCanvasBackground(ctx, wdsStoryBg, W, H);
+      ctx.restore();
+    }
+  } else {
+    wdsFillCanvasBackground(ctx, wdsStoryBg, W, H);
+  }
+
+  wdsStoryTextItems.forEach(item => {
+    if (!item.text.trim()) return;
+    const fontPx = item.fontSizeFrac * H;
+    const fontFamily = WDS_STORY_TEXT_FONTS[item.font] || WDS_STORY_TEXT_FONTS.display;
+    ctx.font = `700 ${fontPx}px ${fontFamily}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const lines = wdsWrapCanvasText(ctx, item.text, W * 0.8);
+    const lineHeight = fontPx * 1.25;
+    const totalH = lineHeight * lines.length;
+    ctx.save();
+    ctx.translate(item.x * W, item.y * H);
+    ctx.rotate(item.rotation * Math.PI / 180);
+    if (item.style === 'pill') {
+      const maxW = Math.max(...lines.map(l => ctx.measureText(l).width));
+      const padX = fontPx * 0.5, padY = fontPx * 0.35;
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      wdsRoundRectPath(ctx, -maxW / 2 - padX, -totalH / 2 - padY, maxW + padX * 2, totalH + padY * 2, fontPx * 0.35);
+      ctx.fill();
+    }
+    lines.forEach((line, i) => {
+      const ly = -totalH / 2 + lineHeight * (i + 0.5);
+      if (item.style === 'outline') {
+        ctx.lineWidth = fontPx * 0.08;
+        ctx.strokeStyle = item.color === '#000000' ? '#ffffff' : '#000000';
+        ctx.strokeText(line, 0, ly);
+      }
+      ctx.fillStyle = item.color;
+      ctx.fillText(line, 0, ly);
+    });
+    ctx.restore();
+  });
+
+  return canvas.toDataURL('image/png');
+}
 async function refreshWdsMyday() {
   const el = document.getElementById('wdsMydayRow');
   if (!el) return;
