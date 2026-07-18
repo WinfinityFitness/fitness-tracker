@@ -5562,7 +5562,16 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
 .wds-profile-header {
   display: flex; align-items: flex-end; gap: 18px; position: relative; z-index: 1;
   margin: -84px 0 0; padding: 0 28px; box-sizing: border-box;
+  /* The header's negative top-margin makes it visually overlap the
+     cover photo's bottom edge (avatar-over-cover is the intended look),
+     but that means its own empty space — not just its buttons — was
+     sitting on top of the cover's own Edit Cover Photo button and
+     silently absorbing clicks meant for it. Making the header itself
+     click-through, and re-enabling clicks only on its actual buttons,
+     fixes that without having to hand-tune geometry so nothing overlaps. */
+  pointer-events: none;
 }
+.wds-profile-header button { pointer-events: auto; }
 .wds-profile-avatar {
   width: 128px; height: 128px; border-radius: 50%; background: var(--gradient-bar); color: #060a0d;
   font-weight: 800; font-size: 2.6rem; display: grid; place-items: center; flex-shrink: 0;
