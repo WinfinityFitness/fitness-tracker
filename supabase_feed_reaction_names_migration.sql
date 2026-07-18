@@ -7,6 +7,21 @@
 -- existing function (a plain `create or replace` would leave the old
 -- 3-argument version lingering as an ambiguous duplicate).
 
+-- feed_comment_likes turned out to never have actually been created (the
+-- original reactions migration that was supposed to add it apparently
+-- didn't fully run) — create it here too so this migration is
+-- self-contained and safe regardless of that earlier migration's state.
+create table if not exists feed_comment_likes (
+  comment_id bigint not null references feed_post_comments(id) on delete cascade,
+  share_key uuid not null,
+  emoji text not null default '👍',
+  created_at timestamptz not null default now(),
+  primary key (comment_id, share_key)
+);
+alter table feed_comment_likes enable row level security;
+drop policy if exists "Public read access" on feed_comment_likes;
+create policy "Public read access" on feed_comment_likes for select using (true);
+
 alter table feed_post_likes add column if not exists code_name text;
 alter table feed_comment_likes add column if not exists code_name text;
 
