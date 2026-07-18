@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.1.6';
+const APP_VERSION = 'WF_SYS_V.1.1.7';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -459,6 +459,17 @@ function initDesktopShell() {
     storyLinkInput.value = '';
     wdsUpdateStoryHint();
   };
+  // Starting a brand-new story (as opposed to "Share to My Day", which
+  // preloads a link preview instead) jumps straight to the phone's gallery
+  // picker — the closest available equivalent to a native app's own
+  // in-page gallery grid, since a website has no API to read the photo
+  // library directly. Canceling the picker just leaves the normal
+  // composer open (text/background/link still available).
+  const openStoryComposerForNewStory = () => {
+    resetWdsStoryComposer();
+    wdsOpenStoryComposer();
+    storyComposerImageInput.click();
+  };
   const handleStoryImageFile = (file) => {
     if (!file) return;
     const reader = new FileReader();
@@ -559,7 +570,7 @@ function initDesktopShell() {
   document.getElementById('wdsMydayRow').addEventListener('click', e => {
     const target = e.target.closest('[data-action]');
     if (!target) return;
-    if (target.dataset.action === 'add-story') { resetWdsStoryComposer(); wdsOpenStoryComposer(); return; }
+    if (target.dataset.action === 'add-story') { openStoryComposerForNewStory(); return; }
     const storyId = Number(target.dataset.storyId);
     if (storyId) wdsOpenStoryViewer(storyId);
   });
@@ -967,7 +978,7 @@ function initDesktopShell() {
   // Own-profile action row — only shown when wdsViewedProfile is null
   // (renderWdsProfileHeader toggles this).
   const addStoryBtn = document.getElementById('btnWdsProfileAddStory');
-  if (addStoryBtn) addStoryBtn.addEventListener('click', () => { resetWdsStoryComposer(); wdsOpenStoryComposer(); });
+  if (addStoryBtn) addStoryBtn.addEventListener('click', openStoryComposerForNewStory);
 
   // Who-can-post-on-my-wall — only visible/enabled on your own profile
   // (renderWdsProfileHeader hides it when wdsViewedProfile is set).
