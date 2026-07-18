@@ -5262,9 +5262,29 @@ html.wf-desktop-shell body { overflow-x: auto; }
   background: linear-gradient(135deg, rgba(128,105,214,0.35), rgba(51,200,204,0.25));
 }
 .wds-story-content-actions { padding: 10px 14px 16px; display: flex; justify-content: flex-end; position: relative; z-index: 2; }
+/* Reply bar — message input + quick-tap emoji, Facebook/Instagram's own
+   "reply to a story" convention. Same z-index treatment as the actions
+   row above (sits above the tap zones so typing/tapping an emoji here
+   doesn't also advance the story). */
+.wds-story-reply-row {
+  display: flex; align-items: center; gap: 8px; padding: 10px 14px 16px;
+  position: relative; z-index: 2;
+}
+.wds-story-reply-input {
+  flex: 1; min-width: 0; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 20px; padding: 8px 14px; color: #fff; font-size: 0.8rem; font-family: var(--font-display);
+}
+.wds-story-reply-input::placeholder { color: rgba(255,255,255,0.6); }
+.wds-story-quick-reacts { display: flex; gap: 2px; flex-shrink: 0; }
+.wds-story-quick-reacts button {
+  background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 2px; line-height: 1;
+}
+.wds-story-quick-reacts button:hover { transform: scale(1.2); }
+.wds-story-reply-sent { color: #fff; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
 /* Facebook/Instagram-style tap-to-advance — left half steps back, right
-   half steps forward. Sits under the head/actions (z-index 1) so those
-   stay clickable, but covers the media area to catch taps there. */
+   half steps forward. Sits under the head/actions/reply row (z-index 1)
+   so those stay clickable, but covers the media area to catch taps
+   there. */
 .wds-story-tap-zone { position: absolute; top: 0; bottom: 0; width: 50%; z-index: 1; cursor: pointer; }
 .wds-story-tap-zone--left { left: 0; }
 .wds-story-tap-zone--right { right: 0; }

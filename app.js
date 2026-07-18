@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.1.3';
+const APP_VERSION = 'WF_SYS_V.1.1.4';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -550,8 +550,35 @@ function initDesktopShell() {
       } catch (e2) { btn.disabled = false; }
       return;
     }
+    const quickReactBtn = e.target.closest('[data-quick-react]');
+    if (quickReactBtn) {
+      const group = wdsStoryGroups[wdsStoryGroupIdx];
+      const story = group && group.stories[wdsStoryLocalIdx];
+      if (story) { await wdsSendStoryReply(story, quickReactBtn.dataset.quickReact); wdsFlashStorySent(); }
+      return;
+    }
     const tapZone = e.target.closest('[data-story-tap]');
     if (tapZone) wdsAdvanceStory(tapZone.dataset.storyTap === 'prev' ? -1 : 1);
+  });
+  // The reply input sits on top of the tap zones (see CSS) so typing
+  // itself doesn't advance the story — but the 5s auto-advance timer
+  // would still fire mid-sentence without this, so it's paused for as
+  // long as the input is focused and left paused after sending/blur
+  // (the viewer isn't meant to yank the story away while composing).
+  document.getElementById('wdsStoryViewerContent').addEventListener('focusin', e => {
+    if (e.target.matches('.wds-story-reply-input')) clearTimeout(wdsStoryTimer);
+  });
+  document.getElementById('wdsStoryViewerContent').addEventListener('keydown', async e => {
+    if (e.key !== 'Enter' || !e.target.matches('.wds-story-reply-input')) return;
+    const input = e.target;
+    if (!input.value.trim()) return;
+    const group = wdsStoryGroups[wdsStoryGroupIdx];
+    const story = group && group.stories[wdsStoryLocalIdx];
+    if (!story) return;
+    const text = input.value;
+    input.value = '';
+    await wdsSendStoryReply(story, text);
+    wdsFlashStorySent();
   });
 
   // Profile Page — cover photo (choose → drag to reposition → Save), its
@@ -1618,7 +1645,11 @@ function wdsRenderCurrentStory() {
       </div>
       ${mediaHtml}
       ${story.image_url && story.message ? `<p class="wds-post-body" style="padding:10px 14px;color:#fff;">${escapeHtml(story.message)}</p>` : ''}
-      ${isOwn ? `<div class="wds-story-content-actions"><button type="button" class="wds-post-unsend-btn" id="btnWdsUnsendStory" data-story-id="${story.id}">Remove</button></div>` : ''}
+      ${isOwn ? `<div class="wds-story-content-actions"><button type="button" class="wds-post-unsend-btn" id="btnWdsUnsendStory" data-story-id="${story.id}">Remove</button></div>` : `
+        <div class="wds-story-reply-row">
+          <input type="text" class="wds-story-reply-input" placeholder="Send message…" maxlength="280">
+          <div class="wds-story-quick-reacts">${QUICK_REACTIONS.map(e => `<button type="button" data-quick-react="${e}">${e}</button>`).join('')}</div>
+        </div>`}
       <div class="wds-story-tap-zone wds-story-tap-zone--left" data-story-tap="prev"></div>
       <div class="wds-story-tap-zone wds-story-tap-zone--right" data-story-tap="next"></div>
     </div>`;
@@ -1647,6 +1678,40 @@ function wdsCloseStoryViewer() {
   clearTimeout(wdsStoryTimer);
   const overlay = document.getElementById('wdsStoryViewerOverlay');
   if (overlay) overlay.hidden = true;
+}
+
+// Story reply — a typed message or a quick-tap emoji, delivered as a
+// normal DM to that story's author (start_dm_by_name/postChatMessage,
+// same RPCs the rest of desktop DM already uses), Instagram/Facebook's
+// own "reply to a story" convention. Delivered silently in the
+// background — sending doesn't open the chat popup or leave the story,
+// so it doesn't interrupt watching.
+async function wdsSendStoryReply(story, text) {
+  if (!wdsRemoteData || !text.trim()) return;
+  const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
+  try {
+    const { data: roomId, error } = await sb.rpc('start_dm_by_name', {
+      p_my_key: wdsRemoteData.shareKey, p_my_name: codeName, p_other_name: story.code_name,
+    });
+    if (error || !roomId) return;
+    await postChatMessage(text, null, wdsRemoteData.shareKey, codeName, roomId);
+    await refreshWdsChatRooms();
+  } catch (e) { /* best effort */ }
+}
+// Brief "Sent!" flash next to the reply input so a quick-react tap (no
+// typed text, nothing else changes on screen) gets some feedback.
+function wdsFlashStorySent() {
+  const row = document.querySelector('.wds-story-reply-row');
+  if (!row) return;
+  let note = row.querySelector('.wds-story-reply-sent');
+  if (!note) {
+    note = document.createElement('span');
+    note.className = 'wds-story-reply-sent';
+    row.appendChild(note);
+  }
+  note.textContent = 'Sent!';
+  clearTimeout(wdsFlashStorySent._t);
+  wdsFlashStorySent._t = setTimeout(() => { note.textContent = ''; }, 1200);
 }
 function wdsOpenStoryComposer() {
   const overlay = document.getElementById('wdsStoryComposerOverlay');
