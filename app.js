@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.1.0';
+const APP_VERSION = 'WF_SYS_V.1.1.1';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -395,7 +395,7 @@ function initDesktopShell() {
       wdsComposerPreviewUrl = null;
       wdsComposerLinkPreview = null;
       renderWdsComposerLinkPreview();
-      await refreshWdsFeed();
+      await refreshWdsFeed(true);
     } catch (e) {
       // Composer keeps the typed text so nothing is lost — but the failure
       // itself must be visible, not silent (this is exactly what made an
@@ -532,7 +532,7 @@ function initDesktopShell() {
       const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
       await shareFeedPost(wdsRemoteData.shareKey, codeName, wdsSharingPostId, input ? input.value : '');
       wdsCloseShareComposeOverlay();
-      await refreshWdsFeed();
+      await refreshWdsFeed(true);
     } catch (e) {
       if (errorEl) { errorEl.textContent = 'Could not share: ' + ((e && e.message) || 'unknown error') + '.'; errorEl.hidden = false; }
     }
@@ -2548,13 +2548,19 @@ const wdsFeedExpandedComments = new Set();
 // thread expanded.
 const wdsFeedExpandedReplies = new Set();
 
-async function refreshWdsFeed() {
+async function refreshWdsFeed(force) {
   const listEl = document.getElementById('wdsFeedList');
   if (!listEl) return;
   // Same reasoning as refreshWdsChat's guard above — a poll-triggered
   // rebuild would restart any playing video embed from scratch, which is
   // exactly why a shared video never finished playing before this fix.
-  if (listEl.querySelector('.chat-video-embed iframe')) return;
+  // But that's only the right tradeoff for a PASSIVE poll — an explicit
+  // action (liking, commenting, sharing, posting) needs its own result to
+  // actually show up, so every one of those call sites passes force=true
+  // to skip this guard. Without this split, the action would silently
+  // succeed on the server while the screen never updated to show it,
+  // for as long as any video stayed embedded in the feed.
+  if (!force && listEl.querySelector('.chat-video-embed iframe')) return;
   try {
     const posts = await fetchFeedPosts();
     renderFeedPosts(posts);
@@ -3177,7 +3183,7 @@ function initWdsFeed() {
         try {
           const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
           await toggleFeedPostLike(postId, shareKey, currentEmoji, codeName);
-          await refreshWdsFeed();
+          await refreshWdsFeed(true);
         } catch (err) { /* best effort */ }
       }, WDS_LIKE_CLICK_DELAY_MS);
       return;
@@ -3195,7 +3201,7 @@ function initWdsFeed() {
           const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
           await toggleFeedCommentLike(commentId, shareKey, currentCommentEmoji, codeName);
           wdsFeedExpandedComments.add(postId);
-          await refreshWdsFeed();
+          await refreshWdsFeed(true);
         } catch (err) { /* best effort */ }
       }, WDS_LIKE_CLICK_DELAY_MS);
       return;
@@ -3209,7 +3215,7 @@ function initWdsFeed() {
     }
     if (e.target.closest('[data-action="unsend-post"]')) {
       if (!shareKey || !confirm('Remove this post?')) return;
-      try { await unsendFeedPost(postId, shareKey); await refreshWdsFeed(); } catch (err) { /* best effort */ }
+      try { await unsendFeedPost(postId, shareKey); await refreshWdsFeed(true); } catch (err) { /* best effort */ }
       return;
     }
     if (e.target.closest('[data-action="unsend-comment"]')) {
@@ -3219,7 +3225,7 @@ function initWdsFeed() {
       try {
         await unsendFeedComment(commentId, shareKey);
         wdsFeedExpandedComments.add(postId);
-        await refreshWdsFeed();
+        await refreshWdsFeed(true);
       } catch (err) { /* best effort */ }
       return;
     }
@@ -3231,7 +3237,7 @@ function initWdsFeed() {
         await postFeedComment(postId, input.value, shareKey, codeName);
         input.value = '';
         wdsFeedExpandedComments.add(postId);
-        await refreshWdsFeed();
+        await refreshWdsFeed(true);
       } catch (err) { /* best effort */ }
       return;
     }
@@ -3246,7 +3252,7 @@ function initWdsFeed() {
       const commentId = Number(toggleRepliesBtn.dataset.commentId);
       if (wdsFeedExpandedReplies.has(commentId)) wdsFeedExpandedReplies.delete(commentId);
       else wdsFeedExpandedReplies.add(commentId);
-      await refreshWdsFeed();
+      await refreshWdsFeed(true);
       return;
     }
     const sendReplyBtn = e.target.closest('[data-action="send-reply"]');
@@ -3261,7 +3267,7 @@ function initWdsFeed() {
         input.value = '';
         wdsFeedExpandedComments.add(postId);
         wdsFeedExpandedReplies.add(parentId);
-        await refreshWdsFeed();
+        await refreshWdsFeed(true);
       } catch (err) { /* best effort */ }
       return;
     }
@@ -3382,7 +3388,7 @@ function initWdsFeedReactionMenu(list) {
       const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
       if (type === 'post') await toggleFeedPostLike(id, shareKey, emoji, codeName);
       else await toggleFeedCommentLike(id, shareKey, emoji, codeName);
-      await refreshWdsFeed();
+      await refreshWdsFeed(true);
     } catch (err) { /* best effort */ }
   });
   document.addEventListener('click', e => {
