@@ -5643,6 +5643,14 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
   margin: 0 0 2px; font-size: 1.7rem; font-weight: 800;
   background: var(--gradient-bar); background-clip: text; -webkit-background-clip: text;
   color: transparent; -webkit-text-fill-color: transparent;
+  /* The gradient fill is the SAME gradient the cover falls back to when
+     there's no custom photo, so the name goes invisible against an empty
+     cover — text-shadow (not text-stroke, which Firefox doesn't support)
+     draws a themed outline around the glyph shapes regardless of the
+     transparent fill color, so it stays readable over any cover. */
+  text-shadow:
+    -1px -1px 0 var(--surface-1), 1px -1px 0 var(--surface-1),
+    -1px 1px 0 var(--surface-1), 1px 1px 0 var(--surface-1);
 }
 .wds-profile-identity p { margin: 0; font-size: 0.82rem; color: var(--text-secondary); }
 .wds-profile-viewed-actions { display: flex; gap: 8px; padding-bottom: 8px; margin-left: auto; }
