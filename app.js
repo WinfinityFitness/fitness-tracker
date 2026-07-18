@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.1.5';
+const APP_VERSION = 'WF_SYS_V.1.1.6';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -428,6 +428,10 @@ function initDesktopShell() {
   const storyPhotoZoomRow = document.getElementById('wdsStoryPhotoZoomRow');
   const storyPhotoZoomSlider = document.getElementById('wdsStoryPhotoZoom');
   const storyPhotoLayer = document.getElementById('wdsStoryPhotoLayer');
+  const storyModeLinkBtn = document.getElementById('btnWdsStoryModeLink');
+  const storyLinkRow = document.getElementById('wdsStoryLinkRow');
+  const storyLinkInput = document.getElementById('wdsStoryLinkInput');
+  const storyLinkAddBtn = document.getElementById('btnWdsStoryLinkAdd');
 
   wdsBuildStoryBgRow();
   wdsBuildStoryToolbarRows();
@@ -449,6 +453,10 @@ function initDesktopShell() {
     wdsDeselectStoryText();
     clearWdsPendingStoryImage();
     wdsSetStoryBg(WDS_STORY_BG_SWATCHES[1]);
+    wdsStoryLinkPreview = null;
+    wdsRenderStoryLinkPreviewBox();
+    storyLinkRow.hidden = true;
+    storyLinkInput.value = '';
     wdsUpdateStoryHint();
   };
   const handleStoryImageFile = (file) => {
@@ -470,6 +478,25 @@ function initDesktopShell() {
   };
   storyModeTextBtn.addEventListener('click', () => wdsAddStoryText());
   storyModePhotoBtn.addEventListener('click', () => storyComposerImageInput.click());
+  storyModeLinkBtn.addEventListener('click', () => {
+    storyLinkRow.hidden = !storyLinkRow.hidden;
+    if (!storyLinkRow.hidden) storyLinkInput.focus();
+  });
+  const addStoryLink = async () => {
+    const url = storyLinkInput.value.trim();
+    if (!url) return;
+    storyLinkAddBtn.disabled = true;
+    try {
+      const preview = await fetchLinkPreview(url);
+      wdsStoryLinkPreview = preview;
+      wdsRenderStoryLinkPreviewBox();
+      storyLinkRow.hidden = true;
+      storyLinkInput.value = '';
+    } catch (e) { /* leave the row open so they can retry/edit the URL */ }
+    finally { storyLinkAddBtn.disabled = false; }
+  };
+  storyLinkAddBtn.addEventListener('click', addStoryLink);
+  storyLinkInput.addEventListener('keydown', e => { if (e.key === 'Enter') addStoryLink(); });
   storyComposerImageInput.addEventListener('change', () => handleStoryImageFile(storyComposerImageInput.files[0]));
   storyComposerCameraInput.addEventListener('change', () => handleStoryImageFile(storyComposerCameraInput.files[0]));
   storyCameraFab.addEventListener('click', () => storyComposerCameraInput.click());
@@ -514,12 +541,12 @@ function initDesktopShell() {
       return;
     }
     const hasText = wdsStoryTextItems.some(t => t.text.trim());
-    if (!hasText && !wdsPendingStoryImageDataUrl) return;
+    if (!hasText && !wdsPendingStoryImageDataUrl && !wdsStoryLinkPreview) return;
     storyComposerPostBtn.disabled = true;
     try {
       const flattened = await wdsFlattenStoryToDataUrl();
       const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
-      await postFeedStory(null, flattened, wdsRemoteData.shareKey, codeName);
+      await postFeedStory(null, flattened, wdsRemoteData.shareKey, codeName, wdsStoryLinkPreview);
       wdsCloseStoryComposer();
       resetWdsStoryComposer();
       await refreshWdsMyday();
@@ -1167,7 +1194,7 @@ function initDesktopShell() {
         await postChatMessage(text, image, wdsRemoteData.shareKey, codeName, roomId);
         await wdsRefreshChatPopup(roomId);
         await refreshWdsChatRooms();
-      } catch (err) { /* best effort */ }
+      } catch (err) { console.error('Popup send failed:', err); }
       return;
     }
     const popupEl = e.target.closest('.wds-chat-popup');
@@ -1541,7 +1568,7 @@ async function renderWdsNexus() {
 // ---------------------------------------------------------------------
 async function fetchActiveStories() {
   const { data, error } = await sb.from('feed_stories')
-    .select('id, share_key, code_name, message, image_url, created_at')
+    .select('id, share_key, code_name, message, image_url, link_preview, created_at')
     .eq('deleted', false)
     .order('created_at', { ascending: false })
     .limit(100);
@@ -1567,12 +1594,12 @@ function wdsGroupStoriesByUser(stories) {
   }));
 }
 
-async function postFeedStory(text, imageDataUrl, shareKey, codeName) {
+async function postFeedStory(text, imageDataUrl, shareKey, codeName, linkPreview) {
   const trimmed = (text || '').trim().slice(0, 500);
-  if (!trimmed && !imageDataUrl) return;
+  if (!trimmed && !imageDataUrl && !linkPreview) return;
   let imageUrl = null;
   if (imageDataUrl) imageUrl = await uploadChatImage(imageDataUrl, shareKey);
-  const { error } = await sb.from('feed_stories').insert({ share_key: shareKey, code_name: codeName, message: trimmed, image_url: imageUrl });
+  const { error } = await sb.from('feed_stories').insert({ share_key: shareKey, code_name: codeName, message: trimmed, image_url: imageUrl, link_preview: linkPreview || null });
   if (error) throw error;
 }
 
@@ -1668,6 +1695,50 @@ function wdsApplyPhotoTransform() {
 function wdsUpdateStoryHint() {
   const hint = document.getElementById('wdsStoryCreateHint');
   if (hint) hint.hidden = !!wdsPendingStoryImageDataUrl || wdsStoryTextItems.length > 0;
+}
+
+// Link attachment — a small card shown below the canvas (not baked into
+// the flattened PNG, since it needs to stay a real, tappable element in
+// the viewer). Two sources: pasting a URL here unfurls it via the same
+// link-preview Edge Function feed posts already use; "Share to My Day"
+// (from a feed post's action row) builds one of these objects locally
+// instead, with internal:true (see wdsBuildLinkPreviewHtml).
+let wdsStoryLinkPreview = null;
+function wdsRenderStoryLinkPreviewBox() {
+  const box = document.getElementById('wdsStoryLinkPreviewBox');
+  if (!box) return;
+  if (!wdsStoryLinkPreview) { box.hidden = true; box.innerHTML = ''; return; }
+  box.hidden = false;
+  box.innerHTML = `<div style="position:relative;">${wdsBuildLinkPreviewHtml(wdsStoryLinkPreview)}<button type="button" class="wds-link-preview-remove" id="btnWdsStoryLinkPreviewRemove" aria-label="Remove link">✕</button></div>`;
+  box.querySelectorAll('a.wds-link-preview-card').forEach(a => a.style.pointerEvents = 'none');
+  const removeBtn = document.getElementById('btnWdsStoryLinkPreviewRemove');
+  if (removeBtn) removeBtn.addEventListener('click', () => { wdsStoryLinkPreview = null; wdsRenderStoryLinkPreviewBox(); });
+}
+
+// Resets the composer (clearing any in-progress text/photo) and preloads
+// it with a link preview built from an existing feed post, then opens it
+// — the "Share to My Day" action on a feed post's action row. A standalone
+// top-level function (not reusing the composer-init closure's own
+// resetWdsStoryComposer) so it can be called from the feed's own click
+// handler regardless of which function scope that's in.
+function wdsShareFeedPostToMyDay(preview) {
+  const textLayers = document.getElementById('wdsStoryTextLayers');
+  if (textLayers) textLayers.innerHTML = '';
+  wdsStoryTextItems = [];
+  wdsDeselectStoryText();
+  wdsPendingStoryImageDataUrl = null;
+  const photoLayer = document.getElementById('wdsStoryPhotoLayer');
+  if (photoLayer) photoLayer.hidden = true;
+  const removeBtn = document.getElementById('btnWdsStoryComposerImageRemove');
+  if (removeBtn) removeBtn.hidden = true;
+  const zoomRow = document.getElementById('wdsStoryPhotoZoomRow');
+  if (zoomRow) zoomRow.hidden = true;
+  wdsStoryPhotoTransform = { scale: 1, x: 0, y: 0 };
+  wdsSetStoryBg(WDS_STORY_BG_SWATCHES[1]);
+  wdsStoryLinkPreview = preview;
+  wdsRenderStoryLinkPreviewBox();
+  wdsUpdateStoryHint();
+  wdsOpenStoryComposer();
 }
 
 function wdsSyncStoryTextToolbar(item) {
@@ -1792,15 +1863,17 @@ function wdsCreateStoryTextEl(item) {
   inner.addEventListener('pointerdown', e => { e.stopPropagation(); wdsSelectStoryText(item.id); });
   inner.addEventListener('input', () => { item.text = inner.innerText; });
 
+  // Icons match the app's existing stroke-SVG icon language (see e.g. the
+  // admin drawer icons in index.html) rather than emoji glyphs.
   const moveHandle = document.createElement('div');
   moveHandle.className = 'wds-story-text-handle wds-story-text-handle--move';
-  moveHandle.textContent = '✥';
+  moveHandle.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>';
   const resizeHandle = document.createElement('div');
   resizeHandle.className = 'wds-story-text-handle wds-story-text-handle--resize';
-  resizeHandle.textContent = '⤡';
+  resizeHandle.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
   const rotateHandle = document.createElement('div');
   rotateHandle.className = 'wds-story-text-handle wds-story-text-handle--rotate';
-  rotateHandle.textContent = '↻';
+  rotateHandle.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>';
 
   el.append(inner, moveHandle, resizeHandle, rotateHandle);
   wdsWireStoryTextDrag(moveHandle, el, item, canvas);
@@ -2052,6 +2125,37 @@ let wdsStoryGroupIdx = 0;
 let wdsStoryLocalIdx = 0;
 let wdsStoryTimer = null;
 
+// Back button / gesture closes whichever My Day overlay (viewer or
+// composer) is open and returns to whatever page was underneath, instead
+// of navigating the browser away from the dashboard. Same push-on-open,
+// pop-on-close, guard-against-double-handling shape as the mobile app's
+// own sheet-overlay back-button system (initBackButtonNav), just scoped
+// to these two overlays specifically rather than driven by a
+// MutationObserver, since their open/close functions are already single
+// choke points here.
+let wdsStoryHistoryOpen = false;
+let wdsStoryClosingViaHistory = false;
+function wdsPushStoryHistory() {
+  if (wdsStoryHistoryOpen) return;
+  wdsStoryHistoryOpen = true;
+  history.pushState({ wdsStoryOverlay: true }, '');
+}
+function wdsPopStoryHistoryIfNeeded() {
+  if (!wdsStoryHistoryOpen) return;
+  wdsStoryHistoryOpen = false;
+  if (wdsStoryClosingViaHistory) { wdsStoryClosingViaHistory = false; return; }
+  history.back();
+}
+window.addEventListener('popstate', () => {
+  if (!wdsStoryHistoryOpen) return;
+  wdsStoryClosingViaHistory = true;
+  const composerOverlay = document.getElementById('wdsStoryComposerOverlay');
+  const viewerOverlay = document.getElementById('wdsStoryViewerOverlay');
+  if (composerOverlay && !composerOverlay.hidden) wdsCloseStoryComposer();
+  else if (viewerOverlay && !viewerOverlay.hidden) wdsCloseStoryViewer();
+  else wdsStoryClosingViaHistory = false;
+});
+
 function wdsOpenStoryViewer(storyId) {
   for (let g = 0; g < wdsStoryGroups.length; g++) {
     const li = wdsStoryGroups[g].stories.findIndex(s => s.id === storyId);
@@ -2060,6 +2164,7 @@ function wdsOpenStoryViewer(storyId) {
   const overlay = document.getElementById('wdsStoryViewerOverlay');
   if (!overlay) return;
   overlay.hidden = false;
+  wdsPushStoryHistory();
   wdsRenderCurrentStory();
 }
 
@@ -2092,6 +2197,7 @@ function wdsRenderCurrentStory() {
       </div>
       ${mediaHtml}
       ${story.image_url && story.message ? `<p class="wds-post-body" style="padding:10px 14px;color:#fff;">${escapeHtml(story.message)}</p>` : ''}
+      ${story.link_preview ? `<div class="wds-story-link-attach">${wdsBuildLinkPreviewHtml(story.link_preview)}</div>` : ''}
       ${isOwn ? `<div class="wds-story-content-actions"><button type="button" class="wds-post-unsend-btn" id="btnWdsUnsendStory" data-story-id="${story.id}">Remove</button></div>` : `
         <div class="wds-story-reply-row">
           <input type="text" class="wds-story-reply-input" placeholder="Send message…" maxlength="280">
@@ -2125,6 +2231,7 @@ function wdsCloseStoryViewer() {
   clearTimeout(wdsStoryTimer);
   const overlay = document.getElementById('wdsStoryViewerOverlay');
   if (overlay) overlay.hidden = true;
+  wdsPopStoryHistoryIfNeeded();
 }
 
 // Story reply — a typed message or a quick-tap emoji, delivered as a
@@ -2165,8 +2272,13 @@ function wdsOpenStoryComposer() {
   const errorEl = document.getElementById('wdsStoryComposerError');
   if (errorEl) errorEl.hidden = true;
   if (overlay) overlay.hidden = false;
+  wdsPushStoryHistory();
 }
-function wdsCloseStoryComposer() { const overlay = document.getElementById('wdsStoryComposerOverlay'); if (overlay) overlay.hidden = true; }
+function wdsCloseStoryComposer() {
+  const overlay = document.getElementById('wdsStoryComposerOverlay');
+  if (overlay) overlay.hidden = true;
+  wdsPopStoryHistoryIfNeeded();
+}
 
 // ---------------------------------------------------------------------
 // Desktop Nexus chat — a real, usable substitute for the mobile Nexus tab
@@ -2284,7 +2396,13 @@ async function refreshWdsChatRooms() {
       };
     });
     wdsChatRoomMeta = meta;
-  } catch (e) { /* best effort */ }
+  } catch (e) {
+    // Was a silent best-effort swallow — the exact pattern that hid the
+    // feed-reactions column bug earlier. Logging it so a real failure here
+    // (RLS, a bad column, a thrown RPC) is at least visible in the console
+    // instead of just quietly leaving the Chats list empty.
+    console.error('refreshWdsChatRooms failed:', e);
+  }
   renderWdsChatListPanel();
 }
 
@@ -2488,10 +2606,10 @@ async function wdsStartDM(otherName) {
     const { data, error } = await sb.rpc('start_dm_by_name', {
       p_my_key: wdsRemoteData.shareKey, p_my_name: codeName, p_other_name: otherName,
     });
-    if (error || !data) return;
+    if (error || !data) { if (error) console.error('start_dm_by_name failed:', error); return; }
     await refreshWdsChatRooms();
     wdsOpenChatPopup(data);
-  } catch (e) { /* best effort */ }
+  } catch (e) { console.error('wdsStartDM failed:', e); }
 }
 function wdsRenderChatUserMenuGroups() {
   const container = document.getElementById('wdsChatUserMenuGroups');
@@ -3002,14 +3120,20 @@ function wdsBuildLinkPreviewHtml(preview) {
   if (!preview) return '';
   if (preview.type === 'image') return `<img class="wds-post-image" src="${escapeHtml(preview.image || preview.url)}" alt="" data-lightbox="${escapeHtml(preview.image || preview.url)}">`;
   if (preview.type === 'video') return `<video class="wds-post-image" src="${escapeHtml(preview.video || preview.url)}" controls></video>`;
-  return `<a class="wds-link-preview-card" href="${escapeHtml(preview.url)}" target="_blank" rel="noopener noreferrer">
+  // "Share to My Day" builds one of these locally from a feed post's own
+  // fields (see wdsShareFeedPostToMyDay) with internal:true — there's no
+  // real per-post URL in this single-page app to link to, so it renders as
+  // a plain card instead of an <a href>.
+  const tag = preview.internal ? 'div' : 'a';
+  const linkAttrs = preview.internal ? '' : ` href="${escapeHtml(preview.url)}" target="_blank" rel="noopener noreferrer"`;
+  return `<${tag} class="wds-link-preview-card"${linkAttrs}>
     ${preview.image ? `<img class="wds-link-preview-img" src="${escapeHtml(preview.image)}" alt="">` : ''}
     <div class="wds-link-preview-body">
       ${preview.siteName ? `<span class="wds-link-preview-site">${escapeHtml(preview.siteName)}</span>` : ''}
       <strong class="wds-link-preview-title">${escapeHtml(preview.title || preview.url)}</strong>
       ${preview.description ? `<p class="wds-link-preview-desc">${escapeHtml(preview.description)}</p>` : ''}
     </div>
-  </a>`;
+  </${tag}>`;
 }
 
 async function toggleFeedPostLike(postId, shareKey, emoji, codeName) {
@@ -3290,6 +3414,7 @@ function renderFeedPosts(posts) {
           <button type="button" class="wds-post-action-btn${myLike ? ' is-liked' : ''}" data-action="like" data-current-emoji="${myLike ? myLike.emoji : ''}">${wdsReactionButtonHtml(p.likes, myShareKey)}</button>
           <button type="button" class="wds-post-action-btn" data-action="toggle-comments">💬 Comments</button>
           ${canShare ? `<button type="button" class="wds-post-action-btn" data-action="open-share" data-post-id="${isShare ? p.shared_post_id : p.id}">↗ Share</button>` : ''}
+          <button type="button" class="wds-post-action-btn" data-action="share-to-myday" data-post-id="${isShare ? p.shared_post_id : p.id}">Share to My Day</button>
         </div>
         <div class="wds-post-comments" ${expanded ? '' : 'hidden'}>
           ${commentsHtml}
@@ -3801,6 +3926,21 @@ function initWdsFeed() {
         previewHtml = `<div class="wds-shared-post-embed">${headHtml}${bodyEl ? bodyEl.outerHTML : ''}${mediaEl ? mediaEl.outerHTML : ''}</div>`;
       }
       wdsOpenShareCompose(Number(shareBtn.dataset.postId), previewHtml);
+      return;
+    }
+    const shareToMydayBtn = e.target.closest('[data-action="share-to-myday"]');
+    if (shareToMydayBtn) {
+      const nameEl = card.querySelector('.wds-post-meta strong');
+      const bodyEl = card.querySelector('.wds-post-body');
+      const imgEl = card.querySelector('.wds-post-image, .wds-post-gallery img');
+      wdsShareFeedPostToMyDay({
+        internal: true,
+        siteName: 'Winfinity Nexus',
+        title: nameEl ? nameEl.textContent.trim() + "'s post" : 'Shared post',
+        description: bodyEl ? bodyEl.textContent.trim().slice(0, 200) : '',
+        image: imgEl ? imgEl.src : null,
+        url: '#',
+      });
       return;
     }
     const sharersEl = e.target.closest('[data-action="view-sharers"]');
