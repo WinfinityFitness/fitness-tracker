@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.2.3';
+const APP_VERSION = 'WF_SYS_V.1.2.4';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1016,33 +1016,24 @@ function initDesktopShell() {
   // Chats panel — opened from the header chat icon (replaces the old
   // manual refresh button; the dashboard still auto-refreshes every 2min).
   // Global Chat minimize toggle — collapses the fixed bottom-left widget
-  // down to a small globe-icon button in the same corner. On narrow
-  // (mobile) viewports it also starts minimized by default, opens
-  // full-width, and auto-closes on an outside click — matching how the
-  // DM/group popups already behave there, instead of permanently
-  // occupying the screen the way it does on desktop.
+  // out of the way entirely. Used to fall back to a small globe-icon
+  // button in the same corner to reopen it, but that's redundant now that
+  // the quick-access dial's Nexus Com item does the same thing — removed
+  // rather than kept as a second, easy-to-miss way to do the same thing.
+  // On narrow (mobile) viewports it also starts minimized by default and
+  // auto-closes on an outside click — matching how the DM/group popups
+  // already behave there, instead of permanently occupying the screen the
+  // way it does on desktop.
   const WDS_MOBILE_BREAKPOINT = 860;
   const isWdsMobileViewport = () => window.innerWidth <= WDS_MOBILE_BREAKPOINT;
   const globalChatFixed = document.getElementById('wdsGlobalChatFixed');
   const globalChatMinimizeBtn = document.getElementById('btnWdsGlobalChatMinimize');
-  const globalChatCollapsedIcon = document.getElementById('wdsGlobalChatCollapsedIcon');
-  if (globalChatFixed && globalChatMinimizeBtn && globalChatCollapsedIcon) {
-    if (isWdsMobileViewport()) {
-      globalChatFixed.hidden = true;
-      globalChatCollapsedIcon.hidden = false;
-    }
-    globalChatMinimizeBtn.addEventListener('click', () => {
-      globalChatFixed.hidden = true;
-      globalChatCollapsedIcon.hidden = false;
-    });
-    globalChatCollapsedIcon.addEventListener('click', () => {
-      globalChatFixed.hidden = false;
-      globalChatCollapsedIcon.hidden = true;
-    });
+  if (globalChatFixed && globalChatMinimizeBtn) {
+    if (isWdsMobileViewport()) globalChatFixed.hidden = true;
+    globalChatMinimizeBtn.addEventListener('click', () => { globalChatFixed.hidden = true; });
     document.addEventListener('click', e => {
-      if (isWdsMobileViewport() && !globalChatFixed.hidden && !globalChatFixed.contains(e.target) && e.target !== globalChatCollapsedIcon) {
+      if (isWdsMobileViewport() && !globalChatFixed.hidden && !globalChatFixed.contains(e.target) && e.target.id !== 'wdsDialBtn' && !e.target.closest('#wdsDialMenu')) {
         globalChatFixed.hidden = true;
-        globalChatCollapsedIcon.hidden = false;
       }
     });
   }
@@ -2568,9 +2559,7 @@ function initWdsDial() {
     const action = item.dataset.dialAction;
     if (action === 'nexus-com') {
       const fixed = document.getElementById('wdsGlobalChatFixed');
-      const collapsedIcon = document.getElementById('wdsGlobalChatCollapsedIcon');
       if (fixed) fixed.hidden = false;
-      if (collapsedIcon) collapsedIcon.hidden = true;
     } else if (action === 'settings' || action === 'theme') {
       const card = document.getElementById('wdsAccountCard');
       if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
