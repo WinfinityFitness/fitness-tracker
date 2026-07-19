@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.2.6';
+const APP_VERSION = 'WF_SYS_V.1.2.7';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -14356,8 +14356,8 @@ function applyAdminTabPosition(tab) {
   const { minY, maxY } = adminTabYBounds();
   const y = Math.min(maxY, Math.max(minY, (pos ? pos.yFrac : 0.5) * window.innerHeight));
   tab.style.top = y + 'px';
-  tab.style.right = edge === 'right' ? '0' : 'auto';
-  tab.style.left = edge === 'left' ? '0' : 'auto';
+  tab.style.right = edge === 'right' ? '4px' : 'auto';
+  tab.style.left = edge === 'left' ? '4px' : 'auto';
   tab.classList.toggle('admin-drawer-tab--left', edge === 'left');
 }
 
@@ -14423,8 +14423,8 @@ function initAdminDrawer() {
       const y = Math.min(maxY, Math.max(minY, e.clientY - grabOffsetY));
       tab.style.top = y + 'px';
       const edge = e.clientX < window.innerWidth / 2 ? 'left' : 'right';
-      tab.style.right = edge === 'right' ? '0' : 'auto';
-      tab.style.left = edge === 'left' ? '0' : 'auto';
+      tab.style.right = edge === 'right' ? '4px' : 'auto';
+      tab.style.left = edge === 'left' ? '4px' : 'auto';
       tab.classList.toggle('admin-drawer-tab--left', edge === 'left');
       return;
     }

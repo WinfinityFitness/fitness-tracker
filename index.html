@@ -46,7 +46,7 @@ if (sessionStorage.getItem('wds_operator_id') && sessionStorage.getItem('wds_ope
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.2.6">
+<link rel="stylesheet" href="style.css?v=1.2.7">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -57,23 +57,26 @@ if (sessionStorage.getItem('wds_operator_id') && sessionStorage.getItem('wds_ope
   <div class="custom-bg-overlay" id="customBgOverlay"></div>
 </div>
 
-<!-- Admin Command Center: small drag/tap tab (an 8mm semicircle bump) on the
-     right edge — visible to every user (see initAdminDrawer in app.js).
-     Tapping/dragging the tab opens a rotatable icon arc — a semicircle fan
-     of icons that you drag up/down to spin, like a dial, bringing other
-     icons into the front position (see layoutAdminDrawerArc in app.js).
-     Icons marked data-admin-only are hidden unless logged in as admin (see
-     refreshDigitalIdOverrideVisibility); Quick Log icons (data-quicklog-key)
-     are shown to everyone per the admin-set list in Drawer Settings, loaded
-     by loadQuickLogDialConfig — both start hidden here and get toggled on
-     load, not shown by default in markup. Only the frontmost icon is grown
-     and tappable; tapping it either fires that action directly
-     (data-action, e.g. Log Out) or opens the slide-out panel focused on
-     just that section/group (data-target, comma-separated for a group),
-     with the panel's back arrow returning to the arc. Icons match the
-     app's existing thin cyan-stroke line-icon style rather than emoji. -->
+<!-- Admin Command Center: small drag/tap circular logo button (same
+     8mm diameter the old half-circle edge bump used, now a full circle
+     instead of clipped at the edge — matches the web dashboard's own
+     quick-access dial) — visible to every user (see initAdminDrawer in
+     app.js). Tapping/dragging the tab opens a rotatable icon arc — a
+     semicircle fan of icons that you drag up/down to spin, like a dial,
+     bringing other icons into the front position (see layoutAdminDrawerArc
+     in app.js). Icons marked data-admin-only are hidden unless logged in as
+     admin (see refreshDigitalIdOverrideVisibility); Quick Log icons
+     (data-quicklog-key) are shown to everyone per the admin-set list in
+     Drawer Settings, loaded by loadQuickLogDialConfig — both start hidden
+     here and get toggled on load, not shown by default in markup. Only the
+     frontmost icon is grown and tappable; tapping it either fires that
+     action directly (data-action, e.g. Log Out) or opens the slide-out
+     panel focused on just that section/group (data-target, comma-separated
+     for a group), with the panel's back arrow returning to the arc. Icons
+     match the app's existing thin cyan-stroke line-icon style rather than
+     emoji. -->
 <button type="button" class="admin-drawer-tab" id="adminDrawerTab" aria-label="Open drawer">
-  <span class="admin-drawer-tab-bar" aria-hidden="true"></span>
+  <span class="admin-drawer-tab-bar" aria-hidden="true"><img src="icons/icon-512.png" alt=""></span>
 </button>
 <div class="admin-drawer-backdrop" id="adminDrawerBackdrop" hidden></div>
 
@@ -3965,10 +3968,10 @@ if (sessionStorage.getItem('wds_operator_id') && sessionStorage.getItem('wds_ope
   <img id="chatLightboxImg" alt="">
 </div>
 
-<script src="config.js?v=1.2.6"></script>
+<script src="config.js?v=1.2.7"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.2.6"></script>
+<script src="app.js?v=1.2.7"></script>
 </body>
 </html>

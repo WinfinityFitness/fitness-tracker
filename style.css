@@ -2559,19 +2559,18 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 
 /* ---------------- Admin Command Center (slide-out drawer) ---------------- */
 /* Tab visibility is gated to isAdminLoggedIn() in refreshDigitalIdOverrideVisibility()
-   — it never shows for a regular user. Visual bar is an 8mm-diameter semicircle
-   bump (30px diameter / 15px radius at a 96dpi CSS reference) — a true semicircle
-   comes from a box exactly radius-wide and diameter-tall with both same-side
-   corners fully rounded by that radius. The tap/drag hit target (the button
-   itself) is padded out wider than the visible bump since 15px alone is under
-   any comfortable touch-target minimum. */
+   — it never shows for a regular user. A full circle (same 8mm/30px
+   diameter the old half-circle edge bump used) sitting just inside the
+   edge instead of clipped by it — matches the web dashboard's own
+   quick-access dial (logo inside a circle) rather than a strip poking out
+   of the screen. */
 .admin-drawer-tab {
   position: fixed;
   top: 50%;
-  right: 0;
+  right: 4px;
   transform: translateY(-50%);
   z-index: 400;
-  width: 26px;
+  width: 40px;
   height: 40px;
   padding: 0;
   margin: 0;
@@ -2579,7 +2578,7 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   background: transparent;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   cursor: grab;
   touch-action: none;
   transition: transform 0.15s ease;
@@ -2597,41 +2596,26 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .admin-drawer-tab.is-repositioning .admin-drawer-tab-bar {
   box-shadow: 0 0 18px var(--cyan-glow), 0 0 6px var(--cyan);
 }
-/* Docked to the left edge instead of the default right — mirrors the bump
-   shape (rounded corners + arrow flip to the other side) so it still reads
-   as "poking out from this edge" rather than a right-edge shape stranded
-   on the wrong side. */
-.admin-drawer-tab--left { justify-content: flex-start; }
-.admin-drawer-tab--left .admin-drawer-tab-bar {
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-  border-top-right-radius: 15px;
-  border-bottom-right-radius: 15px;
-  box-shadow: 0 0 10px var(--cyan-glow), 1px 0 3px rgba(0,0,0,0.3);
-}
-.admin-drawer-tab--left.is-repositioning .admin-drawer-tab-bar {
-  box-shadow: 0 0 18px var(--cyan-glow), 0 0 6px var(--cyan);
-}
-.admin-drawer-tab--left .admin-drawer-tab-bar::after { content: '›'; left: 58%; }
+/* Docked to the left edge instead of the default right — a full circle
+   looks identical either way, so this variant only needs to flip which
+   side the container itself hugs. */
+.admin-drawer-tab--left { right: auto; left: 4px; }
 .admin-drawer-tab-bar {
-  width: 15px;
+  width: 30px;
   height: 30px;
-  border-top-left-radius: 15px;
-  border-bottom-left-radius: 15px;
-  background: linear-gradient(180deg, var(--cyan), var(--cyan-dim));
-  box-shadow: 0 0 10px var(--cyan-glow), -1px 0 3px rgba(0,0,0,0.3);
-  position: relative;
+  border-radius: 50%;
+  border: 2px solid var(--cyan);
+  background: var(--surface-1);
+  box-shadow: 0 0 10px var(--cyan-glow), 0 2px 6px rgba(0,0,0,0.4);
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
 }
-.admin-drawer-tab-bar::after {
-  content: '‹';
-  position: absolute;
-  top: 50%; left: 42%;
-  transform: translate(-50%, -52%);
-  color: var(--bg);
-  font-size: 9px;
-  font-weight: 700;
-  line-height: 1;
-}
+.admin-drawer-tab-bar img { width: 100%; height: 100%; object-fit: contain; border-radius: 50%; pointer-events: none; }
+/* Same universal border-radius reset (Grand Core/Nezuko Digital) the web
+   dial had to fight — ID/class-scoped !important keeps both the tab and
+   every arc icon circular under any skin. */
+#adminDrawerTab .admin-drawer-tab-bar,
+#adminDrawerTab .admin-drawer-tab-bar img,
+.admin-drawer-pill-item { border-radius: 50% !important; }
 
 .admin-drawer-backdrop {
   position: fixed; inset: 0;
