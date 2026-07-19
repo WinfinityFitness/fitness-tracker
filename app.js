@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.4.2';
+const APP_VERSION = 'WF_SYS_V.1.4.3';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1172,6 +1172,13 @@ function initDesktopShell() {
   document.getElementById('wdsProfileFriendsList').addEventListener('click', e => {
     const item = e.target.closest('[data-view-profile]');
     if (item) wdsOpenOtherProfile(item.dataset.viewProfile);
+  });
+  const pendingFriendRequestsEl = document.getElementById('wdsPendingFriendRequestsList');
+  if (pendingFriendRequestsEl) pendingFriendRequestsEl.addEventListener('click', e => {
+    const acceptBtn = e.target.closest('[data-accept-friend]');
+    if (acceptBtn) { wdsRespondFriendRequest(acceptBtn.dataset.acceptFriend, true); return; }
+    const declineBtn = e.target.closest('[data-decline-friend]');
+    if (declineBtn) wdsRespondFriendRequest(declineBtn.dataset.declineFriend, false);
   });
 
   // Viewing someone else's profile (a click-through from a name/avatar)
@@ -4502,6 +4509,29 @@ async function refreshWdsFriendsList(targetShareKey) {
   }
 }
 
+// Own-profile-only, always-visible pending-requests list — see the
+// comment on #wdsPendingFriendRequestsList in index.html for why this
+// exists alongside (not instead of) the bell notification.
+async function refreshWdsPendingFriendRequestsList() {
+  const listEl = document.getElementById('wdsPendingFriendRequestsList');
+  if (!listEl || !wdsRemoteData) return;
+  try {
+    const { data, error } = await sb.rpc('list_pending_friend_requests', { p_share_key: wdsRemoteData.shareKey });
+    if (error) throw error;
+    if (!data || !data.length) { listEl.innerHTML = ''; return; }
+    listEl.innerHTML = `<p class="field-group-heading" style="margin:0 0 6px;">Friend Requests</p>` + data.map(r => `
+      <div class="wds-friend-item">
+        <span class="wds-friend-avatar"${r.avatar_data_url ? ` style="background-image:url(${escapeHtml(r.avatar_data_url)});"` : ''}>${r.avatar_data_url ? '' : escapeHtml((r.code_name || '?').charAt(0).toUpperCase())}</span>
+        <span class="wds-friend-name">${escapeHtml(r.code_name || 'Unknown')}</span>
+        <button type="button" class="wds-mini-btn" data-accept-friend="${escapeHtml(r.requester_share_key)}">Accept</button>
+        <button type="button" class="wds-mini-btn" data-decline-friend="${escapeHtml(r.requester_share_key)}">Decline</button>
+      </div>`).join('');
+  } catch (e) {
+    console.error('refreshWdsPendingFriendRequestsList failed:', e);
+    listEl.innerHTML = '<p class="empty-note">Could not load friend requests.</p>';
+  }
+}
+
 // New pending requests get pushed into the same notification history as
 // posts/comments/stories — first pass just seeds the "seen" set silently,
 // same baseline-then-diff pattern used there, so existing requests don't
@@ -4531,7 +4561,7 @@ async function refreshWdsFriendRequests() {
     });
     wdsNotifFriendReqBaselineSet = true;
     renderWdsNotifications();
-  } catch (e) { /* best effort */ }
+  } catch (e) { console.error('refreshWdsFriendRequests failed:', e); }
 }
 
 async function wdsSendFriendRequest(digitalId) {
@@ -4543,11 +4573,13 @@ async function wdsSendFriendRequest(digitalId) {
 async function wdsRespondFriendRequest(requesterShareKey, accept) {
   if (!wdsRemoteData) return;
   try {
-    await sb.rpc('respond_friend_request', { p_share_key: wdsRemoteData.shareKey, p_requester_share_key: requesterShareKey, p_accept: accept });
+    const { error } = await sb.rpc('respond_friend_request', { p_share_key: wdsRemoteData.shareKey, p_requester_share_key: requesterShareKey, p_accept: accept });
+    if (error) throw error;
     wdsNotifSeenFriendReqIds.delete(requesterShareKey);
     await refreshWdsFriendRequests();
+    await refreshWdsPendingFriendRequestsList();
     if (accept) await refreshWdsFriendsList();
-  } catch (e) { /* best effort */ }
+  } catch (e) { console.error('wdsRespondFriendRequest failed:', e); }
 }
 
 // Render/show only — no history mutation. Used both by the click-driven
@@ -4581,6 +4613,7 @@ async function wdsShowProfilePage(targetShareKey) {
   renderWdsProfileHeader();
   await refreshWdsProfilePosts();
   await refreshWdsFriendsList(isOwn ? null : targetShareKey);
+  if (isOwn) await refreshWdsPendingFriendRequestsList();
   renderWdsProfileVisuals();
 }
 function wdsHideProfilePage() {
