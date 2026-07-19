@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.4.16';
+const APP_VERSION = 'WF_SYS_V.1.4.17';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -7683,6 +7683,8 @@ function initEntityPhotoUpload() {
         await sb.rpc('set_leaderboard_avatar', {
           p_share_key: getOrCreateShareKey(),
           p_avatar_data_url: (getProfile() || {}).photoDataUrl || null,
+          p_code_name: effectiveLeaderboardName(),
+          p_public_id: getOrCreatePublicId(),
         });
       } catch (e) { /* best effort */ }
     }
@@ -14459,7 +14461,10 @@ async function pushLeaderboardEntry() {
   // periodic sync runs regardless, so it naturally catches an existing
   // photo up without the user needing to re-touch it.
   try {
-    await sb.rpc('set_leaderboard_avatar', { p_share_key: shareKey, p_avatar_data_url: (getProfile() || {}).photoDataUrl || null });
+    await sb.rpc('set_leaderboard_avatar', {
+      p_share_key: shareKey, p_avatar_data_url: (getProfile() || {}).photoDataUrl || null,
+      p_code_name: effectiveLeaderboardName(), p_public_id: getOrCreatePublicId(),
+    });
   } catch (e) { /* best effort — avatar just stays an initial circle until this succeeds */ }
 }
 
