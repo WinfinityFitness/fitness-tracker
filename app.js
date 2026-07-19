@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.3.2';
+const APP_VERSION = 'WF_SYS_V.1.4.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -184,8 +184,8 @@ function initDesktopShell() {
       errorEl.hidden = false;
       return false;
     }
-    sessionStorage.setItem(SESSION_ID_KEY, cleanId);
-    sessionStorage.setItem(SESSION_PIN_KEY, cleanPin);
+    localStorage.setItem(SESSION_ID_KEY, cleanId);
+    localStorage.setItem(SESSION_PIN_KEY, cleanPin);
     // Not applyTheme()/applySkin() — those also touch mobile-only Settings
     // elements (themeIcon/themeToggle/skinSelect) that don't exist in this
     // markup. Setting the attributes directly gets the same CSS repaint
@@ -245,8 +245,8 @@ function initDesktopShell() {
   function startWdsDashboardPolling() {
     stopWdsDashboardPolling();
     wdsDashboardPollId = setInterval(async () => {
-      const id = sessionStorage.getItem(SESSION_ID_KEY);
-      const pin = sessionStorage.getItem(SESSION_PIN_KEY);
+      const id = localStorage.getItem(SESSION_ID_KEY);
+      const pin = localStorage.getItem(SESSION_PIN_KEY);
       if (!id || !pin) { stopWdsDashboardPolling(); return; }
       const ok = await enterDashboard(id, pin);
       if (!ok) stopWdsDashboardPolling();
@@ -298,8 +298,8 @@ function initDesktopShell() {
 
   signOutBtn.addEventListener('click', () => {
     if (!confirm('Log out?')) return;
-    sessionStorage.removeItem(SESSION_ID_KEY);
-    sessionStorage.removeItem(SESSION_PIN_KEY);
+    localStorage.removeItem(SESSION_ID_KEY);
+    localStorage.removeItem(SESSION_PIN_KEY);
     wdsRemoteData = null;
     // Resetting these here (not just on guest sign-in) matters: if this
     // isn't cleared, a REAL sign-in right after leaving a guest session
@@ -790,8 +790,8 @@ function initDesktopShell() {
       // dashboard itself uses and compare, so "Save" only ever claims
       // success once the server confirms it. This is what was missing
       // before: the button always looked successful even when it wasn't.
-      const id = sessionStorage.getItem(SESSION_ID_KEY);
-      const pin = sessionStorage.getItem(SESSION_PIN_KEY);
+      const id = localStorage.getItem(SESSION_ID_KEY);
+      const pin = localStorage.getItem(SESSION_PIN_KEY);
       const { data: verifyData, error: verifyError } = await sb.rpc('web_sync_get_dashboard', {
         p_public_id: id, p_pin: pin, p_days: 1,
       });
@@ -1429,15 +1429,17 @@ function initDesktopShell() {
     if (nameEl) { e.stopPropagation(); wdsOpenChatUserMenu(nameEl.dataset.dmName, e.clientX, e.clientY, nameEl.dataset.dmKey); }
   });
 
-  // A Digital ID + PIN entered earlier in this browser tab's session
-  // re-signs-in automatically on reload (re-fetching fresh data) instead of
-  // re-prompting — sessionStorage is tab-scoped and cleared on tab close.
+  // A Digital ID + PIN entered earlier on this browser re-sign in
+  // automatically here (re-fetching fresh data) instead of re-prompting —
+  // localStorage, not sessionStorage, so a brand-new tab or window opens
+  // straight into the same signed-in session instead of asking again;
+  // only an explicit Log Out actually clears it.
   // The inline <head> script already showed the reload splash instead of
   // this gate for that same reason; once this attempt resolves (either
   // way), drop the class so the gate/dashboard's own hidden state (already
   // set correctly by enterDashboard above) takes back over.
-  const rememberedId = sessionStorage.getItem(SESSION_ID_KEY);
-  const rememberedPin = sessionStorage.getItem(SESSION_PIN_KEY);
+  const rememberedId = localStorage.getItem(SESSION_ID_KEY);
+  const rememberedPin = localStorage.getItem(SESSION_PIN_KEY);
   if (rememberedId && rememberedPin) {
     enterDashboard(rememberedId, rememberedPin).finally(() => {
       document.documentElement.classList.remove('wf-resume-session');
@@ -2614,11 +2616,102 @@ function wdsCloseDial() {
   wdsDialOpen = false;
   const menu = document.getElementById('wdsDialMenu');
   if (menu) menu.classList.remove('is-open');
+  const catcher = document.getElementById('wdsDialArcCatcher');
+  if (catcher) catcher.hidden = true;
 }
+
+// Mobile-viewport arc — a straight port of the mobile app's own
+// admin-drawer-pill/layoutAdminDrawerArc mechanic (see that section of
+// this file): every icon sits on a virtual full circle, but only the
+// ~180° half facing the screen (nearest angle 0) is ever visible, and
+// only the one closest to angle 0 is enlarged and clickable — dragging
+// vertically anywhere on the arc (wdsDialArcCatcher, an invisible circle
+// behind the icons — dimmed icons are pointer-events:none so the drag
+// reaches it right through them, same trick the mobile version uses)
+// spins different icons into that front position. Desktop keeps the
+// simpler full-ring layout below instead.
+const WDS_DIAL_ARC_ICON_SPACING = 60;
+const WDS_DIAL_ARC_MIN_RADIUS = 65;
+let wdsDialArcRadius = WDS_DIAL_ARC_MIN_RADIUS;
+let wdsDialArcRotation = 0;
+function wdsComputeDialArcRadius(n) { return Math.max(WDS_DIAL_ARC_MIN_RADIUS, (n * WDS_DIAL_ARC_ICON_SPACING) / (2 * Math.PI)); }
+function wdsNormalizeAngle180(deg) {
+  let a = deg % 360;
+  if (a > 180) a -= 360;
+  if (a < -180) a += 360;
+  return a;
+}
+function wdsLayoutDialArc() {
+  const btn = document.getElementById('wdsDialBtn');
+  const menu = document.getElementById('wdsDialMenu');
+  const catcher = document.getElementById('wdsDialArcCatcher');
+  if (!btn || !menu) return;
+  const items = Array.from(menu.querySelectorAll('.wds-dial-item'));
+  const n = items.length;
+  if (!n) return;
+  const rect = btn.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+  const radius = wdsComputeDialArcRadius(n);
+  wdsDialArcRadius = radius;
+  // A right-docked button fans its arc leftward, into the screen (never
+  // off the edge) — the web dial's mobile view always docks right, but
+  // this stays correct if that ever changes.
+  const mirror = cx > window.innerWidth / 2 ? -1 : 1;
+  if (catcher) {
+    catcher.style.width = catcher.style.height = (radius * 2) + 'px';
+    catcher.style.left = cx + 'px';
+    catcher.style.top = cy + 'px';
+  }
+  const state = items.map((el, i) => {
+    const home = (360 / n) * i;
+    const phi = wdsNormalizeAngle180(home + wdsDialArcRotation);
+    return { el, phi, abs: Math.abs(phi) };
+  });
+  let focusedIdx = 0, minAbs = Infinity;
+  state.forEach((s, i) => { if (s.abs < minAbs) { minAbs = s.abs; focusedIdx = i; } });
+  state.forEach((s, i) => {
+    const rad = s.phi * Math.PI / 180;
+    const x = cx + mirror * radius * Math.cos(rad);
+    const y = cy + radius * Math.sin(rad);
+    const isFocused = i === focusedIdx;
+    s.el.style.left = x + 'px';
+    s.el.style.top = y + 'px';
+    s.el.style.transform = `translate(-50%, -50%) scale(${isFocused ? 1.3 : 1})`;
+    let opacity;
+    if (s.abs <= 80) opacity = 1;
+    else if (s.abs <= 100) opacity = 1 - (s.abs - 80) / 20;
+    else opacity = 0;
+    s.el.style.opacity = opacity;
+    s.el.style.pointerEvents = isFocused ? 'auto' : 'none';
+    s.el.classList.toggle('is-focused', isFocused);
+  });
+}
+function initWdsDialArcDrag() {
+  const catcher = document.getElementById('wdsDialArcCatcher');
+  if (!catcher) return;
+  let dragging = false, startY = 0, startRotation = 0;
+  catcher.addEventListener('pointerdown', e => {
+    dragging = true;
+    startY = e.clientY;
+    startRotation = wdsDialArcRotation;
+    catcher.setPointerCapture(e.pointerId);
+  });
+  catcher.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const dy = e.clientY - startY;
+    wdsDialArcRotation = startRotation + (dy / wdsDialArcRadius) * (180 / Math.PI);
+    wdsLayoutDialArc();
+  });
+  const endDrag = () => { dragging = false; };
+  catcher.addEventListener('pointerup', endDrag);
+  catcher.addEventListener('pointercancel', endDrag);
+}
+
 // Arranges every .wds-dial-item in a full ring around the button's CURRENT
 // position (so it still looks right after being dragged), clamped inside
-// the viewport so items near a screen edge don't end up unreachable.
-function wdsOpenDial() {
+// the viewport so items near a screen edge don't end up unreachable. Only
+// used at desktop widths — see wdsLayoutDialArc for the mobile version.
+function wdsLayoutDialRing() {
   const btn = document.getElementById('wdsDialBtn');
   const menu = document.getElementById('wdsDialMenu');
   if (!btn || !menu) return;
@@ -2632,7 +2725,24 @@ function wdsOpenDial() {
     const y = Math.max(margin, Math.min(window.innerHeight - margin, cy + WDS_DIAL_ITEM_RADIUS * Math.sin(angle)));
     item.style.left = x + 'px';
     item.style.top = y + 'px';
+    item.style.transform = 'translate(-50%, -50%) scale(1)';
+    item.style.opacity = '1';
+    item.style.pointerEvents = 'auto';
+    item.classList.remove('is-focused');
   });
+}
+function wdsOpenDial() {
+  const menu = document.getElementById('wdsDialMenu');
+  if (!menu) return;
+  const catcher = document.getElementById('wdsDialArcCatcher');
+  if (wdsIsDialMobileViewport()) {
+    wdsDialArcRotation = 0;
+    wdsLayoutDialArc();
+    if (catcher) catcher.hidden = false;
+  } else {
+    if (catcher) catcher.hidden = true;
+    wdsLayoutDialRing();
+  }
   menu.hidden = false;
   requestAnimationFrame(() => menu.classList.add('is-open'));
   wdsDialOpen = true;
@@ -2722,6 +2832,7 @@ function initWdsDialDrag() {
 function initWdsDial() {
   wdsApplyDialPosition();
   initWdsDialDrag();
+  initWdsDialArcDrag();
   // Crossing the mobile breakpoint (window resize, or a tablet rotation)
   // re-applies the right rule — fixed corner on mobile, restores any
   // saved free-drag position on desktop.
@@ -3439,6 +3550,24 @@ function stopWdsChatPolling() {
 // app), liking/unsending go through RPCs (see supabase_feed_migration.sql).
 // Desktop-only, same as chat — no mobile equivalent exists.
 // ---------------------------------------------------------------------
+// Real profile photos wherever a post/comment just showed an initial-
+// letter avatar circle — leaderboard.avatar_data_url is the same column
+// the friends list / profile page already read for this, just batched by
+// share_key per feed "page" instead of once per item.
+async function wdsFetchAvatarsByShareKey(shareKeys) {
+  const distinct = Array.from(new Set(shareKeys.filter(Boolean)));
+  if (!distinct.length) return {};
+  const { data } = await sb.from('leaderboard').select('share_key, avatar_data_url').in('share_key', distinct);
+  const map = {};
+  (data || []).forEach(r => { if (r.avatar_data_url) map[r.share_key] = r.avatar_data_url; });
+  return map;
+}
+// Inline background-image style when a real photo exists; falls back to
+// the plain initial-letter circle (unchanged) when it doesn't.
+function wdsAvatarStyleAttr(avatarUrl) {
+  return avatarUrl ? ` style="background-image:url('${escapeHtml(avatarUrl)}');background-size:cover;background-position:center;"` : '';
+}
+
 async function fetchFeedPosts() {
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   // get_visible_feed_posts (not a plain table select) applies visibility
@@ -3478,6 +3607,16 @@ async function fetchFeedPosts() {
     });
 
     await wdsAttachSharedOriginals(posts);
+
+    const avatarKeys = posts.map(p => p.share_key)
+      .concat(posts.flatMap(p => p.comments.map(c => c.share_key)))
+      .concat(posts.filter(p => p.sharedPost).map(p => p.sharedPost.share_key));
+    const avatarsByKey = await wdsFetchAvatarsByShareKey(avatarKeys);
+    posts.forEach(p => {
+      p.avatar_data_url = avatarsByKey[p.share_key] || null;
+      p.comments.forEach(c => { c.avatar_data_url = avatarsByKey[c.share_key] || null; });
+      if (p.sharedPost) p.sharedPost.avatar_data_url = avatarsByKey[p.sharedPost.share_key] || null;
+    });
   }
   return posts;
 }
@@ -3617,7 +3756,7 @@ function wdsSharedPostEmbedHtml(original) {
     ? `<img class="wds-post-image" src="${escapeHtml(original.image_url)}" alt="" data-lightbox="${escapeHtml(original.image_url)}">` : '';
   return `<div class="wds-shared-post-embed">
     <div class="wds-post-head">
-      <span class="wds-post-avatar" data-view-profile="${escapeHtml(original.share_key)}">${escapeHtml((original.code_name || '?').charAt(0).toUpperCase())}</span>
+      <span class="wds-post-avatar" data-view-profile="${escapeHtml(original.share_key)}"${wdsAvatarStyleAttr(original.avatar_data_url)}>${original.avatar_data_url ? '' : escapeHtml((original.code_name || '?').charAt(0).toUpperCase())}</span>
       <div class="wds-post-meta"><strong data-view-profile="${escapeHtml(original.share_key)}">${escapeHtml(original.code_name || 'Anonymous')}</strong><span>${wdsRelativeTime(original.created_at)}</span></div>
     </div>
     ${original.message ? `<p class="wds-post-body">${wdsLinkifyText(original.message)}</p>` : ''}
@@ -3923,7 +4062,7 @@ function wdsCommentHtml(c, myShareKey, isReply) {
   const canRemove = !!myShareKey && c.share_key === myShareKey;
   const cMyLike = (c.likes || []).find(l => l.share_key === myShareKey);
   return `<div class="wds-post-comment${isReply ? ' wds-post-comment--reply' : ''}" data-comment-id="${c.id}">
-    <span class="wds-post-comment-avatar" data-view-profile="${escapeHtml(c.share_key)}">${escapeHtml((c.code_name || '?').charAt(0).toUpperCase())}</span>
+    <span class="wds-post-comment-avatar" data-view-profile="${escapeHtml(c.share_key)}"${wdsAvatarStyleAttr(c.avatar_data_url)}>${c.avatar_data_url ? '' : escapeHtml((c.code_name || '?').charAt(0).toUpperCase())}</span>
     <div class="wds-post-comment-body">
       <div class="wds-post-comment-bubble"><strong data-view-profile="${escapeHtml(c.share_key)}">${escapeHtml(c.code_name || 'Anonymous')}</strong><span>${escapeHtml(c.message)}</span></div>
       <div class="wds-post-comment-actions">
@@ -3978,7 +4117,7 @@ function renderFeedPosts(posts) {
     return `
       <div class="wds-card wds-feed-post" data-post-id="${p.id}">
         <div class="wds-post-head">
-          <span class="wds-post-avatar" data-view-profile="${escapeHtml(p.share_key)}">${escapeHtml((p.code_name || '?').charAt(0).toUpperCase())}</span>
+          <span class="wds-post-avatar" data-view-profile="${escapeHtml(p.share_key)}"${wdsAvatarStyleAttr(p.avatar_data_url)}>${p.avatar_data_url ? '' : escapeHtml((p.code_name || '?').charAt(0).toUpperCase())}</span>
           <div class="wds-post-meta"><strong data-view-profile="${escapeHtml(p.share_key)}">${escapeHtml(p.code_name || 'Anonymous')}</strong><span>${isShare ? 'shared a post • ' : ''}${wdsRelativeTime(p.created_at)}</span></div>
           <button type="button" class="wds-post-menu-btn" data-action="post-menu" data-post-id="${p.id}" data-share-id="${isShare ? p.shared_post_id : p.id}" data-is-own="${isOwn ? '1' : '0'}" aria-label="Post options"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
         </div>

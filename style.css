@@ -4897,9 +4897,11 @@ html.wf-resume-session .wds-reload-splash { display: flex !important; }
 }
 .wds-theme-popup[hidden] { display: none; }
 .wds-theme-popup-card {
-  width: 100%; max-width: 320px; background: var(--surface-1); border: 1px solid var(--border);
-  border-radius: 12px; padding: 18px;
+  width: 100%; max-width: 260px; background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 14px;
 }
+.wds-theme-popup-row { margin-top: 8px !important; font-size: 0.8rem; }
+.wds-theme-popup-select { padding: 6px 8px; font-size: 0.78rem; }
 
 /* ---------- Top nav ---------- */
 .wds-topnav {
@@ -5251,6 +5253,15 @@ html.wf-desktop-shell body { overflow-x: auto; }
 .wds-dial-item span { display: none; }
 .wds-dial-menu.is-open .wds-dial-item { pointer-events: auto; transform: translate(-50%, -50%) scale(1); opacity: 1; }
 .wds-dial-item:hover { background: var(--surface-2); color: var(--accent); }
+.wds-dial-item.is-focused { border-color: var(--cyan); box-shadow: 0 0 14px var(--cyan-glow); color: var(--cyan); }
+/* Mobile-viewport arc drag catcher — invisible, sits behind the icons
+   (see index.html comment above #wdsDialArcCatcher). */
+.wds-dial-arc-catcher {
+  position: fixed; border-radius: 50%; transform: translate(-50%, -50%);
+  pointer-events: auto; touch-action: none; background: transparent; z-index: 1;
+}
+.wds-dial-arc-catcher[hidden] { display: none; }
+.wds-dial-item { z-index: 2; }
 
 /* Story composer/viewer overlays over a dark backdrop. */
 .wds-story-overlay {
