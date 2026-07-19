@@ -16,6 +16,17 @@
 if (location.hostname === 'wellness.winfinityfitness.com') {
   document.documentElement.classList.add('wf-desktop-shell');
 }
+// If a Digital ID + PIN were remembered from earlier in this browser tab
+// (see SESSION_ID_KEY/SESSION_PIN_KEY and the auto-resume block at the end
+// of initDesktopShell in app.js), the page is about to silently re-sign-in
+// with them — flashing the plain sign-in card for that split second before
+// app.js even runs reads as broken. Checked synchronously here, same
+// pattern as wf-desktop-shell above, so style.css can swap in a small
+// branded splash (.wds-reload-splash) instead with zero flash; app.js
+// removes this class once the auto-resume attempt actually resolves.
+if (sessionStorage.getItem('wds_operator_id') && sessionStorage.getItem('wds_operator_pin')) {
+  document.documentElement.classList.add('wf-resume-session');
+}
 </script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
@@ -35,7 +46,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.2.1">
+<link rel="stylesheet" href="style.css?v=1.2.2">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3254,6 +3265,12 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
      ============================================================ -->
 <div id="wdsShell">
 
+  <!-- ---------- Reload splash (see the inline script above + style.css) ---------- -->
+  <div class="wds-reload-splash" id="wdsReloadSplash">
+    <img class="wds-reload-splash-logo" src="icons/icon-512.png" alt="">
+    <p class="wds-reload-splash-label">RELOAD</p>
+  </div>
+
   <!-- ---------- Sign-in gate ---------- -->
   <div class="wds-gate" id="wdsGate">
     <div class="wds-gate-card">
@@ -3943,10 +3960,10 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
   <img id="chatLightboxImg" alt="">
 </div>
 
-<script src="config.js?v=1.2.1"></script>
+<script src="config.js?v=1.2.2"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.2.1"></script>
+<script src="app.js?v=1.2.2"></script>
 </body>
 </html>

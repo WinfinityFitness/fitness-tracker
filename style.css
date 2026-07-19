@@ -4830,6 +4830,27 @@ html.wf-desktop-shell #wdsShell {
     radial-gradient(ellipse 900px 500px at 15% 0%, rgba(51,200,204,0.10), transparent 60%),
     radial-gradient(ellipse 700px 400px at 90% 100%, rgba(128,105,214,0.08), transparent 60%);
 }
+/* Shown instead of .wds-gate for the split second a remembered session is
+   auto-resuming on reload (see the inline script in <head> and
+   initDesktopShell's auto-resume block in app.js) — the plain sign-in
+   card flashing on every refresh for someone already signed in reads as
+   broken. Hidden by default; html.wf-resume-session swaps the two. */
+.wds-reload-splash {
+  display: none; min-height: 100vh; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; padding: 24px;
+}
+html.wf-resume-session #wdsGate { display: none !important; }
+html.wf-resume-session .wds-reload-splash { display: flex !important; }
+.wds-reload-splash-logo { width: 64px; height: 64px; border-radius: 16px; animation: wds-reload-pulse 1.4s ease-in-out infinite; }
+@keyframes wds-reload-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.55; transform: scale(0.92); }
+}
+.wds-reload-splash-label {
+  margin: 0; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em; color: var(--text-muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .wds-reload-splash-logo { animation: none; }
+}
 .wds-gate-card {
   width: 100%;
   max-width: 380px;

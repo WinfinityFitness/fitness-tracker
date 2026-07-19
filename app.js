@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.2.1';
+const APP_VERSION = 'WF_SYS_V.1.2.2';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1326,9 +1326,19 @@ function initDesktopShell() {
   // A Digital ID + PIN entered earlier in this browser tab's session
   // re-signs-in automatically on reload (re-fetching fresh data) instead of
   // re-prompting — sessionStorage is tab-scoped and cleared on tab close.
+  // The inline <head> script already showed the reload splash instead of
+  // this gate for that same reason; once this attempt resolves (either
+  // way), drop the class so the gate/dashboard's own hidden state (already
+  // set correctly by enterDashboard above) takes back over.
   const rememberedId = sessionStorage.getItem(SESSION_ID_KEY);
   const rememberedPin = sessionStorage.getItem(SESSION_PIN_KEY);
-  if (rememberedId && rememberedPin) enterDashboard(rememberedId, rememberedPin);
+  if (rememberedId && rememberedPin) {
+    enterDashboard(rememberedId, rememberedPin).finally(() => {
+      document.documentElement.classList.remove('wf-resume-session');
+    });
+  } else {
+    document.documentElement.classList.remove('wf-resume-session');
+  }
 }
 // ---------------------------------------------------------------------
 // Desktop dashboard rendering — calls the SAME pure calc functions the
