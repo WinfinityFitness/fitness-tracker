@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.4.3';
+const APP_VERSION = 'WF_SYS_V.1.4.4';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1649,6 +1649,7 @@ function renderWdsDashboard() {
   renderWdsNexus().catch(() => {});
   refreshWdsFeed().catch(() => {});
   refreshWdsFriendRequests().catch(() => {});
+  refreshWdsSentFriendRequestOutcomes().catch(() => {});
   refreshWdsLeaderboardList().catch(() => {});
   renderWdsMenu();
   renderWdsNotifications();
@@ -4562,6 +4563,44 @@ async function refreshWdsFriendRequests() {
     wdsNotifFriendReqBaselineSet = true;
     renderWdsNotifications();
   } catch (e) { console.error('refreshWdsFriendRequests failed:', e); }
+}
+
+// The requester's side of the same flow refreshWdsFriendRequests handles
+// for the recipient. Unlike that one, this deliberately does NOT suppress
+// the first pass — an outcome persists on the friendships row indefinitely
+// (see supabase_friend_request_outcomes_migration.sql), so the correct
+// behavior is "notify the first time THIS BROWSER sees it," even if that's
+// a fresh page load long after the actual accept/decline happened, not
+// "only if the tab was open at that exact moment." The seen-set is
+// therefore persisted (localStorage), not just an in-memory Set.
+const WDS_SEEN_FRIEND_OUTCOMES_KEY = 'wft_web_seen_friend_outcomes';
+function wdsLoadSeenFriendOutcomes() {
+  try { return new Set(JSON.parse(localStorage.getItem(WDS_SEEN_FRIEND_OUTCOMES_KEY)) || []); }
+  catch (e) { return new Set(); }
+}
+async function refreshWdsSentFriendRequestOutcomes() {
+  if (!wdsRemoteData) return;
+  try {
+    const { data, error } = await sb.rpc('list_sent_friend_request_outcomes', { p_share_key: wdsRemoteData.shareKey });
+    if (error) throw error;
+    const seen = wdsLoadSeenFriendOutcomes();
+    let sawNewAccept = false;
+    (data || []).forEach(r => {
+      const key = `${r.addressee_share_key}:${r.status}:${r.responded_at}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      const name = escapeHtml(r.code_name || 'Someone');
+      if (r.status === 'accepted') {
+        sawNewAccept = true;
+        wdsPushNotification(`friend-outcome:${key}`, 'Friend Request Accepted', `${name} accepted your friend request.`, '');
+      } else if (r.status === 'declined') {
+        wdsPushNotification(`friend-outcome:${key}`, 'Friend Request Declined', `${name} declined your friend request.`, '');
+      }
+    });
+    localStorage.setItem(WDS_SEEN_FRIEND_OUTCOMES_KEY, JSON.stringify(Array.from(seen)));
+    if (sawNewAccept) await refreshWdsFriendsList();
+    renderWdsNotifications();
+  } catch (e) { console.error('refreshWdsSentFriendRequestOutcomes failed:', e); }
 }
 
 async function wdsSendFriendRequest(digitalId) {
