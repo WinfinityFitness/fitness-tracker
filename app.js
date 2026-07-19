@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.4.6';
+const APP_VERSION = 'WF_SYS_V.1.4.7';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -4599,6 +4599,18 @@ async function refreshWdsFriendsList(targetShareKey) {
   try {
     const { data, error } = await sb.rpc('list_friends', { p_share_key: shareKey });
     if (error) throw error;
+    // Viewing someone else's profile: their own friends list happens to be
+    // the easiest way to tell whether WE'RE already friends with them (no
+    // separate are-we-friends RPC exists) — if our share_key shows up in
+    // it, hide "+ Add Friend" instead of offering to re-send a request.
+    if (targetShareKey) {
+      const addFriendBtn = document.getElementById('btnWdsProfileAddFriendDirect');
+      if (addFriendBtn) {
+        const alreadyFriends = (data || []).some(f => f.share_key === wdsRemoteData.shareKey);
+        addFriendBtn.hidden = alreadyFriends;
+        if (!alreadyFriends) { addFriendBtn.disabled = false; addFriendBtn.textContent = '+ Add Friend'; }
+      }
+    }
     if (!data || !data.length) { listEl.innerHTML = '<p class="empty-note">No friends yet.</p>'; return; }
     listEl.innerHTML = data.map(f => `
       <div class="wds-friend-item" data-view-profile="${escapeHtml(f.share_key)}">
