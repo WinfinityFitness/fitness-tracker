@@ -35,7 +35,7 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.1.9">
+<link rel="stylesheet" href="style.css?v=1.2.0">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3684,6 +3684,16 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
 
   <!-- Per-user chat context menu — click a name in any Winfinity chat
        surface (Global Chat or a DM/Group popup). -->
+  <!-- Feed post ⋮ menu — Share to My Day always offered; Edit/Delete
+       hidden (via [hidden] on the buttons themselves) unless it's your
+       own post. One shared floating menu (see wdsOpenPostMenu in app.js),
+       repositioned per click. -->
+  <div class="chat-user-menu" id="wdsPostMenu" hidden>
+    <button type="button" class="chat-room-menu-item" id="btnWdsPostMenuEdit" hidden>Edit</button>
+    <button type="button" class="chat-room-menu-item chat-room-menu-item--danger" id="btnWdsPostMenuDelete" hidden>Delete</button>
+    <button type="button" class="chat-room-menu-item" id="btnWdsPostMenuShareMyday">Share to My Day</button>
+  </div>
+
   <div class="chat-user-menu" id="wdsChatUserMenu" hidden>
     <div id="wdsChatUserMenuMain">
       <p class="chat-user-menu-name" id="wdsChatUserMenuName"></p>
@@ -3873,10 +3883,10 @@ if (location.hostname === 'wellness.winfinityfitness.com') {
   <img id="chatLightboxImg" alt="">
 </div>
 
-<script src="config.js?v=1.1.9"></script>
+<script src="config.js?v=1.2.0"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.1.9"></script>
+<script src="app.js?v=1.2.0"></script>
 </body>
 </html>

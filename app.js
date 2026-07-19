@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.1.9';
+const APP_VERSION = 'WF_SYS_V.1.2.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1276,6 +1276,32 @@ function initDesktopShell() {
     if (!chatUserMenu.hidden && !chatUserMenu.contains(e.target) && !e.target.closest('[data-dm-name]')) wdsCloseChatUserMenu();
   });
 
+  // ⋮ post menu — Edit/Delete (own posts only) + Share to My Day (any
+  // post). Edit/Delete need the post's own card (found by
+  // wdsPostMenuTargetId) since this menu is a single shared floating
+  // element, not nested inside any one post.
+  const postMenu = document.getElementById('wdsPostMenu');
+  document.getElementById('btnWdsPostMenuEdit').addEventListener('click', () => {
+    const id = wdsPostMenuTargetId;
+    wdsClosePostMenu();
+    if (id != null) wdsStartEditPost(id);
+  });
+  document.getElementById('btnWdsPostMenuDelete').addEventListener('click', async () => {
+    const id = wdsPostMenuTargetId;
+    wdsClosePostMenu();
+    if (id == null || !wdsRemoteData || !confirm('Remove this post?')) return;
+    try { await unsendFeedPost(id, wdsRemoteData.shareKey); await refreshWdsFeed(true); } catch (e) { /* best effort */ }
+  });
+  document.getElementById('btnWdsPostMenuShareMyday').addEventListener('click', () => {
+    const shareId = wdsPostMenuShareId;
+    const card = document.querySelector(`.wds-feed-post[data-post-id="${shareId}"]`) || document.querySelector(`.wds-feed-post[data-post-id="${wdsPostMenuTargetId}"]`);
+    wdsClosePostMenu();
+    if (card) wdsShareFeedPostToMyDay(wdsBuildSharePreviewFromCard(card));
+  });
+  document.addEventListener('click', e => {
+    if (!postMenu.hidden && !postMenu.contains(e.target) && !e.target.closest('[data-action="post-menu"]')) wdsClosePostMenu();
+  });
+
   // Global Chat's own sender names open the same context menu.
   document.getElementById('wdsChatList').addEventListener('click', e => {
     const nameEl = e.target.closest('[data-dm-name]');
@@ -1750,6 +1776,83 @@ function wdsShareFeedPostToMyDay(preview) {
   wdsRenderStoryLinkPreviewBox();
   wdsUpdateStoryHint();
   wdsOpenStoryComposer();
+}
+
+// Shared by the ⋮ post menu's "Share to My Day" item — builds a
+// link_preview-shaped object (internal:true, see wdsBuildLinkPreviewHtml)
+// from a post card's own rendered name/text/image, no extra fetch needed.
+function wdsBuildSharePreviewFromCard(card) {
+  const nameEl = card.querySelector('.wds-post-meta strong');
+  const bodyEl = card.querySelector('.wds-post-body');
+  const imgEl = card.querySelector('.wds-post-image, .wds-post-gallery img');
+  return {
+    internal: true,
+    siteName: 'Winfinity Nexus',
+    title: nameEl ? nameEl.textContent.trim() + "'s post" : 'Shared post',
+    description: bodyEl ? bodyEl.textContent.trim().slice(0, 200) : '',
+    image: imgEl ? imgEl.src : null,
+    url: '#',
+  };
+}
+
+// The ⋮ menu on each feed post — Share to My Day always offered; Edit and
+// Delete only for your own posts. A single shared floating menu (same
+// pattern as wdsChatUserMenu) repositioned per click, rather than one
+// per-post popover, since only one can ever be open at a time.
+let wdsPostMenuTargetId = null;
+let wdsPostMenuShareId = null;
+function wdsOpenPostMenu(postId, shareId, isOwn, x, y) {
+  wdsPostMenuTargetId = postId;
+  wdsPostMenuShareId = shareId;
+  const menu = document.getElementById('wdsPostMenu');
+  if (!menu) return;
+  const editBtn = document.getElementById('btnWdsPostMenuEdit');
+  const deleteBtn = document.getElementById('btnWdsPostMenuDelete');
+  if (editBtn) editBtn.hidden = !isOwn;
+  if (deleteBtn) deleteBtn.hidden = !isOwn;
+  menu.hidden = false;
+  const menuWidth = 200;
+  menu.style.left = Math.max(8, Math.min(x, window.innerWidth - menuWidth - 12)) + 'px';
+  menu.style.top = Math.max(8, Math.min(y, window.innerHeight - 160)) + 'px';
+}
+function wdsClosePostMenu() {
+  const menu = document.getElementById('wdsPostMenu');
+  if (menu) menu.hidden = true;
+  wdsPostMenuTargetId = null;
+  wdsPostMenuShareId = null;
+}
+
+// Inline edit — swaps the post body (or inserts one, for an image-only
+// post) for a textarea + Save/Cancel row. Cancel just re-renders from the
+// already-fetched feed cache instead of trying to restore the original
+// markup by hand.
+function wdsStartEditPost(postId) {
+  const card = document.querySelector(`.wds-feed-post[data-post-id="${postId}"]`);
+  if (!card) return;
+  const existing = card.querySelector('.wds-post-body');
+  const currentText = existing ? existing.textContent : '';
+  const editBox = document.createElement('div');
+  editBox.className = 'wds-post-edit-box';
+  editBox.innerHTML = `
+    <textarea maxlength="2000">${escapeHtml(currentText)}</textarea>
+    <div class="wds-post-edit-actions">
+      <button type="button" class="wds-mini-btn" data-action="save-edit-post">Save</button>
+      <button type="button" class="wds-mini-btn" data-action="cancel-edit-post">Cancel</button>
+    </div>`;
+  if (existing) existing.replaceWith(editBox);
+  else card.querySelector('.wds-post-head').insertAdjacentElement('afterend', editBox);
+  const textarea = editBox.querySelector('textarea');
+  textarea.focus();
+  textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+}
+async function wdsSaveEditPost(postId, shareKey) {
+  const card = document.querySelector(`.wds-feed-post[data-post-id="${postId}"]`);
+  const textarea = card ? card.querySelector('.wds-post-edit-box textarea') : null;
+  if (!textarea || !shareKey) return;
+  try {
+    await editFeedPost(postId, shareKey, textarea.value);
+    await refreshWdsFeed(true);
+  } catch (e) { /* best effort — leaves the edit box open so nothing typed is lost */ }
 }
 
 function wdsSyncStoryTextToolbar(item) {
@@ -3190,6 +3293,11 @@ async function unsendFeedPost(postId, shareKey) {
   if (error) throw error;
 }
 
+async function editFeedPost(postId, shareKey, message) {
+  const { error } = await sb.rpc('edit_feed_post', { p_post_id: postId, p_share_key: shareKey, p_message: (message || '').trim().slice(0, 2000) });
+  if (error) throw error;
+}
+
 async function unsendFeedComment(commentId, shareKey) {
   const { error } = await sb.rpc('unsend_feed_comment', { p_comment_id: commentId, p_share_key: shareKey });
   if (error) throw error;
@@ -3234,10 +3342,18 @@ const WDS_REACTION_LABEL = { '👍': 'Like', '❤️': 'Love', '😂': 'Haha', '
 // separate line at the bottom-right of the post (wdsReactionSummaryHtml
 // below), matching Facebook's actual layout instead of cramming both into
 // one button.
-function wdsReactionButtonHtml(likes, myShareKey) {
+function wdsReactionLabel(likes, myShareKey) {
   const mine = (likes || []).find(l => l.share_key === myShareKey);
-  const label = mine ? (WDS_REACTION_LABEL[mine.emoji] || 'Liked') : 'Like';
-  return `${mine ? mine.emoji : '👍'} ${label}`;
+  return mine ? (WDS_REACTION_LABEL[mine.emoji] || 'Liked') : 'Like';
+}
+// showLabel defaults to true (comment-like buttons keep their text); the
+// post-level actions row passes false — icon (the reaction emoji itself)
+// only, label moved to the button's aria-label/title instead.
+function wdsReactionButtonHtml(likes, myShareKey, showLabel) {
+  const mine = (likes || []).find(l => l.share_key === myShareKey);
+  const emoji = mine ? mine.emoji : '👍';
+  if (showLabel === false) return emoji;
+  return `${emoji} ${wdsReactionLabel(likes, myShareKey)}`;
 }
 
 // Bottom-right summary: the top distinct reaction emoji + total count —
@@ -3419,7 +3535,7 @@ function renderFeedPosts(posts) {
         <div class="wds-post-head">
           <span class="wds-post-avatar" data-view-profile="${escapeHtml(p.share_key)}">${escapeHtml((p.code_name || '?').charAt(0).toUpperCase())}</span>
           <div class="wds-post-meta"><strong data-view-profile="${escapeHtml(p.share_key)}">${escapeHtml(p.code_name || 'Anonymous')}</strong><span>${isShare ? 'shared a post • ' : ''}${wdsRelativeTime(p.created_at)}</span></div>
-          ${isOwn ? `<button type="button" class="wds-post-unsend-btn" data-action="unsend-post">Remove</button>` : ''}
+          <button type="button" class="wds-post-menu-btn" data-action="post-menu" data-post-id="${p.id}" data-share-id="${isShare ? p.shared_post_id : p.id}" data-is-own="${isOwn ? '1' : '0'}" aria-label="Post options"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
         </div>
         ${bodyHtml}
         <div class="wds-post-stats-row">
@@ -3430,10 +3546,9 @@ function renderFeedPosts(posts) {
           </span>
         </div>
         <div class="wds-post-actions">
-          <button type="button" class="wds-post-action-btn${myLike ? ' is-liked' : ''}" data-action="like" data-current-emoji="${myLike ? myLike.emoji : ''}">${wdsReactionButtonHtml(p.likes, myShareKey)}</button>
-          <button type="button" class="wds-post-action-btn" data-action="toggle-comments">💬 Comments</button>
-          ${canShare ? `<button type="button" class="wds-post-action-btn" data-action="open-share" data-post-id="${isShare ? p.shared_post_id : p.id}">↗ Share</button>` : ''}
-          <button type="button" class="wds-post-action-btn" data-action="share-to-myday" data-post-id="${isShare ? p.shared_post_id : p.id}">Share to My Day</button>
+          <button type="button" class="wds-post-action-btn${myLike ? ' is-liked' : ''}" data-action="like" data-current-emoji="${myLike ? myLike.emoji : ''}" aria-label="${wdsReactionLabel(p.likes, myShareKey)}" title="${wdsReactionLabel(p.likes, myShareKey)}">${wdsReactionButtonHtml(p.likes, myShareKey, false)}</button>
+          <button type="button" class="wds-post-action-btn" data-action="toggle-comments" aria-label="Comments" title="Comments"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></button>
+          ${canShare ? `<button type="button" class="wds-post-action-btn" data-action="open-share" data-post-id="${isShare ? p.shared_post_id : p.id}" aria-label="Share" title="Share"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></button>` : ''}
         </div>
         <div class="wds-post-comments" ${expanded ? '' : 'hidden'}>
           ${commentsHtml}
@@ -3874,6 +3989,14 @@ function initWdsFeed() {
       try { await unsendFeedPost(postId, shareKey); await refreshWdsFeed(true); } catch (err) { /* best effort */ }
       return;
     }
+    const postMenuBtn = e.target.closest('[data-action="post-menu"]');
+    if (postMenuBtn) {
+      e.stopPropagation();
+      wdsOpenPostMenu(Number(postMenuBtn.dataset.postId), Number(postMenuBtn.dataset.shareId), postMenuBtn.dataset.isOwn === '1', e.clientX, e.clientY);
+      return;
+    }
+    if (e.target.closest('[data-action="save-edit-post"]')) { await wdsSaveEditPost(postId, shareKey); return; }
+    if (e.target.closest('[data-action="cancel-edit-post"]')) { await refreshWdsFeed(true); return; }
     if (e.target.closest('[data-action="unsend-comment"]')) {
       const commentRow = e.target.closest('[data-comment-id]');
       const commentId = commentRow ? Number(commentRow.dataset.commentId) : null;
@@ -3947,21 +4070,9 @@ function initWdsFeed() {
       wdsOpenShareCompose(Number(shareBtn.dataset.postId), previewHtml);
       return;
     }
-    const shareToMydayBtn = e.target.closest('[data-action="share-to-myday"]');
-    if (shareToMydayBtn) {
-      const nameEl = card.querySelector('.wds-post-meta strong');
-      const bodyEl = card.querySelector('.wds-post-body');
-      const imgEl = card.querySelector('.wds-post-image, .wds-post-gallery img');
-      wdsShareFeedPostToMyDay({
-        internal: true,
-        siteName: 'Winfinity Nexus',
-        title: nameEl ? nameEl.textContent.trim() + "'s post" : 'Shared post',
-        description: bodyEl ? bodyEl.textContent.trim().slice(0, 200) : '',
-        image: imgEl ? imgEl.src : null,
-        url: '#',
-      });
-      return;
-    }
+    // "Share to My Day" now lives in the ⋮ post menu (wdsOpenPostMenu/
+    // wdsPostMenu click handler below) rather than a standalone action-row
+    // button — see wdsBuildSharePreviewFromCard for the shared logic.
     const sharersEl = e.target.closest('[data-action="view-sharers"]');
     if (sharersEl) { wdsShowSharers(Number(sharersEl.dataset.postId)); return; }
   });

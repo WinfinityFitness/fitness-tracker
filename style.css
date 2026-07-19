@@ -5476,6 +5476,20 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
 }
 .wds-post-action-btn:hover { background: var(--surface-2); color: var(--text-primary); }
 .wds-post-action-btn.is-liked { color: var(--magenta); }
+/* ⋮ post menu trigger — sits at the end of .wds-post-head, replacing what
+   used to be an always-visible text "Remove" button for own posts only. */
+.wds-post-menu-btn {
+  margin-left: auto; flex-shrink: 0; background: none; border: none; color: var(--text-muted);
+  padding: 4px; border-radius: 6px; cursor: pointer; display: flex; align-items: center;
+}
+.wds-post-menu-btn:hover { background: var(--surface-2); color: var(--text-primary); }
+.wds-post-edit-box { display: flex; flex-direction: column; gap: 8px; padding: 4px 0 10px; }
+.wds-post-edit-box textarea {
+  width: 100%; min-height: 60px; background: var(--surface-2); border: 1px solid var(--border-soft);
+  border-radius: 8px; padding: 8px 10px; color: var(--text-primary); font-size: 0.84rem;
+  font-family: var(--font-display); resize: vertical; box-sizing: border-box;
+}
+.wds-post-edit-actions { display: flex; gap: 6px; justify-content: flex-end; }
 
 .wds-post-comments { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border-soft); padding-top: 10px; }
 .wds-post-comment { display: flex; gap: 8px; }
