@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.1.8';
+const APP_VERSION = 'WF_SYS_V.1.1.9';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -2365,7 +2365,15 @@ async function refreshWdsChatRooms() {
   if (!wdsRemoteData) return;
   const myShareKey = wdsRemoteData.shareKey;
   try {
-    sb.rpc('cleanup_stale_solo_rooms').catch(() => {});
+    // sb.rpc(...) isn't a plain Promise here — chaining .catch() directly
+    // onto it threw synchronously ("catch is not a function") on every
+    // single call, aborting this whole function before it ever reached the
+    // actual room-fetching queries below. That's why the Chats dropdown
+    // showed "No conversations yet" even for accounts with real rooms/
+    // messages. A local try/catch (matching refreshChatRooms's own working
+    // call to the same RPC, app.js ~15857) fixes it: real failures here
+    // stay non-fatal without needing .catch to exist on the return value.
+    try { await sb.rpc('cleanup_stale_solo_rooms'); } catch (e) { /* best effort, opportunistic */ }
     const { data: memberRows } = await sb.from('chat_room_members').select('room_id, status').eq('share_key', myShareKey);
     const roomIds = (memberRows || []).map(r => r.room_id);
     if (!roomIds.length) { wdsChatRoomMeta = {}; renderWdsChatListPanel(); return; }
