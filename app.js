@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.4.7';
+const APP_VERSION = 'WF_SYS_V.1.4.8';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -2757,7 +2757,34 @@ function wdsCloseDial() {
   if (menu) menu.classList.remove('is-open');
   const catcher = document.getElementById('wdsDialArcCatcher');
   if (catcher) catcher.hidden = true;
+  wdsPopDialHistoryIfNeeded();
 }
+
+// Back-button integration — same push-on-open, pop-on-close,
+// guard-against-double-handling shape as the story composer/viewer's own
+// history block above (wdsPushStoryHistory/wdsPopStoryHistoryIfNeeded),
+// scoped to the dial instead. wdsCloseDial is the single choke point every
+// close path already runs through (outside click, re-tapping the dial
+// button, a dead-space tap on the mobile arc, picking a menu item), so
+// wiring the pop there covers all of them for free.
+let wdsDialHistoryOpen = false;
+let wdsDialClosingViaHistory = false;
+function wdsPushDialHistory() {
+  if (wdsDialHistoryOpen) return;
+  wdsDialHistoryOpen = true;
+  history.pushState({ wdsDialOverlay: true }, '');
+}
+function wdsPopDialHistoryIfNeeded() {
+  if (!wdsDialHistoryOpen) return;
+  wdsDialHistoryOpen = false;
+  if (wdsDialClosingViaHistory) { wdsDialClosingViaHistory = false; return; }
+  history.back();
+}
+window.addEventListener('popstate', () => {
+  if (!wdsDialHistoryOpen) return;
+  wdsDialClosingViaHistory = true;
+  wdsCloseDial();
+});
 
 // Mobile-viewport arc — a straight port of the mobile app's own
 // admin-drawer-pill/layoutAdminDrawerArc mechanic (see that section of
@@ -2899,6 +2926,7 @@ function wdsOpenDial() {
   menu.hidden = false;
   requestAnimationFrame(() => menu.classList.add('is-open'));
   wdsDialOpen = true;
+  wdsPushDialHistory();
 }
 function wdsToggleDial() { if (wdsDialOpen) wdsCloseDial(); else wdsOpenDial(); }
 
