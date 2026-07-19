@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.4.4';
+const APP_VERSION = 'WF_SYS_V.1.4.5';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -87,6 +87,7 @@ function wdsUpdateAdminBadge() {
 // content ever actually reaching a real table, not just a convention.
 let wdsGuestMode = false;
 const WDS_GUEST_SHARE_KEY = 'guest-preview';
+const WDS_GUEST_MODE_KEY = 'wft_web_guest_mode';
 const WDS_GUEST_NAME = 'Guest';
 let wdsGuestFeedPosts = null;
 let wdsGuestStories = null;
@@ -286,8 +287,12 @@ function initDesktopShell() {
   // Every write anywhere in the dashboard checks wdsGuestMode itself and
   // simulates locally instead of touching Supabase — see the
   // wdsGuestMode/WDS_GUEST_SHARE_KEY block near the top of this file.
-  if (guestLoginBtn) guestLoginBtn.addEventListener('click', () => {
+  // Persisted (WDS_GUEST_MODE_KEY) the same way a real sign-in is, so a
+  // refresh or a new tab/window resumes guest mode instead of silently
+  // signing them out — only the explicit Log Out button actually ends it.
+  const enterGuestDashboard = () => {
     wdsGuestMode = true;
+    localStorage.setItem(WDS_GUEST_MODE_KEY, '1');
     wdsRemoteData = {
       publicId: 'GUEST', shareKey: WDS_GUEST_SHARE_KEY, profile: { name: WDS_GUEST_NAME },
       theme: 'dark', skin: 'default', logsObj: {}, reviewsObj: {}, dailyReviewsObj: {},
@@ -312,7 +317,8 @@ function initDesktopShell() {
     if (globalChatFixedEl && window.innerWidth > 860) globalChatFixedEl.hidden = false;
     const banner = document.getElementById('wdsGuestBanner');
     if (banner) banner.hidden = false;
-  });
+  };
+  if (guestLoginBtn) guestLoginBtn.addEventListener('click', enterGuestDashboard);
 
   signOutBtn.addEventListener('click', () => {
     if (!confirm('Log out?')) return;
@@ -324,6 +330,7 @@ function initDesktopShell() {
     // would silently simulate every one of that real account's actions
     // as guest-mode no-ops instead of actually posting them.
     wdsGuestMode = false;
+    localStorage.removeItem(WDS_GUEST_MODE_KEY);
     wdsGuestFeedPosts = null;
     wdsGuestStories = null;
     wdsGuestChatMessages = null;
@@ -1534,6 +1541,16 @@ function initDesktopShell() {
   // this gate for that same reason; once this attempt resolves (either
   // way), drop the class so the gate/dashboard's own hidden state (already
   // set correctly by enterDashboard above) takes back over.
+  // Guest Log In persists the exact same way — a refresh or new tab/
+  // window resumes it instead of silently signing the guest out; only
+  // the explicit Log Out button (which clears WDS_GUEST_MODE_KEY) ends it.
+  // No network round-trip here (unlike a real sign-in), so there's no
+  // meaningful flash to avoid — no reload-splash handling needed.
+  if (localStorage.getItem(WDS_GUEST_MODE_KEY) === '1') {
+    enterGuestDashboard();
+    document.documentElement.classList.remove('wf-resume-session');
+    return;
+  }
   const rememberedId = localStorage.getItem(SESSION_ID_KEY);
   const rememberedPin = localStorage.getItem(SESSION_PIN_KEY);
   if (rememberedId && rememberedPin) {
@@ -3705,10 +3722,15 @@ async function fetchFeedPosts() {
   // (public/friends/only_me) server-side against the signed-in viewer —
   // see supabase_friends_and_visibility_migration.sql for why this is an
   // RPC rather than an RLS policy (no real per-request auth to check
-  // "who's asking" against).
-  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+  // "who's asking" against). p_viewer_share_key is uuid-typed — a guest's
+  // WDS_GUEST_SHARE_KEY sentinel is deliberately NOT a valid uuid (see its
+  // definition), so passing it here would fail the RPC outright before
+  // the query even ran. null is the correct "no real identity" viewer key
+  // — the query's own logic already treats that as "public posts only",
+  // exactly the guest's intended visibility.
+  const myShareKey = (wdsRemoteData && !wdsGuestMode) ? wdsRemoteData.shareKey : null;
   const { data, error } = await sb.rpc('get_visible_feed_posts', {
-    p_viewer_share_key: myShareKey, p_cutoff: cutoff, p_limit: 30,
+    p_viewer_share_key: myShareKey, p_cutoff: cutoff, p_limit: wdsGuestMode ? 10 : 30,
   });
   if (error) throw error;
   const posts = data || [];
@@ -4541,7 +4563,7 @@ let wdsNotifFriendReqBaselineSet = false;
 const wdsNotifSeenFriendReqIds = new Set();
 
 async function refreshWdsFriendRequests() {
-  if (!wdsRemoteData) return;
+  if (!wdsRemoteData || wdsGuestMode) return;
   try {
     const { data, error } = await sb.rpc('list_pending_friend_requests', { p_share_key: wdsRemoteData.shareKey });
     if (error) throw error;
@@ -4579,7 +4601,7 @@ function wdsLoadSeenFriendOutcomes() {
   catch (e) { return new Set(); }
 }
 async function refreshWdsSentFriendRequestOutcomes() {
-  if (!wdsRemoteData) return;
+  if (!wdsRemoteData || wdsGuestMode) return;
   try {
     const { data, error } = await sb.rpc('list_sent_friend_request_outcomes', { p_share_key: wdsRemoteData.shareKey });
     if (error) throw error;
