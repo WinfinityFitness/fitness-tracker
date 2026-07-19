@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.4.11';
+const APP_VERSION = 'WF_SYS_V.1.4.12';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -3210,10 +3210,12 @@ async function refreshWdsChat() {
     const messages = await fetchChatMessages();
     wdsLastChatMessages = messages;
     const receipts = await fetchChatSeenReceipts('global').catch(() => []);
-    // Real photos on the "Seen by" row instead of always a letter circle —
-    // chat_read_receipts itself has no avatar column, so this is a separate
-    // batch lookup keyed off each receipt's share_key.
-    const avatarsByKey = receipts.length ? await wdsFetchAvatarsByShareKey(receipts.map(r => r.share_key)) : {};
+    // Real photos on message rows and the "Seen by" row instead of always a
+    // letter circle — neither chat_messages nor chat_read_receipts carries
+    // an avatar column of its own, so this is a separate batch lookup
+    // covering every share_key either one references.
+    const avatarKeys = messages.map(m => m.sender_share_key).concat(receipts.map(r => r.share_key));
+    const avatarsByKey = avatarKeys.length ? await wdsFetchAvatarsByShareKey(avatarKeys) : {};
     renderWdsChatMessages(messages, receipts, avatarsByKey);
     renderWdsNotifications();
     wdsMaybeMarkChatRead();
@@ -3721,7 +3723,9 @@ function renderWdsChatMessages(messages, receipts, avatarsByKey) {
     const row = document.createElement('div');
     row.className = 'chat-row ' + (isOwn ? 'chat-row--own' : 'chat-row--other');
     const time = new Date(m.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-    const nameHtml = !isOwn ? `<span class="chat-name" data-dm-name="${escapeHtml(m.code_name || 'Anonymous')}" data-dm-key="${escapeHtml(m.sender_share_key || '')}" style="cursor:pointer;">${escapeHtml(m.code_name || 'Anonymous')}</span>` : '';
+    const senderPhoto = avatarsByKey[m.sender_share_key];
+    const avatarHtml = !isOwn ? `<span class="wds-chat-msg-avatar" data-dm-name="${escapeHtml(m.code_name || 'Anonymous')}" data-dm-key="${escapeHtml(m.sender_share_key || '')}"${wdsAvatarStyleAttr(senderPhoto)}>${senderPhoto ? '' : escapeHtml((m.code_name || '?').charAt(0).toUpperCase())}</span>` : '';
+    const nameHtml = !isOwn ? `<div class="chat-name-row">${avatarHtml}<span class="chat-name" data-dm-name="${escapeHtml(m.code_name || 'Anonymous')}" data-dm-key="${escapeHtml(m.sender_share_key || '')}" style="cursor:pointer;">${escapeHtml(m.code_name || 'Anonymous')}</span></div>` : '';
     const myReaction = (m.reactions || []).find(r => r.share_key === myShareKey);
     const imageHtml = (!m.deleted && m.image_url) ? `<img class="chat-msg-image" src="${m.image_url}" alt="Shared photo" data-lightbox="${m.image_url}">` : '';
     const videoHtml = m.deleted ? '' : wdsExtractVideoEmbed(m.message);

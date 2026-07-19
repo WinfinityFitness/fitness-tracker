@@ -1820,6 +1820,13 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .chat-row--own { align-self: flex-end; align-items: flex-end; }
 .chat-row--other { align-self: flex-start; align-items: flex-start; }
 .chat-name { display: block; color: var(--cyan); font-weight: 700; font-size: 0.6rem; margin: 0 0 2px 8px; }
+.chat-name-row { display: flex; align-items: center; gap: 4px; margin: 0 0 2px 0; }
+.chat-name-row .chat-name { margin: 0; }
+.wds-chat-msg-avatar {
+  width: 18px; height: 18px; border-radius: 50%; background: var(--surface-2); border: 1px solid var(--border-soft);
+  display: grid; place-items: center; font-size: 0.55rem; font-weight: 700; color: var(--text-secondary);
+  flex: none; cursor: pointer;
+}
 .chat-name-link { cursor: pointer; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 2px; }
 /* Bubble + timestamp sit side by side, time OUTSIDE the bubble on the
    inner edge (opposite whichever side the bubble itself hugs) — own
