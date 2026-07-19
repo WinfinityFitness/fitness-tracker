@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.4.14';
+const APP_VERSION = 'WF_SYS_V.1.4.15';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -2770,6 +2770,18 @@ function wdsResetDialPosition() {
 // behind" (and, for a plain tap that the 6px move threshold misclassifies
 // as a micro-drag, as "the drawer doesn't minimize" — same root cause,
 // just less obviously so since the button barely appears to move at all).
+// Matches FT's own closeAdminDrawerPill (same file): removing 'is-open'
+// alone only ever ASKS the CSS transition to fade each item down to
+// scale(0)/opacity:0 -- it never actually hides the container, so a real
+// device where that transition doesn't finish rendering cleanly (a paint/
+// compositor hiccup that desktop Chromium testing won't reproduce) leaves
+// the icons visibly on screen forever, even though pointer-events are
+// already correctly disabled underneath (which is why everything ELSE on
+// the page kept responding fine -- only the now-decorative, still-visible
+// icons looked "stuck"). wdsDialHideTimer is the guard against reopening
+// mid-fade: without it, a quick reopen-then-close-then-reopen could have
+// this stale timeout hide the menu out from under a freshly-opened state.
+let wdsDialHideTimer = null;
 function wdsCloseDial(instant) {
   wdsDialOpen = false;
   const menu = document.getElementById('wdsDialMenu');
@@ -2783,6 +2795,11 @@ function wdsCloseDial(instant) {
       void menu.offsetWidth;
       menu.classList.remove('wds-dial-no-transition');
     }
+    if (wdsDialHideTimer) clearTimeout(wdsDialHideTimer);
+    wdsDialHideTimer = setTimeout(() => {
+      wdsDialHideTimer = null;
+      if (!wdsDialOpen) menu.hidden = true;
+    }, instant ? 0 : 220);
   }
   const catcher = document.getElementById('wdsDialArcCatcher');
   if (catcher) catcher.hidden = true;
@@ -2942,6 +2959,7 @@ function wdsLayoutDialRing() {
 function wdsOpenDial() {
   const menu = document.getElementById('wdsDialMenu');
   if (!menu) return;
+  if (wdsDialHideTimer) { clearTimeout(wdsDialHideTimer); wdsDialHideTimer = null; }
   const catcher = document.getElementById('wdsDialArcCatcher');
   if (wdsIsDialMobileViewport()) {
     // Deliberately NOT resetting wdsDialArcRotation here — reopening
