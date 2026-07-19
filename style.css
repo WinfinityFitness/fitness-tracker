@@ -5219,6 +5219,15 @@ html.wf-desktop-shell body { overflow-x: auto; }
 }
 .wds-myday-item--create .wds-myday-add-badge { position: static; margin-top: 6px; }
 
+/* Invisible full-screen click-catcher behind the dial button/menu — see
+   the HTML comment above #wdsDialBackdrop for why this replaced the old
+   document-click-target check. z-index sits below both .wds-dial-btn
+   (400) and .wds-dial-menu (399, which is what the arc catcher and dial
+   items live inside), so any of those still win a click at their own
+   position; this only ever catches a click that landed on neither. */
+.wds-dial-backdrop { position: fixed; inset: 0; z-index: 398; background: transparent; }
+.wds-dial-backdrop[hidden] { display: none; }
+
 /* Quick-access dial — movable circular launcher + radial icon menu.
    Default position (bottom-right corner) comes from right/bottom here;
    once dragged, JS switches it to explicit left/top (see wdsApplyDialPosition

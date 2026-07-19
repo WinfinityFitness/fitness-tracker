@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.4.13';
+const APP_VERSION = 'WF_SYS_V.1.4.14';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -2786,6 +2786,8 @@ function wdsCloseDial(instant) {
   }
   const catcher = document.getElementById('wdsDialArcCatcher');
   if (catcher) catcher.hidden = true;
+  const backdrop = document.getElementById('wdsDialBackdrop');
+  if (backdrop) backdrop.hidden = true;
   wdsPopDialHistoryIfNeeded();
 }
 
@@ -2954,6 +2956,8 @@ function wdsOpenDial() {
   }
   menu.hidden = false;
   requestAnimationFrame(() => menu.classList.add('is-open'));
+  const backdrop = document.getElementById('wdsDialBackdrop');
+  if (backdrop) backdrop.hidden = false;
   wdsDialOpen = true;
   wdsPushDialHistory();
 }
@@ -3148,9 +3152,16 @@ function initWdsDial() {
   // re-applies the right rule — fixed corner on mobile, restores any
   // saved free-drag position on desktop.
   window.addEventListener('resize', wdsApplyDialPosition);
-  document.addEventListener('click', e => {
-    if (wdsDialOpen && !e.target.closest('.wds-dial-menu') && !e.target.closest('#wdsDialBtn')) wdsCloseDial();
-  });
+  // A dedicated backdrop element (see the HTML/CSS comments on
+  // #wdsDialBackdrop) instead of a document-level "was the click's target
+  // outside these elements" check — that check raced against pointer
+  // capture's inconsistent click-target redirection on touch browsers, so
+  // a legitimate tap on the launcher button itself could immediately
+  // self-undo right after opening. The backdrop can only ever receive a
+  // click when nothing more specific (button/menu item/arc catcher, all
+  // higher z-index) was on top of it at that exact point.
+  const dialBackdrop = document.getElementById('wdsDialBackdrop');
+  if (dialBackdrop) dialBackdrop.addEventListener('click', () => wdsCloseDial());
   const menu = document.getElementById('wdsDialMenu');
   if (menu) menu.addEventListener('click', e => {
     const item = e.target.closest('[data-dial-action]');

@@ -48,7 +48,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.4.13">
+<link rel="stylesheet" href="style.css?v=1.4.14">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3942,6 +3942,20 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
        movement) snaps back to the default corner. See initWdsDial in
        app.js. Starts hidden — shown once signed in, alongside the rest of
        the dashboard. -->
+  <!-- Dedicated invisible click-catcher for "tap outside closes it",
+       shown/hidden alongside the menu (wdsOpenDial/wdsCloseDial) — matches
+       FT's own adminDrawerBackdrop pattern instead of the document-level
+       "was the click's target outside these elements" check this used to
+       rely on. That approach raced against pointer-capture's click-target
+       redirection during a tap on the launcher button itself (touch
+       browsers don't consistently redirect the derived 'click' event the
+       same way they redirect pointer events), so a legitimate tap on the
+       button could immediately self-undo via the outside-click listener
+       right after opening. A real backdrop element removes the race
+       entirely: it can only ever receive a click when nothing more
+       specific (the button, a dial item, the arc catcher) was on top of
+       it at that exact point, since z-index puts all of those above it. -->
+  <div class="wds-dial-backdrop" id="wdsDialBackdrop" hidden></div>
   <button type="button" class="wds-dial-btn" id="wdsDialBtn" aria-label="Quick menu" hidden>
     <img src="icons/icon-512.png" alt="">
   </button>
@@ -4130,10 +4144,10 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <img id="chatLightboxImg" alt="">
 </div>
 
-<script src="config.js?v=1.4.13"></script>
+<script src="config.js?v=1.4.14"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.4.13"></script>
+<script src="app.js?v=1.4.14"></script>
 </body>
 </html>
