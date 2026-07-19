@@ -48,7 +48,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.4.0">
+<link rel="stylesheet" href="style.css?v=1.4.2">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -103,6 +103,14 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </button>
   <button type="button" class="admin-drawer-pill-item" data-admin-only hidden data-action="btnAdminLogout" aria-label="Log Out" title="Log Out">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+  </button>
+  <!-- Theme changer shortcut — always visible (unlike the Quick Log icons
+       below, not gated behind Drawer Settings' per-icon admin toggle),
+       forwards to the real Open Settings button; Appearance (theme
+       toggle + skin select) is the first section there. Matches the web
+       dashboard's own dial having the same shortcut. -->
+  <button type="button" class="admin-drawer-pill-item" data-action="btnOpenSettings" aria-label="Theme" title="Theme">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 0 20c1.5 0 2-1 2-2s-.5-1.5-1-2 .5-2 2-2h2a4 4 0 0 0 4-4c0-5-4-10-9-10z"/><circle cx="7.5" cy="10.5" r="1.1"/><circle cx="12" cy="7.5" r="1.1"/><circle cx="16.5" cy="10.5" r="1.1"/></svg>
   </button>
   <button type="button" class="admin-drawer-pill-item" data-quicklog-key="startDayLog" hidden data-action="btnOpenStartDayLog" aria-label="Start Day Log" title="Start Day Log">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 18a5 5 0 0 0-10 0"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="4.22" y1="10.22" x2="5.64" y2="11.64"/><line x1="1" y1="18" x2="3" y2="18"/><line x1="21" y1="18" x2="23" y2="18"/><line x1="18.36" y1="11.64" x2="19.78" y2="10.22"/><line x1="23" y1="22" x2="1" y2="22"/><polyline points="8 6 12 2 16 6"/></svg>
@@ -3347,6 +3355,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
             <span class="wds-user-label">Operator</span>
             <span class="wds-user-name" id="wdsOperatorName">Operator</span>
           </span>
+          <span class="wds-admin-badge" id="wdsAdminBadge" hidden>ADMIN</span>
           <span class="wds-user-mode-icon" id="wdsUserModeIcon" title="Fitness mode">
             <img src="icons/mode-beginner.png" alt="" id="wdsUserModeIconImg">
           </span>
@@ -4009,6 +4018,69 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <p class="hint hint--sm wds-theme-popup-row">Web-only — separate from the app's own theme, doesn't affect your phone.</p>
     </div>
   </div>
+
+  <!-- Settings menu — the dial's Settings item opens this small menu
+       first; each row opens its own popup below. -->
+  <div class="wds-theme-popup" id="wdsSettingsMenuPopup" hidden>
+    <div class="wds-theme-popup-card">
+      <div class="wds-story-modal-head">
+        <strong>Settings</strong>
+        <button type="button" class="wds-icon-btn" id="btnWdsSettingsMenuClose" aria-label="Close">✕</button>
+      </div>
+      <button type="button" class="chat-room-menu-item wds-theme-popup-row" id="btnWdsSettingsMenuAdmin" style="width:100%;text-align:left;">Admin Log In</button>
+      <button type="button" class="chat-room-menu-item wds-theme-popup-row" id="btnWdsSettingsMenuTextSize" style="width:100%;text-align:left;">Text Size</button>
+    </div>
+  </div>
+
+  <!-- Admin login popup — opened from the Settings menu above. Just the
+       login itself for now (verify_admin_login, same RPC/credentials as
+       FT's own admin login) — no admin actions wired to it yet on
+       wellness; those come as separate follow-ups. See
+       wdsOpenAdminLoginPopup/wdsAdminSession in app.js. -->
+  <div class="wds-theme-popup" id="wdsAdminLoginPopup" hidden>
+    <div class="wds-theme-popup-card">
+      <div class="wds-story-modal-head">
+        <strong>Admin</strong>
+        <button type="button" class="wds-icon-btn" id="btnWdsAdminLoginClose" aria-label="Close">✕</button>
+      </div>
+      <div id="wdsAdminLoginForm">
+        <label class="field wds-theme-popup-row">
+          <span>Digital ID</span>
+          <input type="text" id="wdsAdminLoginId" autocomplete="off" autocapitalize="characters">
+        </label>
+        <label class="field wds-theme-popup-row">
+          <span>Password</span>
+          <input type="password" id="wdsAdminLoginPassword" autocomplete="off">
+        </label>
+        <button type="button" class="wds-gate-btn wds-theme-popup-row" id="btnWdsAdminLoginSubmit">Log In</button>
+        <p class="wds-gate-error wds-theme-popup-row" id="wdsAdminLoginNote" hidden></p>
+      </div>
+      <div id="wdsAdminLoggedInState" hidden>
+        <p class="wds-theme-popup-row">Signed in as <strong id="wdsAdminLoggedInName">Admin</strong>.</p>
+        <button type="button" class="wds-gate-btn wds-gate-btn--ghost wds-theme-popup-row" id="btnWdsAdminLogOut">Log Out of Admin</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Text Size popup — opened from the Settings menu above. Reuses the
+       exact same wft_text_scale storage + applyTextScale/getTextScale
+       functions FT's own Settings > Appearance slider uses, since
+       --user-font-scale is a root-level CSS variable that already scales
+       every rem-based font-size on the page, wellness included. -->
+  <div class="wds-theme-popup" id="wdsTextSizePopup" hidden>
+    <div class="wds-theme-popup-card">
+      <div class="wds-story-modal-head">
+        <strong>Text Size</strong>
+        <button type="button" class="wds-icon-btn" id="btnWdsTextSizePopupClose" aria-label="Close">✕</button>
+      </div>
+      <label class="field wds-theme-popup-row">
+        <span>Text Size</span>
+        <input type="range" id="wdsTextSizeSlider" min="90" max="115" step="5" value="100">
+        <output id="wdsTextSizeOut">100%</output>
+      </label>
+      <div class="slider-endpoints wds-theme-popup-row"><span>Smaller</span><span>Larger</span></div>
+    </div>
+  </div>
 </div>
 
 <!-- Full-size image lightbox — used by both the mobile app's chat/feed
@@ -4026,10 +4098,10 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <img id="chatLightboxImg" alt="">
 </div>
 
-<script src="config.js?v=1.4.0"></script>
+<script src="config.js?v=1.4.2"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.4.0"></script>
+<script src="app.js?v=1.4.2"></script>
 </body>
 </html>

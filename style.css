@@ -5064,6 +5064,10 @@ html.wf-resume-session .wds-reload-splash { display: flex !important; }
 }
 .wds-chat-contact-avatar.is-open { border-color: var(--cyan); }
 .wds-user-chip { display: flex; align-items: center; gap: 10px; }
+.wds-admin-badge {
+  background: var(--gradient-bar); color: #060a0d; font-size: 0.6rem; font-weight: 800;
+  letter-spacing: 0.06em; padding: 2px 6px; border-radius: 4px;
+}
 .wds-user-avatar {
   width: 32px; height: 32px; border-radius: 50%; background: var(--gradient-bar);
   color: #060a0d; font-weight: 700; display: grid; place-items: center; font-size: 0.85rem;

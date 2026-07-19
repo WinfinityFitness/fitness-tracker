@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.4.0';
+const APP_VERSION = 'WF_SYS_V.1.4.2';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -49,6 +49,24 @@ const isDesktopShellSite = location.hostname === DESKTOP_SHELL_HOST;
 // targets, body fat %, etc.) against a signed-in operator's real remote data
 // without touching any of those functions' call sites.
 let wdsRemoteData = null;
+
+// wellness's own admin session — separate localStorage key from FT's
+// wft_admin_session (different origins/SW scopes anyway, but kept
+// explicit) since logging into admin on one surface shouldn't silently
+// affect the other. Just the login itself for now (verify_admin_login,
+// same RPC/credentials FT's admin login already uses) — no admin actions
+// wired to it yet on wellness.
+const WDS_ADMIN_SESSION_KEY = 'wft_web_admin_session';
+let wdsAdminSession = { digitalId: null, password: null };
+try {
+  const savedWdsAdmin = JSON.parse(localStorage.getItem(WDS_ADMIN_SESSION_KEY));
+  if (savedWdsAdmin && savedWdsAdmin.digitalId && savedWdsAdmin.password) wdsAdminSession = savedWdsAdmin;
+} catch (e) { /* ignore malformed/missing saved session */ }
+function wdsIsAdminLoggedIn() { return !!wdsAdminSession.password; }
+function wdsUpdateAdminBadge() {
+  const badge = document.getElementById('wdsAdminBadge');
+  if (badge) badge.hidden = !wdsIsAdminLoggedIn();
+}
 
 // ---------------------------------------------------------------------
 // Guest Log In — a throwaway local identity for browsing the web
@@ -1024,6 +1042,77 @@ function initDesktopShell() {
   const closeThemePopupBtn = document.getElementById('btnWdsThemePopupClose');
   if (closeThemePopupBtn) closeThemePopupBtn.addEventListener('click', () => { themePopup.hidden = true; });
   if (themePopup) themePopup.addEventListener('click', e => { if (e.target === themePopup) themePopup.hidden = true; });
+
+  // Settings menu (dial's Settings item) + the two popups it opens
+  // (Admin Log In, Text Size) — same click-the-backdrop-to-close pattern
+  // as the theme popup above.
+  const settingsMenuPopup = document.getElementById('wdsSettingsMenuPopup');
+  const closeSettingsMenuBtn = document.getElementById('btnWdsSettingsMenuClose');
+  if (closeSettingsMenuBtn) closeSettingsMenuBtn.addEventListener('click', () => { settingsMenuPopup.hidden = true; });
+  if (settingsMenuPopup) settingsMenuPopup.addEventListener('click', e => { if (e.target === settingsMenuPopup) settingsMenuPopup.hidden = true; });
+  const settingsMenuAdminBtn = document.getElementById('btnWdsSettingsMenuAdmin');
+  if (settingsMenuAdminBtn) settingsMenuAdminBtn.addEventListener('click', () => {
+    settingsMenuPopup.hidden = true;
+    wdsOpenAdminLoginPopup();
+  });
+  const settingsMenuTextSizeBtn = document.getElementById('btnWdsSettingsMenuTextSize');
+  if (settingsMenuTextSizeBtn) settingsMenuTextSizeBtn.addEventListener('click', () => {
+    settingsMenuPopup.hidden = true;
+    wdsOpenTextSizePopup();
+  });
+
+  const adminLoginPopup = document.getElementById('wdsAdminLoginPopup');
+  const closeAdminLoginBtn = document.getElementById('btnWdsAdminLoginClose');
+  if (closeAdminLoginBtn) closeAdminLoginBtn.addEventListener('click', () => { adminLoginPopup.hidden = true; });
+  if (adminLoginPopup) adminLoginPopup.addEventListener('click', e => { if (e.target === adminLoginPopup) adminLoginPopup.hidden = true; });
+  const adminLoginSubmitBtn = document.getElementById('btnWdsAdminLoginSubmit');
+  if (adminLoginSubmitBtn) adminLoginSubmitBtn.addEventListener('click', async () => {
+    const id = document.getElementById('wdsAdminLoginId').value.trim();
+    const pw = document.getElementById('wdsAdminLoginPassword').value;
+    const noteEl = document.getElementById('wdsAdminLoginNote');
+    if (!id || !pw) { noteEl.textContent = 'Enter both Digital ID and password.'; noteEl.hidden = false; return; }
+    if (!sbConfigured()) { noteEl.textContent = 'Not available offline.'; noteEl.hidden = false; return; }
+    noteEl.hidden = true;
+    try {
+      // Same void-returning, raise-on-failure contract as FT's own admin
+      // login (see the fix earlier in this file) — success is "no error
+      // thrown," not a returned true/false.
+      const { error } = await sb.rpc('verify_admin_login', { p_digital_id: id, p_password: pw });
+      if (error) throw error;
+      wdsAdminSession = { digitalId: id, password: pw };
+      localStorage.setItem(WDS_ADMIN_SESSION_KEY, JSON.stringify(wdsAdminSession));
+      wdsUpdateAdminBadge();
+      wdsOpenAdminLoginPopup();
+    } catch (e) {
+      console.error('wellness verify_admin_login failed:', e);
+      const msg = (e && e.message) || '';
+      noteEl.textContent = msg.includes('Too many attempts') ? msg : 'Incorrect Digital ID or password.';
+      noteEl.hidden = false;
+    }
+  });
+  const adminLogOutBtn = document.getElementById('btnWdsAdminLogOut');
+  if (adminLogOutBtn) adminLogOutBtn.addEventListener('click', () => {
+    wdsAdminSession = { digitalId: null, password: null };
+    localStorage.removeItem(WDS_ADMIN_SESSION_KEY);
+    wdsUpdateAdminBadge();
+    wdsOpenAdminLoginPopup();
+  });
+  wdsUpdateAdminBadge();
+
+  const textSizePopup = document.getElementById('wdsTextSizePopup');
+  const closeTextSizeBtn = document.getElementById('btnWdsTextSizePopupClose');
+  if (closeTextSizeBtn) closeTextSizeBtn.addEventListener('click', () => { textSizePopup.hidden = true; });
+  if (textSizePopup) textSizePopup.addEventListener('click', e => { if (e.target === textSizePopup) textSizePopup.hidden = true; });
+  const wdsTextSizeSlider = document.getElementById('wdsTextSizeSlider');
+  const wdsTextSizeOut = document.getElementById('wdsTextSizeOut');
+  if (wdsTextSizeSlider) wdsTextSizeSlider.addEventListener('input', () => {
+    const v = parseInt(wdsTextSizeSlider.value, 10);
+    if (wdsTextSizeOut) wdsTextSizeOut.textContent = v + '%';
+    localStorage.setItem('wft_text_scale', v);
+    applyTextScale(v);
+    const mobileSlider = document.getElementById('textSizeSlider');
+    if (mobileSlider) { mobileSlider.value = v; const mobileOut = document.getElementById('textSizeOut'); if (mobileOut) mobileOut.textContent = v + '%'; }
+  });
 
   // Notification bell — simple open/close popover, closes on outside click.
   const bellBtn = document.getElementById('wdsBellBtn');
@@ -2736,7 +2825,10 @@ function wdsOpenDial() {
   if (!menu) return;
   const catcher = document.getElementById('wdsDialArcCatcher');
   if (wdsIsDialMobileViewport()) {
-    wdsDialArcRotation = 0;
+    // Deliberately NOT resetting wdsDialArcRotation here — reopening
+    // after closing a popup launched from the arc (Theme, Settings, etc.)
+    // should still show whichever icon was last brought to the front,
+    // not snap back to the default rotation every time.
     wdsLayoutDialArc();
     if (catcher) catcher.hidden = false;
   } else {
@@ -2759,6 +2851,41 @@ function wdsOpenThemePopup() {
   const select = document.getElementById('wdsSkinSelectMobile');
   if (toggle) toggle.checked = document.documentElement.getAttribute('data-theme') === 'light';
   if (select) select.value = document.documentElement.getAttribute('data-skin') || 'default';
+  popup.hidden = false;
+}
+
+function wdsOpenSettingsMenu() {
+  const popup = document.getElementById('wdsSettingsMenuPopup');
+  if (popup) popup.hidden = false;
+}
+// Shows the logged-in state instead of the form when already signed in —
+// verify_admin_login isn't re-checked here, just the cached local session.
+function wdsOpenAdminLoginPopup() {
+  const popup = document.getElementById('wdsAdminLoginPopup');
+  if (!popup) return;
+  const form = document.getElementById('wdsAdminLoginForm');
+  const loggedIn = document.getElementById('wdsAdminLoggedInState');
+  const note = document.getElementById('wdsAdminLoginNote');
+  if (note) note.hidden = true;
+  if (wdsIsAdminLoggedIn()) {
+    if (form) form.hidden = true;
+    if (loggedIn) loggedIn.hidden = false;
+    const nameEl = document.getElementById('wdsAdminLoggedInName');
+    if (nameEl) nameEl.textContent = wdsAdminSession.digitalId;
+  } else {
+    if (form) form.hidden = false;
+    if (loggedIn) loggedIn.hidden = true;
+  }
+  popup.hidden = false;
+}
+function wdsOpenTextSizePopup() {
+  const popup = document.getElementById('wdsTextSizePopup');
+  if (!popup) return;
+  const slider = document.getElementById('wdsTextSizeSlider');
+  const out = document.getElementById('wdsTextSizeOut');
+  const scale = getTextScale();
+  if (slider) slider.value = scale;
+  if (out) out.textContent = scale + '%';
   popup.hidden = false;
 }
 
@@ -2852,14 +2979,10 @@ function initWdsDial() {
     } else if (action === 'nexus-com') {
       const fixed = document.getElementById('wdsGlobalChatFixed');
       if (fixed) fixed.hidden = false;
-    } else if (action === 'theme' && window.innerWidth <= 860) {
-      // The 3-column dashboard layout puts the Account card (where the
-      // theme controls normally live) somewhere not reliably reachable on
-      // a narrow viewport — a popup instead of scrollIntoView on mobile.
+    } else if (action === 'theme') {
       wdsOpenThemePopup();
-    } else if (action === 'settings' || action === 'theme') {
-      const card = document.getElementById('wdsAccountCard');
-      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else if (action === 'settings') {
+      wdsOpenSettingsMenu();
     } else if (action === 'log-out') {
       if (confirm('Log out of Nexus?')) {
         const signOutBtn = document.getElementById('wdsSignOutBtn');
