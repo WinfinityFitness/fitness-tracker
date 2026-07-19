@@ -123,5 +123,14 @@ if ($result['contentType'] && stripos($result['contentType'], 'text/html') !== f
         '<meta name="apple-mobile-web-app-title" content="Winfinity Nexus">',
         $body
     );
+    // iOS Safari's "Add to Home Screen" reads this tag directly rather than
+    // the manifest's icons array (which iOS ignores) — without this swap
+    // too, an iPhone install would still pick up the mobile app's icon
+    // despite everything else above already being Nexus-branded.
+    $body = str_replace(
+        '<link rel="apple-touch-icon" href="icons/icon-192.png">',
+        '<link rel="apple-touch-icon" href="icons/icon-nexus-192.png">',
+        $body
+    );
 }
 echo $body;

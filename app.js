@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.4.8';
+const APP_VERSION = 'WF_SYS_V.1.4.10';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1492,6 +1492,15 @@ function initDesktopShell() {
   // Right-edge contact rail — click a DM/group avatar to open (or bring
   // back an evicted) popup.
   document.getElementById('wdsChatContactRail').addEventListener('click', e => {
+    const closeBtn = e.target.closest('[data-close-rail]');
+    if (closeBtn) {
+      e.stopPropagation();
+      const roomId = closeBtn.dataset.closeRail;
+      wdsDismissedRailIds.add(String(roomId));
+      wdsCloseChatPopup(roomId);
+      renderWdsChatContactRail();
+      return;
+    }
     const avatar = e.target.closest('[data-room-id]');
     if (avatar) wdsOpenChatPopup(avatar.dataset.roomId);
   });
@@ -2751,10 +2760,30 @@ function wdsResetDialPosition() {
   btn.classList.add('wds-dial-reset-pulse');
 }
 
-function wdsCloseDial() {
+// instant=true skips .wds-dial-item's 0.2s opacity/transform transition —
+// used when the close is triggered by the launcher button itself starting
+// to move (see initWdsDialDrag below). Each item's left/top is only ever
+// recalculated on open (wdsLayoutDialArc/wdsLayoutDialRing), so while the
+// button drags in real time those coordinates stay frozen at their
+// pre-drag spot; an animated close then spends 200ms fading out in place
+// instead of tracking the button, which reads as "the icons got left
+// behind" (and, for a plain tap that the 6px move threshold misclassifies
+// as a micro-drag, as "the drawer doesn't minimize" — same root cause,
+// just less obviously so since the button barely appears to move at all).
+function wdsCloseDial(instant) {
   wdsDialOpen = false;
   const menu = document.getElementById('wdsDialMenu');
-  if (menu) menu.classList.remove('is-open');
+  if (menu) {
+    if (instant) menu.classList.add('wds-dial-no-transition');
+    menu.classList.remove('is-open');
+    if (instant) {
+      // Force the removal to actually paint before the class comes back
+      // off, otherwise the browser can coalesce both class changes into
+      // one frame and the "no transition" state never visibly applies.
+      void menu.offsetWidth;
+      menu.classList.remove('wds-dial-no-transition');
+    }
+  }
   const catcher = document.getElementById('wdsDialArcCatcher');
   if (catcher) catcher.hidden = true;
   wdsPopDialHistoryIfNeeded();
@@ -3058,7 +3087,7 @@ function initWdsDialDrag() {
         clearTimeout(longPressTimer);
         dragging = true;
         btn.classList.add('is-dragging');
-        wdsCloseDial();
+        wdsCloseDial(true);
       }
       if (dragging) {
         const margin = 8;
@@ -3246,21 +3275,30 @@ async function refreshWdsChatRooms() {
     (recentMsgs || []).forEach(m => { if (!lastMsgByRoom[m.room_id]) lastMsgByRoom[m.room_id] = m; });
 
     const meta = {};
+    const otherShareKeys = [];
     (rooms || []).forEach(r => {
       const memberRow = (memberRows || []).find(mr => mr.room_id === r.id);
       let name = r.name;
+      let otherShareKey = null;
       if (r.is_dm) {
         const other = (dmMembersByRoom[r.id] || []).find(m => m.share_key !== myShareKey);
-        if (other) name = other.code_name;
+        if (other) { name = other.code_name; otherShareKey = other.share_key; otherShareKeys.push(other.share_key); }
       }
       const last = lastMsgByRoom[r.id];
       meta[r.id] = {
-        name, isDm: r.is_dm, createdByKey: r.created_by_key,
+        name, isDm: r.is_dm, createdByKey: r.created_by_key, otherShareKey,
         joinedByMe: memberRow ? memberRow.status === 'joined' : false,
         lastMessage: last ? (last.deleted ? 'Message unsent' : (last.image_url ? '📷 Photo' : last.message)) : '',
         lastMessageAt: last ? last.created_at : null,
       };
     });
+    // Real profile photos on chat avatars (rail/thread list/popup header)
+    // instead of always-a-letter-circle — reuses the same batch avatar
+    // lookup the feed already uses for post/comment authors.
+    if (otherShareKeys.length) {
+      const avatarsByKey = await wdsFetchAvatarsByShareKey(otherShareKeys);
+      Object.values(meta).forEach(m => { if (m.otherShareKey) m.avatarDataUrl = avatarsByKey[m.otherShareKey] || null; });
+    }
     wdsChatRoomMeta = meta;
   } catch (e) {
     // Was a silent best-effort swallow — the exact pattern that hid the
@@ -3302,7 +3340,7 @@ function renderWdsChatListPanel() {
     const unread = wdsIsRoomUnread(t.id, t);
     const initial = escapeHtml((t.name || '?').charAt(0).toUpperCase());
     return `<div class="wds-chat-thread-item${unread ? ' is-unread' : ''}" data-room-id="${t.id}">
-      <div class="wds-chat-thread-avatar${t.isDm ? '' : ' wds-chat-thread-avatar--group'}">${t.isDm ? initial : '👥'}</div>
+      <div class="wds-chat-thread-avatar${t.isDm ? '' : ' wds-chat-thread-avatar--group'}"${wdsAvatarStyleAttr(t.avatarDataUrl)}>${t.avatarDataUrl ? '' : (t.isDm ? initial : '👥')}</div>
       <div class="wds-chat-thread-body">
         <div class="wds-chat-thread-name">${escapeHtml(t.name || 'Unknown')}${unread ? '<span class="wds-chat-thread-dot"></span>' : ''}</div>
         <div class="wds-chat-thread-preview">${escapeHtml(t.lastMessage || 'No messages yet')}</div>
@@ -3387,7 +3425,7 @@ async function wdsOpenChatPopup(roomId) {
     popup.dataset.roomId = roomId;
     popup.innerHTML = `
       <div class="wds-chat-popup-head">
-        <span class="wds-chat-popup-head-avatar">${escapeHtml((meta.name || '?').trim().charAt(0).toUpperCase())}</span>
+        <span class="wds-chat-popup-head-avatar"${wdsAvatarStyleAttr(meta.avatarDataUrl)}>${meta.avatarDataUrl ? '' : escapeHtml((meta.name || '?').trim().charAt(0).toUpperCase())}</span>
         <strong>${escapeHtml(meta.name || 'Chat')}</strong>
         <button type="button" class="wds-chat-popup-close" data-close-popup="${roomId}" aria-label="Close">✕</button>
       </div>
@@ -3423,19 +3461,28 @@ function wdsCloseChatPopup(roomId) {
 // Right-edge rail — every DM/group thread as a clickable avatar, doubling
 // as both "start/open a chat" and "here's the one that got minimized"
 // (an evicted popup has no separate collapsed state; its rail icon is
-// simply how you bring it back).
+// simply how you bring it back). The small ✕ lets a bubble be dismissed
+// from the rail entirely instead of just minimized further — session-only
+// (wdsDismissedRailIds isn't persisted), and a new message for that thread
+// clears the dismissal so it can't silently hide real activity forever.
+let wdsDismissedRailIds = new Set();
 function renderWdsChatContactRail() {
   const rail = document.getElementById('wdsChatContactRail');
   if (!rail) return;
-  const threads = wdsChatThreadList().slice(0, 12);
+  const threads = wdsChatThreadList().filter(t => {
+    if (!wdsDismissedRailIds.has(String(t.id))) return true;
+    if (wdsIsRoomUnread(t.id, t)) { wdsDismissedRailIds.delete(String(t.id)); return true; }
+    return false;
+  }).slice(0, 12);
   if (!threads.length) { rail.innerHTML = ''; return; }
   const openIds = new Set(Array.from(document.querySelectorAll('.wds-chat-popup')).map(el => el.dataset.roomId));
   rail.innerHTML = threads.map(t => {
     const unread = wdsIsRoomUnread(t.id, t);
     const initial = escapeHtml((t.name || '?').charAt(0).toUpperCase());
     const isOpen = openIds.has(String(t.id));
-    return `<div class="wds-chat-contact-avatar${isOpen ? ' is-open' : ''}" data-room-id="${t.id}" title="${escapeHtml(t.name || 'Chat')}">
-      ${t.isDm ? initial : '👥'}${unread ? '<span class="wds-chat-thread-dot"></span>' : ''}
+    return `<div class="wds-chat-contact-avatar${isOpen ? ' is-open' : ''}"${wdsAvatarStyleAttr(t.avatarDataUrl)} data-room-id="${t.id}" title="${escapeHtml(t.name || 'Chat')}">
+      ${t.avatarDataUrl ? '' : (t.isDm ? initial : '👥')}${unread ? '<span class="wds-chat-thread-dot"></span>' : ''}
+      <button type="button" class="wds-chat-contact-avatar-close" data-close-rail="${t.id}" aria-label="Remove from rail" title="Remove">✕</button>
     </div>`;
   }).join('');
 }
@@ -4755,6 +4802,23 @@ async function wdsRespondFriendRequest(requesterShareKey, accept) {
     const { error } = await sb.rpc('respond_friend_request', { p_share_key: wdsRemoteData.shareKey, p_requester_share_key: requesterShareKey, p_accept: accept });
     if (error) throw error;
     wdsNotifSeenFriendReqIds.delete(requesterShareKey);
+    // The bell dropdown's own copy of this request otherwise lingers with
+    // its stale Accept/Decline pair forever, since refreshWdsFriendRequests
+    // only ever ADDS new pending-request notifications -- it never revisits
+    // one already resolved. Update it in place here instead: accept turns
+    // the buttons into a plain confirmation line, decline drops it from
+    // history outright.
+    const notifId = `friend-request:${requesterShareKey}`;
+    const history = wdsLoadNotifHistory();
+    if (accept) {
+      const item = history.find(n => n.id === notifId);
+      if (item) { item.body = item.body.replace(/wants to be friends\.?$/, 'is now your friend.'); item.actionsHtml = null; }
+    } else {
+      const idx = history.findIndex(n => n.id === notifId);
+      if (idx !== -1) history.splice(idx, 1);
+    }
+    wdsSaveNotifHistory(history);
+    renderWdsNotifications();
     await refreshWdsFriendRequests();
     await refreshWdsPendingFriendRequestsList();
     if (accept) await refreshWdsFriendsList();

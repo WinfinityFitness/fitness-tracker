@@ -5063,6 +5063,13 @@ html.wf-resume-session .wds-reload-splash { display: flex !important; }
   position: absolute; right: -1px; bottom: -1px; box-shadow: 0 0 0 2px var(--surface-1);
 }
 .wds-chat-contact-avatar.is-open { border-color: var(--cyan); }
+.wds-chat-contact-avatar-close {
+  position: absolute; top: -5px; right: -5px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--surface-2); color: var(--text-secondary); border: 1px solid var(--border-soft);
+  font-size: 9px; line-height: 1; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; padding: 0; box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+.wds-chat-contact-avatar-close:hover { background: var(--critical); color: #fff; border-color: var(--critical); }
 .wds-user-chip { display: flex; align-items: center; gap: 10px; }
 .wds-admin-badge {
   background: var(--gradient-bar); color: #060a0d; font-size: 0.6rem; font-weight: 800;
@@ -5247,6 +5254,7 @@ html.wf-desktop-shell body { overflow-x: auto; }
   0% { transform: scale(1); } 50% { transform: scale(1.18); } 100% { transform: scale(1); }
 }
 .wds-dial-menu { position: fixed; z-index: 399; inset: 0; pointer-events: none; }
+.wds-dial-menu.wds-dial-no-transition .wds-dial-item { transition: none !important; }
 .wds-dial-item {
   position: absolute; left: 0; top: 0; width: 46px; height: 46px; border-radius: 50%; pointer-events: none;
   background: var(--surface-1); border: 1px solid var(--border-soft); color: var(--text-primary);
