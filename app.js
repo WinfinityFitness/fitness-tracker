@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.4.5';
+const APP_VERSION = 'WF_SYS_V.1.4.6';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -164,6 +164,7 @@ function initDesktopShell() {
   const SESSION_ID_KEY = 'wds_operator_id';
   const SESSION_PIN_KEY = 'wds_operator_pin';
   let wdsInitialRouteChecked = false;
+  let wdsPushResubscribeChecked = false;
 
   // Fetches the real synced payload via web_sync_get_dashboard, wires it up
   // as wdsRemoteData (so every calc function getProfile/getLogs/etc. already
@@ -250,6 +251,19 @@ function initDesktopShell() {
     startWdsDashboardPolling();
     startWdsChatPolling();
     startWdsFeedPolling();
+    // Silent re-subscribe if this browser previously opted into push on
+    // this account (e.g. the subscription was dropped) — deliberately done
+    // HERE, after wdsRemoteData is populated, rather than at page-load time:
+    // subscribeToPush() keys the subscription to wdsRemoteData.shareKey, so
+    // calling it before sign-in resolves would have nothing real to key it
+    // to yet. Only on the first sign-in of the session, not every 2-minute
+    // dashboard poll (enterDashboard is also the poll's own refresh call).
+    if (!wdsPushResubscribeChecked) {
+      wdsPushResubscribeChecked = true;
+      if (localStorage.getItem('wft_push_enabled') === '1' && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        subscribeToPush();
+      }
+    }
     return true;
   }
 
@@ -1067,6 +1081,11 @@ function initDesktopShell() {
     settingsMenuPopup.hidden = true;
     wdsOpenTextSizePopup();
   });
+  const settingsMenuPushBtn = document.getElementById('btnWdsSettingsMenuPush');
+  if (settingsMenuPushBtn) settingsMenuPushBtn.addEventListener('click', () => {
+    settingsMenuPopup.hidden = true;
+    wdsOpenPushPopup();
+  });
 
   const adminLoginPopup = document.getElementById('wdsAdminLoginPopup');
   const closeAdminLoginBtn = document.getElementById('btnWdsAdminLoginClose');
@@ -1120,6 +1139,12 @@ function initDesktopShell() {
     const mobileSlider = document.getElementById('textSizeSlider');
     if (mobileSlider) { mobileSlider.value = v; const mobileOut = document.getElementById('textSizeOut'); if (mobileOut) mobileOut.textContent = v + '%'; }
   });
+
+  const pushPopup = document.getElementById('wdsPushPopup');
+  const closePushBtn = document.getElementById('btnWdsPushPopupClose');
+  if (closePushBtn) closePushBtn.addEventListener('click', () => { pushPopup.hidden = true; });
+  if (pushPopup) pushPopup.addEventListener('click', e => { if (e.target === pushPopup) pushPopup.hidden = true; });
+  initWdsPushNotifications();
 
   // Notification bell — simple open/close popover, closes on outside click.
   const bellBtn = document.getElementById('wdsBellBtn');
@@ -2803,9 +2828,10 @@ function wdsLayoutDialArc() {
 function initWdsDialArcDrag() {
   const catcher = document.getElementById('wdsDialArcCatcher');
   if (!catcher) return;
-  let dragging = false, startY = 0, startRotation = 0;
+  let dragging = false, moved = false, startY = 0, startRotation = 0;
   catcher.addEventListener('pointerdown', e => {
     dragging = true;
+    moved = false;
     startY = e.clientY;
     startRotation = wdsDialArcRotation;
     catcher.setPointerCapture(e.pointerId);
@@ -2813,12 +2839,22 @@ function initWdsDialArcDrag() {
   catcher.addEventListener('pointermove', e => {
     if (!dragging) return;
     const dy = e.clientY - startY;
+    if (Math.abs(dy) > 4) moved = true;
     wdsDialArcRotation = startRotation + (dy / wdsDialArcRadius) * (180 / Math.PI);
     wdsLayoutDialArc();
   });
-  const endDrag = () => { dragging = false; };
+  const endDrag = () => {
+    dragging = false;
+    // The catcher only ever receives a pointer in the first place where no
+    // icon (pointer-events:auto, painted on top) covers it — i.e. genuinely
+    // empty space inside the circle. A tap there with no drag is the same
+    // gesture as tapping the page outside the dial entirely, so it should
+    // dismiss it the same way, instead of silently doing nothing (which is
+    // what "click outside doesn't close it" looked like from this area).
+    if (!moved) wdsCloseDial();
+  };
   catcher.addEventListener('pointerup', endDrag);
-  catcher.addEventListener('pointercancel', endDrag);
+  catcher.addEventListener('pointercancel', () => { dragging = false; });
 }
 
 // Arranges every .wds-dial-item in a full ring around the button's CURRENT
@@ -2912,6 +2948,48 @@ function wdsOpenTextSizePopup() {
   if (slider) slider.value = scale;
   if (out) out.textContent = scale + '%';
   popup.hidden = false;
+}
+function wdsOpenPushPopup() {
+  const popup = document.getElementById('wdsPushPopup');
+  if (!popup) return;
+  const toggle = document.getElementById('wdsPushToggle');
+  const hint = document.getElementById('wdsPushHint');
+  if (wdsGuestMode) {
+    if (toggle) { toggle.checked = false; toggle.disabled = true; }
+    if (hint) hint.textContent = 'Not available in Guest mode — sign in with your Digital ID to enable push notifications.';
+  } else {
+    if (toggle) { toggle.disabled = false; toggle.checked = localStorage.getItem('wft_push_enabled') === '1'; }
+    if (hint) hint.textContent = 'Delivered even when this tab is closed. Powers new direct message alerts.';
+  }
+  popup.hidden = false;
+}
+// Reuses FT's own subscribeToPush/unsubscribeFromPush (they now pick
+// wdsRemoteData.shareKey over getOrCreateShareKey() whenever the desktop
+// shell has a real signed-in session — see the guard added inside those
+// functions) so both surfaces share one push_subscriptions row-per-device
+// mechanism instead of duplicating it. This just wires the wellness-native
+// toggle to the same calls FT's own #pushNotifToggle already makes.
+function initWdsPushNotifications() {
+  const toggle = document.getElementById('wdsPushToggle');
+  if (!toggle) return;
+  const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  if (!supported) { toggle.disabled = true; return; }
+  toggle.addEventListener('change', async () => {
+    const hint = document.getElementById('wdsPushHint');
+    if (toggle.checked) {
+      if (Notification.permission === 'denied') {
+        toggle.checked = false;
+        if (hint) hint.textContent = 'Notifications are blocked for this site in your browser settings.';
+        return;
+      }
+      const perm = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+      if (perm !== 'granted') { toggle.checked = false; return; }
+      const ok = await subscribeToPush();
+      if (!ok) toggle.checked = false;
+    } else {
+      await unsubscribeFromPush();
+    }
+  });
 }
 
 // Tap opens/closes the dial; drag (movement past a small threshold)
@@ -9935,6 +10013,10 @@ function urlBase64ToUint8Array(base64String) {
 
 async function subscribeToPush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !sbConfigured()) return false;
+  // Guests have no persistent server-side identity to attach a subscription
+  // to (WDS_GUEST_SHARE_KEY isn't a real uuid) — the wellness toggle already
+  // disables itself in guest mode, this is just a hard backstop.
+  if (wdsGuestMode) return false;
   try {
     const reg = await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
@@ -9945,8 +10027,13 @@ async function subscribeToPush() {
       });
     }
     const json = sub.toJSON();
+    // On the wellness desktop shell, wdsRemoteData.shareKey is the real
+    // signed-in account's identity — using that instead of the mobile app's
+    // device-anonymous getOrCreateShareKey() keeps the subscription anchored
+    // to the same account the dashboard's other reads/writes already use.
+    const shareKey = wdsRemoteData ? wdsRemoteData.shareKey : getOrCreateShareKey();
     const { error } = await sb.rpc('upsert_push_subscription', {
-      p_share_key: getOrCreateShareKey(),
+      p_share_key: shareKey,
       p_endpoint: json.endpoint,
       p_p256dh: json.keys.p256dh,
       p_auth: json.keys.auth,
@@ -10034,6 +10121,15 @@ function initNativePushNotifications(toggle, hint) {
 }
 
 function initPushNotifications() {
+  // On wellness this DOM lives (unreachable) under #wdsShell's overlay —
+  // the desktop shell has its own initWdsPushNotifications()/#wdsPushToggle
+  // wiring instead. Skipping this one here matters, not just cosmetically:
+  // its silent re-subscribe-on-load-if-previously-enabled path would fire
+  // before wdsRemoteData is populated (sign-in resolves later, async),
+  // subscribing under the mobile app's device-anonymous getOrCreateShareKey()
+  // and silently overwriting the correct account-keyed subscription row on
+  // every wellness reload.
+  if (isDesktopShellSite) return;
   const toggle = document.getElementById('pushNotifToggle');
   const hint = document.getElementById('pushNotifHint');
   if (!toggle) return;

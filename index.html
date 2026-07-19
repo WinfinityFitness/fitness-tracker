@@ -48,7 +48,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.4.5">
+<link rel="stylesheet" href="style.css?v=1.4.6">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -4036,6 +4036,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       </div>
       <button type="button" class="chat-room-menu-item wds-theme-popup-row" id="btnWdsSettingsMenuAdmin" style="width:100%;text-align:left;">Admin Log In</button>
       <button type="button" class="chat-room-menu-item wds-theme-popup-row" id="btnWdsSettingsMenuTextSize" style="width:100%;text-align:left;">Text Size</button>
+      <button type="button" class="chat-room-menu-item wds-theme-popup-row" id="btnWdsSettingsMenuPush" style="width:100%;text-align:left;">Push Notifications</button>
     </div>
   </div>
 
@@ -4088,6 +4089,30 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <div class="slider-endpoints wds-theme-popup-row"><span>Smaller</span><span>Larger</span></div>
     </div>
   </div>
+
+  <!-- Push Notifications popup — opened from the Settings menu above.
+       Reuses the same subscribeToPush/unsubscribeFromPush + push_subscriptions
+       plumbing FT's own Settings > Push Notifications toggle uses, but keys
+       the subscription to the signed-in account's real wdsRemoteData.shareKey
+       instead of the device-anonymous getOrCreateShareKey() — see
+       wdsOpenPushPopup/initWdsPushNotifications in app.js. Not available in
+       Guest mode (no persistent account identity to attach a subscription to). -->
+  <div class="wds-theme-popup" id="wdsPushPopup" hidden>
+    <div class="wds-theme-popup-card">
+      <div class="wds-story-modal-head">
+        <strong>Push Notifications</strong>
+        <button type="button" class="wds-icon-btn" id="btnWdsPushPopupClose" aria-label="Close">✕</button>
+      </div>
+      <div class="theme-toggle-row wds-theme-popup-row">
+        <span>Enable push notifications</span>
+        <label class="switch">
+          <input type="checkbox" id="wdsPushToggle">
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+        </label>
+      </div>
+      <p class="hint hint--sm wds-theme-popup-row" id="wdsPushHint">Delivered even when this tab is closed. Powers new direct message alerts.</p>
+    </div>
+  </div>
 </div>
 
 <!-- Full-size image lightbox — used by both the mobile app's chat/feed
@@ -4105,10 +4130,10 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <img id="chatLightboxImg" alt="">
 </div>
 
-<script src="config.js?v=1.4.5"></script>
+<script src="config.js?v=1.4.6"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.4.5"></script>
+<script src="app.js?v=1.4.6"></script>
 </body>
 </html>
