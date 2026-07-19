@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.1.7';
+const APP_VERSION = 'WF_SYS_V.1.1.8';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -13484,8 +13484,40 @@ function wdsGetPastedImageFile(e) {
   return null;
 }
 
+// Phone camera photos routinely come in at 3000px+ on a side — uploading
+// that verbatim is a lot of bandwidth/storage for something only ever
+// viewed on a phone screen. Downscales to WDS_MAX_UPLOAD_DIM and
+// re-encodes as JPEG; images already at or under the cap (e.g. the My Day
+// composer's own 720x1280 flattened canvas) resolve to null and pass
+// through untouched in uploadChatImage below — re-encoding those as JPEG
+// would visibly degrade their text/pill edges for no size benefit.
+const WDS_MAX_UPLOAD_DIM = 1280;
+function wdsDownscaleImageForUpload(dataUrl) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const { width, height } = img;
+      if (Math.max(width, height) <= WDS_MAX_UPLOAD_DIM) { resolve(null); return; }
+      const scale = WDS_MAX_UPLOAD_DIM / Math.max(width, height);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(width * scale);
+      canvas.height = Math.round(height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.82);
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+}
+
+// Single shared upload path for every image in the app — feed posts, My
+// Day stories, and chat (mobile Nexus tab and desktop chat/popups alike).
 async function uploadChatImage(dataUrl, shareKeyOverride) {
-  const blob = await (await fetch(dataUrl)).blob();
+  let blob = await (await fetch(dataUrl)).blob();
+  if (blob.type !== 'image/gif') { // skip animated GIFs — canvas would flatten to one frame
+    const resized = await wdsDownscaleImageForUpload(dataUrl);
+    if (resized) blob = resized;
+  }
   const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
   const path = `${shareKeyOverride || getOrCreateShareKey()}/${Date.now()}.${ext}`;
   const { error } = await sb.storage.from('chat-images').upload(path, blob, { contentType: blob.type });
