@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.4.10';
+const APP_VERSION = 'WF_SYS_V.1.4.11';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -3200,7 +3200,7 @@ async function refreshWdsChat() {
   if (wdsGuestMode) {
     try {
       if (!wdsGuestChatMessages) wdsGuestChatMessages = await fetchChatMessages();
-      renderWdsChatMessages(wdsGuestChatMessages, []);
+      renderWdsChatMessages(wdsGuestChatMessages, [], {});
     } catch (e) {
       listEl.innerHTML = '<p class="empty-note">Could not load chat.</p>';
     }
@@ -3210,7 +3210,11 @@ async function refreshWdsChat() {
     const messages = await fetchChatMessages();
     wdsLastChatMessages = messages;
     const receipts = await fetchChatSeenReceipts('global').catch(() => []);
-    renderWdsChatMessages(messages, receipts);
+    // Real photos on the "Seen by" row instead of always a letter circle —
+    // chat_read_receipts itself has no avatar column, so this is a separate
+    // batch lookup keyed off each receipt's share_key.
+    const avatarsByKey = receipts.length ? await wdsFetchAvatarsByShareKey(receipts.map(r => r.share_key)) : {};
+    renderWdsChatMessages(messages, receipts, avatarsByKey);
     renderWdsNotifications();
     wdsMaybeMarkChatRead();
   } catch (e) {
@@ -3700,7 +3704,8 @@ function wdsExtractVideoEmbed(text) {
   return '';
 }
 
-function renderWdsChatMessages(messages, receipts) {
+function renderWdsChatMessages(messages, receipts, avatarsByKey) {
+  avatarsByKey = avatarsByKey || {};
   const list = document.getElementById('wdsChatList');
   list.innerHTML = '';
   if (!messages.length) { list.innerHTML = '<p class="empty-note">No messages yet. Say hi!</p>'; return; }
@@ -3748,9 +3753,10 @@ function renderWdsChatMessages(messages, receipts) {
     if (seenBy.length) {
       const seenRow = document.createElement('div');
       seenRow.className = 'wds-chat-seen-row';
-      seenRow.innerHTML = seenBy.slice(0, 8).map(r =>
-        `<span class="wds-chat-seen-avatar" title="Seen by ${escapeHtml(r.code_name || '?')}">${escapeHtml((r.code_name || '?').charAt(0).toUpperCase())}</span>`
-      ).join('');
+      seenRow.innerHTML = seenBy.slice(0, 8).map(r => {
+        const photo = avatarsByKey[r.share_key];
+        return `<span class="wds-chat-seen-avatar" title="Seen by ${escapeHtml(r.code_name || '?')}"${wdsAvatarStyleAttr(photo)}>${photo ? '' : escapeHtml((r.code_name || '?').charAt(0).toUpperCase())}</span>`;
+      }).join('');
       list.appendChild(seenRow);
     }
   }
