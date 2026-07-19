@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.3.0';
+const APP_VERSION = 'WF_SYS_V.1.3.1';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1002,6 +1002,28 @@ function initDesktopShell() {
     document.documentElement.setAttribute('data-skin', skinSelectEl.value);
     localStorage.setItem(WDS_SKIN_OVERRIDE_KEY, skinSelectEl.value);
   });
+
+  // Theme popup (dial's Theme item, mobile viewports only — see
+  // initWdsDial) — mirrors the Account card's own theme controls above
+  // with separate ids, writing to the exact same override keys so both
+  // stay in sync regardless of which one was last used.
+  const themePopup = document.getElementById('wdsThemePopup');
+  const themeToggleMobileEl = document.getElementById('wdsThemeToggleMobile');
+  const skinSelectMobileEl = document.getElementById('wdsSkinSelectMobile');
+  if (themeToggleMobileEl) themeToggleMobileEl.addEventListener('change', () => {
+    const theme = themeToggleMobileEl.checked ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem(WDS_THEME_OVERRIDE_KEY, theme);
+    if (themeToggleEl) themeToggleEl.checked = themeToggleMobileEl.checked;
+  });
+  if (skinSelectMobileEl) skinSelectMobileEl.addEventListener('change', () => {
+    document.documentElement.setAttribute('data-skin', skinSelectMobileEl.value);
+    localStorage.setItem(WDS_SKIN_OVERRIDE_KEY, skinSelectMobileEl.value);
+    if (skinSelectEl) skinSelectEl.value = skinSelectMobileEl.value;
+  });
+  const closeThemePopupBtn = document.getElementById('btnWdsThemePopupClose');
+  if (closeThemePopupBtn) closeThemePopupBtn.addEventListener('click', () => { themePopup.hidden = true; });
+  if (themePopup) themePopup.addEventListener('click', e => { if (e.target === themePopup) themePopup.hidden = true; });
 
   // Notification bell — simple open/close popover, closes on outside click.
   const bellBtn = document.getElementById('wdsBellBtn');
@@ -2611,6 +2633,19 @@ function wdsOpenDial() {
 }
 function wdsToggleDial() { if (wdsDialOpen) wdsCloseDial(); else wdsOpenDial(); }
 
+// Syncs the popup's controls to the CURRENT data-theme/data-skin (which
+// might have been set by the Account card's own controls, a real sign-in,
+// or a previous popup use) before showing it, so the two never disagree.
+function wdsOpenThemePopup() {
+  const popup = document.getElementById('wdsThemePopup');
+  if (!popup) return;
+  const toggle = document.getElementById('wdsThemeToggleMobile');
+  const select = document.getElementById('wdsSkinSelectMobile');
+  if (toggle) toggle.checked = document.documentElement.getAttribute('data-theme') === 'light';
+  if (select) select.value = document.documentElement.getAttribute('data-skin') || 'default';
+  popup.hidden = false;
+}
+
 // Tap opens/closes the dial; drag (movement past a small threshold)
 // repositions it and persists the new spot; a press-and-hold with no
 // movement resets it back to the default corner.
@@ -2682,6 +2717,11 @@ function initWdsDial() {
     } else if (action === 'nexus-com') {
       const fixed = document.getElementById('wdsGlobalChatFixed');
       if (fixed) fixed.hidden = false;
+    } else if (action === 'theme' && window.innerWidth <= 860) {
+      // The 3-column dashboard layout puts the Account card (where the
+      // theme controls normally live) somewhere not reliably reachable on
+      // a narrow viewport — a popup instead of scrollIntoView on mobile.
+      wdsOpenThemePopup();
     } else if (action === 'settings' || action === 'theme') {
       const card = document.getElementById('wdsAccountCard');
       if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });

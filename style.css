@@ -4890,6 +4890,16 @@ html.wf-resume-session .wds-reload-splash { display: flex !important; }
   font-size: 0.76rem; text-align: center; padding: 8px 16px; line-height: 1.4;
 }
 .wds-guest-banner strong { color: var(--cyan); }
+/* Theme popup — see index.html comment above #wdsThemePopup. */
+.wds-theme-popup {
+  position: fixed; inset: 0; z-index: 500; background: rgba(5,10,14,0.85);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.wds-theme-popup[hidden] { display: none; }
+.wds-theme-popup-card {
+  width: 100%; max-width: 320px; background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: 12px; padding: 18px;
+}
 
 /* ---------- Top nav ---------- */
 .wds-topnav {
@@ -5210,6 +5220,14 @@ html.wf-desktop-shell body { overflow-x: auto; }
    source order, so the dial stays circular under every skin instead of
    inheriting whatever card-radius that skin uses. */
 #wdsDialBtn, #wdsDialBtn img, #wdsDialMenu .wds-dial-item { border-radius: 50% !important; }
+/* Smaller on narrow (mobile) viewports — matches the mobile app's own
+   drawer button sizing convention (8mm launcher, 6mm arc icons) rather
+   than the full desktop-sized dial. */
+@media (max-width: 860px) {
+  .wds-dial-btn { width: 8mm; height: 8mm; }
+  .wds-dial-item { width: 6mm; height: 6mm; }
+  .wds-dial-item svg { width: 13px; height: 13px; }
+}
 .wds-dial-btn:active { cursor: grabbing; }
 .wds-dial-btn.is-dragging { box-shadow: 0 10px 30px rgba(0,0,0,0.6); transition: none; }
 .wds-dial-btn.wds-dial-reset-pulse { animation: wds-dial-pulse 0.4s ease; }
