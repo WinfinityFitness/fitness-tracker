@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.2.2';
+const APP_VERSION = 'WF_SYS_V.1.2.3';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -16768,6 +16768,25 @@ let currentAnnouncementText = '';
 
 function isAdminLoggedIn() { return !!adminSession.password; }
 
+// Shared by every admin RPC call site — logs the real error (previously
+// swallowed into a generic "try again"), and if it's specifically an auth
+// failure, clears the cached admin session so a stale password left over
+// from before a password change (this app's admin password has been
+// rotated more than once) doesn't keep silently failing every action; the
+// admin just has to log in again with the current password.
+function handleAdminRpcError(label, e, noteEl) {
+  console.error(label + ' failed:', e);
+  const msg = (e && e.message) || '';
+  if (msg === 'Not authorized') {
+    adminSession = { digitalId: null, password: null };
+    localStorage.removeItem('wft_admin_session');
+    refreshAnnouncementMenuState();
+    if (noteEl) noteEl.textContent = 'Your admin session is out of date — log in again.';
+  } else if (noteEl) {
+    noteEl.textContent = msg.includes('Too many attempts') ? msg : 'Failed — try again.';
+  }
+}
+
 // Two identical copies laid out side by side, animated -50% and looped —
 // speed is set from the measured text width so it always scrolls at a
 // constant pace instead of a fixed duration that would race short messages
@@ -16866,20 +16885,23 @@ function initAnnouncementWidget() {
     if (!sbConfigured()) { noteEl.textContent = 'Not available offline.'; return; }
     noteEl.textContent = 'Checking…';
     try {
-      const { data, error } = await sb.rpc('verify_admin_login', { p_digital_id: id, p_password: pw });
+      // verify_admin_login (supabase_security_hardening_migration_2.sql)
+      // now returns void and RAISES on failure instead of returning
+      // true/false — success is "no error thrown", not data === true
+      // (which used to work under the old boolean-returning version, but
+      // now can never be true since data is always null/undefined).
+      const { error } = await sb.rpc('verify_admin_login', { p_digital_id: id, p_password: pw });
       if (error) throw error;
-      if (data === true) {
-        adminSession = { digitalId: id, password: pw };
-        localStorage.setItem('wft_admin_session', JSON.stringify(adminSession));
-        loginOverlay.hidden = true;
-        refreshAnnouncementMenuState();
-        refreshChatRooms();
-        showRestToast('Admin unlocked.');
-      } else {
-        noteEl.textContent = 'Incorrect Digital ID or password.';
-      }
+      adminSession = { digitalId: id, password: pw };
+      localStorage.setItem('wft_admin_session', JSON.stringify(adminSession));
+      loginOverlay.hidden = true;
+      refreshAnnouncementMenuState();
+      refreshChatRooms();
+      showRestToast('Admin unlocked.');
     } catch (e) {
-      noteEl.textContent = 'Login failed — try again.';
+      console.error('verify_admin_login failed:', e);
+      const msg = (e && e.message) || '';
+      noteEl.textContent = msg.includes('Too many attempts') ? msg : 'Incorrect Digital ID or password.';
     }
   });
 
@@ -16901,7 +16923,7 @@ function initAnnouncementWidget() {
       postOverlay.hidden = true;
       showRestToast('Announcement posted.');
     } catch (e) {
-      noteEl.textContent = 'Failed to post — try again.';
+      handleAdminRpcError('set_announcement', e, noteEl);
     }
   });
 
