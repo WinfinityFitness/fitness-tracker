@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.2.7';
+const APP_VERSION = 'WF_SYS_V.1.3.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -50,6 +50,40 @@ const isDesktopShellSite = location.hostname === DESKTOP_SHELL_HOST;
 // without touching any of those functions' call sites.
 let wdsRemoteData = null;
 
+// ---------------------------------------------------------------------
+// Guest Log In — a throwaway local identity for browsing the web
+// dashboard without a real Digital ID (see enterGuestDashboard in
+// initDesktopShell). Reads are real (fetchFeedPosts/fetchActiveStories/
+// fetchChatMessages run exactly as they would for any stranger with no
+// friends — same public-only visibility rules); every WRITE
+// (post/react/comment/story/message) is simulated purely client-side
+// against one of the caches below instead of touching Supabase, so
+// nothing a guest does is ever visible to a real signed-in user and it
+// all resets on reload. Each relevant function (postFeedPost,
+// toggleFeedPostLike, refreshWdsFeed, etc.) checks wdsGuestMode itself.
+//
+// Deliberately NOT a valid UUID: on the rare write path this file might
+// not have explicitly guarded, passing this as a uuid-typed RPC/insert
+// parameter fails server-side (Postgres rejects the malformed uuid)
+// rather than silently succeeding — a real, hard backstop against guest
+// content ever actually reaching a real table, not just a convention.
+let wdsGuestMode = false;
+const WDS_GUEST_SHARE_KEY = 'guest-preview';
+const WDS_GUEST_NAME = 'Guest';
+let wdsGuestFeedPosts = null;
+let wdsGuestStories = null;
+let wdsGuestChatMessages = null;
+let wdsGuestIdSeq = 0;
+function wdsNextGuestId() { wdsGuestIdSeq -= 1; return wdsGuestIdSeq; }
+function wdsGuestFindPost(postId) { return (wdsGuestFeedPosts || []).find(p => p.id === postId); }
+function wdsGuestFindComment(commentId) {
+  for (const post of (wdsGuestFeedPosts || [])) {
+    const c = (post.comments || []).find(c => c.id === commentId);
+    if (c) return c;
+  }
+  return null;
+}
+
 // Desktop Messenger-style chat (DMs + group chatrooms) — reuses the exact
 // same chat_rooms/chat_room_members tables and RPCs (start_dm_by_name,
 // create_chat_room, invite_to_chat_room, leave_chat_room, delete_chat_room,
@@ -93,6 +127,7 @@ function initDesktopShell() {
   const idInput = document.getElementById('wdsDigitalIdInput');
   const pinInput = document.getElementById('wdsPinInput');
   const signInBtn = document.getElementById('wdsSignInBtn');
+  const guestLoginBtn = document.getElementById('wdsGuestLoginBtn');
   const signOutBtn = document.getElementById('wdsSignOutBtn');
   const errorEl = document.getElementById('wdsGateError');
   const operatorNameEl = document.getElementById('wdsOperatorName');
@@ -119,6 +154,10 @@ function initDesktopShell() {
     const cleanId = digitalId.trim().toUpperCase();
     const cleanPin = pin.trim();
     if (!cleanId || !cleanPin) return false;
+    // Defensive: a real sign-in must never proceed with guest-mode still
+    // active, or every one of this real account's actions would silently
+    // simulate as a no-op instead of actually posting.
+    wdsGuestMode = false;
     errorEl.hidden = true;
     if (!sbConfigured()) {
       errorEl.textContent = 'Not connected — check your internet connection and try again.';
@@ -223,11 +262,55 @@ function initDesktopShell() {
     if (e.key === 'Enter') trySignIn();
   }));
 
+  // Guest Log In — a throwaway identity with no real profile/logs (every
+  // calc function already degrades to empty/zero states when wdsRemoteData
+  // has nothing to read, same as a brand-new real account would show).
+  // Every write anywhere in the dashboard checks wdsGuestMode itself and
+  // simulates locally instead of touching Supabase — see the
+  // wdsGuestMode/WDS_GUEST_SHARE_KEY block near the top of this file.
+  if (guestLoginBtn) guestLoginBtn.addEventListener('click', () => {
+    wdsGuestMode = true;
+    wdsRemoteData = {
+      publicId: 'GUEST', shareKey: WDS_GUEST_SHARE_KEY, profile: { name: WDS_GUEST_NAME },
+      theme: 'dark', skin: 'default', logsObj: {}, reviewsObj: {}, dailyReviewsObj: {},
+    };
+    document.documentElement.setAttribute('data-theme', wdsRemoteData.theme);
+    document.documentElement.setAttribute('data-skin', wdsRemoteData.skin);
+    wdsApplyThemeOverride();
+    operatorNameEl.textContent = WDS_GUEST_NAME;
+    modeIconImgEl.src = MODE_ICON.beginner;
+    modeIconEl.classList.remove('wds-user-mode-icon--photo');
+    modeIconEl.title = WDS_GUEST_NAME;
+    const composerAvatarEl = document.getElementById('wdsComposerAvatar');
+    wdsSetAvatarVisual(composerAvatarEl, null, 'G');
+    const composerInputEl = document.getElementById('wdsComposerInput');
+    if (composerInputEl) composerInputEl.placeholder = "What's on your mind, Guest?";
+    renderWdsDashboard();
+    gate.hidden = true;
+    dashboard.hidden = false;
+    const dialBtn = document.getElementById('wdsDialBtn');
+    if (dialBtn) dialBtn.hidden = false;
+    const globalChatFixedEl = document.getElementById('wdsGlobalChatFixed');
+    if (globalChatFixedEl && window.innerWidth > 860) globalChatFixedEl.hidden = false;
+    const banner = document.getElementById('wdsGuestBanner');
+    if (banner) banner.hidden = false;
+  });
+
   signOutBtn.addEventListener('click', () => {
     if (!confirm('Log out?')) return;
     sessionStorage.removeItem(SESSION_ID_KEY);
     sessionStorage.removeItem(SESSION_PIN_KEY);
     wdsRemoteData = null;
+    // Resetting these here (not just on guest sign-in) matters: if this
+    // isn't cleared, a REAL sign-in right after leaving a guest session
+    // would silently simulate every one of that real account's actions
+    // as guest-mode no-ops instead of actually posting them.
+    wdsGuestMode = false;
+    wdsGuestFeedPosts = null;
+    wdsGuestStories = null;
+    wdsGuestChatMessages = null;
+    const guestBanner = document.getElementById('wdsGuestBanner');
+    if (guestBanner) guestBanner.hidden = true;
     stopWdsDashboardPolling();
     stopWdsChatPolling();
     stopWdsFeedPolling();
@@ -1662,6 +1745,17 @@ function wdsGroupStoriesByUser(stories) {
 async function postFeedStory(text, imageDataUrl, shareKey, codeName, linkPreview) {
   const trimmed = (text || '').trim().slice(0, 500);
   if (!trimmed && !imageDataUrl && !linkPreview) return;
+  if (wdsGuestMode) {
+    if (!wdsGuestStories) wdsGuestStories = [];
+    wdsGuestStories.unshift({
+      id: wdsNextGuestId(), share_key: WDS_GUEST_SHARE_KEY, code_name: codeName || WDS_GUEST_NAME,
+      message: trimmed, image_url: imageDataUrl || null, link_preview: linkPreview || null,
+      created_at: new Date().toISOString(),
+    });
+    wdsActiveStories = wdsGuestStories;
+    wdsStoryGroups = wdsGroupStoriesByUser(wdsActiveStories);
+    return;
+  }
   let imageUrl = null;
   if (imageDataUrl) imageUrl = await uploadChatImage(imageDataUrl, shareKey);
   const { error } = await sb.from('feed_stories').insert({ share_key: shareKey, code_name: codeName, message: trimmed, image_url: imageUrl, link_preview: linkPreview || null });
@@ -2208,6 +2302,17 @@ async function wdsFlattenStoryToDataUrl() {
 async function refreshWdsMyday() {
   const el = document.getElementById('wdsMydayRow');
   if (!el) return;
+  if (wdsGuestMode) {
+    try {
+      if (!wdsGuestStories) wdsGuestStories = await fetchActiveStories();
+      wdsActiveStories = wdsGuestStories;
+      wdsStoryGroups = wdsGroupStoriesByUser(wdsActiveStories);
+      renderWdsMyday();
+    } catch (e) {
+      el.innerHTML = '<p class="empty-note">Could not load My Day.</p>';
+    }
+    return;
+  }
   try {
     wdsActiveStories = await fetchActiveStories();
     wdsStoryGroups = wdsGroupStoriesByUser(wdsActiveStories);
@@ -2384,6 +2489,10 @@ function wdsCloseStoryViewer() {
 // so it doesn't interrupt watching.
 async function wdsSendStoryReply(story, text) {
   if (!wdsRemoteData || !text.trim()) return;
+  // No real DM as a guest (there's no real reciprocal account to receive
+  // it) — the caller flashes "Sent!" regardless of this function's outcome,
+  // so the interaction still feels complete.
+  if (wdsGuestMode) return;
   const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
   try {
     const { data: roomId, error } = await sb.rpc('start_dm_by_name', {
@@ -2630,6 +2739,15 @@ async function refreshWdsChat() {
   // cycle entirely while one's showing; polling resumes once it scrolls
   // away or the message list otherwise re-renders for another reason.
   if (listEl && listEl.querySelector('.chat-video-embed iframe')) return;
+  if (wdsGuestMode) {
+    try {
+      if (!wdsGuestChatMessages) wdsGuestChatMessages = await fetchChatMessages();
+      renderWdsChatMessages(wdsGuestChatMessages, []);
+    } catch (e) {
+      listEl.innerHTML = '<p class="empty-note">Could not load chat.</p>';
+    }
+    return;
+  }
   try {
     const messages = await fetchChatMessages();
     wdsLastChatMessages = messages;
@@ -3325,6 +3443,18 @@ async function postFeedPost(text, imageDataUrl, shareKey, codeName, linkPreview,
   const trimmed = text.trim().slice(0, 2000);
   const images = Array.isArray(imageDataUrl) ? imageDataUrl.filter(Boolean) : (imageDataUrl ? [imageDataUrl] : []);
   if (!trimmed && !images.length) return;
+  if (wdsGuestMode) {
+    if (!wdsGuestFeedPosts) wdsGuestFeedPosts = [];
+    // Image data URLs render fine directly as an <img src> — no need to
+    // actually upload anything for a post that's never leaving this tab.
+    wdsGuestFeedPosts.unshift({
+      id: wdsNextGuestId(), share_key: WDS_GUEST_SHARE_KEY, code_name: codeName || WDS_GUEST_NAME,
+      message: trimmed, image_url: images[0] || null, image_urls: images.length > 1 ? images : null,
+      link_preview: linkPreview || null, created_at: new Date().toISOString(),
+      likes: [], comments: [], shareCount: 0,
+    });
+    return;
+  }
   const uploadedUrls = [];
   for (const dataUrl of images) uploadedUrls.push(await uploadChatImage(dataUrl, shareKey));
   const singleImageUrl = uploadedUrls.length === 1 ? uploadedUrls[0] : null;
@@ -3456,12 +3586,31 @@ function wdsBuildLinkPreviewHtml(preview) {
 }
 
 async function toggleFeedPostLike(postId, shareKey, emoji, codeName) {
+  if (wdsGuestMode) {
+    const post = wdsGuestFindPost(postId);
+    if (!post) return false;
+    const idx = post.likes.findIndex(l => l.share_key === WDS_GUEST_SHARE_KEY);
+    if (idx === -1) { post.likes.push({ post_id: postId, share_key: WDS_GUEST_SHARE_KEY, emoji: emoji || '👍', code_name: codeName || WDS_GUEST_NAME }); return true; }
+    if (post.likes[idx].emoji === (emoji || '👍')) { post.likes.splice(idx, 1); return false; }
+    post.likes[idx].emoji = emoji || '👍';
+    return true;
+  }
   const { data, error } = await sb.rpc('toggle_feed_post_like', { p_post_id: postId, p_share_key: shareKey, p_emoji: emoji || '👍', p_code_name: codeName || null });
   if (error) throw error;
   return data;
 }
 
 async function toggleFeedCommentLike(commentId, shareKey, emoji, codeName) {
+  if (wdsGuestMode) {
+    const comment = wdsGuestFindComment(commentId);
+    if (!comment) return false;
+    if (!comment.likes) comment.likes = [];
+    const idx = comment.likes.findIndex(l => l.share_key === WDS_GUEST_SHARE_KEY);
+    if (idx === -1) { comment.likes.push({ comment_id: commentId, share_key: WDS_GUEST_SHARE_KEY, emoji: emoji || '👍', code_name: codeName || WDS_GUEST_NAME }); return true; }
+    if (comment.likes[idx].emoji === (emoji || '👍')) { comment.likes.splice(idx, 1); return false; }
+    comment.likes[idx].emoji = emoji || '👍';
+    return true;
+  }
   const { data, error } = await sb.rpc('toggle_feed_comment_like', { p_comment_id: commentId, p_share_key: shareKey, p_emoji: emoji || '👍', p_code_name: codeName || null });
   if (error) throw error;
   return data;
@@ -3470,6 +3619,17 @@ async function toggleFeedCommentLike(commentId, shareKey, emoji, codeName) {
 async function postFeedComment(postId, text, shareKey, codeName, parentCommentId) {
   const trimmed = text.trim().slice(0, 500);
   if (!trimmed) return;
+  if (wdsGuestMode) {
+    const post = wdsGuestFindPost(postId);
+    if (!post) return;
+    if (!post.comments) post.comments = [];
+    post.comments.push({
+      id: wdsNextGuestId(), post_id: postId, parent_comment_id: parentCommentId || null,
+      share_key: WDS_GUEST_SHARE_KEY, code_name: codeName || WDS_GUEST_NAME, message: trimmed,
+      deleted: false, created_at: new Date().toISOString(), likes: [],
+    });
+    return;
+  }
   const { error } = await sb.from('feed_post_comments').insert({
     post_id: postId, share_key: shareKey, code_name: codeName, message: trimmed,
     parent_comment_id: parentCommentId || null,
@@ -3486,16 +3646,27 @@ async function shareFeedPost(shareKey, codeName, originalPostId, message) {
 }
 
 async function unsendFeedPost(postId, shareKey) {
+  if (wdsGuestMode) { wdsGuestFeedPosts = (wdsGuestFeedPosts || []).filter(p => p.id !== postId); return; }
   const { error } = await sb.rpc('unsend_feed_post', { p_post_id: postId, p_share_key: shareKey });
   if (error) throw error;
 }
 
 async function editFeedPost(postId, shareKey, message) {
+  if (wdsGuestMode) {
+    const post = wdsGuestFindPost(postId);
+    if (post) post.message = (message || '').trim().slice(0, 2000);
+    return;
+  }
   const { error } = await sb.rpc('edit_feed_post', { p_post_id: postId, p_share_key: shareKey, p_message: (message || '').trim().slice(0, 2000) });
   if (error) throw error;
 }
 
 async function unsendFeedComment(commentId, shareKey) {
+  if (wdsGuestMode) {
+    const comment = wdsGuestFindComment(commentId);
+    if (comment) { comment.deleted = true; comment.message = ''; }
+    return;
+  }
   const { error } = await sb.rpc('unsend_feed_comment', { p_comment_id: commentId, p_share_key: shareKey });
   if (error) throw error;
 }
@@ -3521,6 +3692,19 @@ async function refreshWdsFeed(force) {
   // succeed on the server while the screen never updated to show it,
   // for as long as any video stayed embedded in the feed.
   if (!force && listEl.querySelector('.chat-video-embed iframe')) return;
+  if (wdsGuestMode) {
+    // Fetched from the real feed exactly once (same public-only visibility
+    // a stranger with no friends would see) and cached from then on —
+    // every subsequent "refresh" (after a simulated post/react/comment)
+    // just re-renders that local cache instead of hitting the network again.
+    try {
+      if (!wdsGuestFeedPosts) wdsGuestFeedPosts = await fetchFeedPosts();
+      renderFeedPosts(wdsGuestFeedPosts);
+    } catch (e) {
+      listEl.innerHTML = '<p class="empty-note">Could not load the feed.</p>';
+    }
+    return;
+  }
   try {
     const posts = await fetchFeedPosts();
     renderFeedPosts(posts);
@@ -13775,6 +13959,21 @@ async function fetchChatMessages() {
 async function postChatMessage(text, imageDataUrl, shareKeyOverride, codeNameOverride, roomIdOverride) {
   const trimmed = text.trim().slice(0, 280);
   if (!trimmed && !imageDataUrl) return;
+
+  // wdsGuestMode is a desktop-only flag (mobile never sets it), and Nexus
+  // Com (Global Chat) is the only guest-reachable surface that calls this
+  // — roomIdOverride is omitted for it, same as any other Global Chat
+  // send. Simulated locally: never actually sent, and never visible to a
+  // real signed-in user.
+  if (wdsGuestMode && roomIdOverride === undefined) {
+    if (!wdsGuestChatMessages) wdsGuestChatMessages = [];
+    wdsGuestChatMessages.push({
+      id: wdsNextGuestId(), code_name: codeNameOverride || WDS_GUEST_NAME, message: trimmed,
+      image_url: imageDataUrl || null, created_at: new Date().toISOString(), deleted: false,
+      sender_share_key: shareKeyOverride || WDS_GUEST_SHARE_KEY, reactions: [],
+    });
+    return;
+  }
 
   let imageUrl = null;
   if (imageDataUrl) imageUrl = await uploadChatImage(imageDataUrl, shareKeyOverride);

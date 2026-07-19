@@ -46,7 +46,7 @@ if (sessionStorage.getItem('wds_operator_id') && sessionStorage.getItem('wds_ope
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.2.7">
+<link rel="stylesheet" href="style.css?v=1.3.0">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3291,11 +3291,25 @@ if (sessionStorage.getItem('wds_operator_id') && sessionStorage.getItem('wds_ope
       <button type="button" class="wds-gate-btn" id="wdsSignInBtn">Enter Command Center</button>
       <p class="wds-gate-error" id="wdsGateError" hidden></p>
       <p class="wds-gate-note">Enable Web Dashboard Sync in the app's Settings first (sets your PIN and uploads your data), then sign in here with the same Digital ID + PIN.</p>
+      <div class="wds-gate-divider"><span>or</span></div>
+      <!-- Guest Log In — see enterGuestDashboard/wdsGuestMode in app.js. A
+           throwaway local identity that reads the REAL public feed/My
+           Day/Nexus Com (same visibility rules a stranger with no friends
+           would see), but every write (post/react/comment/story/message)
+           is simulated purely client-side — nothing ever reaches
+           Supabase, so it never appears for any real signed-in user and
+           resets the moment the page reloads. -->
+      <button type="button" class="wds-gate-btn wds-gate-btn--ghost" id="wdsGuestLoginBtn">Guest Log In</button>
+      <p class="hint hint--sm">Browse and try out the dashboard with a temporary identity — nothing you post or react to here is saved or visible to real users.</p>
     </div>
   </div>
 
   <!-- ---------- Dashboard ---------- -->
   <div class="wds-dashboard" id="wdsDashboard" hidden>
+
+    <div class="wds-guest-banner" id="wdsGuestBanner" hidden>
+      You're browsing as a <strong>Guest</strong> — posts, reactions, comments, stories, and messages here are just a preview. Nothing you do is saved or visible to real signed-in users.
+    </div>
 
     <header class="wds-topnav">
       <div class="wds-topnav-brand" id="wdsTopnavBrand" role="button" tabindex="0" title="Back to home">
@@ -3968,10 +3982,10 @@ if (sessionStorage.getItem('wds_operator_id') && sessionStorage.getItem('wds_ope
   <img id="chatLightboxImg" alt="">
 </div>
 
-<script src="config.js?v=1.2.7"></script>
+<script src="config.js?v=1.3.0"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.2.7"></script>
+<script src="app.js?v=1.3.0"></script>
 </body>
 </html>

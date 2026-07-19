@@ -4873,6 +4873,23 @@ html.wf-resume-session .wds-reload-splash { display: flex !important; }
 .wds-gate-btn:hover { filter: brightness(1.08); }
 .wds-gate-note { color: var(--text-muted); font-size: 0.72rem; margin: 16px 0 0; line-height: 1.5; }
 .wds-gate-error { color: var(--critical); font-size: 0.78rem; margin: 12px 0 0; line-height: 1.4; }
+.wds-gate-divider {
+  display: flex; align-items: center; gap: 10px; margin: 18px 0 14px;
+  color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;
+}
+.wds-gate-divider::before, .wds-gate-divider::after { content: ''; flex: 1; height: 1px; background: var(--border-soft); }
+.wds-gate-btn--ghost {
+  background: none; border: 1px solid var(--border); color: var(--text-primary); font-weight: 600;
+}
+.wds-gate-btn--ghost:hover { background: var(--surface-2); filter: none; }
+/* Persistent reminder while in guest mode (see enterGuestDashboard/
+   wdsGuestMode in app.js) — sits above the topnav so it's visible no
+   matter which part of the dashboard is scrolled into view. */
+.wds-guest-banner {
+  background: var(--surface-2); border-bottom: 1px solid var(--border-soft); color: var(--text-secondary);
+  font-size: 0.76rem; text-align: center; padding: 8px 16px; line-height: 1.4;
+}
+.wds-guest-banner strong { color: var(--cyan); }
 
 /* ---------- Top nav ---------- */
 .wds-topnav {
