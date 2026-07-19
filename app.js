@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.4.15';
+const APP_VERSION = 'WF_SYS_V.1.4.16';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -7661,17 +7661,23 @@ function initEntityPhotoUpload() {
   const input = document.getElementById('setupPhotoInput');
   const noteEl = document.getElementById('setupPhotoNote');
   uploadBtn.addEventListener('click', () => { if (!uploadBtn.disabled) input.click(); });
-  // Web sync only ever pushes to the server when "Sync Now" is tapped —
-  // a photo saved locally otherwise never reaches the desktop dashboard
-  // until the user remembers to sync separately. Auto-push here (best
-  // effort, only when sync is already enabled) closes that gap.
+  // Two SEPARATE syncs, deliberately gated differently:
+  //  - pushWebSyncSnapshot() carries the full private profile/logs/history
+  //    blob into web_sync_accounts, correctly gated behind the user having
+  //    explicitly turned on (PIN-protected) Web Dashboard Sync.
+  //  - The photo itself is public-safe (same threat model as the public
+  //    leaderboard entry's code_name) and is what feed posts/comments/
+  //    Friends cards/chat avatars everywhere on wellness read from
+  //    (leaderboard.avatar_data_url) -- this used to ALSO be gated behind
+  //    Web Sync, which meant anyone who'd simply set a profile photo
+  //    without ever opting into that separate, PIN-gated feature stayed
+  //    permanently stuck showing an initial-letter circle everywhere,
+  //    even to their own friends. Split out so it always best-effort
+  //    pushes on every photo change, independent of Web Sync's state.
   const autoSyncIfEnabled = async () => {
-    if (localStorage.getItem('wft_web_sync_enabled') !== '1') return;
-    try { await pushWebSyncSnapshot(); } catch (e) { /* best effort — Sync Now still works as a fallback */ }
-    // Also mirror the photo onto leaderboard's public-safe avatar column —
-    // the private profile blob (pushed above) never leaves web_sync_accounts,
-    // but Friends cards/feed avatars need SOMETHING public to show for
-    // other people, not just initials.
+    if (localStorage.getItem('wft_web_sync_enabled') === '1') {
+      try { await pushWebSyncSnapshot(); } catch (e) { /* best effort — Sync Now still works as a fallback */ }
+    }
     if (sbConfigured()) {
       try {
         await sb.rpc('set_leaderboard_avatar', {
@@ -14448,6 +14454,13 @@ async function pushLeaderboardEntry() {
   try {
     await sb.rpc('set_fitness_mode', { p_share_key: shareKey, p_mode: getFitnessMode() });
   } catch (e) { /* best effort — rank badge just won't update on other people's screens until this succeeds */ }
+  // Backfill for anyone who already had a photo set before this mirror
+  // existed independently of Web Sync (see initEntityPhotoUpload) — this
+  // periodic sync runs regardless, so it naturally catches an existing
+  // photo up without the user needing to re-touch it.
+  try {
+    await sb.rpc('set_leaderboard_avatar', { p_share_key: shareKey, p_avatar_data_url: (getProfile() || {}).photoDataUrl || null });
+  } catch (e) { /* best effort — avatar just stays an initial circle until this succeeds */ }
 }
 
 async function autoSyncLeaderboardIfOptedIn() {
