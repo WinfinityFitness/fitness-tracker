@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.4.12';
+const APP_VERSION = 'WF_SYS_V.1.4.13';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -3059,20 +3059,35 @@ function initWdsPushNotifications() {
 const WDS_DIAL_MOBILE_BREAKPOINT = 860;
 function wdsIsDialMobileViewport() { return window.innerWidth <= WDS_DIAL_MOBILE_BREAKPOINT; }
 
+// Persistent listeners (registered once below), not re-registered per
+// gesture inside pointerdown like an earlier version of this did — that
+// shape added a FRESH {once:true} 'pointerup' listener on every tap, and
+// relied on pointerup actually firing to clean it back up. Real mobile
+// Chrome routinely ends a gesture with 'pointercancel' instead (edge-swipe
+// gesture detection, a reflow, briefly-recognized multitouch) especially
+// for a button pinned right at the screen edge like this one — and
+// 'pointercancel' only ever removed ITSELF, never the orphaned 'pointerup'
+// listener from that same gesture. Every cancelled tap left one more
+// 'pointerup' listener permanently stacked on the button, so the NEXT
+// successful tap fired wdsToggleDial() once per stacked listener —
+// toggling open+closed (or closed+open) in the same tap and net-cancelling
+// out, which reads exactly like "the drawer doesn't respond" or "hangs."
+// FT's own admin-drawer tab (initAdminDrawer, same file) never had this
+// bug because its pointerup/pointercancel listeners are attached once,
+// outside the gesture, with plain state variables reset on both paths —
+// mirrored here instead of the previous per-gesture registration.
 function initWdsDialDrag() {
   const btn = document.getElementById('wdsDialBtn');
   if (!btn) return;
-  let startX, startY, startLeft, startTop, dragging, moved, longPressFired, longPressTimer;
+  let startX, startY, startLeft, startTop, dragging, moved, longPressFired, longPressTimer, gestureActive;
   btn.addEventListener('pointerdown', e => {
+    gestureActive = true;
+    btn.setPointerCapture(e.pointerId);
     if (wdsIsDialMobileViewport()) {
-      btn.setPointerCapture(e.pointerId);
-      const onUpMobile = () => wdsToggleDial();
-      btn.addEventListener('pointerup', onUpMobile, { once: true });
-      btn.addEventListener('pointercancel', () => {}, { once: true });
+      dragging = false; moved = false; longPressFired = false;
       return;
     }
     e.preventDefault();
-    btn.setPointerCapture(e.pointerId);
     const rect = btn.getBoundingClientRect();
     startX = e.clientX; startY = e.clientY;
     startLeft = rect.left; startTop = rect.top;
@@ -3080,39 +3095,48 @@ function initWdsDialDrag() {
     longPressTimer = setTimeout(() => {
       if (!moved) { wdsResetDialPosition(); longPressFired = true; }
     }, 600);
-    const onMove = ev => {
-      const dx = ev.clientX - startX, dy = ev.clientY - startY;
-      if (!moved && Math.hypot(dx, dy) > 6) {
-        moved = true;
-        clearTimeout(longPressTimer);
-        dragging = true;
-        btn.classList.add('is-dragging');
-        wdsCloseDial(true);
-      }
-      if (dragging) {
-        const margin = 8;
-        const x = Math.max(margin, Math.min(window.innerWidth - btn.offsetWidth - margin, startLeft + dx));
-        const y = Math.max(margin, Math.min(window.innerHeight - btn.offsetHeight - margin, startTop + dy));
-        btn.style.left = x + 'px';
-        btn.style.top = y + 'px';
-        btn.style.right = 'auto';
-        btn.style.bottom = 'auto';
-      }
-    };
-    const onUp = () => {
+  });
+  btn.addEventListener('pointermove', e => {
+    if (!gestureActive || wdsIsDialMobileViewport()) return;
+    const dx = e.clientX - startX, dy = e.clientY - startY;
+    if (!moved && Math.hypot(dx, dy) > 6) {
+      moved = true;
       clearTimeout(longPressTimer);
-      btn.removeEventListener('pointermove', onMove);
-      if (dragging) {
-        btn.classList.remove('is-dragging');
-        const finalRect = btn.getBoundingClientRect();
-        localStorage.setItem(WDS_DIAL_POS_KEY, JSON.stringify({ x: finalRect.left, y: finalRect.top }));
-      } else if (!moved && !longPressFired) {
-        wdsToggleDial();
-      }
-    };
-    btn.addEventListener('pointermove', onMove);
-    btn.addEventListener('pointerup', onUp, { once: true });
-    btn.addEventListener('pointercancel', onUp, { once: true });
+      dragging = true;
+      btn.classList.add('is-dragging');
+      wdsCloseDial(true);
+    }
+    if (dragging) {
+      const margin = 8;
+      const x = Math.max(margin, Math.min(window.innerWidth - btn.offsetWidth - margin, startLeft + dx));
+      const y = Math.max(margin, Math.min(window.innerHeight - btn.offsetHeight - margin, startTop + dy));
+      btn.style.left = x + 'px';
+      btn.style.top = y + 'px';
+      btn.style.right = 'auto';
+      btn.style.bottom = 'auto';
+    }
+  });
+  btn.addEventListener('pointerup', () => {
+    if (!gestureActive) return;
+    gestureActive = false;
+    clearTimeout(longPressTimer);
+    if (wdsIsDialMobileViewport()) {
+      wdsToggleDial();
+      return;
+    }
+    if (dragging) {
+      btn.classList.remove('is-dragging');
+      const finalRect = btn.getBoundingClientRect();
+      localStorage.setItem(WDS_DIAL_POS_KEY, JSON.stringify({ x: finalRect.left, y: finalRect.top }));
+    } else if (!moved && !longPressFired) {
+      wdsToggleDial();
+    }
+  });
+  btn.addEventListener('pointercancel', () => {
+    gestureActive = false;
+    clearTimeout(longPressTimer);
+    if (dragging) btn.classList.remove('is-dragging');
+    dragging = false; moved = false;
   });
 }
 
