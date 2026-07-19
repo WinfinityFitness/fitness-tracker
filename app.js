@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.2.0';
+const APP_VERSION = 'WF_SYS_V.1.2.1';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -153,6 +153,11 @@ function initDesktopShell() {
     // (every token in style.css keys off data-theme/data-skin) without it.
     document.documentElement.setAttribute('data-theme', wdsRemoteData.theme);
     document.documentElement.setAttribute('data-skin', wdsRemoteData.skin);
+    // A web-only theme/skin override (set via the dial's Theme option)
+    // takes over from here if present — deliberately never written back to
+    // the phone's own wft_theme/wft_skin, so switching themes on the
+    // website never touches the app.
+    wdsApplyThemeOverride();
     const displayName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || cleanId;
     operatorNameEl.textContent = displayName;
     const mode = getFitnessMode();
@@ -167,6 +172,8 @@ function initDesktopShell() {
     renderWdsDashboard();
     gate.hidden = true;
     dashboard.hidden = false;
+    const dialBtn = document.getElementById('wdsDialBtn');
+    if (dialBtn) dialBtn.hidden = false;
     // Deep-link support: a bookmarked/shared /<DigitalID> URL only makes
     // sense to check once, right after the FIRST successful sign-in — not
     // on every 2-minute poll refresh, which would otherwise re-open the
@@ -405,6 +412,7 @@ function initDesktopShell() {
     finally { composerPostBtn.disabled = false; }
   });
   initWdsFeed();
+  initWdsDial();
 
   // My Day — full-screen story composer: a background (photo or
   // color/gradient) plus any number of draggable/resizable/rotatable text
@@ -892,7 +900,14 @@ function initDesktopShell() {
   if (menuSignOutBtn) menuSignOutBtn.addEventListener('click', () => signOutBtn.click());
   const themeToggleEl = document.getElementById('wdsThemeToggle');
   if (themeToggleEl) themeToggleEl.addEventListener('change', () => {
-    document.documentElement.setAttribute('data-theme', themeToggleEl.checked ? 'light' : 'dark');
+    const theme = themeToggleEl.checked ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem(WDS_THEME_OVERRIDE_KEY, theme);
+  });
+  const skinSelectEl = document.getElementById('wdsSkinSelect');
+  if (skinSelectEl) skinSelectEl.addEventListener('change', () => {
+    document.documentElement.setAttribute('data-skin', skinSelectEl.value);
+    localStorage.setItem(WDS_SKIN_OVERRIDE_KEY, skinSelectEl.value);
   });
 
   // Notification bell — simple open/close popover, closes on outside click.
@@ -1464,6 +1479,8 @@ function renderWdsMenu() {
   if (modeEl) modeEl.textContent = MODE_LABEL[getFitnessMode()] || '–';
   const themeToggle = document.getElementById('wdsThemeToggle');
   if (themeToggle) themeToggle.checked = document.documentElement.getAttribute('data-theme') === 'light';
+  const skinSelect = document.getElementById('wdsSkinSelect');
+  if (skinSelect) skinSelect.value = document.documentElement.getAttribute('data-skin') || 'default';
 
   const profile = getProfile();
   const daysEl = document.getElementById('wdsMenuDaysActive');
@@ -2392,6 +2409,174 @@ function wdsCloseStoryComposer() {
   const overlay = document.getElementById('wdsStoryComposerOverlay');
   if (overlay) overlay.hidden = true;
   wdsPopStoryHistoryIfNeeded();
+}
+
+// ---------------------------------------------------------------------
+// Quick-access dial — this site's own equivalent of the mobile app's
+// edge-anchored admin/quick-log drawer, adapted for a freely-movable
+// circular launcher instead: logo button, tap to open a radial ring of
+// icons, drag to reposition anywhere, press-hold (no movement) to snap
+// back to the default corner. Position and theme/skin overrides persist
+// per-browser (localStorage), entirely independent of the phone app.
+// ---------------------------------------------------------------------
+const WDS_DIAL_POS_KEY = 'wft_web_dial_pos';
+const WDS_THEME_OVERRIDE_KEY = 'wft_web_theme_override';
+const WDS_SKIN_OVERRIDE_KEY = 'wft_web_skin_override';
+const WDS_DIAL_ITEM_RADIUS = 78;
+let wdsDialOpen = false;
+
+// Applied right after sign-in sets data-theme/data-skin from the synced
+// phone data — if a web-only override was ever set (via the dial's Theme
+// item), it wins, without ever touching the phone's own wft_theme/wft_skin.
+function wdsApplyThemeOverride() {
+  const themeOverride = localStorage.getItem(WDS_THEME_OVERRIDE_KEY);
+  const skinOverride = localStorage.getItem(WDS_SKIN_OVERRIDE_KEY);
+  if (themeOverride) document.documentElement.setAttribute('data-theme', themeOverride);
+  if (skinOverride) document.documentElement.setAttribute('data-skin', skinOverride);
+}
+
+function wdsApplyDialPosition() {
+  const btn = document.getElementById('wdsDialBtn');
+  if (!btn) return;
+  let pos = null;
+  try { pos = JSON.parse(localStorage.getItem(WDS_DIAL_POS_KEY)); } catch (e) { pos = null; }
+  if (pos && typeof pos.x === 'number' && typeof pos.y === 'number') {
+    btn.style.left = pos.x + 'px';
+    btn.style.top = pos.y + 'px';
+    btn.style.right = 'auto';
+    btn.style.bottom = 'auto';
+  } else {
+    btn.style.left = '';
+    btn.style.top = '';
+    btn.style.right = '';
+    btn.style.bottom = '';
+  }
+}
+function wdsResetDialPosition() {
+  localStorage.removeItem(WDS_DIAL_POS_KEY);
+  wdsApplyDialPosition();
+  const btn = document.getElementById('wdsDialBtn');
+  if (!btn) return;
+  btn.classList.remove('wds-dial-reset-pulse');
+  void btn.offsetWidth; // restart the CSS animation even if triggered twice in a row
+  btn.classList.add('wds-dial-reset-pulse');
+}
+
+function wdsCloseDial() {
+  wdsDialOpen = false;
+  const menu = document.getElementById('wdsDialMenu');
+  if (menu) menu.classList.remove('is-open');
+}
+// Arranges every .wds-dial-item in a full ring around the button's CURRENT
+// position (so it still looks right after being dragged), clamped inside
+// the viewport so items near a screen edge don't end up unreachable.
+function wdsOpenDial() {
+  const btn = document.getElementById('wdsDialBtn');
+  const menu = document.getElementById('wdsDialMenu');
+  if (!btn || !menu) return;
+  const rect = btn.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+  const items = Array.from(menu.querySelectorAll('.wds-dial-item'));
+  const margin = 30;
+  items.forEach((item, i) => {
+    const angle = (2 * Math.PI * i / items.length) - Math.PI / 2;
+    const x = Math.max(margin, Math.min(window.innerWidth - margin, cx + WDS_DIAL_ITEM_RADIUS * Math.cos(angle)));
+    const y = Math.max(margin, Math.min(window.innerHeight - margin, cy + WDS_DIAL_ITEM_RADIUS * Math.sin(angle)));
+    item.style.left = x + 'px';
+    item.style.top = y + 'px';
+  });
+  menu.hidden = false;
+  requestAnimationFrame(() => menu.classList.add('is-open'));
+  wdsDialOpen = true;
+}
+function wdsToggleDial() { if (wdsDialOpen) wdsCloseDial(); else wdsOpenDial(); }
+
+// Tap opens/closes the dial; drag (movement past a small threshold)
+// repositions it and persists the new spot; a press-and-hold with no
+// movement resets it back to the default corner.
+function initWdsDialDrag() {
+  const btn = document.getElementById('wdsDialBtn');
+  if (!btn) return;
+  let startX, startY, startLeft, startTop, dragging, moved, longPressFired, longPressTimer;
+  btn.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    btn.setPointerCapture(e.pointerId);
+    const rect = btn.getBoundingClientRect();
+    startX = e.clientX; startY = e.clientY;
+    startLeft = rect.left; startTop = rect.top;
+    dragging = false; moved = false; longPressFired = false;
+    longPressTimer = setTimeout(() => {
+      if (!moved) { wdsResetDialPosition(); longPressFired = true; }
+    }, 600);
+    const onMove = ev => {
+      const dx = ev.clientX - startX, dy = ev.clientY - startY;
+      if (!moved && Math.hypot(dx, dy) > 6) {
+        moved = true;
+        clearTimeout(longPressTimer);
+        dragging = true;
+        btn.classList.add('is-dragging');
+        wdsCloseDial();
+      }
+      if (dragging) {
+        const margin = 8;
+        const x = Math.max(margin, Math.min(window.innerWidth - btn.offsetWidth - margin, startLeft + dx));
+        const y = Math.max(margin, Math.min(window.innerHeight - btn.offsetHeight - margin, startTop + dy));
+        btn.style.left = x + 'px';
+        btn.style.top = y + 'px';
+        btn.style.right = 'auto';
+        btn.style.bottom = 'auto';
+      }
+    };
+    const onUp = () => {
+      clearTimeout(longPressTimer);
+      btn.removeEventListener('pointermove', onMove);
+      if (dragging) {
+        btn.classList.remove('is-dragging');
+        const finalRect = btn.getBoundingClientRect();
+        localStorage.setItem(WDS_DIAL_POS_KEY, JSON.stringify({ x: finalRect.left, y: finalRect.top }));
+      } else if (!moved && !longPressFired) {
+        wdsToggleDial();
+      }
+    };
+    btn.addEventListener('pointermove', onMove);
+    btn.addEventListener('pointerup', onUp, { once: true });
+    btn.addEventListener('pointercancel', onUp, { once: true });
+  });
+}
+
+function initWdsDial() {
+  wdsApplyDialPosition();
+  initWdsDialDrag();
+  document.addEventListener('click', e => {
+    if (wdsDialOpen && !e.target.closest('.wds-dial-menu') && !e.target.closest('#wdsDialBtn')) wdsCloseDial();
+  });
+  const menu = document.getElementById('wdsDialMenu');
+  if (menu) menu.addEventListener('click', e => {
+    const item = e.target.closest('[data-dial-action]');
+    if (!item) return;
+    wdsCloseDial();
+    const action = item.dataset.dialAction;
+    if (action === 'nexus-com') {
+      const fixed = document.getElementById('wdsGlobalChatFixed');
+      const collapsedIcon = document.getElementById('wdsGlobalChatCollapsedIcon');
+      if (fixed) fixed.hidden = false;
+      if (collapsedIcon) collapsedIcon.hidden = true;
+    } else if (action === 'settings' || action === 'theme') {
+      const card = document.getElementById('wdsAccountCard');
+      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else if (action === 'log-out') {
+      if (confirm('Log out of Nexus?')) {
+        const signOutBtn = document.getElementById('wdsSignOutBtn');
+        if (signOutBtn) signOutBtn.click();
+      }
+    } else {
+      // Fuel / Start Day Log / End Day Log / Weekend Log — each would mean
+      // building a full second copy of that mobile data-entry screen
+      // against the web's remote data; tracked as its own follow-up rather
+      // than a silent stub pretending to work.
+      showRestToast(`${item.getAttribute('aria-label')} is coming soon.`);
+    }
+  });
 }
 
 // ---------------------------------------------------------------------
