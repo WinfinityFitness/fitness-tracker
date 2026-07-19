@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.2.4';
+const APP_VERSION = 'WF_SYS_V.1.2.5';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -2557,7 +2557,10 @@ function initWdsDial() {
     if (!item) return;
     wdsCloseDial();
     const action = item.dataset.dialAction;
-    if (action === 'nexus-com') {
+    if (action === 'home') {
+      closeWdsProfilePage();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (action === 'nexus-com') {
       const fixed = document.getElementById('wdsGlobalChatFixed');
       if (fixed) fixed.hidden = false;
     } else if (action === 'settings' || action === 'theme') {

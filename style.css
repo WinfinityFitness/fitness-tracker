@@ -5203,6 +5203,12 @@ html.wf-desktop-shell body { overflow-x: auto; }
   box-shadow: 0 6px 20px rgba(0,0,0,0.5); touch-action: none;
 }
 .wds-dial-btn img { width: 100%; height: 100%; object-fit: contain; border-radius: 50%; pointer-events: none; }
+/* A couple of skins (Grand Core, Nezuko Digital) force border-radius on
+   literally every element via a `[data-skin="..."] * { ... !important }`
+   reset — ID selectors beat that regardless of !important-vs-!important
+   source order, so the dial stays circular under every skin instead of
+   inheriting whatever card-radius that skin uses. */
+#wdsDialBtn, #wdsDialBtn img, #wdsDialMenu .wds-dial-item { border-radius: 50% !important; }
 .wds-dial-btn:active { cursor: grabbing; }
 .wds-dial-btn.is-dragging { box-shadow: 0 10px 30px rgba(0,0,0,0.6); transition: none; }
 .wds-dial-btn.wds-dial-reset-pulse { animation: wds-dial-pulse 0.4s ease; }
@@ -5816,14 +5822,15 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
   margin: 0 0 2px; font-size: 1.7rem; font-weight: 800;
   background: var(--gradient-bar); background-clip: text; -webkit-background-clip: text;
   color: transparent; -webkit-text-fill-color: transparent;
-  /* The gradient fill is the SAME gradient the cover falls back to when
-     there's no custom photo, so the name goes invisible against an empty
-     cover — text-shadow (not text-stroke, which Firefox doesn't support)
-     draws a themed outline around the glyph shapes regardless of the
-     transparent fill color, so it stays readable over any cover. */
-  text-shadow:
-    -1px -1px 0 var(--surface-1), 1px -1px 0 var(--surface-1),
-    -1px 1px 0 var(--surface-1), 1px 1px 0 var(--surface-1);
+  /* The gradient fill is the SAME gradient the cover falls back to (and
+     often close to whatever a custom cover photo looks like too), so the
+     name needs a real outline to stay readable over any cover — a thin
+     -webkit-text-stroke traces the actual glyph edges directly, unlike
+     the previous text-shadow simulation, which turned out too faint to
+     read against a bright cover in some themes. paint-order keeps the
+     stroke from eating into the gradient fill on top of it. */
+  -webkit-text-stroke: 0.4px var(--surface-1);
+  paint-order: stroke fill;
 }
 .wds-profile-identity p { margin: 0; font-size: 0.82rem; color: var(--text-secondary); }
 .wds-profile-viewed-actions { display: flex; gap: 8px; padding-bottom: 8px; margin-left: auto; }

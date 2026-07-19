@@ -46,7 +46,7 @@ if (sessionStorage.getItem('wds_operator_id') && sessionStorage.getItem('wds_ope
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.2.4">
+<link rel="stylesheet" href="style.css?v=1.2.5">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3775,7 +3775,7 @@ if (sessionStorage.getItem('wds_operator_id') && sessionStorage.getItem('wds_ope
     <div class="wds-profile-cover" id="wdsProfileCover">
       <button type="button" class="wds-profile-back" id="btnWdsProfileBack">← Back to Dashboard</button>
       <p class="wds-profile-cover-hint" id="wdsProfileCoverHint" hidden>Drag to reposition, then Save.</p>
-      <button type="button" class="wds-profile-cover-edit" id="btnWdsProfileCoverEdit">🖼 Edit Cover Photo</button>
+      <button type="button" class="wds-profile-cover-edit" id="btnWdsProfileCoverEdit">Edit Cover Photo</button>
       <input type="file" id="wdsProfileCoverInput" accept="image/*" hidden>
     </div>
     <p class="wds-gate-error wds-profile-cover-error" id="wdsProfileCoverError" hidden></p>
@@ -3909,6 +3909,10 @@ if (sessionStorage.getItem('wds_operator_id') && sessionStorage.getItem('wds_ope
     <img src="icons/icon-512.png" alt="">
   </button>
   <div class="wds-dial-menu" id="wdsDialMenu" hidden>
+    <button type="button" class="wds-dial-item" data-dial-action="home" aria-label="Home" title="Home">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>Home</span>
+    </button>
     <button type="button" class="wds-dial-item" data-dial-action="nexus-com" aria-label="Nexus Com" title="Nexus Com">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
       <span>Nexus Com</span>
@@ -3959,10 +3963,10 @@ if (sessionStorage.getItem('wds_operator_id') && sessionStorage.getItem('wds_ope
   <img id="chatLightboxImg" alt="">
 </div>
 
-<script src="config.js?v=1.2.4"></script>
+<script src="config.js?v=1.2.5"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.2.4"></script>
+<script src="app.js?v=1.2.5"></script>
 </body>
 </html>
