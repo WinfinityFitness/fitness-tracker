@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.2.5';
+const APP_VERSION = 'WF_SYS_V.1.2.6';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -174,6 +174,12 @@ function initDesktopShell() {
     dashboard.hidden = false;
     const dialBtn = document.getElementById('wdsDialBtn');
     if (dialBtn) dialBtn.hidden = false;
+    // Nexus Com (Global Chat) — starts hidden in the markup (no reason to
+    // show it on the bare gate); shown here on sign-in, except on narrow
+    // viewports where it stays collapsed by default like every other
+    // chat surface there (see the mobile-viewport block further down).
+    const globalChatFixedEl = document.getElementById('wdsGlobalChatFixed');
+    if (globalChatFixedEl && window.innerWidth > 860) globalChatFixedEl.hidden = false;
     // Deep-link support: a bookmarked/shared /<DigitalID> URL only makes
     // sense to check once, right after the FIRST successful sign-in — not
     // on every 2-minute poll refresh, which would otherwise re-open the
@@ -230,6 +236,10 @@ function initDesktopShell() {
     idInput.value = '';
     pinInput.value = '';
     idInput.focus();
+    const dialBtnEl = document.getElementById('wdsDialBtn');
+    if (dialBtnEl) dialBtnEl.hidden = true;
+    const globalChatFixedEl = document.getElementById('wdsGlobalChatFixed');
+    if (globalChatFixedEl) globalChatFixedEl.hidden = true;
   });
 
   // No more tabs — everything lives on one page now, so chat polling just

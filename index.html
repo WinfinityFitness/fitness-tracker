@@ -46,7 +46,7 @@ if (sessionStorage.getItem('wds_operator_id') && sessionStorage.getItem('wds_ope
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.2.5">
+<link rel="stylesheet" href="style.css?v=1.2.6">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3742,12 +3742,14 @@ if (sessionStorage.getItem('wds_operator_id') && sessionStorage.getItem('wds_ope
   <div class="wds-chat-popups-wrap" id="wdsChatPopupsWrap"></div>
   <div class="wds-chat-contact-rail" id="wdsChatContactRail"></div>
 
-  <!-- Global Chat — fixed to the bottom-left of the viewport, always
-       visible while scrolling. Minimizing swaps it for just a small
-       globe-icon button in the same spot; clicking that reopens it. -->
-  <div class="wds-card wds-card--feed wds-chat-card wds-global-chat-fixed" id="wdsGlobalChatFixed">
+  <!-- Nexus Com (Global Chat) — fixed to the bottom-left of the viewport,
+       always visible while scrolling once signed in. Starts hidden here —
+       it has no reason to show on the bare sign-in gate — shown alongside
+       the rest of the dashboard on sign-in. Minimizing hides it entirely;
+       the dial's Nexus Com item reopens it. -->
+  <div class="wds-card wds-card--feed wds-chat-card wds-global-chat-fixed" id="wdsGlobalChatFixed" hidden>
     <div class="wds-chat-popup-head">
-      <h3 class="wds-card-title" style="margin:0;">Global Chat</h3>
+      <h3 class="wds-card-title" style="margin:0;">Nexus Com</h3>
       <button type="button" class="wds-chat-popup-close" id="btnWdsGlobalChatMinimize" aria-label="Minimize">–</button>
     </div>
     <div class="wds-global-chat-body" id="wdsGlobalChatBody">
@@ -3963,10 +3965,10 @@ if (sessionStorage.getItem('wds_operator_id') && sessionStorage.getItem('wds_ope
   <img id="chatLightboxImg" alt="">
 </div>
 
-<script src="config.js?v=1.2.5"></script>
+<script src="config.js?v=1.2.6"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.2.5"></script>
+<script src="app.js?v=1.2.6"></script>
 </body>
 </html>
