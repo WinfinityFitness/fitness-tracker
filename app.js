@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.3.1';
+const APP_VERSION = 'WF_SYS_V.1.3.2';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -2580,6 +2580,12 @@ function wdsApplyThemeOverride() {
 function wdsApplyDialPosition() {
   const btn = document.getElementById('wdsDialBtn');
   if (!btn) return;
+  // Mobile viewports never get a saved free-drag position — always the
+  // fixed corner from CSS (see the @media rule for .wds-dial-btn).
+  if (wdsIsDialMobileViewport()) {
+    btn.style.left = ''; btn.style.top = ''; btn.style.right = ''; btn.style.bottom = '';
+    return;
+  }
   let pos = null;
   try { pos = JSON.parse(localStorage.getItem(WDS_DIAL_POS_KEY)); } catch (e) { pos = null; }
   if (pos && typeof pos.x === 'number' && typeof pos.y === 'number') {
@@ -2649,11 +2655,25 @@ function wdsOpenThemePopup() {
 // Tap opens/closes the dial; drag (movement past a small threshold)
 // repositions it and persists the new spot; a press-and-hold with no
 // movement resets it back to the default corner.
+// Matches the mobile app's own drawer on a narrow viewport: fixed to one
+// corner, no freeform drag, no long-press reset (nothing to reset — it
+// never moves). The full free-drag behavior below still applies at
+// desktop widths.
+const WDS_DIAL_MOBILE_BREAKPOINT = 860;
+function wdsIsDialMobileViewport() { return window.innerWidth <= WDS_DIAL_MOBILE_BREAKPOINT; }
+
 function initWdsDialDrag() {
   const btn = document.getElementById('wdsDialBtn');
   if (!btn) return;
   let startX, startY, startLeft, startTop, dragging, moved, longPressFired, longPressTimer;
   btn.addEventListener('pointerdown', e => {
+    if (wdsIsDialMobileViewport()) {
+      btn.setPointerCapture(e.pointerId);
+      const onUpMobile = () => wdsToggleDial();
+      btn.addEventListener('pointerup', onUpMobile, { once: true });
+      btn.addEventListener('pointercancel', () => {}, { once: true });
+      return;
+    }
     e.preventDefault();
     btn.setPointerCapture(e.pointerId);
     const rect = btn.getBoundingClientRect();
@@ -2702,6 +2722,10 @@ function initWdsDialDrag() {
 function initWdsDial() {
   wdsApplyDialPosition();
   initWdsDialDrag();
+  // Crossing the mobile breakpoint (window resize, or a tablet rotation)
+  // re-applies the right rule — fixed corner on mobile, restores any
+  // saved free-drag position on desktop.
+  window.addEventListener('resize', wdsApplyDialPosition);
   document.addEventListener('click', e => {
     if (wdsDialOpen && !e.target.closest('.wds-dial-menu') && !e.target.closest('#wdsDialBtn')) wdsCloseDial();
   });

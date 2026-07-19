@@ -5220,11 +5220,17 @@ html.wf-desktop-shell body { overflow-x: auto; }
    source order, so the dial stays circular under every skin instead of
    inheriting whatever card-radius that skin uses. */
 #wdsDialBtn, #wdsDialBtn img, #wdsDialMenu .wds-dial-item { border-radius: 50% !important; }
-/* Smaller on narrow (mobile) viewports — matches the mobile app's own
-   drawer button sizing convention (8mm launcher, 6mm arc icons) rather
-   than the full desktop-sized dial. */
+/* Narrow (mobile) viewports match the mobile app's own drawer: smaller
+   (8mm launcher, 6mm arc icons) AND fixed to one corner — vertically
+   centered on the right edge, same spot the mobile app's own drawer tab
+   sits by default — with no free-drag repositioning (see
+   wdsIsDialMobileViewport in app.js, which also skips restoring any
+   saved desktop drag position here). */
 @media (max-width: 860px) {
-  .wds-dial-btn { width: 8mm; height: 8mm; }
+  .wds-dial-btn {
+    width: 8mm; height: 8mm; top: 50%; right: 4px; bottom: auto; left: auto;
+    transform: translateY(-50%); cursor: pointer;
+  }
   .wds-dial-item { width: 6mm; height: 6mm; }
   .wds-dial-item svg { width: 13px; height: 13px; }
 }
