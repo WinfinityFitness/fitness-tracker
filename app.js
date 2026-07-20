@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.6.2';
+const APP_VERSION = 'WF_SYS_V.1.6.3';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -189,15 +189,8 @@ function initDesktopShell() {
     brandEl.addEventListener('click', closeWdsProfilePage);
     brandEl.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeWdsProfilePage(); } });
   }
-  const headerVersionEl = document.getElementById('wdsHeaderVersion');
-  if (headerVersionEl) {
-    headerVersionEl.textContent = APP_VERSION;
-    headerVersionEl.classList.toggle('has-update', updateAvailable);
-    headerVersionEl.addEventListener('click', e => { e.stopPropagation(); checkAndApplyAppUpdate(); });
-    headerVersionEl.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); checkAndApplyAppUpdate(); }
-    });
-  }
+  // Click wiring for #wdsHeaderVersion (opens the same App Update popup FT's
+  // own #sysVersion does) lives in initSysVersionUpdatePopup, shared by both.
 
   const SESSION_ID_KEY = 'wds_operator_id';
   const SESSION_PIN_KEY = 'wds_operator_pin';
@@ -19882,18 +19875,26 @@ safeInit(initAnnouncementWidget, 'initAnnouncementWidget');
 safeInit(initAdminDrawer, 'initAdminDrawer');
 safeInit(loadSetupForm, 'loadSetupForm');
 safeInit(loadCheckinForm, 'loadCheckinForm');
-safeInit(() => { document.getElementById('sysVersion').textContent = APP_VERSION; }, 'sysVersion');
+safeInit(() => {
+  document.getElementById('sysVersion').textContent = APP_VERSION;
+  const headerVersionEl = document.getElementById('wdsHeaderVersion');
+  if (headerVersionEl) headerVersionEl.textContent = APP_VERSION;
+}, 'sysVersion');
 safeInit(initSysVersionUpdatePopup, 'initSysVersionUpdatePopup');
 
 function initSysVersionUpdatePopup() {
-  const versionEl = document.getElementById('sysVersion');
   const overlay = document.getElementById('appUpdateInfoOverlay');
-  if (!versionEl || !overlay) return;
-  const open = () => { overlay.hidden = false; };
+  if (!overlay) return;
+  const open = e => { if (e) e.stopPropagation(); overlay.hidden = false; };
   const close = () => { overlay.hidden = true; };
-  versionEl.addEventListener('click', open);
-  versionEl.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+  // Same popup, two triggers — FT's own #sysVersion (Status tab) and
+  // wellness's #wdsHeaderVersion (topnav logo corner) both open it.
+  [document.getElementById('sysVersion'), document.getElementById('wdsHeaderVersion')].forEach(versionEl => {
+    if (!versionEl) return;
+    versionEl.addEventListener('click', open);
+    versionEl.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(e); }
+    });
   });
   document.getElementById('btnCloseAppUpdateInfo').addEventListener('click', close);
   bindOverlayBackdropClose(overlay, close);
