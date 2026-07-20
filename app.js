@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.6.6';
+const APP_VERSION = 'WF_SYS_V.1.6.7';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -5086,21 +5086,11 @@ function renderWdsProfileHeader() {
 // collide with the dashboard's copies. Own data only, so this is skipped
 // entirely (cards hidden) when viewing another operator's profile.
 function renderWdsProfileVisuals() {
-  const gaugeCard = document.getElementById('wdsProfileConsistencyCard');
   const chartCard = document.getElementById('wdsProfileWeightTrendCard');
-  if (!gaugeCard || !chartCard) return;
+  if (!chartCard) return;
   const isOwn = !wdsViewedProfile;
-  gaugeCard.hidden = !isOwn;
   chartCard.hidden = !isOwn;
   if (!isOwn) return;
-
-  const mp = getModeProgress();
-  const pct = mp.target ? Math.round((mp.completeCount / mp.target) * 100) : 0;
-  document.getElementById('wdsProfileConsistencyGauge').style.setProperty('--pct', Math.min(100, pct));
-  document.getElementById('wdsProfileConsistencyValue').innerHTML = pct + '<small>%</small>';
-  const foot = document.getElementById('wdsProfileConsistencyFoot');
-  foot.textContent = `${mp.completeCount} of ${mp.target} days logged this cycle`;
-  foot.className = 'wds-card-foot ' + (pct >= 70 ? 'wds-foot-good' : pct >= 40 ? 'wds-foot-warning' : '');
 
   const series = computeTrendSeries(sortedLogsArray()).slice(-90);
   wdsSetChartPaths('wdsProfileWeightChartArea', 'wdsProfileWeightChartLine', 'wdsProfileWeightChartDot', 'wdsProfileWeightChartEmpty', series.map(s => s.trendKg));

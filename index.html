@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.6.6">
+<link rel="stylesheet" href="style.css?v=1.6.7">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3921,17 +3921,9 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
           <div id="wdsProfileFriendsList"><p class="empty-note">No friends yet.</p></div>
         </div>
 
-        <!-- Same gauge/chart visuals as the dashboard's Status tab (own
-             data only — hidden when viewing another operator's profile,
-             same as the Bio-Markers card above). -->
-        <div class="wds-card wds-card--gauge" id="wdsProfileConsistencyCard">
-          <h3 class="wds-card-title">Consistency Index</h3>
-          <div class="wds-gauge wds-gauge--mini" id="wdsProfileConsistencyGauge" style="--pct:0;">
-            <span class="wds-gauge-value" id="wdsProfileConsistencyValue">–<small>%</small></span>
-          </div>
-          <p class="wds-card-foot" id="wdsProfileConsistencyFoot">No data yet</p>
-        </div>
-
+        <!-- Same chart visual as the dashboard's Status tab (own data only
+             — hidden when viewing another operator's profile, same as the
+             Bio-Markers card above). -->
         <div class="wds-card wds-card--chart" id="wdsProfileWeightTrendCard">
           <div class="wds-card-head">
             <h3 class="wds-card-title">Weight Trend</h3>
@@ -4228,10 +4220,10 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
-<script src="config.js?v=1.6.6"></script>
+<script src="config.js?v=1.6.7"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.6.6"></script>
+<script src="app.js?v=1.6.7"></script>
 </body>
 </html>
