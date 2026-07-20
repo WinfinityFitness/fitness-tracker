@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.4.17';
+const APP_VERSION = 'WF_SYS_V.1.5.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -166,6 +166,29 @@ function initDesktopShell() {
   let wdsInitialRouteChecked = false;
   let wdsPushResubscribeChecked = false;
 
+  // A photo shared into FT via Android's share sheet lands here as
+  // ?shared-image=<public URL>&shared-dest=feed|myday (see FT's own
+  // initShareTargetHandling, which uploads the shared photo and hands off
+  // via a plain navigation since Feed/My Day only exist on wellness).
+  // Parsed and stripped immediately on boot, same as every other
+  // location.search convention in this app; APPLYING it has to wait for a
+  // successful sign-in (real or guest) though, so it's stashed here rather
+  // than acted on right away — see applyWdsPendingShareIfAny below.
+  let wdsPendingShareUrl = null;
+  let wdsPendingShareDest = null;
+  let wdsPendingShareApplied = false;
+  {
+    const shareParams = new URLSearchParams(location.search);
+    const sharedImage = shareParams.get('shared-image');
+    if (sharedImage) {
+      wdsPendingShareUrl = sharedImage;
+      wdsPendingShareDest = shareParams.get('shared-dest') === 'myday' ? 'myday' : 'feed';
+      history.replaceState({}, '', location.pathname);
+      const hintEl = document.getElementById('wdsPendingShareHint');
+      if (hintEl) hintEl.hidden = false;
+    }
+  }
+
   // Fetches the real synced payload via web_sync_get_dashboard, wires it up
   // as wdsRemoteData (so every calc function getProfile/getLogs/etc. already
   // reuses picks it up automatically), applies the operator's own real
@@ -264,6 +287,7 @@ function initDesktopShell() {
         subscribeToPush();
       }
     }
+    applyWdsPendingShareIfAny();
     return true;
   }
 
@@ -331,6 +355,7 @@ function initDesktopShell() {
     if (globalChatFixedEl && window.innerWidth > 860) globalChatFixedEl.hidden = false;
     const banner = document.getElementById('wdsGuestBanner');
     if (banner) banner.hidden = false;
+    applyWdsPendingShareIfAny();
   };
   if (guestLoginBtn) guestLoginBtn.addEventListener('click', enterGuestDashboard);
 
@@ -610,23 +635,61 @@ function initDesktopShell() {
     wdsOpenStoryComposer();
     storyComposerImageInput.click();
   };
+  // Split out so a data URL that's already known (e.g. a shared photo
+  // handed off from FT, see applyWdsPendingShareIfAny below) can reuse the
+  // exact same "attach to story" steps without going through a File/
+  // FileReader round-trip it doesn't need.
+  const applyStoryImageDataUrl = (dataUrl) => {
+    wdsPendingStoryImageDataUrl = dataUrl;
+    storyComposerPendingImagePreview.src = wdsPendingStoryImageDataUrl;
+    document.getElementById('wdsStoryPhotoLayer').hidden = false;
+    storyComposerImageRemoveBtn.hidden = false;
+    storyPhotoZoomRow.hidden = false;
+    wdsStoryPhotoTransform = { scale: 1, x: 0, y: 0 };
+    storyPhotoZoomSlider.value = '1';
+    wdsApplyPhotoTransform();
+    wdsSetStoryBg(wdsStoryBg);
+    wdsUpdateStoryHint();
+  };
   const handleStoryImageFile = (file) => {
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
-      wdsPendingStoryImageDataUrl = reader.result;
-      storyComposerPendingImagePreview.src = wdsPendingStoryImageDataUrl;
-      document.getElementById('wdsStoryPhotoLayer').hidden = false;
-      storyComposerImageRemoveBtn.hidden = false;
-      storyPhotoZoomRow.hidden = false;
-      wdsStoryPhotoTransform = { scale: 1, x: 0, y: 0 };
-      storyPhotoZoomSlider.value = '1';
-      wdsApplyPhotoTransform();
-      wdsSetStoryBg(wdsStoryBg);
-      wdsUpdateStoryHint();
-    };
+    reader.onload = () => applyStoryImageDataUrl(reader.result);
     reader.readAsDataURL(file);
   };
+  // Applies a pending shared photo (stashed by the parsing block near the
+  // top of initDesktopShell) once a sign-in — real or guest — actually
+  // succeeds. Called from both enterDashboard's success path and
+  // enterGuestDashboard, since guest sign-in never calls enterDashboard at
+  // all. wdsPendingShareApplied guards against enterDashboard's later
+  // 2-minute poll ticks re-running this.
+  async function applyWdsPendingShareIfAny() {
+    if (!wdsPendingShareUrl || wdsPendingShareApplied) return;
+    wdsPendingShareApplied = true;
+    const url = wdsPendingShareUrl;
+    const dest = wdsPendingShareDest;
+    wdsPendingShareUrl = null;
+    const hintEl = document.getElementById('wdsPendingShareHint');
+    if (hintEl) hintEl.hidden = true;
+    try {
+      const blob = await (await fetch(url)).blob();
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      if (dest === 'myday') {
+        resetWdsStoryComposer();
+        wdsOpenStoryComposer();
+        applyStoryImageDataUrl(dataUrl);
+      } else {
+        wdsPendingPostImageDataUrls.push(dataUrl);
+        renderWdsPendingPostImages();
+        if (composerInput) composerInput.focus();
+      }
+    } catch (e) { /* best effort — the shared photo just won't appear */ }
+  }
   storyModeTextBtn.addEventListener('click', () => wdsAddStoryText());
   storyModePhotoBtn.addEventListener('click', () => storyComposerImageInput.click());
   storyModeLinkBtn.addEventListener('click', () => {
@@ -7256,6 +7319,91 @@ function initDeepLinkHandling() {
       if (event.data && event.data.type === 'DEEP_LINK') handleDeepLinkUrl(event.data.url);
     });
   }
+}
+
+/* ---------------------------------------------------------------- */
+/* Web Share Target (Android share sheet -> FT)                       */
+/* ---------------------------------------------------------------- */
+// manifest.webmanifest's share_target block routes a shared photo here as
+// a POST that sw.js intercepts and stashes into IndexedDB (same DB/store
+// name as sw.js's own copy of these constants — the service worker has no
+// access to these top-level consts, so they're duplicated deliberately
+// rather than shared via import). Feed/My Day are wellness-only features,
+// so this doesn't post anything itself — it uploads the shared photo via
+// the same uploadChatImage path every other image in this app already
+// goes through, then hands the resulting public URL to wellness via a
+// plain top-level navigation (see wellness's own pending-share handling
+// inside initDesktopShell).
+const WFT_SHARE_DB_NAME = 'wft-share-target';
+const WFT_SHARE_STORE_NAME = 'pending';
+function wftOpenShareDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(WFT_SHARE_DB_NAME, 1);
+    req.onupgradeneeded = () => { req.result.createObjectStore(WFT_SHARE_STORE_NAME); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+function wftGetPendingShare() {
+  return wftOpenShareDb().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(WFT_SHARE_STORE_NAME, 'readonly');
+    const req = tx.objectStore(WFT_SHARE_STORE_NAME).get('pending');
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  }));
+}
+function wftClearPendingShare() {
+  return wftOpenShareDb().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(WFT_SHARE_STORE_NAME, 'readwrite');
+    tx.objectStore(WFT_SHARE_STORE_NAME).delete('pending');
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  }));
+}
+function closeShareTargetOverlay() {
+  const overlay = document.getElementById('shareTargetOverlay');
+  if (overlay) overlay.hidden = true;
+}
+async function initShareTargetHandling() {
+  const overlay = document.getElementById('shareTargetOverlay');
+  if (!overlay) return;
+  document.getElementById('btnCloseShareTarget').addEventListener('click', closeShareTargetOverlay);
+  bindOverlayBackdropClose(overlay, closeShareTargetOverlay);
+
+  // Same parse-then-strip convention as initDeepLinkHandling above.
+  const isSharedTarget = new URLSearchParams(location.search).get('shared-target') === '1';
+  if (location.search) history.replaceState({}, '', location.pathname);
+  if (!isSharedTarget) return;
+
+  let record = null;
+  try { record = await wftGetPendingShare(); } catch (e) { /* nothing to recover — the prompt just won't show */ }
+  if (!record || !record.blob) return; // a text/link-only share has no photo to hand off yet
+
+  const previewImg = document.getElementById('shareTargetPreview');
+  if (previewImg) previewImg.src = URL.createObjectURL(record.blob);
+  overlay.hidden = false;
+
+  const feedBtn = document.getElementById('btnShareTargetFeed');
+  const myDayBtn = document.getElementById('btnShareTargetMyDay');
+  const hint = document.getElementById('shareTargetHint');
+  const goTo = async dest => {
+    if (feedBtn) feedBtn.disabled = true;
+    if (myDayBtn) myDayBtn.disabled = true;
+    if (hint) hint.textContent = 'Uploading…';
+    try {
+      const objectUrl = URL.createObjectURL(record.blob);
+      const publicUrl = await uploadChatImage(objectUrl);
+      URL.revokeObjectURL(objectUrl);
+      await wftClearPendingShare();
+      location.href = 'https://wellness.winfinityfitness.com/?shared-image=' + encodeURIComponent(publicUrl) + '&shared-dest=' + dest;
+    } catch (e) {
+      if (hint) hint.textContent = 'Could not upload — check your connection and try again.';
+      if (feedBtn) feedBtn.disabled = false;
+      if (myDayBtn) myDayBtn.disabled = false;
+    }
+  };
+  if (feedBtn) feedBtn.addEventListener('click', () => goTo('feed'));
+  if (myDayBtn) myDayBtn.addEventListener('click', () => goTo('myday'));
 }
 
 /* ---------------------------------------------------------------- */
@@ -19258,6 +19406,7 @@ safeInit(initCustomBackground, 'initCustomBackground');
 safeInit(initTextSizeSlider, 'initTextSizeSlider');
 safeInit(initPushNotifications, 'initPushNotifications');
 safeInit(initDeepLinkHandling, 'initDeepLinkHandling');
+safeInit(initShareTargetHandling, 'initShareTargetHandling');
 safeInit(initWidgetActionHandling, 'initWidgetActionHandling');
 safeInit(initProgressPhotoCamera, 'initProgressPhotoCamera');
 safeInit(initLeaderboard, 'initLeaderboard');

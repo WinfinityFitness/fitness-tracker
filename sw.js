@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fittracker-v381';
+const CACHE_NAME = 'fittracker-v382';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -102,7 +102,52 @@ self.addEventListener('notificationclick', event => {
   );
 });
 
+// ---------------------------------------------------------------------
+// Web Share Target (manifest.webmanifest's share_target block) — lets FT
+// appear in Android's native share sheet. A share arrives here as a POST
+// with multipart form data; the service worker has no localStorage, so the
+// shared photo/text is stashed in IndexedDB (one fixed key, overwritten on
+// every new share) for the page itself to pick up after the redirect below
+// — see initShareTargetHandling in app.js. The Blob is stored as-is rather
+// than round-tripped through a data URL first (Chrome supports Blob values
+// in IndexedDB directly).
+// ---------------------------------------------------------------------
+const SHARE_DB_NAME = 'wft-share-target';
+const SHARE_STORE_NAME = 'pending';
+
+function openShareDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(SHARE_DB_NAME, 1);
+    req.onupgradeneeded = () => { req.result.createObjectStore(SHARE_STORE_NAME); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function handleShareTarget(request) {
+  try {
+    const formData = await request.formData();
+    const file = formData.get('photo');
+    const text = formData.get('text') || '';
+    const title = formData.get('title') || '';
+    const db = await openShareDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(SHARE_STORE_NAME, 'readwrite');
+      tx.objectStore(SHARE_STORE_NAME).put({ blob: file || null, text, title, ts: Date.now() }, 'pending');
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) { /* best effort — the page just won't find a pending share */ }
+  // 303 so the browser follows up with a GET (not a re-POST) — this landing
+  // page is served by the cache-first GET handler below like any other nav.
+  return Response.redirect('./?shared-target=1', 303);
+}
+
 self.addEventListener('fetch', event => {
+  if (event.request.method === 'POST' && new URL(event.request.url).pathname.endsWith('/share-target/')) {
+    event.respondWith(handleShareTarget(event.request));
+    return;
+  }
   if (event.request.method !== 'GET') return;
   // Only same-origin app assets go through the cache-first strategy below.
   // Cross-origin GETs (Supabase REST reads, Google APIs, etc.) must always

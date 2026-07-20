@@ -48,7 +48,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.4.17">
+<link rel="stylesheet" href="style.css?v=1.5.0">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -375,6 +375,26 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <button class="sheet-close" id="btnCloseCommunityQuick">✕</button>
     </div>
     <div id="communityQuickMount"></div>
+  </div>
+</div>
+
+<!-- Web Share Target landing — shown when FT is opened via the Android
+     share sheet (manifest.webmanifest's share_target, handled in sw.js /
+     initShareTargetHandling in app.js). Feed/My Day are wellness-only
+     features, so the two buttons here just hand the shared photo off to
+     wellness.winfinityfitness.com with the right destination baked into
+     the URL, rather than trying to post from FT itself. -->
+<div class="sheet-overlay" id="shareTargetOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Share to Winfinity</h2>
+      <button class="sheet-close" id="btnCloseShareTarget">✕</button>
+    </div>
+    <img id="shareTargetPreview" alt="" style="width:100%;border-radius:10px;margin:8px 0;display:block;">
+    <p class="hint" id="shareTargetHint">Where should this go?</p>
+    <button type="button" class="btn btn--primary" id="btnShareTargetFeed" style="width:100%;margin-bottom:8px;">Share to Feed</button>
+    <button type="button" class="btn" id="btnShareTargetMyDay" style="width:100%;">Share to My Day</button>
   </div>
 </div>
 
@@ -3290,6 +3310,13 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <img class="wds-gate-logo" src="icons/icon-512.png" alt="">
       <h1 class="wds-gate-title">WINFINITY <span>NEXUS</span></h1>
       <p class="wds-gate-sub">Sign in with your Digital ID and sync PIN to view your dashboard.</p>
+      <!-- Shown only when arriving with a pending shared photo from FT's
+           Web Share Target flow (?shared-image=...&shared-dest=...) — see
+           the pending-share parsing near the top of initDesktopShell in
+           app.js. Confirms to the user that signing in will still deliver
+           the photo, instead of the gate silently sitting there with no
+           indication anything is waiting. -->
+      <p class="wds-gate-note" id="wdsPendingShareHint" hidden>A shared photo is waiting — sign in (or continue as Guest) to finish sharing it.</p>
       <label class="wds-gate-field">
         <span>Digital ID</span>
         <input type="text" id="wdsDigitalIdInput" placeholder="e.g. WF-7741ZQ" autocomplete="off" spellcheck="false">
@@ -4144,10 +4171,10 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <img id="chatLightboxImg" alt="">
 </div>
 
-<script src="config.js?v=1.4.17"></script>
+<script src="config.js?v=1.5.0"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.4.17"></script>
+<script src="app.js?v=1.5.0"></script>
 </body>
 </html>
