@@ -48,7 +48,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.5.4">
+<link rel="stylesheet" href="style.css?v=1.5.5">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3364,7 +3364,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
             <strong>Chats</strong>
             <button type="button" class="wds-mini-btn" id="btnWdsNewGroup">+ New Group</button>
           </div>
-          <input type="text" id="wdsChatListSearch" placeholder="Search Messenger…" class="wds-chat-list-search">
+          <div class="wds-chat-list-stories" id="wdsChatListStories"></div>
+          <div class="wds-chat-list-search-wrap">
+            <svg class="wds-chat-list-search-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+            <input type="text" id="wdsChatListSearch" placeholder="Search Messenger…" class="wds-chat-list-search">
+          </div>
           <div class="wds-chat-list-tabs">
             <button type="button" class="wds-chat-list-tab is-active" id="btnWdsChatTabAll" data-tab="all">All</button>
             <button type="button" class="wds-chat-list-tab" id="btnWdsChatTabUnread" data-tab="unread">Unread</button>
@@ -4171,10 +4175,10 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <img id="chatLightboxImg" alt="">
 </div>
 
-<script src="config.js?v=1.5.4"></script>
+<script src="config.js?v=1.5.5"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.5.4"></script>
+<script src="app.js?v=1.5.5"></script>
 </body>
 </html>

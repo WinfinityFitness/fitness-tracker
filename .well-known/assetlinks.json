@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.winfinityfitness.nexus",
+    "sha256_cert_fingerprints": ["7B:BE:56:10:E4:7B:AC:BC:82:A5:DD:3A:31:7B:03:C3:96:5F:3F:B3:44:CD:08:DA:0B:F6:6E:A9:5C:6C:38:15"]
+  }
+}]

@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.5.4';
+const APP_VERSION = 'WF_SYS_V.1.5.5';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -792,6 +792,13 @@ function initDesktopShell() {
     const storyId = Number(target.dataset.storyId);
     if (storyId) wdsOpenStoryViewer(storyId);
   });
+  document.getElementById('wdsChatListStories').addEventListener('click', e => {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    if (target.dataset.action === 'add-story') { openStoryComposerForNewStory(); return; }
+    const storyId = Number(target.dataset.storyId);
+    if (storyId) wdsOpenStoryViewer(storyId);
+  });
   document.getElementById('btnWdsStoryViewerClose').addEventListener('click', wdsCloseStoryViewer);
   document.getElementById('wdsStoryViewerOverlay').addEventListener('click', e => {
     if (e.target.id === 'wdsStoryViewerOverlay') wdsCloseStoryViewer();
@@ -1384,6 +1391,7 @@ function initDesktopShell() {
       const notifPopEl = document.getElementById('wdsNotifPop');
       if (notifPopEl) notifPopEl.hidden = true;
       refreshWdsChatRooms();
+      if (wdsStoryGroups.length) renderWdsChatListStories(); else refreshWdsMyday();
     }
   });
 
@@ -2630,6 +2638,34 @@ function renderWdsMyday() {
     const name = g.codeName || '?';
     const newest = g.stories[g.stories.length - 1];
     return `<div class="wds-myday-item wds-myday-item--has-story" data-action="view-story" data-story-id="${g.stories[0].id}">${thumbHtml(newest)}<span class="wds-myday-avatar-badge">${initial(name)}</span><span class="wds-myday-name">${escapeHtml(name)}</span></div>`;
+  }).join('');
+  el.innerHTML = youItem + otherItems;
+  renderWdsChatListStories();
+}
+
+// Compact version of the My Day rail (same wdsStoryGroups data, same
+// view-story/add-story click contract) for the top of the Chats dropdown —
+// the "bubble note on an avatar" row from the Messenger reference.
+function renderWdsChatListStories() {
+  const el = document.getElementById('wdsChatListStories');
+  if (!el) return;
+  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+  const myPhoto = wdsRemoteData && wdsRemoteData.profile && wdsRemoteData.profile.photoDataUrl;
+  const myName = (wdsRemoteData && wdsRemoteData.profile && wdsRemoteData.profile.name) || (wdsRemoteData && wdsRemoteData.publicId) || '?';
+  const initial = (name) => escapeHtml((name || '?').trim().charAt(0).toUpperCase() || '?');
+  const mineGroup = wdsStoryGroups.find(g => g.shareKey === myShareKey);
+  const otherGroups = wdsStoryGroups.filter(g => g.shareKey !== myShareKey);
+
+  const myAvatar = myPhoto
+    ? `<span class="wds-chat-list-story-avatar" style="background-image:url(${escapeHtml(myPhoto)});background-size:cover;background-position:center;"></span>`
+    : `<span class="wds-chat-list-story-avatar">${initial(myName)}</span>`;
+  const youItem = mineGroup
+    ? `<div class="wds-chat-list-story-item is-active" data-action="view-story" data-story-id="${mineGroup.stories[0].id}">${myAvatar}<span class="wds-chat-list-story-name">Your Day</span></div>`
+    : `<div class="wds-chat-list-story-item" data-action="add-story">${myAvatar}<span class="wds-chat-list-story-add">+</span><span class="wds-chat-list-story-name">Your Day</span></div>`;
+
+  const otherItems = otherGroups.map(g => {
+    const name = g.codeName || '?';
+    return `<div class="wds-chat-list-story-item is-active" data-action="view-story" data-story-id="${g.stories[0].id}"><span class="wds-chat-list-story-avatar">${initial(name)}</span><span class="wds-chat-list-story-name">${escapeHtml(name)}</span></div>`;
   }).join('');
   el.innerHTML = youItem + otherItems;
 }
