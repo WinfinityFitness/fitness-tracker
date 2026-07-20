@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.6.7';
+const APP_VERSION = 'WF_SYS_V.1.6.8';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -3327,6 +3327,13 @@ function initWdsDial() {
   if (menu) menu.addEventListener('click', e => {
     const item = e.target.closest('[data-dial-action]');
     if (!item) return;
+    // Search/Notifications below trigger a real .click() on the navbar's
+    // own button, which bubbles a SEPARATE synthetic event to document and
+    // opens the popup synchronously, then execution returns here and THIS
+    // original event keeps bubbling too -- without stopping it, document's
+    // outside-click-closes-popup listener would see it land outside the
+    // popup and immediately re-close what was just opened.
+    e.stopPropagation();
     wdsCloseDial();
     const action = item.dataset.dialAction;
     if (action === 'home') {
@@ -3335,6 +3342,15 @@ function initWdsDial() {
     } else if (action === 'nexus-com') {
       const fixed = document.getElementById('wdsGlobalChatFixed');
       if (fixed) fixed.hidden = false;
+    } else if (action === 'search') {
+      // Reuses the real navbar button's own click handler (opens
+      // #wdsPeopleSearchPop, closes the other navbar dropdowns, focuses the
+      // input) rather than re-implementing any of that here.
+      const btn = document.getElementById('wdsPeopleSearchBtn');
+      if (btn) btn.click();
+    } else if (action === 'notifications') {
+      const btn = document.getElementById('wdsBellBtn');
+      if (btn) btn.click();
     } else if (action === 'theme') {
       wdsOpenThemePopup();
     } else if (action === 'settings') {
@@ -19927,7 +19943,9 @@ safeInit(loadCheckinForm, 'loadCheckinForm');
 safeInit(() => {
   document.getElementById('sysVersion').textContent = APP_VERSION;
   const headerVersionEl = document.getElementById('wdsHeaderVersion');
-  if (headerVersionEl) headerVersionEl.textContent = APP_VERSION;
+  // Wellness's small topnav badge shows just "V.1.2.3" -- FT's own Status
+  // tab keeps the full "WF_SYS_V.1.2.3" label unchanged.
+  if (headerVersionEl) headerVersionEl.textContent = APP_VERSION.replace('WF_SYS_', '');
 }, 'sysVersion');
 safeInit(initSysVersionUpdatePopup, 'initSysVersionUpdatePopup');
 

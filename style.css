@@ -4968,11 +4968,12 @@ html.wf-resume-session .wds-reload-splash { display: flex !important; }
 }
 .wds-topnav-brand { display: flex; align-items: center; gap: 10px; font-size: 1.05rem; letter-spacing: 0.05em; color: var(--cyan); font-weight: 800; white-space: nowrap; cursor: pointer; }
 .wds-topnav-brand img { width: 24px; height: 24px; flex-shrink: 0; }
-.wds-topnav-brand-label { position: relative; display: inline-block; }
-/* Tucked under the bottom-right corner of the WINFINITY label rather than
-   inline in the flow — plain, unobtrusive, matches FT's own .sys-version look. */
+/* WINFINITY stacked above the version number — plain, unobtrusive, matches
+   FT's own .sys-version look. On mobile the WINFINITY line hides (see the
+   860px breakpoint below) and align-self:flex-end there keeps the version
+   text sitting at the bottom of the logo instead of vertically centered. */
+.wds-topnav-brand-text { display: flex; flex-direction: column; line-height: 1.1; }
 .wds-topnav-version {
-  position: absolute; right: 0; bottom: -9px;
   font-family: var(--font-mono); font-size: 0.5rem; font-weight: 400; letter-spacing: 0.02em;
   color: var(--text-muted); cursor: pointer; white-space: nowrap;
 }
@@ -5771,6 +5772,7 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
   .wds-uni-left, .wds-uni-right { display: none; }
   .wds-uni-center { width: 100%; }
   .wds-topnav-brand-label { display: none; }
+  .wds-topnav-brand-text { align-self: flex-end; }
   .wds-user-meta { display: none; }
   .wds-logout-label { display: none; }
   .wds-logout-btn { padding: 9px; border-radius: 50%; }
