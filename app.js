@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.6.9';
+const APP_VERSION = 'WF_SYS_V.1.7.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -15237,7 +15237,7 @@ async function pushWebSyncSnapshot() {
       p_share_key: shareKey,
       p_profile: profile,
       p_theme: localStorage.getItem('wft_theme') || 'dark',
-      p_skin: localStorage.getItem('wft_skin') || 'default',
+      p_skin: localStorage.getItem('wft_skin') || 'default-core',
     });
   } catch (e) { /* best effort — profile/theme just won't update until next successful sync */ }
   try {
@@ -19247,7 +19247,7 @@ function applySkin(skin) {
 }
 
 function initSkinSelector() {
-  applySkin(localStorage.getItem('wft_skin') || 'default');
+  applySkin(localStorage.getItem('wft_skin') || 'default-core');
   document.getElementById('skinSelect').addEventListener('change', e => {
     applySkin(e.target.value);
   });

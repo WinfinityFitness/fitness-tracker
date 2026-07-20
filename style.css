@@ -4693,6 +4693,191 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .sheet-section--compact .btn-row .btn { padding: 9px 12px; font-size: 0.8rem; min-width: 110px; }
 .sheet-section--compact .section-title-row { margin: 4px 0 -2px; }
 
+/* ================================================================== */
+/* SKIN: Default Core — "Corporate Modern with a Neon Edge." Low-HUD:   */
+/* the chrome recedes into a neutral light palette (soft grey app bg,   */
+/* white cards) so content and the signature cyan-to-mint gradient do   */
+/* the work. Purple (#4f378a) fills the --cyan "brand accent" slot      */
+/* (headings/active-state/glows, the dominant color in the reference    */
+/* screenshots); the actual cyan-mint gradient is reserved for          */
+/* --gradient-bar (primary buttons/progress fills) per the brief's own  */
+/* "reserved for high-impact brand moments" rule. THE APP DEFAULT — see */
+/* initSkinSelector's fallback in app.js. Sora reuses the same local     */
+/* fonts/sora.woff2 + sora-regular.woff2 files Sovereign/Hashira Core    */
+/* already self-host, no new font asset. Dark companion derived from    */
+/* the brief's own Material 3 inverse-* tokens (inverse-surface,        */
+/* inverse-on-surface, primary-fixed-dim) so the light/dark toggle       */
+/* stays meaningful instead of being invented from scratch. */
+/* ================================================================== */
+@font-face {
+  font-family: 'Default Core Sora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('fonts/sora-regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Default Core Sora';
+  font-style: normal;
+  font-weight: 600 800;
+  font-display: swap;
+  src: url('fonts/sora.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Default Core Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('fonts/jetbrains-mono.woff2') format('woff2');
+}
+
+/* Dark — derived from the brief's own Material 3 inverse-surface/
+   inverse-on-surface/primary-fixed-dim tokens rather than invented,
+   since those are the actual M3-correct dark companions for this
+   exact palette. */
+:root[data-skin="default-core"] {
+  --bg: #1d1b20;
+  --bg-elevated: #322f35;
+  --surface-1: #322f35;
+  --surface-2: #494551;
+  --surface-1-rgb: 50,47,53;
+  --surface-2-rgb: 73,69,81;
+  --border: rgba(207,188,255,0.3);
+  --border-soft: rgba(255,255,255,0.08);
+  --text-primary: #f5eff7;
+  --text-secondary: #cbc4d2;
+  --text-muted: #7a7582;
+  --gridline: rgba(255,255,255,0.08);
+  --baseline: rgba(255,255,255,0.16);
+
+  --cyan: #cfbcff;
+  --cyan-dim: #9a7fe0;
+  --cyan-glow: rgba(207,188,255,0.35);
+  --violet: #66e0ea;
+  --magenta: #e7c365;
+
+  --series-1: #cfbcff;
+  --series-2: #66e0ea;
+  --gradient-bar: linear-gradient(135deg, #00f0ff 0%, #00ffaa 100%);
+  --gradient-glow: rgba(0,240,255,0.35);
+
+  --good: #6edb94;
+  --warning: #e0c04a;
+  --serious: #e0973c;
+  --critical: #ffb4ab;
+
+  --surface-translucent: rgba(29,27,32,0.88);
+  --nav-translucent: rgba(50,47,53,0.9);
+
+  --card-radius: 1rem;
+  --font-mono: 'Default Core Mono', ui-monospace, monospace;
+  --font-display: 'Default Core Sora', system-ui, sans-serif;
+  --font-headline: var(--font-display);
+}
+
+/* Light — the brief's actual palette, verbatim (this is the intended/
+   primary mode; dark above is the derived companion). */
+:root[data-skin="default-core"][data-theme="light"] {
+  --bg: #f0f2f5;
+  --bg-elevated: #ffffff;
+  --surface-1: #ffffff;
+  --surface-2: #e4e6eb;
+  --surface-1-rgb: 255,255,255;
+  --surface-2-rgb: 228,230,235;
+  --border: rgba(0,131,143,0.35);
+  --border-soft: #dddfe2;
+  --text-primary: #1c1e21;
+  --text-secondary: #65676b;
+  --text-muted: #8a8d91;
+  --gridline: rgba(28,30,33,0.08);
+  --baseline: rgba(28,30,33,0.16);
+
+  --cyan: #4f378a;
+  --cyan-dim: #3a2966;
+  --cyan-glow: rgba(79,55,138,0.28);
+  --violet: #00838f;
+  --magenta: #765b00;
+
+  --series-1: #4f378a;
+  --series-2: #00838f;
+  --gradient-bar: linear-gradient(135deg, #00f0ff 0%, #00ffaa 100%);
+  --gradient-glow: rgba(0,240,255,0.3);
+
+  --good: #146c2e;
+  --warning: #9a6700;
+  --serious: #b5650a;
+  --critical: #ba1a1a;
+
+  --surface-translucent: rgba(240,242,245,0.85);
+  --nav-translucent: rgba(255,255,255,0.92);
+}
+
+/* Shapes: 8px base radius everywhere (buttons/inputs/small cards use the
+   sitewide default already), large containers explicitly bumped to 16px
+   ("lg" in the brief's scale), chips/pills to a full pill — contextual,
+   not a blanket override, since the brief itself distinguishes "Standard
+   Elements: 8px" from "Large Containers: 16px" rather than using one
+   radius for everything the way Grand Core/Sovereign Core do. */
+[data-skin="default-core"] .wds-card,
+[data-skin="default-core"] .chart-card,
+[data-skin="default-core"] .stat-tile,
+[data-skin="default-core"] .hero-card,
+[data-skin="default-core"] .ring-card,
+[data-skin="default-core"] .computed-card {
+  border-radius: 1rem !important;
+  border: 1px solid var(--border-soft);
+  box-shadow: 0px 2px 4px rgba(0,0,0,0.05);
+}
+[data-skin="default-core"] .chip,
+[data-skin="default-core"] .pill {
+  border-radius: 9999px !important;
+}
+[data-skin="default-core"] .hero-title,
+[data-skin="default-core"] .chart-card-title,
+[data-skin="default-core"] .section-title,
+[data-skin="default-core"] .app-header h1,
+[data-skin="default-core"] .sheet-head h2,
+[data-skin="default-core"] .field-group-heading {
+  font-family: var(--font-headline);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+/* Buttons don't lean on shadows to read as interactive — the gradient
+   fill (primary) or flat grey fill (secondary) does that job instead,
+   per the brief's own "Active State" rule. */
+[data-skin="default-core"] .btn {
+  background: var(--surface-2);
+  color: var(--text-primary);
+  border: none;
+  box-shadow: none;
+}
+[data-skin="default-core"] .btn--primary {
+  background: var(--gradient-bar);
+  color: #ffffff;
+  border: none;
+  box-shadow: none;
+}
+[data-skin="default-core"] input,
+[data-skin="default-core"] select,
+[data-skin="default-core"] textarea {
+  background: var(--surface-2) !important;
+  color: var(--text-primary) !important;
+  border: none !important;
+}
+[data-skin="default-core"] input:focus,
+[data-skin="default-core"] select:focus,
+[data-skin="default-core"] textarea:focus {
+  background: var(--surface-1) !important;
+  border: 2px solid var(--violet) !important;
+  outline: none;
+}
+[data-skin="default-core"] .tab-bar,
+[data-skin="default-core"] .app-header {
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border-soft);
+  box-shadow: none;
+}
+
 /* ---------------- Custom background upload (Settings) ---------------- */
 .opacity-preview-row { display: flex; align-items: center; gap: 12px; margin: 10px 0 4px; }
 .opacity-preview-swatch {
