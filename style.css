@@ -4968,9 +4968,12 @@ html.wf-resume-session .wds-reload-splash { display: flex !important; }
 }
 .wds-topnav-brand { display: flex; align-items: center; gap: 10px; font-size: 1.05rem; letter-spacing: 0.05em; color: var(--cyan); font-weight: 800; white-space: nowrap; cursor: pointer; }
 .wds-topnav-brand img { width: 24px; height: 24px; flex-shrink: 0; }
-/* Plain, unobtrusive — matches FT's own .sys-version look exactly. */
+.wds-topnav-brand-label { position: relative; display: inline-block; }
+/* Tucked under the bottom-right corner of the WINFINITY label rather than
+   inline in the flow — plain, unobtrusive, matches FT's own .sys-version look. */
 .wds-topnav-version {
-  font-family: var(--font-mono); font-size: 0.6rem; font-weight: 400; letter-spacing: 0.04em;
+  position: absolute; right: 0; bottom: -9px;
+  font-family: var(--font-mono); font-size: 0.5rem; font-weight: 400; letter-spacing: 0.02em;
   color: var(--text-muted); cursor: pointer; white-space: nowrap;
 }
 .wds-topnav-version:hover, .wds-topnav-version:focus-visible { color: var(--cyan); outline: none; }
@@ -4992,11 +4995,11 @@ html.wf-resume-session .wds-reload-splash { display: flex !important; }
 .wds-tab-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--critical); display: inline-block; }
 .wds-topnav-user { display: flex; align-items: center; gap: 14px; position: relative; }
 .wds-icon-btn {
-  width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border-soft);
-  background: var(--surface-2); color: var(--text-secondary); display: grid; place-items: center;
-  cursor: pointer; position: relative;
+  width: 34px; height: 34px; border: none; background: transparent;
+  color: var(--text-secondary); display: grid; place-items: center;
+  cursor: pointer; position: relative; filter: drop-shadow(0 0 3px var(--cyan-glow));
 }
-.wds-icon-btn:hover { color: var(--cyan); border-color: var(--border); }
+.wds-icon-btn:hover { color: var(--cyan); filter: drop-shadow(0 0 6px var(--cyan-glow)); }
 .wds-icon-btn.is-spinning svg { animation: wds-spin 0.7s linear infinite; }
 @keyframes wds-spin { to { transform: rotate(360deg); } }
 .wds-bell-badge {
@@ -5283,8 +5286,8 @@ html.wf-desktop-shell body { overflow-x: auto; }
 }
 .wds-myday-add-badge {
   position: absolute; right: 6px; bottom: 6px; width: 24px; height: 24px; border-radius: 50%;
-  background: var(--accent); color: var(--surface-1); display: grid; place-items: center;
-  font-weight: 800; font-size: 1rem; box-shadow: 0 0 0 2px var(--surface-1); z-index: 1;
+  background: var(--accent); color: #fff; display: grid; place-items: center;
+  font-weight: 800; font-size: 1.1rem; box-shadow: 0 0 0 2px var(--surface-1), 0 0 6px var(--cyan-glow); z-index: 1;
 }
 .wds-myday-item--create .wds-myday-add-badge { position: static; margin-top: 6px; }
 
