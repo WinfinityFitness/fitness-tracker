@@ -6132,10 +6132,33 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
   pointer-events: none;
 }
 .wds-profile-header button { pointer-events: auto; }
+.wds-profile-avatar-wrap { position: relative; flex-shrink: 0; }
 .wds-profile-avatar {
   width: 128px; height: 128px; border-radius: 50%; background: var(--gradient-bar); color: #060a0d;
   font-weight: 800; font-size: 2.6rem; display: grid; place-items: center; flex-shrink: 0;
   border: 4px solid var(--surface-1); background-size: cover; background-position: center;
+}
+/* The "+" badge that replaced the old fixed "+ Add to Story" button —
+   opens a 2-item menu (Add Story / Add Shout) instead of a single action. */
+.wds-profile-avatar-add {
+  position: absolute; right: 2px; bottom: 2px; width: 34px; height: 34px; border-radius: 50%;
+  background: var(--gradient-bar); color: #060a0d; border: 3px solid var(--surface-1);
+  font-size: 1.3rem; font-weight: 800; line-height: 1; display: grid; place-items: center;
+  cursor: pointer; pointer-events: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.wds-profile-avatar-add:hover { filter: brightness(1.08); }
+.wds-profile-avatar-add-menu { position: absolute; left: 0; bottom: -8px; transform: translateY(100%); z-index: 5; }
+/* Shout — a small speech-bubble tucked above the avatar, own or viewed
+   profile alike. Persistent (no expiry) unlike Stories. */
+.wds-profile-shout-bubble {
+  position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); margin: 0 0 8px;
+  max-width: 220px; background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border-soft);
+  border-radius: 14px; padding: 7px 12px; font-size: 0.78rem; font-weight: 600; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; box-shadow: 0 2px 10px rgba(0,0,0,0.25); pointer-events: none;
+}
+.wds-profile-shout-bubble::after {
+  content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+  border: 6px solid transparent; border-top-color: var(--surface-1);
 }
 .wds-profile-identity { padding-bottom: 8px; }
 .wds-profile-identity h2 {
@@ -6154,23 +6177,44 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
 }
 .wds-profile-identity p { margin: 0; font-size: 0.82rem; color: var(--text-secondary); }
 .wds-profile-viewed-actions { display: flex; gap: 8px; padding-bottom: 8px; margin-left: auto; }
-/* Own-profile action row — "+ Add to Story", bottom-aligned with
-   .wds-profile-identity by the header's own flex align-items:flex-end,
-   so it naturally lands level with the subtitle line (Fitness Mode •
-   Digital ID) without any extra positioning here. */
-.wds-profile-own-actions { display: flex; gap: 8px; padding-bottom: 8px; margin-left: auto; }
-.wds-profile-action-btn {
-  display: flex; align-items: center; gap: 6px; border-radius: 8px; border: 1px solid var(--border-soft);
-  background: var(--surface-2); color: var(--text-primary); font-size: 0.82rem; font-weight: 600;
-  padding: 9px 14px; cursor: pointer; white-space: nowrap;
-}
-.wds-profile-action-btn--primary {
-  background: var(--gradient-bar); color: #060a0d; border-color: transparent;
-}
-.wds-profile-action-btn--primary:hover { filter: brightness(1.08); }
 @media (max-width: 720px) {
-  .wds-profile-own-actions, .wds-profile-viewed-actions { margin-left: 0; }
+  .wds-profile-viewed-actions { margin-left: 0; }
 }
+/* Tab bar — All / Photos / Friends, under the header, above the two-column
+   body. Facebook-style underline-active tabs. */
+.wds-profile-tabs {
+  display: flex; gap: 4px; padding: 0 28px; margin: 18px 0 0; border-bottom: 1px solid var(--border-soft);
+}
+.wds-profile-tab {
+  background: none; border: none; border-bottom: 3px solid transparent; color: var(--text-secondary);
+  padding: 10px 14px; font-size: 0.86rem; font-weight: 700; cursor: pointer;
+}
+.wds-profile-tab:hover { color: var(--text-primary); }
+.wds-profile-tab.is-active { color: var(--cyan); border-bottom-color: var(--cyan); }
+.wds-profile-tab-panel { display: flex; flex-direction: column; gap: 16px; }
+.wds-profile-photos-head { display: flex; align-items: center; justify-content: space-between; }
+.wds-profile-photos-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px;
+}
+.wds-profile-photo-tile {
+  aspect-ratio: 1; border-radius: 8px; overflow: hidden; cursor: pointer; background: var(--surface-2);
+}
+.wds-profile-photo-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.wds-profile-friends-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px;
+}
+.wds-profile-friend-card {
+  display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 8px;
+  border-radius: 10px; border: 1px solid var(--border-soft); background: var(--surface-1); cursor: pointer;
+}
+.wds-profile-friend-card:hover { background: var(--surface-2); }
+.wds-profile-friend-avatar {
+  width: 64px; height: 64px; border-radius: 50%; background: var(--gradient-bar); color: #060a0d;
+  font-weight: 800; font-size: 1.4rem; display: grid; place-items: center; background-size: cover; background-position: center;
+}
+.wds-profile-friend-name { font-size: 0.82rem; font-weight: 600; color: var(--text-primary); text-align: center; }
+.wds-composer-action-btn--danger { color: var(--critical); border-color: var(--critical); }
+.wds-composer-action-btn--danger:hover { background: var(--critical); color: #fff; }
 [data-view-profile] { cursor: pointer; }
 .wds-post-meta strong[data-view-profile]:hover,
 .wds-post-comment-bubble strong[data-view-profile]:hover,
