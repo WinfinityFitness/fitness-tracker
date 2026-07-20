@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.6.4">
+<link rel="stylesheet" href="style.css?v=1.6.5">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3368,10 +3368,8 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
 
     <header class="wds-topnav">
       <div class="wds-topnav-brand" id="wdsTopnavBrand" role="button" tabindex="0" title="Back to home">
-        <span class="wds-topnav-logo-wrap">
-          <img src="icons/icon-192.png" alt="">
-          <span class="wds-topnav-version" id="wdsHeaderVersion" role="button" tabindex="0" title="Check for update">–</span>
-        </span>
+        <img src="icons/icon-192.png" alt="">
+        <span class="wds-topnav-version" id="wdsHeaderVersion" role="button" tabindex="0" title="Check for update">–</span>
         <span class="wds-topnav-brand-label">WINFINITY</span>
       </div>
       <div class="wds-topnav-spacer"></div>
@@ -4231,10 +4229,10 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
-<script src="config.js?v=1.6.4"></script>
+<script src="config.js?v=1.6.5"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.6.4"></script>
+<script src="app.js?v=1.6.5"></script>
 </body>
 </html>

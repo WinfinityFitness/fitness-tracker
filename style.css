@@ -4967,16 +4967,17 @@ html.wf-resume-session .wds-reload-splash { display: flex !important; }
   border-bottom: 1px solid var(--border-soft); position: sticky; top: 0; z-index: 250;
 }
 .wds-topnav-brand { display: flex; align-items: center; gap: 10px; font-size: 1.05rem; letter-spacing: 0.05em; color: var(--cyan); font-weight: 800; white-space: nowrap; cursor: pointer; }
-.wds-topnav-logo-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
 .wds-topnav-brand img { width: 24px; height: 24px; flex-shrink: 0; }
+/* Plain, unobtrusive — matches FT's own .sys-version look exactly. */
 .wds-topnav-version {
-  position: absolute; right: -3px; bottom: -7px; font-size: 0.48rem; font-family: var(--font-mono);
-  font-weight: 600; letter-spacing: 0; color: var(--text-muted); background: var(--surface-1);
-  border: 1px solid var(--border-soft); padding: 1px 3px; border-radius: 5px; line-height: 1.2;
-  cursor: pointer; white-space: nowrap;
+  font-family: var(--font-mono); font-size: 0.6rem; font-weight: 400; letter-spacing: 0.04em;
+  color: var(--text-muted); cursor: pointer; white-space: nowrap;
 }
-.wds-topnav-version:hover, .wds-topnav-version:focus-visible { color: var(--cyan); border-color: var(--cyan); outline: none; }
-.wds-topnav-version.has-update { color: var(--cyan); border-color: var(--cyan); text-shadow: 0 0 4px var(--cyan-glow); }
+.wds-topnav-version:hover, .wds-topnav-version:focus-visible { color: var(--cyan); outline: none; }
+.wds-topnav-version.has-update::before {
+  content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--good); margin-right: 5px; vertical-align: middle; box-shadow: 0 0 4px var(--good);
+}
 .wds-topnav-tabs { display: flex; gap: 4px; flex: 1; }
 .wds-topnav-tab {
   background: none; border: none; color: var(--text-secondary); font-size: 0.72rem;
