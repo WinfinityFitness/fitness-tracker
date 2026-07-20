@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.6.3';
+const APP_VERSION = 'WF_SYS_V.1.6.4';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1275,6 +1275,8 @@ function initDesktopShell() {
       // down (bottom-right, can have several open, see wdsCloseChatPopup).
       const chatListPopEl = document.getElementById('wdsChatListPop');
       if (chatListPopEl) chatListPopEl.hidden = true;
+      const peopleSearchPopEl = document.getElementById('wdsPeopleSearchPop');
+      if (peopleSearchPopEl) peopleSearchPopEl.hidden = true;
       localStorage.setItem('wft_web_nexus_last_seen', new Date().toISOString());
       wdsMarkAllNotificationsRead();
       renderWdsNotifications();
@@ -1444,9 +1446,66 @@ function initDesktopShell() {
     if (!chatListPop.hidden) {
       const notifPopEl = document.getElementById('wdsNotifPop');
       if (notifPopEl) notifPopEl.hidden = true;
+      const peopleSearchPopEl = document.getElementById('wdsPeopleSearchPop');
+      if (peopleSearchPopEl) peopleSearchPopEl.hidden = true;
       refreshWdsChatRooms();
     }
   });
+
+  // People search — name or Digital ID lookup, opens that person's profile
+  // (same wdsOpenOtherProfile/data-view-profile convention used everywhere
+  // else: friends list, feed posts, comments). leaderboard is publicly
+  // readable, so this needs no new RPC.
+  const peopleSearchBtn = document.getElementById('wdsPeopleSearchBtn');
+  const peopleSearchPop = document.getElementById('wdsPeopleSearchPop');
+  if (peopleSearchBtn && peopleSearchPop) {
+    const peopleSearchInput = document.getElementById('wdsPeopleSearchInput');
+    const peopleSearchResults = document.getElementById('wdsPeopleSearchResults');
+    peopleSearchBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      peopleSearchPop.hidden = !peopleSearchPop.hidden;
+      if (!peopleSearchPop.hidden) {
+        chatListPop.hidden = true;
+        const notifPopEl = document.getElementById('wdsNotifPop');
+        if (notifPopEl) notifPopEl.hidden = true;
+        peopleSearchInput.focus();
+      }
+    });
+    let peopleSearchDebounce = null;
+    const runPeopleSearch = async () => {
+      const q = peopleSearchInput.value.trim();
+      if (!q) { peopleSearchResults.innerHTML = '<p class="empty-note">Type a name or Digital ID.</p>'; return; }
+      peopleSearchResults.innerHTML = '<p class="empty-note">Searching…</p>';
+      try {
+        const { data, error } = await sb.from('leaderboard')
+          .select('share_key, code_name, public_id, avatar_data_url')
+          .or(`code_name.ilike.%${q}%,public_id.ilike.%${q}%`)
+          .limit(20);
+        if (error) throw error;
+        if (!data || !data.length) { peopleSearchResults.innerHTML = '<p class="empty-note">No one found.</p>'; return; }
+        peopleSearchResults.innerHTML = data.map(p => `
+          <div class="wds-friend-item" data-view-profile="${escapeHtml(p.share_key)}">
+            <span class="wds-friend-avatar"${p.avatar_data_url ? ` style="background-image:url(${escapeHtml(p.avatar_data_url)});"` : ''}>${p.avatar_data_url ? '' : escapeHtml((p.code_name || '?').charAt(0).toUpperCase())}</span>
+            <span class="wds-friend-name">${escapeHtml(p.code_name || 'Unknown')}<span class="wds-people-search-id">${escapeHtml(p.public_id || '')}</span></span>
+          </div>`).join('');
+      } catch (err) {
+        peopleSearchResults.innerHTML = '<p class="empty-note">Search failed — try again.</p>';
+      }
+    };
+    peopleSearchInput.addEventListener('input', () => {
+      clearTimeout(peopleSearchDebounce);
+      peopleSearchDebounce = setTimeout(runPeopleSearch, 300);
+    });
+    peopleSearchResults.addEventListener('click', e => {
+      const item = e.target.closest('[data-view-profile]');
+      if (item) { wdsOpenOtherProfile(item.dataset.viewProfile); peopleSearchPop.hidden = true; }
+    });
+    document.addEventListener('click', e => {
+      if (!peopleSearchPop.hidden && !peopleSearchPop.contains(e.target) && e.target !== peopleSearchBtn) {
+        peopleSearchPop.hidden = true;
+      }
+    });
+  }
 
   // Icon strip above the composer. Home is the feed itself — just marks
   // itself active, nothing to navigate to. Groups opens the real Chats

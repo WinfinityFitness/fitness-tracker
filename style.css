@@ -5038,6 +5038,7 @@ html.wf-resume-session .wds-reload-splash { display: flex !important; }
   background-size: cover; background-position: center;
 }
 .wds-friend-name { flex: 1; font-size: 0.82rem; color: var(--text-primary); font-weight: 600; }
+.wds-people-search-id { display: block; font-size: 0.68rem; color: var(--text-muted); font-weight: 400; font-family: var(--font-mono); }
 .wds-friend-actions { display: flex; gap: 6px; }
 .wds-notif-item-actions { display: flex; gap: 8px; margin-top: 6px; }
 
@@ -5765,7 +5766,8 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
   }
   .wds-uni-left, .wds-uni-right { display: none; }
   .wds-uni-center { width: 100%; }
-  .wds-topnav-brand span { display: none; }
+  .wds-topnav-brand-label { display: none; }
+  .wds-user-meta { display: none; }
   .wds-logout-label { display: none; }
   .wds-logout-btn { padding: 9px; border-radius: 50%; }
   .wds-global-chat-fixed { right: 8px; width: calc(100vw - 16px); }
