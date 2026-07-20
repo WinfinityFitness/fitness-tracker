@@ -5,4 +5,11 @@
     "package_name": "com.winfinityfitness.nexus",
     "sha256_cert_fingerprints": ["7B:BE:56:10:E4:7B:AC:BC:82:A5:DD:3A:31:7B:03:C3:96:5F:3F:B3:44:CD:08:DA:0B:F6:6E:A9:5C:6C:38:15"]
   }
+}, {
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "io.github.winfinityfitness.twa",
+    "sha256_cert_fingerprints": ["CF:6A:B4:41:86:50:75:66:45:60:1E:FD:7D:4D:78:D3:1A:6A:91:21:B8:BC:81:31:8F:F9:74:99:A5:89:7B:FF"]
+  }
 }]
