@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.6.1';
+const APP_VERSION = 'WF_SYS_V.1.6.2';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -935,8 +935,16 @@ function initDesktopShell() {
     if (profileCoverErrorEl) profileCoverErrorEl.hidden = true;
     profileCoverEditBtn.disabled = true;
     try {
+      // Upload to Storage before pushing — desktop has no offline/local
+      // copy to preserve (wdsRemoteData is the sole source of truth here),
+      // so this can upload directly on every interactive save, no caching
+      // needed the way the mobile periodic-sync paths need it.
+      let coverUrl = wdsPendingCoverDataUrl;
+      if (coverUrl && coverUrl.startsWith('data:')) {
+        coverUrl = await uploadChatImage(coverUrl, wdsRemoteData.shareKey, 'covers');
+      }
       const p = Object.assign({}, wdsRemoteData.profile, {
-        coverPhotoDataUrl: wdsPendingCoverDataUrl, coverPhotoPosY: wdsPendingCoverPosY,
+        coverPhotoDataUrl: coverUrl, coverPhotoPosY: wdsPendingCoverPosY,
       });
       await wdsPushProfileUpdate(p);
       // web_sync_push_snapshot returning without error doesn't guarantee
@@ -951,7 +959,7 @@ function initDesktopShell() {
         p_public_id: id, p_pin: pin, p_days: 1,
       });
       if (verifyError) throw verifyError;
-      if (!verifyData || !verifyData.profile || verifyData.profile.coverPhotoDataUrl !== wdsPendingCoverDataUrl) {
+      if (!verifyData || !verifyData.profile || verifyData.profile.coverPhotoDataUrl !== coverUrl) {
         throw new Error('Save did not verify — the server still has the old cover photo.');
       }
       wdsRemoteData.profile = verifyData.profile;
@@ -8166,9 +8174,17 @@ function initEntityPhotoUpload() {
     }
     if (sbConfigured()) {
       try {
+        const localPhoto = (getProfile() || {}).photoDataUrl || null;
+        let avatarUrl = localPhoto;
+        if (localPhoto && localPhoto.startsWith('data:')) {
+          // Usually a cache hit here — pushWebSyncSnapshot() above already
+          // uploaded+cached this same photo under the same 'avatar' key.
+          try { avatarUrl = await uploadImageWithCache(localPhoto, 'avatar', 'avatars'); }
+          catch (e) { avatarUrl = localPhoto; /* fall back to base64 rather than drop the avatar */ }
+        }
         await sb.rpc('set_leaderboard_avatar', {
           p_share_key: getOrCreateShareKey(),
-          p_avatar_data_url: (getProfile() || {}).photoDataUrl || null,
+          p_avatar_data_url: avatarUrl,
           p_code_name: effectiveLeaderboardName(),
           p_public_id: getOrCreatePublicId(),
         });
@@ -15014,8 +15030,14 @@ async function pushLeaderboardEntry() {
   // periodic sync runs regardless, so it naturally catches an existing
   // photo up without the user needing to re-touch it.
   try {
+    const localPhoto = (getProfile() || {}).photoDataUrl || null;
+    let avatarUrl = localPhoto;
+    if (localPhoto && localPhoto.startsWith('data:')) {
+      try { avatarUrl = await uploadImageWithCache(localPhoto, 'avatar', 'avatars', shareKey); }
+      catch (e) { avatarUrl = localPhoto; /* fall back to base64 rather than drop the avatar */ }
+    }
     await sb.rpc('set_leaderboard_avatar', {
-      p_share_key: shareKey, p_avatar_data_url: (getProfile() || {}).photoDataUrl || null,
+      p_share_key: shareKey, p_avatar_data_url: avatarUrl,
       p_code_name: effectiveLeaderboardName(), p_public_id: getOrCreatePublicId(),
     });
   } catch (e) { /* best effort — avatar just stays an initial circle until this succeeds */ }
@@ -15280,18 +15302,39 @@ function wdsDownscaleImageForUpload(dataUrl) {
 }
 
 // Single shared upload path for every image in the app — feed posts, My
-// Day stories, and chat (mobile Nexus tab and desktop chat/popups alike).
-async function uploadChatImage(dataUrl, shareKeyOverride) {
+// Day stories, chat (mobile Nexus tab and desktop chat/popups alike), and
+// (via the optional folder param) profile avatar/cover photos.
+async function uploadChatImage(dataUrl, shareKeyOverride, folder) {
   let blob = await (await fetch(dataUrl)).blob();
   if (blob.type !== 'image/gif') { // skip animated GIFs — canvas would flatten to one frame
     const resized = await wdsDownscaleImageForUpload(dataUrl);
     if (resized) blob = resized;
   }
   const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
-  const path = `${shareKeyOverride || getOrCreateShareKey()}/${Date.now()}.${ext}`;
+  const path = `${folder ? folder + '/' : ''}${shareKeyOverride || getOrCreateShareKey()}/${Date.now()}.${ext}`;
   const { error } = await sb.storage.from('chat-images').upload(path, blob, { contentType: blob.type });
   if (error) throw error;
   return sb.storage.from('chat-images').getPublicUrl(path).data.publicUrl;
+}
+
+// Avoids re-uploading an unchanged avatar/cover photo every time one of the
+// periodic sync paths (autoSyncIfEnabled, pushLeaderboardEntry) fires against
+// a photo that hasn't actually changed since the last upload — compares
+// against the exact data URL cached under cacheKey and reuses that Storage
+// URL on a hit instead of creating a duplicate object. The LOCAL profile
+// (getProfile().photoDataUrl/coverPhotoDataUrl) stays base64 always, for
+// offline display — only this cache and the values actually sent to
+// Supabase ever become URLs.
+async function uploadImageWithCache(dataUrl, cacheKey, folder, shareKeyOverride) {
+  if (!dataUrl) return null;
+  const CACHE_KEY = 'wft_image_upload_cache';
+  let cache = {};
+  try { cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); } catch (e) {}
+  if (cache[cacheKey] && cache[cacheKey].src === dataUrl) return cache[cacheKey].url;
+  const url = await uploadChatImage(dataUrl, shareKeyOverride, folder);
+  cache[cacheKey] = { src: dataUrl, url };
+  localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+  return url;
 }
 
 function getOrCreateShareKey() {
@@ -15368,9 +15411,21 @@ async function pushWebSyncSnapshot() {
   if (!sbConfigured()) throw new Error('Not connected.');
   const shareKey = getOrCreateShareKey();
   try {
+    // Clone before touching photo fields — getProfile() is mobile's
+    // offline-first local copy and must stay base64 there; only this
+    // clone's values (what actually gets sent) become Storage URLs.
+    const profile = Object.assign({}, getProfile());
+    if (profile.photoDataUrl && profile.photoDataUrl.startsWith('data:')) {
+      try { profile.photoDataUrl = await uploadImageWithCache(profile.photoDataUrl, 'avatar', 'avatars', shareKey); }
+      catch (e) { /* best effort — send the base64 rather than drop the photo */ }
+    }
+    if (profile.coverPhotoDataUrl && profile.coverPhotoDataUrl.startsWith('data:')) {
+      try { profile.coverPhotoDataUrl = await uploadImageWithCache(profile.coverPhotoDataUrl, 'cover', 'covers', shareKey); }
+      catch (e) { /* best effort */ }
+    }
     await sb.rpc('web_sync_push_snapshot', {
       p_share_key: shareKey,
-      p_profile: getProfile(),
+      p_profile: profile,
       p_theme: localStorage.getItem('wft_theme') || 'dark',
       p_skin: localStorage.getItem('wft_skin') || 'default',
     });
