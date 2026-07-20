@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.5.8';
+const APP_VERSION = 'WF_SYS_V.1.5.9';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -52,6 +52,22 @@ const isDesktopShellSite = location.hostname === DESKTOP_SHELL_HOST || new URLSe
 // as isDesktopShellSite — each is pinned to its own exact hostname.
 const MESSENGER_SHELL_HOST = 'messenger.winfinityfitness.com';
 const isMessengerShellSite = location.hostname === MESSENGER_SHELL_HOST || new URLSearchParams(location.search).has('wdsMsgPreview');
+
+// Best-effort "is the Messenger PWA installed on this device" check for the
+// mobile chat icon (see chatListBtn's click handler in initDesktopShell) —
+// getInstalledRelatedApps is Chrome/Android-only and requires
+// manifest-wellness.webmanifest's related_applications entry (added
+// alongside this) to even ask about messenger.winfinityfitness.com.
+// Unsupported browsers/devices, or a genuine "not installed" answer, both
+// resolve false here — the caller's fallback in that case is the original
+// in-page dropdown, so there's no wrong answer to be defensive about.
+async function wdsIsMessengerAppInstalled() {
+  if (!('getInstalledRelatedApps' in navigator)) return false;
+  try {
+    const related = await navigator.getInstalledRelatedApps();
+    return related.some(app => app.platform === 'webapp' && String(app.url || app.id || '').includes('messenger.winfinityfitness.com'));
+  } catch (e) { return false; }
+}
 
 // Set only after a successful desktop sign-in (see signInWithWebSync below)
 // to the payload returned by web_sync_get_dashboard — {profile, theme, skin,
@@ -1398,7 +1414,7 @@ function initDesktopShell() {
   // also keeps the dropdown even on mobile.
   chatListBtn.addEventListener('click', async e => {
     e.stopPropagation();
-    if (isWdsMobileViewport() && !wdsGuestMode && wdsRemoteData && wdsRemoteData.publicId) {
+    if (isWdsMobileViewport() && !wdsGuestMode && wdsRemoteData && wdsRemoteData.publicId && await wdsIsMessengerAppInstalled()) {
       const pin = localStorage.getItem(SESSION_PIN_KEY);
       let url = 'https://messenger.winfinityfitness.com/';
       if (pin) {
@@ -1412,6 +1428,8 @@ function initDesktopShell() {
       location.href = url;
       return;
     }
+    // Not installed (or can't tell — see wdsIsMessengerAppInstalled) falls
+    // through to the original in-page dropdown, same on mobile as desktop.
     chatListPop.hidden = !chatListPop.hidden;
     if (!chatListPop.hidden) {
       const notifPopEl = document.getElementById('wdsNotifPop');
