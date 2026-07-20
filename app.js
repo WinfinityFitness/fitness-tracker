@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.6.0';
+const APP_VERSION = 'WF_SYS_V.1.6.1';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -188,6 +188,15 @@ function initDesktopShell() {
   if (brandEl) {
     brandEl.addEventListener('click', closeWdsProfilePage);
     brandEl.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeWdsProfilePage(); } });
+  }
+  const headerVersionEl = document.getElementById('wdsHeaderVersion');
+  if (headerVersionEl) {
+    headerVersionEl.textContent = APP_VERSION;
+    headerVersionEl.classList.toggle('has-update', updateAvailable);
+    headerVersionEl.addEventListener('click', e => { e.stopPropagation(); checkAndApplyAppUpdate(); });
+    headerVersionEl.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); checkAndApplyAppUpdate(); }
+    });
   }
 
   const SESSION_ID_KEY = 'wds_operator_id';
@@ -3684,6 +3693,7 @@ async function wdsOpenChatPopup(roomId) {
   if (!wdsRemoteData || !roomId) return;
   wdsChatPopupLastActive[roomId] = Date.now();
   let popup = document.querySelector(`.wds-chat-popup[data-room-id="${roomId}"]`);
+  if (popup) popup.classList.remove('is-minimized');
   if (!popup) {
     wdsEvictOldestChatPopupIfNeeded(roomId);
     const meta = wdsChatRoomMeta[roomId] || { name: 'Chat' };
@@ -3692,9 +3702,10 @@ async function wdsOpenChatPopup(roomId) {
     popup.dataset.roomId = roomId;
     popup.innerHTML = `
       <div class="wds-chat-popup-head">
-        <span class="wds-chat-popup-head-avatar"${wdsAvatarStyleAttr(meta.avatarDataUrl)}>${meta.avatarDataUrl ? '' : escapeHtml((meta.name || '?').trim().charAt(0).toUpperCase())}</span>
         <strong>${escapeHtml(meta.name || 'Chat')}</strong>
-        <button type="button" class="wds-chat-popup-close" data-close-popup="${roomId}" aria-label="Close">✕</button>
+        <button type="button" class="wds-chat-popup-minimize" data-minimize-popup="${roomId}" aria-label="Minimize" title="Minimize">–</button>
+        <button type="button" class="wds-chat-popup-close" data-close-popup="${roomId}" aria-label="Close" title="Close">✕</button>
+        <span class="wds-chat-popup-head-avatar"${wdsAvatarStyleAttr(meta.avatarDataUrl)}>${meta.avatarDataUrl ? '' : escapeHtml((meta.name || '?').trim().charAt(0).toUpperCase())}</span>
       </div>
       <div class="wds-chat-popup-list"><p class="empty-note">Loading…</p></div>
       <div class="wds-chat-popup-pending-image" hidden data-popup-pending-image="${roomId}">
@@ -3748,6 +3759,12 @@ function wdsWireChatPopups() {
     reader.readAsDataURL(file);
   };
   chatPopupsWrap.addEventListener('click', async e => {
+    const minimizeBtn = e.target.closest('[data-minimize-popup]');
+    if (minimizeBtn) {
+      const popup = minimizeBtn.closest('.wds-chat-popup');
+      if (popup) popup.classList.toggle('is-minimized');
+      return;
+    }
     const closeBtn = e.target.closest('[data-close-popup]');
     if (closeBtn) { wdsCloseChatPopup(closeBtn.dataset.closePopup); return; }
     const lightboxImg = e.target.closest('[data-lightbox]');
@@ -19811,6 +19828,21 @@ safeInit(initAdminDrawer, 'initAdminDrawer');
 safeInit(loadSetupForm, 'loadSetupForm');
 safeInit(loadCheckinForm, 'loadCheckinForm');
 safeInit(() => { document.getElementById('sysVersion').textContent = APP_VERSION; }, 'sysVersion');
+safeInit(initSysVersionUpdatePopup, 'initSysVersionUpdatePopup');
+
+function initSysVersionUpdatePopup() {
+  const versionEl = document.getElementById('sysVersion');
+  const overlay = document.getElementById('appUpdateInfoOverlay');
+  if (!versionEl || !overlay) return;
+  const open = () => { overlay.hidden = false; };
+  const close = () => { overlay.hidden = true; };
+  versionEl.addEventListener('click', open);
+  versionEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+  });
+  document.getElementById('btnCloseAppUpdateInfo').addEventListener('click', close);
+  bindOverlayBackdropClose(overlay, close);
+}
 safeInit(renderDashboard, 'renderDashboard');
 safeInit(updateTabDots, 'updateTabDots');
 safeInit(initBetaLock, 'initBetaLock');
@@ -19920,6 +19952,10 @@ async function fetchLatestVersionLabel() {
 
 async function markUpdateAvailable() {
   updateAvailable = true;
+  const headerVersionEl = document.getElementById('wdsHeaderVersion');
+  if (headerVersionEl) headerVersionEl.classList.add('has-update');
+  const sysVersionEl = document.getElementById('sysVersion');
+  if (sysVersionEl) sysVersionEl.classList.add('has-update');
   const note = document.getElementById('updateAvailableNote');
   const versionEl = document.getElementById('updateAvailableVersion');
   if (!note || !versionEl) return;
@@ -19931,6 +19967,10 @@ async function markUpdateAvailable() {
 
 function clearUpdateAvailable() {
   updateAvailable = false;
+  const headerVersionEl = document.getElementById('wdsHeaderVersion');
+  if (headerVersionEl) headerVersionEl.classList.remove('has-update');
+  const sysVersionEl = document.getElementById('sysVersion');
+  if (sysVersionEl) sysVersionEl.classList.remove('has-update');
   const note = document.getElementById('updateAvailableNote');
   if (note) note.hidden = true;
 }

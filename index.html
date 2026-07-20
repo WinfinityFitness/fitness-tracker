@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.6.0">
+<link rel="stylesheet" href="style.css?v=1.6.1">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -409,7 +409,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <!-- ============ STATUS ============ -->
   <section class="tab-panel" id="tab-status" data-tab="status">
     <div class="hero-card">
-      <p class="sys-version" id="sysVersion"></p>
+      <p class="sys-version" id="sysVersion" role="button" tabindex="0" aria-label="App version — tap for update options"></p>
       <p class="hero-eyebrow">System check-in</p>
       <h2 class="hero-title"><span class="hero-title-shrink hero-welcome-line">Welcome back,</span><span class="accent hero-name-line" id="heroName">Operator</span></h2>
       <div class="chip-row">
@@ -2044,21 +2044,32 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       </div>
     </div>
 
-    <div class="sheet-section">
-      <p class="field-group-heading">App Update</p>
-      <p class="hint">Current version: <span id="settingsAppVersion">–</span></p>
-      <p class="update-available-note" id="updateAvailableNote" hidden>🆕 New update available — <span id="updateAvailableVersion"></span></p>
-      <button type="button" class="btn btn--primary" id="btnCheckUpdate">Update Now</button>
-      <div class="theme-toggle-row" style="margin-top:12px;">
-        <span>Auto-update on Sync/Backup</span>
-        <label class="switch">
-          <input type="checkbox" id="autoUpdateToggle">
-          <span class="switch-track"><span class="switch-thumb"></span></span>
-        </label>
-      </div>
-      <p class="hint hint--sm">When on, a pending update installs automatically right after you Sync to Nexus or Back Up (local or Drive) — those are safe checkpoints since your data's already saved. The app reloads once, right after.</p>
+  </div>
+</div>
 
+<!-- App Update info — was its own Settings section; now reached by tapping
+     the small version number at the top-right of the Status tab
+     (#sysVersion, see the click wiring near initAppUpdateButton in app.js).
+     Same element ids as before, so initAppUpdateButton's existing wiring
+     needs no logic changes, just a new place to live. -->
+<div class="sheet-overlay" id="appUpdateInfoOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>App Update</h2>
+      <button class="sheet-close" id="btnCloseAppUpdateInfo">✕</button>
     </div>
+    <p class="hint">Current version: <span id="settingsAppVersion">–</span></p>
+    <p class="update-available-note" id="updateAvailableNote" hidden>🆕 New update available — <span id="updateAvailableVersion"></span></p>
+    <button type="button" class="btn btn--primary" id="btnCheckUpdate">Update Now</button>
+    <div class="theme-toggle-row" style="margin-top:12px;">
+      <span>Auto-update on Sync/Backup</span>
+      <label class="switch">
+        <input type="checkbox" id="autoUpdateToggle">
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+      </label>
+    </div>
+    <p class="hint hint--sm">When on, a pending update installs automatically right after you Sync to Nexus or Back Up (local or Drive) — those are safe checkpoints since your data's already saved. The app reloads once, right after.</p>
   </div>
 </div>
 
@@ -3357,7 +3368,10 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
 
     <header class="wds-topnav">
       <div class="wds-topnav-brand" id="wdsTopnavBrand" role="button" tabindex="0" title="Back to home">
-        <img src="icons/icon-192.png" alt="">
+        <span class="wds-topnav-logo-wrap">
+          <img src="icons/icon-192.png" alt="">
+          <span class="wds-topnav-version" id="wdsHeaderVersion" role="button" tabindex="0" title="Check for update">–</span>
+        </span>
         <span>WINFINITY</span>
       </div>
       <div class="wds-topnav-spacer"></div>
@@ -4206,10 +4220,10 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
-<script src="config.js?v=1.6.0"></script>
+<script src="config.js?v=1.6.1"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.6.0"></script>
+<script src="app.js?v=1.6.1"></script>
 </body>
 </html>
