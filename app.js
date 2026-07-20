@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.5.9';
+const APP_VERSION = 'WF_SYS_V.1.6.0';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -14498,6 +14498,7 @@ async function exportCSV(logsArr, filenamePrefix) {
 function getBackupPayload(extra) {
   return Object.assign({
     profile: getProfile(), logs: getLogs(), reviews: getReviews(),
+    dailyReviews: getDailyReviews(),
     digitalId: getOrCreatePublicId(), shareKey: getOrCreateShareKey(),
   }, extra || {});
 }
@@ -14514,6 +14515,49 @@ function downloadBackupJSON() {
   renderDashboard();
   autoSyncDriveBackupToNexus();
   maybeAutoApplyUpdate();
+}
+
+// Shared by both restore paths (local file picker and "Restore from
+// Google Drive") so they can never drift apart. Used to just apply
+// whatever a selected file contained the instant it was picked, with zero
+// confirmation and no structural check beyond JSON.parse succeeding —
+// same class of risk as not having a real backup at all, since a misclick
+// could silently overwrite current data with garbage. Now: validate the
+// shape first, confirm with the user before touching anything (same
+// "warn before destructive" convention as initClearAllData), then apply
+// and re-run migrations so a backup taken on an older app version loads
+// in the current data shape rather than the stale one it was saved in.
+function applyRestoredBackup(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data) ||
+      !('profile' in data || 'logs' in data || 'reviews' in data || 'dailyReviews' in data)) {
+    alert("That doesn't look like a Winfinity backup file.");
+    return false;
+  }
+  if (!confirm('Restore this backup? This will overwrite your current profile, logs, reviews, and daily reviews on this device with what\'s in the backup file. This cannot be undone unless you have another backup of the current data.')) {
+    return false;
+  }
+  if (data.profile) saveProfile(data.profile);
+  if (data.logs) saveLogs(data.logs);
+  if (data.reviews) saveReviews(data.reviews);
+  if (data.dailyReviews) saveDailyReviews(data.dailyReviews);
+  // Reclaim the same Nexus identity this backup was saved under, so the
+  // device doesn't mint a fresh share_key/Digital ID and end up split
+  // across two leaderboard rows.
+  if (data.shareKey) localStorage.setItem('wft_lb_share_key', data.shareKey);
+  if (data.digitalId) localStorage.setItem('wft_public_id', data.digitalId);
+  localStorage.removeItem('wft_demo_seeded_at');
+  // Idempotent (guarded by its own wft_water_migrated_v1 flag), so safe to
+  // call unconditionally — brings a restored older backup's data shape up
+  // to date instead of silently leaving it stale.
+  migrateWaterUnitsIfNeeded();
+  alert('Backup restored.' + (data.digitalId ? ` Digital ID ${data.digitalId} reclaimed.` : ''));
+  loadSetupForm();
+  loadCheckinForm();
+  renderDashboard();
+  renderHistory();
+  renderMeasureHistory();
+  renderBodyFatHistory();
+  return true;
 }
 
 function getBackupMode() {
@@ -14564,22 +14608,7 @@ function initExport() {
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      if (data.profile) saveProfile(data.profile);
-      if (data.logs) saveLogs(data.logs);
-      if (data.reviews) saveReviews(data.reviews);
-      // Reclaim the same Nexus identity this backup was saved under, so the
-      // device doesn't mint a fresh share_key/Digital ID and end up split
-      // across two leaderboard rows.
-      if (data.shareKey) localStorage.setItem('wft_lb_share_key', data.shareKey);
-      if (data.digitalId) localStorage.setItem('wft_public_id', data.digitalId);
-      localStorage.removeItem('wft_demo_seeded_at');
-      alert('Backup restored.' + (data.digitalId ? ` Digital ID ${data.digitalId} reclaimed.` : ''));
-      loadSetupForm();
-      loadCheckinForm();
-      renderDashboard();
-      renderHistory();
-      renderMeasureHistory();
-      renderBodyFatHistory();
+      applyRestoredBackup(data);
     } catch (err) {
       alert('Could not read that backup file.');
     }
@@ -14602,6 +14631,15 @@ function driveConfigured() {
   return typeof GOOGLE_CLIENT_ID === 'string' && GOOGLE_CLIENT_ID && !GOOGLE_CLIENT_ID.startsWith('YOUR_CLIENT_ID');
 }
 
+// Only worth offering once a backup file actually exists to restore from —
+// wft_drive_file_id (set in saveToDrive, once the first upload succeeds)
+// is the same id "Restore from Drive" fetches by, so its presence is
+// exactly the right condition.
+function refreshDriveRestoreButtonVisibility() {
+  const btn = document.getElementById('btnDriveRestore');
+  if (btn) btn.hidden = !localStorage.getItem('wft_drive_file_id');
+}
+
 function initDrive() {
   const connectBtn = document.getElementById('btnDriveConnect');
   const syncBtn = document.getElementById('btnDriveSyncNow');
@@ -14617,6 +14655,9 @@ function initDrive() {
     saveToDrive(true);
     if (localStorage.getItem('wft_lb_optin') === '1' && sbConfigured()) updateLeaderboard();
   });
+  const restoreBtn = document.getElementById('btnDriveRestore');
+  if (restoreBtn) restoreBtn.addEventListener('click', () => restoreFromDrive());
+  refreshDriveRestoreButtonVisibility();
 
   // Native Android app: Google Identity Services (the web flow below)
   // deliberately refuses to run inside any embedded WebView as an
@@ -14749,12 +14790,38 @@ async function saveToDrive(manual) {
     }
     localStorage.setItem('wft_drive_last_backup', todayISO());
     setDriveStatus('Last synced ' + new Date().toLocaleTimeString());
+    refreshDriveRestoreButtonVisibility();
     renderDashboard();
     activateNexusFastChat();
     autoSyncDriveBackupToNexus();
     maybeAutoApplyUpdate();
   } catch (e) {
     setDriveStatus('Sync failed — will retry on next save.');
+  }
+}
+
+// Fetches the same file saveToDrive() writes to (by the id it stored) and
+// runs it through the shared restore pipeline — see applyRestoredBackup's
+// own comment for why that matters (validation + confirm + migrations,
+// not just blindly overwriting on tap).
+async function restoreFromDrive() {
+  if (!driveAccessToken) {
+    alert('Not connected to Google Drive right now — tap "Backup now" first to reconnect, then try Restore again.');
+    return;
+  }
+  const fileId = localStorage.getItem('wft_drive_file_id');
+  if (!fileId) { alert('No Drive backup found yet.'); return; }
+  setDriveStatus('Fetching backup…');
+  try {
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+      headers: { Authorization: `Bearer ${driveAccessToken}` },
+    });
+    if (!res.ok) throw new Error('fetch failed: ' + res.status);
+    const data = await res.json();
+    applyRestoredBackup(data);
+    setDriveStatus('Last synced ' + new Date().toLocaleTimeString());
+  } catch (e) {
+    setDriveStatus('Could not fetch backup from Drive — try again.');
   }
 }
 
