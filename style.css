@@ -5089,10 +5089,11 @@ html.wf-resume-session .wds-reload-splash { display: flex !important; }
 .wds-chat-popup-head strong, .wds-chat-popup-head h3 { flex: 1; font-size: 0.82rem; color: var(--text-primary); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wds-chat-popup-close, .wds-chat-popup-minimize { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.05rem; line-height: 1; padding: 0 2px; flex-shrink: 0; }
 .wds-chat-popup-close:hover, .wds-chat-popup-minimize:hover { color: var(--cyan); }
-.wds-chat-popup.is-minimized { height: auto; }
-.wds-chat-popup.is-minimized .wds-chat-popup-list,
-.wds-chat-popup.is-minimized .wds-chat-popup-input-row,
-.wds-chat-popup.is-minimized .wds-chat-popup-pending-image { display: none; }
+/* Minimizing hides the whole floating window (not just its body) — the
+   bottom-right contact rail's own avatar chip (.wds-chat-contact-avatar,
+   driven by the same underlying .wds-chat-popup elements still being in
+   the DOM) is the only visual left representing it as "still open". */
+.wds-chat-popup.is-minimized { display: none; }
 .wds-chat-popup-list { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
 .wds-chat-popup-input-row { display: flex; align-items: center; gap: 6px; padding: 8px; border-top: 1px solid var(--border-soft); flex-shrink: 0; }
 .wds-chat-popup-input-row input {
