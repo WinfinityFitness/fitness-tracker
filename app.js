@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.0';
+const APP_VERSION = 'WF_SYS_V.1.7.1';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -257,12 +257,17 @@ function initDesktopShell() {
         p_public_id: cleanId, p_pin: cleanPin, p_days: 90,
       });
       if (error) throw error;
+      // Default Core's intended look is light -- only relevant the first
+      // time an account is ever seen here (data.theme/data.skin null means
+      // this account has never pushed a choice up), same reasoning as
+      // initThemeToggle's own themeDefault.
+      const wdsResolvedSkin = data.skin || 'default-core';
       wdsRemoteData = {
         publicId: cleanId,
         shareKey: data.shareKey || null,
         profile: data.profile || null,
-        theme: data.theme || 'dark',
-        skin: data.skin || 'default',
+        theme: data.theme || (wdsResolvedSkin === 'default-core' ? 'light' : 'dark'),
+        skin: wdsResolvedSkin,
         logsObj: wdsArrayToDateMap(data.logs),
         reviewsObj: wdsArrayToDateMap(data.reviews),
         dailyReviewsObj: wdsArrayToDateMap(data.dailyReviews),
@@ -373,7 +378,7 @@ function initDesktopShell() {
     localStorage.setItem(WDS_GUEST_MODE_KEY, '1');
     wdsRemoteData = {
       publicId: 'GUEST', shareKey: WDS_GUEST_SHARE_KEY, profile: { name: WDS_GUEST_NAME },
-      theme: 'dark', skin: 'default', logsObj: {}, reviewsObj: {}, dailyReviewsObj: {},
+      theme: 'light', skin: 'default-core', logsObj: {}, reviewsObj: {}, dailyReviewsObj: {},
     };
     document.documentElement.setAttribute('data-theme', wdsRemoteData.theme);
     document.documentElement.setAttribute('data-skin', wdsRemoteData.skin);
@@ -3483,12 +3488,13 @@ function renderWdsMessengerInbox() {
 
 const WDM_SHARE_KEY_STORAGE = 'wft_msg_share_key';
 function wdmSetIdentity(payload) {
+  const wdmResolvedSkin = payload.skin || 'default-core';
   wdsRemoteData = {
     publicId: payload.publicId || null,
     shareKey: payload.shareKey || null,
     profile: payload.profile || null,
-    theme: payload.theme || 'dark',
-    skin: payload.skin || 'default',
+    theme: payload.theme || (wdmResolvedSkin === 'default-core' ? 'light' : 'dark'),
+    skin: wdmResolvedSkin,
     logsObj: {}, reviewsObj: {}, dailyReviewsObj: {},
   };
   document.documentElement.setAttribute('data-theme', wdsRemoteData.theme);
@@ -15236,7 +15242,7 @@ async function pushWebSyncSnapshot() {
     await sb.rpc('web_sync_push_snapshot', {
       p_share_key: shareKey,
       p_profile: profile,
-      p_theme: localStorage.getItem('wft_theme') || 'dark',
+      p_theme: localStorage.getItem('wft_theme') || ((localStorage.getItem('wft_skin') || 'default-core') === 'default-core' ? 'light' : 'dark'),
       p_skin: localStorage.getItem('wft_skin') || 'default-core',
     });
   } catch (e) { /* best effort — profile/theme just won't update until next successful sync */ }
@@ -19228,7 +19234,14 @@ function applyTheme(theme) {
 }
 
 function initThemeToggle() {
-  applyTheme(localStorage.getItem('wft_theme') || 'dark');
+  // Default Core's intended/primary look is light (its dark companion is
+  // a derived fallback, see its style.css comment) -- so light is the
+  // right default specifically when no explicit theme choice has been
+  // made yet AND the skin is (or will default to) Default Core. Every
+  // other skin's un-set-theme default stays 'dark', unchanged.
+  const savedSkin = localStorage.getItem('wft_skin');
+  const themeDefault = (!savedSkin || savedSkin === 'default-core') ? 'light' : 'dark';
+  applyTheme(localStorage.getItem('wft_theme') || themeDefault);
   document.getElementById('themeToggle').addEventListener('change', e => {
     applyTheme(e.target.checked ? 'light' : 'dark');
   });
