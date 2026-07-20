@@ -5067,7 +5067,7 @@ html.wf-resume-session .wds-reload-splash { display: flex !important; }
   display: grid; place-items: center; border: 2px solid var(--surface-1); box-shadow: 0 2px 10px rgba(0,0,0,0.3);
 }
 .wds-chat-contact-avatar .wds-chat-thread-dot {
-  position: absolute; right: -1px; bottom: -1px; box-shadow: 0 0 0 2px var(--surface-1);
+  position: absolute; left: -1px; bottom: -1px; background: var(--good); box-shadow: 0 0 0 2px var(--surface-1);
 }
 .wds-chat-contact-avatar.is-open { border-color: var(--cyan); }
 .wds-chat-contact-avatar-close {

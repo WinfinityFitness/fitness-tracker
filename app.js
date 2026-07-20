@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.5.0';
+const APP_VERSION = 'WF_SYS_V.1.5.1';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -3580,31 +3580,28 @@ function wdsCloseChatPopup(roomId) {
   renderWdsChatContactRail();
 }
 
-// Right-edge rail — every DM/group thread as a clickable avatar, doubling
-// as both "start/open a chat" and "here's the one that got minimized"
-// (an evicted popup has no separate collapsed state; its rail icon is
-// simply how you bring it back). The small ✕ lets a bubble be dismissed
-// from the rail entirely instead of just minimized further — session-only
-// (wdsDismissedRailIds isn't persisted), and a new message for that thread
-// clears the dismissal so it can't silently hide real activity forever.
-let wdsDismissedRailIds = new Set();
+// Right-edge rail — ONLY the threads you've actually opened a popup for
+// (previously showed every recent DM/group thread regardless, which read
+// as "why are all these unread conversations floating here" — now it's
+// closer to a real taskbar: a bubble exists because you opened that chat,
+// and closing it via either the ✕ here or the popup's own close removes
+// the bubble too, both routed through the same wdsCloseChatPopup). Source
+// of truth for "open" is the actual rendered .wds-chat-popup elements, not
+// a separate tracked list, so it can't drift out of sync with what's
+// really on screen.
 function renderWdsChatContactRail() {
   const rail = document.getElementById('wdsChatContactRail');
   if (!rail) return;
-  const threads = wdsChatThreadList().filter(t => {
-    if (!wdsDismissedRailIds.has(String(t.id))) return true;
-    if (wdsIsRoomUnread(t.id, t)) { wdsDismissedRailIds.delete(String(t.id)); return true; }
-    return false;
-  }).slice(0, 12);
+  const openIds = Array.from(document.querySelectorAll('.wds-chat-popup')).map(el => el.dataset.roomId);
+  const allThreads = wdsChatThreadList();
+  const threads = openIds.map(id => allThreads.find(t => String(t.id) === String(id))).filter(Boolean).slice(0, 12);
   if (!threads.length) { rail.innerHTML = ''; return; }
-  const openIds = new Set(Array.from(document.querySelectorAll('.wds-chat-popup')).map(el => el.dataset.roomId));
   rail.innerHTML = threads.map(t => {
     const unread = wdsIsRoomUnread(t.id, t);
     const initial = escapeHtml((t.name || '?').charAt(0).toUpperCase());
-    const isOpen = openIds.has(String(t.id));
-    return `<div class="wds-chat-contact-avatar${isOpen ? ' is-open' : ''}"${wdsAvatarStyleAttr(t.avatarDataUrl)} data-room-id="${t.id}" title="${escapeHtml(t.name || 'Chat')}">
+    return `<div class="wds-chat-contact-avatar is-open"${wdsAvatarStyleAttr(t.avatarDataUrl)} data-room-id="${t.id}" title="${escapeHtml(t.name || 'Chat')}">
       ${t.avatarDataUrl ? '' : (t.isDm ? initial : '👥')}${unread ? '<span class="wds-chat-thread-dot"></span>' : ''}
-      <button type="button" class="wds-chat-contact-avatar-close" data-close-rail="${t.id}" aria-label="Remove from rail" title="Remove">✕</button>
+      <button type="button" class="wds-chat-contact-avatar-close" data-close-rail="${t.id}" aria-label="Close chat" title="Close">✕</button>
     </div>`;
   }).join('');
 }
