@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.5.1';
+const APP_VERSION = 'WF_SYS_V.1.5.2';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1216,6 +1216,11 @@ function initDesktopShell() {
     e.stopPropagation();
     notifPop.hidden = !notifPop.hidden;
     if (!notifPop.hidden) {
+      // Only one navbar dropdown open at a time — doesn't apply to the
+      // chat popup windows themselves, which are a separate system further
+      // down (bottom-right, can have several open, see wdsCloseChatPopup).
+      const chatListPopEl = document.getElementById('wdsChatListPop');
+      if (chatListPopEl) chatListPopEl.hidden = true;
       localStorage.setItem('wft_web_nexus_last_seen', new Date().toISOString());
       wdsMarkAllNotificationsRead();
       renderWdsNotifications();
@@ -1349,7 +1354,11 @@ function initDesktopShell() {
   chatListBtn.addEventListener('click', e => {
     e.stopPropagation();
     chatListPop.hidden = !chatListPop.hidden;
-    if (!chatListPop.hidden) refreshWdsChatRooms();
+    if (!chatListPop.hidden) {
+      const notifPopEl = document.getElementById('wdsNotifPop');
+      if (notifPopEl) notifPopEl.hidden = true;
+      refreshWdsChatRooms();
+    }
   });
 
   // Icon strip above the composer. Home is the feed itself — just marks
@@ -3520,10 +3529,10 @@ async function wdsRefreshChatPopup(roomId) {
   }
 }
 
-// Facebook caps how many chat popups stay expanded at once (2 here) —
-// opening a third evicts the least-recently-active one back down to just
-// its icon in the contact rail, rather than piling up open windows.
-const WDS_MAX_OPEN_CHAT_POPUPS = 2;
+// Only one chat popup stays expanded at a time — opening a new one evicts
+// whichever was open back down to just its icon in the contact rail,
+// rather than piling up several open windows on screen at once.
+const WDS_MAX_OPEN_CHAT_POPUPS = 1;
 let wdsChatPopupLastActive = {}; // roomId -> timestamp (ms)
 
 function wdsEvictOldestChatPopupIfNeeded(exceptRoomId) {
