@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.5.7';
+const APP_VERSION = 'WF_SYS_V.1.5.8';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -7601,7 +7601,16 @@ function handleDeepLinkUrl(url) {
 
 function initDeepLinkHandling() {
   handleDeepLinkUrl(location.href);
-  if (location.search) history.replaceState({}, '', location.pathname);
+  // Only strip the param this handler actually owns — this used to clear
+  // location.search unconditionally, silently destroying any other query
+  // param (e.g. wdsPreview/wdsMsgPreview) present at load, which is a real
+  // bug independent of anything deep-link related.
+  const dlParams = new URLSearchParams(location.search);
+  if (dlParams.has('openSheet')) {
+    dlParams.delete('openSheet');
+    const rest = dlParams.toString();
+    history.replaceState({}, '', location.pathname + (rest ? '?' + rest : ''));
+  }
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('message', event => {
       if (event.data && event.data.type === 'DEEP_LINK') handleDeepLinkUrl(event.data.url);
@@ -7658,9 +7667,15 @@ async function initShareTargetHandling() {
   document.getElementById('btnCloseShareTarget').addEventListener('click', closeShareTargetOverlay);
   bindOverlayBackdropClose(overlay, closeShareTargetOverlay);
 
-  // Same parse-then-strip convention as initDeepLinkHandling above.
-  const isSharedTarget = new URLSearchParams(location.search).get('shared-target') === '1';
-  if (location.search) history.replaceState({}, '', location.pathname);
+  // Same parse-then-strip convention as initDeepLinkHandling above — only
+  // strip the param this handler owns, not the whole query string.
+  const stParams = new URLSearchParams(location.search);
+  const isSharedTarget = stParams.get('shared-target') === '1';
+  if (stParams.has('shared-target')) {
+    stParams.delete('shared-target');
+    const rest = stParams.toString();
+    history.replaceState({}, '', location.pathname + (rest ? '?' + rest : ''));
+  }
   if (!isSharedTarget) return;
 
   let record = null;
