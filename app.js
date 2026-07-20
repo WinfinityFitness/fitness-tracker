@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.5.2';
+const APP_VERSION = 'WF_SYS_V.1.5.3';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1289,16 +1289,25 @@ function initDesktopShell() {
   if (viewedAddFriendBtn) viewedAddFriendBtn.addEventListener('click', async () => {
     if (!wdsViewedProfile) return;
     viewedAddFriendBtn.disabled = true;
+    viewedAddFriendBtn.textContent = 'Sending…';
     try {
       await wdsSendFriendRequest(wdsViewedProfile.publicId);
       viewedAddFriendBtn.textContent = 'Request Sent';
     } catch (e) {
+      console.error('wdsSendFriendRequest failed:', e);
       viewedAddFriendBtn.disabled = false;
+      viewedAddFriendBtn.textContent = 'Could not send — try again';
+      setTimeout(() => { if (viewedAddFriendBtn.textContent === 'Could not send — try again') viewedAddFriendBtn.textContent = '+ Add Friend'; }, 3000);
     }
   });
-  if (viewedMessageBtn) viewedMessageBtn.addEventListener('click', () => {
+  if (viewedMessageBtn) viewedMessageBtn.addEventListener('click', async () => {
     if (!wdsViewedProfile) return;
-    wdsStartDM(wdsViewedProfile.codeName);
+    viewedMessageBtn.disabled = true;
+    viewedMessageBtn.textContent = 'Opening…';
+    const ok = await wdsStartDM(wdsViewedProfile.codeName, wdsViewedProfile.shareKey);
+    viewedMessageBtn.disabled = false;
+    viewedMessageBtn.textContent = ok ? '💬 Message' : 'Could not open — try again';
+    if (!ok) setTimeout(() => { if (viewedMessageBtn.textContent === 'Could not open — try again') viewedMessageBtn.textContent = '💬 Message'; }, 3000);
   });
 
   // Own-profile action row — only shown when wdsViewedProfile is null
@@ -1586,8 +1595,9 @@ function initDesktopShell() {
   });
   document.getElementById('btnWdsChatUserDm').addEventListener('click', () => {
     const target = wdsChatUserMenuTarget;
+    const targetKey = wdsChatUserMenuTargetKey;
     wdsCloseChatUserMenu();
-    wdsStartDM(target);
+    wdsStartDM(target, targetKey);
   });
   document.getElementById('btnWdsChatUserInvite').addEventListener('click', () => {
     wdsRenderChatUserMenuGroups();
@@ -3640,17 +3650,30 @@ function wdsOpenChatUserMenu(name, x, y, shareKey) {
   menu.style.left = Math.max(8, Math.min(x, window.innerWidth - menuWidth - 12)) + 'px';
   menu.style.top = Math.max(8, Math.min(y, window.innerHeight - 160)) + 'px';
 }
-async function wdsStartDM(otherName) {
-  if (!wdsRemoteData) return;
+// otherShareKey, when known, uses start_dm_by_share_key -- matching by the
+// real account id instead of start_dm_by_name's plain code_name lookup,
+// which silently returns null (no error, no room) on any name mismatch or
+// collision. Falls back to the name-only RPC for the one caller that never
+// has a share_key (a Global Chat sender with no synced account). Returns
+// true/false so callers can show their own success/failure UI instead of
+// this failing completely silently, which is what made the Message button
+// look like it "didn't even budge."
+async function wdsStartDM(otherName, otherShareKey) {
+  if (!wdsRemoteData) return false;
   const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
   try {
-    const { data, error } = await sb.rpc('start_dm_by_name', {
-      p_my_key: wdsRemoteData.shareKey, p_my_name: codeName, p_other_name: otherName,
-    });
-    if (error || !data) { if (error) console.error('start_dm_by_name failed:', error); return; }
+    const { data, error } = otherShareKey
+      ? await sb.rpc('start_dm_by_share_key', {
+          p_my_key: wdsRemoteData.shareKey, p_my_name: codeName, p_other_key: otherShareKey, p_other_name: otherName,
+        })
+      : await sb.rpc('start_dm_by_name', {
+          p_my_key: wdsRemoteData.shareKey, p_my_name: codeName, p_other_name: otherName,
+        });
+    if (error || !data) { if (error) console.error('start_dm failed:', error); return false; }
     await refreshWdsChatRooms();
     wdsOpenChatPopup(data);
-  } catch (e) { console.error('wdsStartDM failed:', e); }
+    return true;
+  } catch (e) { console.error('wdsStartDM failed:', e); return false; }
 }
 function wdsRenderChatUserMenuGroups() {
   const container = document.getElementById('wdsChatUserMenuGroups');
@@ -4806,18 +4829,12 @@ async function refreshWdsFriendsList(targetShareKey) {
   try {
     const { data, error } = await sb.rpc('list_friends', { p_share_key: shareKey });
     if (error) throw error;
-    // Viewing someone else's profile: their own friends list happens to be
-    // the easiest way to tell whether WE'RE already friends with them (no
-    // separate are-we-friends RPC exists) — if our share_key shows up in
-    // it, hide "+ Add Friend" instead of offering to re-send a request.
-    if (targetShareKey) {
-      const addFriendBtn = document.getElementById('btnWdsProfileAddFriendDirect');
-      if (addFriendBtn) {
-        const alreadyFriends = (data || []).some(f => f.share_key === wdsRemoteData.shareKey);
-        addFriendBtn.hidden = alreadyFriends;
-        if (!alreadyFriends) { addFriendBtn.disabled = false; addFriendBtn.textContent = '+ Add Friend'; }
-      }
-    }
+    // The Add Friend button's own state (none/pending/friends) is handled
+    // separately by wdsRefreshViewedProfileFriendButton — this used to also
+    // reset it here based only on "are we already friends," which fired on
+    // every refresh and stomped a just-sent "Request Sent" label right back
+    // to "+ Add Friend" (a pending request isn't a friendship yet, so this
+    // check always said "not friends" immediately after sending one).
     if (!data || !data.length) { listEl.innerHTML = '<p class="empty-note">No friends yet.</p>'; return; }
     listEl.innerHTML = data.map(f => `
       <div class="wds-friend-item" data-view-profile="${escapeHtml(f.share_key)}">
@@ -4989,7 +5006,36 @@ async function wdsShowProfilePage(targetShareKey) {
   await refreshWdsProfilePosts();
   await refreshWdsFriendsList(isOwn ? null : targetShareKey);
   if (isOwn) await refreshWdsPendingFriendRequestsList();
+  else await wdsRefreshViewedProfileFriendButton(targetShareKey);
   renderWdsProfileVisuals();
+}
+// Sets the "+ Add Friend" button's actual state (none/pending/already
+// friends/declined) against the real friendships row for this exact pair,
+// instead of refreshWdsFriendsList's old "are we already friends" check —
+// see the comment there for why that alone wasn't enough.
+async function wdsRefreshViewedProfileFriendButton(targetShareKey) {
+  const addFriendBtn = document.getElementById('btnWdsProfileAddFriendDirect');
+  if (!addFriendBtn || !wdsRemoteData) return;
+  try {
+    const { data, error } = await sb.rpc('get_friend_request_status', {
+      p_share_key: wdsRemoteData.shareKey, p_target_share_key: targetShareKey,
+    });
+    if (error) throw error;
+    const row = (data && data[0]) || null;
+    if (!row || row.status === 'declined') {
+      addFriendBtn.hidden = false;
+      addFriendBtn.disabled = false;
+      addFriendBtn.textContent = '+ Add Friend';
+    } else if (row.status === 'accepted') {
+      addFriendBtn.hidden = true;
+    } else if (row.status === 'pending') {
+      addFriendBtn.hidden = false;
+      addFriendBtn.disabled = true;
+      addFriendBtn.textContent = row.requester_share_key === wdsRemoteData.shareKey ? 'Request Sent' : 'Respond in Notifications';
+    }
+  } catch (e) {
+    console.error('wdsRefreshViewedProfileFriendButton failed:', e);
+  }
 }
 function wdsHideProfilePage() {
   const page = document.getElementById('wdsProfilePage');
