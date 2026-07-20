@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.6.8';
+const APP_VERSION = 'WF_SYS_V.1.6.9';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -137,8 +137,9 @@ function wdsGuestFindComment(commentId) {
 // create_chat_room, invite_to_chat_room, leave_chat_room, delete_chat_room,
 // kick_chat_room_member) the mobile app's own group-chat feature already
 // uses, just with new wds*-prefixed state so it never collides with
-// mobile's own currentChatRoomId/chatRoomMeta globals (Global Chat itself
-// is untouched — it still runs on the pre-existing refreshWdsChat() path).
+// mobile's own currentChatRoomId/chatRoomMeta globals. Nexus Com (the
+// public/global room) is pinned as a synthetic entry in this same list —
+// see wdsChatThreadList/wdsNexusComPreview further down.
 let wdsChatRoomMeta = {}; // roomId -> {name, isDm, createdByKey, joinedByMe, lastMessage, lastMessageAt}
 let wdsChatLastRead = {}; // roomId -> ISO timestamp, persisted below
 try { wdsChatLastRead = JSON.parse(localStorage.getItem('wft_web_chat_last_read')) || {}; } catch (e) { wdsChatLastRead = {}; }
@@ -300,12 +301,6 @@ function initDesktopShell() {
     dashboard.hidden = false;
     const dialBtn = document.getElementById('wdsDialBtn');
     if (dialBtn) dialBtn.hidden = false;
-    // Nexus Com (Global Chat) — starts hidden in the markup (no reason to
-    // show it on the bare gate); shown here on sign-in, except on narrow
-    // viewports where it stays collapsed by default like every other
-    // chat surface there (see the mobile-viewport block further down).
-    const globalChatFixedEl = document.getElementById('wdsGlobalChatFixed');
-    if (globalChatFixedEl && window.innerWidth > 860) globalChatFixedEl.hidden = false;
     // Deep-link support: a bookmarked/shared /<DigitalID> URL only makes
     // sense to check once, right after the FIRST successful sign-in — not
     // on every 2-minute poll refresh, which would otherwise re-open the
@@ -396,8 +391,6 @@ function initDesktopShell() {
     dashboard.hidden = false;
     const dialBtn = document.getElementById('wdsDialBtn');
     if (dialBtn) dialBtn.hidden = false;
-    const globalChatFixedEl = document.getElementById('wdsGlobalChatFixed');
-    if (globalChatFixedEl && window.innerWidth > 860) globalChatFixedEl.hidden = false;
     const banner = document.getElementById('wdsGuestBanner');
     if (banner) banner.hidden = false;
     applyWdsPendingShareIfAny();
@@ -431,69 +424,11 @@ function initDesktopShell() {
     idInput.focus();
     const dialBtnEl = document.getElementById('wdsDialBtn');
     if (dialBtnEl) dialBtnEl.hidden = true;
-    const globalChatFixedEl = document.getElementById('wdsGlobalChatFixed');
-    if (globalChatFixedEl) globalChatFixedEl.hidden = true;
   });
 
   // No more tabs — everything lives on one page now, so chat polling just
   // runs continuously for as long as the dashboard is signed in (started
   // alongside dashboard polling in enterDashboard, stopped on sign-out).
-
-  // Nexus chat — send (text + optional image), react/unsend (long-press or
-  // double-click a bubble).
-  const chatInput = document.getElementById('wdsChatInput');
-  const chatSendBtn = document.getElementById('btnWdsChatSend');
-  const chatAttachBtn = document.getElementById('btnWdsChatAttachImage');
-  const chatImageInput = document.getElementById('wdsChatImageInput');
-  const chatPendingImage = document.getElementById('wdsChatPendingImage');
-  const chatPendingImagePreview = document.getElementById('wdsChatPendingImagePreview');
-  const chatPendingImageRemoveBtn = document.getElementById('btnWdsChatPendingImageRemove');
-  let wdsPendingChatImageDataUrl = null;
-
-  const clearWdsPendingChatImage = () => {
-    wdsPendingChatImageDataUrl = null;
-    chatPendingImage.hidden = true;
-    chatImageInput.value = '';
-  };
-  const readWdsChatImageFile = file => {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      wdsPendingChatImageDataUrl = reader.result;
-      chatPendingImagePreview.src = wdsPendingChatImageDataUrl;
-      chatPendingImage.hidden = false;
-    };
-    reader.readAsDataURL(file);
-  };
-  chatAttachBtn.addEventListener('click', () => chatImageInput.click());
-  chatImageInput.addEventListener('change', () => readWdsChatImageFile(chatImageInput.files[0]));
-  chatPendingImageRemoveBtn.addEventListener('click', clearWdsPendingChatImage);
-  // Ctrl+V a copied image straight into the message box — same pending-
-  // image slot the attach button fills, so preview/remove/send all work
-  // identically regardless of how the image got there.
-  chatInput.addEventListener('paste', e => {
-    const file = wdsGetPastedImageFile(e);
-    if (file) { e.preventDefault(); readWdsChatImageFile(file); }
-  });
-
-  const sendWdsChat = async () => {
-    if (!wdsRemoteData || !wdsRemoteData.shareKey || !sbConfigured()) return;
-    const text = chatInput.value;
-    const image = wdsPendingChatImageDataUrl;
-    if (!text.trim() && !image) return;
-    chatSendBtn.disabled = true;
-    try {
-      const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
-      await postChatMessage(text, image, wdsRemoteData.shareKey, codeName);
-      chatInput.value = '';
-      clearWdsPendingChatImage();
-      await refreshWdsChat();
-    } catch (e) { /* best effort — message just won't appear, input keeps the typed text so nothing is lost */ }
-    finally { chatSendBtn.disabled = false; }
-  };
-  chatSendBtn.addEventListener('click', sendWdsChat);
-  chatInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendWdsChat(); });
-  initWdsChatReactionMenu();
 
   // Nexus Feed — composer (text + optional image) and the post/like/comment
   // event delegation set up in initWdsFeed.
@@ -1393,28 +1328,8 @@ function initDesktopShell() {
 
   // Chats panel — opened from the header chat icon (replaces the old
   // manual refresh button; the dashboard still auto-refreshes every 2min).
-  // Global Chat minimize toggle — collapses the fixed bottom-left widget
-  // out of the way entirely. Used to fall back to a small globe-icon
-  // button in the same corner to reopen it, but that's redundant now that
-  // the quick-access dial's Nexus Com item does the same thing — removed
-  // rather than kept as a second, easy-to-miss way to do the same thing.
-  // On narrow (mobile) viewports it also starts minimized by default and
-  // auto-closes on an outside click — matching how the DM/group popups
-  // already behave there, instead of permanently occupying the screen the
-  // way it does on desktop.
   const WDS_MOBILE_BREAKPOINT = 860;
   const isWdsMobileViewport = () => window.innerWidth <= WDS_MOBILE_BREAKPOINT;
-  const globalChatFixed = document.getElementById('wdsGlobalChatFixed');
-  const globalChatMinimizeBtn = document.getElementById('btnWdsGlobalChatMinimize');
-  if (globalChatFixed && globalChatMinimizeBtn) {
-    if (isWdsMobileViewport()) globalChatFixed.hidden = true;
-    globalChatMinimizeBtn.addEventListener('click', () => { globalChatFixed.hidden = true; });
-    document.addEventListener('click', e => {
-      if (isWdsMobileViewport() && !globalChatFixed.hidden && !globalChatFixed.contains(e.target) && e.target.id !== 'wdsDialBtn' && !e.target.closest('#wdsDialMenu')) {
-        globalChatFixed.hidden = true;
-      }
-    });
-  }
 
   const chatListBtn = document.getElementById('wdsChatListBtn');
   const chatListPop = document.getElementById('wdsChatListPop');
@@ -1701,12 +1616,6 @@ function initDesktopShell() {
   });
   document.addEventListener('click', e => {
     if (!postMenu.hidden && !postMenu.contains(e.target) && !e.target.closest('[data-action="post-menu"]')) wdsClosePostMenu();
-  });
-
-  // Global Chat's own sender names open the same context menu.
-  document.getElementById('wdsChatList').addEventListener('click', e => {
-    const nameEl = e.target.closest('[data-dm-name]');
-    if (nameEl) { e.stopPropagation(); wdsOpenChatUserMenu(nameEl.dataset.dmName, e.clientX, e.clientY, nameEl.dataset.dmKey); }
   });
 
   // A Digital ID + PIN entered earlier on this browser re-sign in
@@ -2007,16 +1916,8 @@ function renderWdsBio() {
 }
 
 async function renderWdsNexus() {
-  const chatListEl = document.getElementById('wdsChatList');
-
-  if (!sbConfigured()) {
-    if (chatListEl) chatListEl.innerHTML = '<p class="empty-note">Chat unavailable.</p>';
-    await refreshWdsChat();
-    return;
-  }
-
+  if (!sbConfigured()) return;
   await refreshWdsMyday();
-  await refreshWdsChat();
 }
 
 // ---------------------------------------------------------------------
@@ -3339,9 +3240,11 @@ function initWdsDial() {
     if (action === 'home') {
       closeWdsProfilePage();
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else if (action === 'nexus-com') {
-      const fixed = document.getElementById('wdsGlobalChatFixed');
-      if (fixed) fixed.hidden = false;
+    } else if (action === 'chats') {
+      // Nexus Com is now just the pinned first entry in this same list —
+      // same forwarding pattern as Search/Notifications below.
+      const btn = document.getElementById('wdsChatListBtn');
+      if (btn) btn.click();
     } else if (action === 'search') {
       // Reuses the real navbar button's own click handler (opens
       // #wdsPeopleSearchPop, closes the other navbar dropdowns, focuses the
@@ -3371,83 +3274,30 @@ function initWdsDial() {
 }
 
 // ---------------------------------------------------------------------
-// Desktop Nexus chat — a real, usable substitute for the mobile Nexus tab
-// when someone isn't on the app. Reuses the exact same .chat-row/.chat-bubble
-// markup and CSS as mobile chat (style.css "Public chat (Nexus)" section)
-// for visual parity, and posts/reacts/unsends as the real signed-in account
-// via wdsRemoteData.shareKey (see postChatMessage/setChatReaction/
-// unsendChatMessage's override params above). Image *display* is supported
-// (mirrors whatever's already on a message); image *upload* from the
-// desktop compose box is not implemented in this pass — text only.
-// ---------------------------------------------------------------------
-let wdsLastChatMessages = [];
-async function fetchChatSeenReceipts(roomKey) {
-  const { data, error } = await sb.from('chat_read_receipts').select('share_key, code_name, last_read_at').eq('room_key', roomKey);
-  if (error) throw error;
-  return data || [];
-}
-
-let wdsLastMarkReadAt = 0;
-// Throttled — called on every chat refresh (every 5s while polling) but
-// only actually writes at most once per ~15s, since the receipt only needs
-// to be roughly current, not to the second.
-async function wdsMaybeMarkChatRead() {
-  if (!wdsRemoteData || !wdsRemoteData.shareKey || !sbConfigured()) return;
-  const now = Date.now();
-  if (now - wdsLastMarkReadAt < 15000) return;
-  wdsLastMarkReadAt = now;
-  const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
-  try { await sb.rpc('mark_chat_read', { p_room_key: 'global', p_share_key: wdsRemoteData.shareKey, p_code_name: codeName }); }
-  catch (e) { /* best effort — seen-by row just won't reflect this session until next successful call */ }
-}
-
-async function refreshWdsChat() {
-  const listEl = document.getElementById('wdsChatList');
-  // Every poll fully rebuilds the list's innerHTML, which tears down and
-  // restarts any embedded YouTube/Facebook iframe mid-playback — a video
-  // would never make it to the end since chat polls every 5s. Skip this
-  // cycle entirely while one's showing; polling resumes once it scrolls
-  // away or the message list otherwise re-renders for another reason.
-  if (listEl && listEl.querySelector('.chat-video-embed iframe')) return;
-  if (wdsGuestMode) {
-    try {
-      if (!wdsGuestChatMessages) wdsGuestChatMessages = await fetchChatMessages();
-      renderWdsChatMessages(wdsGuestChatMessages, [], {});
-    } catch (e) {
-      listEl.innerHTML = '<p class="empty-note">Could not load chat.</p>';
-    }
-    return;
-  }
-  try {
-    const messages = await fetchChatMessages();
-    wdsLastChatMessages = messages;
-    const receipts = await fetchChatSeenReceipts('global').catch(() => []);
-    // Real photos on message rows and the "Seen by" row instead of always a
-    // letter circle — neither chat_messages nor chat_read_receipts carries
-    // an avatar column of its own, so this is a separate batch lookup
-    // covering every share_key either one references.
-    const avatarKeys = messages.map(m => m.sender_share_key).concat(receipts.map(r => r.share_key));
-    const avatarsByKey = avatarKeys.length ? await wdsFetchAvatarsByShareKey(avatarKeys) : {};
-    renderWdsChatMessages(messages, receipts, avatarsByKey);
-    renderWdsNotifications();
-    wdsMaybeMarkChatRead();
-  } catch (e) {
-    listEl.innerHTML = '<p class="empty-note">Could not load chat.</p>';
-  }
-}
-
-// ---------------------------------------------------------------------
 // Desktop Messenger-style chat — DMs and group chatrooms, layered on top
-// of the exact same backend the mobile app's group-chat feature uses
-// (see the module-level wdsChat* state declared near wdsRemoteData).
-// Global Chat itself is untouched by any of this.
+// of the exact same backend the mobile app's group-chat feature uses (see
+// the module-level wdsChat* state declared near wdsRemoteData). Nexus Com
+// (the public/global room, chat_messages.room_id IS NULL) is pinned as a
+// synthetic first entry here — see wdsNexusComPreview below and the
+// roomId === 'global' branches in wdsOpenChatPopup/wdsFetchRoomMessages/
+// the popup send handler.
 // ---------------------------------------------------------------------
+
+// Populated by refreshWdsChatRooms() from the latest chat_messages row
+// with room_id IS NULL, so the pinned Nexus Com thread entry has a real
+// preview/timestamp instead of always showing "No messages yet".
+let wdsNexusComPreview = { lastMessage: '', lastMessageAt: null };
 
 function wdsChatThreadList() {
-  return Object.entries(wdsChatRoomMeta)
+  const threads = Object.entries(wdsChatRoomMeta)
     .filter(([id, m]) => m.isDm || m.joinedByMe)
     .map(([id, m]) => Object.assign({ id }, m))
     .sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
+  const nexusEntry = {
+    id: 'global', name: 'Nexus Com', isDm: false, isNexusCom: true, avatarDataUrl: null,
+    lastMessage: wdsNexusComPreview.lastMessage, lastMessageAt: wdsNexusComPreview.lastMessageAt,
+  };
+  return [nexusEntry, ...threads];
 }
 function wdsIsRoomUnread(roomId, meta) {
   if (!meta.lastMessageAt) return false;
@@ -3458,6 +3308,24 @@ function wdsIsRoomUnread(roomId, meta) {
 async function refreshWdsChatRooms() {
   if (!wdsRemoteData) return;
   const myShareKey = wdsRemoteData.shareKey;
+  // Independent of the room-membership fetch below (and run even for a
+  // user with zero joined rooms) so the pinned Nexus Com entry always has
+  // a real preview — chat_messages with room_id IS NULL is the public
+  // room, readable by anon/guest same as any other public content.
+  try {
+    const { data: latestGlobal } = await sb.from('chat_messages')
+      .select('message, image_url, deleted, created_at')
+      .is('room_id', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (latestGlobal) {
+      wdsNexusComPreview = {
+        lastMessage: latestGlobal.deleted ? 'Message unsent' : (latestGlobal.image_url ? '📷 Photo' : latestGlobal.message),
+        lastMessageAt: latestGlobal.created_at,
+      };
+    }
+  } catch (e) { /* best effort — pinned entry just keeps its last known preview */ }
   try {
     // sb.rpc(...) isn't a plain Promise here — chaining .catch() directly
     // onto it threw synchronously ("catch is not a function") on every
@@ -3470,7 +3338,7 @@ async function refreshWdsChatRooms() {
     try { await sb.rpc('cleanup_stale_solo_rooms'); } catch (e) { /* best effort, opportunistic */ }
     const { data: memberRows } = await sb.from('chat_room_members').select('room_id, status').eq('share_key', myShareKey);
     const roomIds = (memberRows || []).map(r => r.room_id);
-    if (!roomIds.length) { wdsChatRoomMeta = {}; renderWdsChatListPanel(); return; }
+    if (!roomIds.length) { wdsChatRoomMeta = {}; renderWdsChatListPanel(); renderWdsNotifications(); return; }
 
     const { data: rooms } = await sb.from('chat_rooms').select('id, name, is_dm, created_by_key').in('id', roomIds);
     const dmRoomIds = (rooms || []).filter(r => r.is_dm).map(r => r.id);
@@ -3526,6 +3394,7 @@ async function refreshWdsChatRooms() {
     console.error('refreshWdsChatRooms failed:', e);
   }
   renderWdsChatListPanel();
+  renderWdsNotifications();
 }
 
 function renderWdsChatListPanel() {
@@ -3558,8 +3427,8 @@ function renderWdsChatListPanel() {
   listEl.innerHTML = pendingHtml + threads.map(t => {
     const unread = wdsIsRoomUnread(t.id, t);
     const initial = escapeHtml((t.name || '?').charAt(0).toUpperCase());
-    return `<div class="wds-chat-thread-item${unread ? ' is-unread' : ''}" data-room-id="${t.id}">
-      <div class="wds-chat-thread-avatar${t.isDm ? '' : ' wds-chat-thread-avatar--group'}"${wdsAvatarStyleAttr(t.avatarDataUrl)}>${t.avatarDataUrl ? '' : (t.isDm ? initial : '👥')}</div>
+    return `<div class="wds-chat-thread-item${unread ? ' is-unread' : ''}${t.isNexusCom ? ' wds-chat-thread-item--pinned' : ''}" data-room-id="${t.id}">
+      <div class="wds-chat-thread-avatar${t.isDm ? '' : ' wds-chat-thread-avatar--group'}"${wdsAvatarStyleAttr(t.avatarDataUrl)}>${t.isNexusCom ? '🌐' : (t.avatarDataUrl ? '' : (t.isDm ? initial : '👥'))}</div>
       <div class="wds-chat-thread-body">
         <div class="wds-chat-thread-name">${escapeHtml(t.name || 'Unknown')}${unread ? '<span class="wds-chat-thread-dot"></span>' : ''}</div>
         <div class="wds-chat-thread-preview">${escapeHtml(t.lastMessage || 'No messages yet')}</div>
@@ -3601,8 +3470,8 @@ function renderWdsMessengerInbox() {
   listEl.innerHTML = pendingHtml + threads.map(t => {
     const unread = wdsIsRoomUnread(t.id, t);
     const initial = escapeHtml((t.name || '?').charAt(0).toUpperCase());
-    return `<div class="wds-chat-thread-item${unread ? ' is-unread' : ''}" data-room-id="${t.id}">
-      <div class="wds-chat-thread-avatar${t.isDm ? '' : ' wds-chat-thread-avatar--group'}"${wdsAvatarStyleAttr(t.avatarDataUrl)}>${t.avatarDataUrl ? '' : (t.isDm ? initial : '👥')}</div>
+    return `<div class="wds-chat-thread-item${unread ? ' is-unread' : ''}${t.isNexusCom ? ' wds-chat-thread-item--pinned' : ''}" data-room-id="${t.id}">
+      <div class="wds-chat-thread-avatar${t.isDm ? '' : ' wds-chat-thread-avatar--group'}"${wdsAvatarStyleAttr(t.avatarDataUrl)}>${t.isNexusCom ? '🌐' : (t.avatarDataUrl ? '' : (t.isDm ? initial : '👥'))}</div>
       <div class="wds-chat-thread-body">
         <div class="wds-chat-thread-name">${escapeHtml(t.name || 'Unknown')}${unread ? '<span class="wds-chat-thread-dot"></span>' : ''}</div>
         <div class="wds-chat-thread-preview">${escapeHtml(t.lastMessage || 'No messages yet')}</div>
@@ -3703,6 +3572,22 @@ async function initMessengerShell() {
 }
 
 async function wdsFetchRoomMessages(roomId) {
+  // 'global' isn't a real chat_rooms.id (chat_messages.room_id is a uuid
+  // column, would throw on the literal string) -- fetchChatMessages()
+  // already resolves to the public room (room_id IS NULL) on this surface,
+  // since wellness never sets the mobile-only currentChatRoomId switcher.
+  if (roomId === 'global') {
+    // Guest sends are simulated purely in this local array (postChatMessage
+    // never writes them to Supabase) -- fetch once and keep reusing the
+    // same array so a guest's own just-sent message keeps showing up on
+    // every subsequent popup refresh instead of vanishing on the next
+    // real fetchChatMessages() call, which would never contain it.
+    if (wdsGuestMode) {
+      if (!wdsGuestChatMessages) wdsGuestChatMessages = await fetchChatMessages();
+      return wdsGuestChatMessages;
+    }
+    return fetchChatMessages();
+  }
   const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await sb.from('chat_messages')
     .select('id, code_name, message, image_url, created_at, deleted, sender_share_key')
@@ -3772,16 +3657,17 @@ async function wdsOpenChatPopup(roomId) {
   if (popup) popup.classList.remove('is-minimized');
   if (!popup) {
     wdsEvictOldestChatPopupIfNeeded(roomId);
-    const meta = wdsChatRoomMeta[roomId] || { name: 'Chat' };
+    const isNexusCom = roomId === 'global';
+    const meta = isNexusCom ? { name: 'Nexus Com', isDm: false, isNexusCom: true } : (wdsChatRoomMeta[roomId] || { name: 'Chat' });
     popup = document.createElement('div');
-    popup.className = 'wds-chat-popup';
+    popup.className = 'wds-chat-popup' + (isNexusCom ? ' wds-chat-popup--pinned' : '');
     popup.dataset.roomId = roomId;
     popup.innerHTML = `
       <div class="wds-chat-popup-head">
         <strong>${escapeHtml(meta.name || 'Chat')}</strong>
         <button type="button" class="wds-chat-popup-minimize" data-minimize-popup="${roomId}" aria-label="Minimize" title="Minimize">–</button>
         <button type="button" class="wds-chat-popup-close" data-close-popup="${roomId}" aria-label="Close" title="Close">✕</button>
-        <span class="wds-chat-popup-head-avatar"${wdsAvatarStyleAttr(meta.avatarDataUrl)}>${meta.avatarDataUrl ? '' : escapeHtml((meta.name || '?').trim().charAt(0).toUpperCase())}</span>
+        <span class="wds-chat-popup-head-avatar"${wdsAvatarStyleAttr(meta.avatarDataUrl)}>${isNexusCom ? '🌐' : (meta.avatarDataUrl ? '' : escapeHtml((meta.name || '?').trim().charAt(0).toUpperCase()))}</span>
       </div>
       <div class="wds-chat-popup-list"><p class="empty-note">Loading…</p></div>
       <div class="wds-chat-popup-pending-image" hidden data-popup-pending-image="${roomId}">
@@ -3880,7 +3766,12 @@ function wdsWireChatPopups() {
       if (fileInput) fileInput.value = '';
       wdsChatPopupLastActive[roomId] = Date.now();
       try {
-        await postChatMessage(text, image, wdsRemoteData.shareKey, codeName, roomId);
+        // roomIdOverride must be genuinely omitted (not null) for Nexus
+        // Com specifically -- postChatMessage's guest-mode simulated-send
+        // branch only triggers when roomIdOverride === undefined, same
+        // contract Nexus Com's own compose box always relied on.
+        if (roomId === 'global') await postChatMessage(text, image, wdsRemoteData.shareKey, codeName);
+        else await postChatMessage(text, image, wdsRemoteData.shareKey, codeName, roomId);
         await wdsRefreshChatPopup(roomId);
         await refreshWdsChatRooms();
       } catch (err) { console.error('Popup send failed:', err); }
@@ -3927,8 +3818,8 @@ function renderWdsChatContactRail() {
   rail.innerHTML = threads.map(t => {
     const unread = wdsIsRoomUnread(t.id, t);
     const initial = escapeHtml((t.name || '?').charAt(0).toUpperCase());
-    return `<div class="wds-chat-contact-avatar is-open"${wdsAvatarStyleAttr(t.avatarDataUrl)} data-room-id="${t.id}" title="${escapeHtml(t.name || 'Chat')}">
-      ${t.avatarDataUrl ? '' : (t.isDm ? initial : '👥')}${unread ? '<span class="wds-chat-thread-dot"></span>' : ''}
+    return `<div class="wds-chat-contact-avatar is-open${t.isNexusCom ? ' wds-chat-contact-avatar--pinned' : ''}"${wdsAvatarStyleAttr(t.avatarDataUrl)} data-room-id="${t.id}" title="${escapeHtml(t.name || 'Chat')}">
+      ${t.isNexusCom ? '🌐' : (t.avatarDataUrl ? '' : (t.isDm ? initial : '👥'))}${unread ? '<span class="wds-chat-thread-dot"></span>' : ''}
       <button type="button" class="wds-chat-contact-avatar-close" data-close-rail="${t.id}" aria-label="Close chat" title="Close">✕</button>
     </div>`;
   }).join('');
@@ -4117,12 +4008,12 @@ function renderWdsNotifications() {
     wdsPushNotification('consistency', 'Consistency', `You've hit your logging target this cycle (${mp.completeCount}/${mp.target}).`);
   }
 
-  const lastSeen = localStorage.getItem('wft_web_nexus_last_seen');
-  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
-  const unread = wdsLastChatMessages.filter(m =>
-    !m.deleted && m.sender_share_key !== myShareKey && (!lastSeen || new Date(m.created_at) > new Date(lastSeen))
-  );
-  if (unread.length) wdsPushNotification('chat-unread', 'Nexus', `${unread.length} new message${unread.length === 1 ? '' : 's'} in Global Chat.`);
+  // Nexus Com is pinned in the same Chats list/unread-tracking as every
+  // other thread now — reuse wdsIsRoomUnread/wdsChatLastRead['global']
+  // instead of a separate message-array + last-seen-timestamp check.
+  if (wdsIsRoomUnread('global', { lastMessageAt: wdsNexusComPreview.lastMessageAt })) {
+    wdsPushNotification('chat-unread', 'Nexus', 'New messages in Nexus Com.');
+  }
 
   const history = wdsLoadNotifHistory();
   const unreadCount = history.filter(n => !n.read).length;
@@ -4160,145 +4051,6 @@ function wdsExtractVideoEmbed(text) {
   return '';
 }
 
-function renderWdsChatMessages(messages, receipts, avatarsByKey) {
-  avatarsByKey = avatarsByKey || {};
-  const list = document.getElementById('wdsChatList');
-  list.innerHTML = '';
-  if (!messages.length) { list.innerHTML = '<p class="empty-note">No messages yet. Say hi!</p>'; return; }
-  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
-  messages.forEach(m => {
-    // Ownership by share_key (the real signed-in identity), not code_name —
-    // more correct than the mobile render's name-based check for this
-    // purpose, since two people could share a display name. Compared
-    // case-insensitively/trimmed — a UUID is logically the same value
-    // regardless of casing, but a strict === would treat two differently-
-    // cased representations of the same key as different senders.
-    const isOwn = !!myShareKey && String(m.sender_share_key).trim().toLowerCase() === String(myShareKey).trim().toLowerCase();
-    const row = document.createElement('div');
-    row.className = 'chat-row ' + (isOwn ? 'chat-row--own' : 'chat-row--other');
-    const time = new Date(m.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-    const senderPhoto = avatarsByKey[m.sender_share_key];
-    const avatarHtml = !isOwn ? `<span class="wds-chat-msg-avatar" data-dm-name="${escapeHtml(m.code_name || 'Anonymous')}" data-dm-key="${escapeHtml(m.sender_share_key || '')}"${wdsAvatarStyleAttr(senderPhoto)}>${senderPhoto ? '' : escapeHtml((m.code_name || '?').charAt(0).toUpperCase())}</span>` : '';
-    const nameHtml = !isOwn ? `<div class="chat-name-row">${avatarHtml}<span class="chat-name" data-dm-name="${escapeHtml(m.code_name || 'Anonymous')}" data-dm-key="${escapeHtml(m.sender_share_key || '')}" style="cursor:pointer;">${escapeHtml(m.code_name || 'Anonymous')}</span></div>` : '';
-    const myReaction = (m.reactions || []).find(r => r.share_key === myShareKey);
-    const imageHtml = (!m.deleted && m.image_url) ? `<img class="chat-msg-image" src="${m.image_url}" alt="Shared photo" data-lightbox="${m.image_url}">` : '';
-    const videoHtml = m.deleted ? '' : wdsExtractVideoEmbed(m.message);
-    const bubbleInner = m.deleted
-      ? `<span class="chat-msg chat-msg-unsent">Unsent a message</span>`
-      : `${imageHtml}<span class="chat-msg">${escapeHtml(m.message)}</span>${videoHtml}`;
-    const counts = aggregateReactions(m.reactions);
-    const totalReactions = (m.reactions || []).length;
-    const reactionsHtml = Object.keys(counts).length
-      ? `<div class="chat-reactions"><span class="chat-reaction-pill${myReaction ? ' is-mine' : ''}">${Object.keys(counts).join('')}${totalReactions > 1 ? ' ' + totalReactions : ''}</span></div>`
-      : '';
-    const bubbleClass = 'chat-bubble' + (imageHtml ? ' chat-bubble--has-image' : videoHtml ? ' chat-bubble--has-video' : '');
-    row.innerHTML = `${nameHtml}<div class="chat-bubble-line"><div class="${bubbleClass}" data-msg-id="${m.id}" data-deleted="${m.deleted ? 1 : 0}" data-own="${isOwn ? 1 : 0}" data-my-reaction="${myReaction ? myReaction.emoji : ''}">${bubbleInner}${reactionsHtml}</div><span class="chat-time">${time}</span></div>`;
-    list.appendChild(row);
-  });
-  list.querySelectorAll('[data-lightbox]').forEach(img => img.addEventListener('click', e => {
-    e.stopPropagation();
-    window.open(img.dataset.lightbox, '_blank', 'noopener');
-  }));
-
-  // "Seen by" row — Messenger-group-chat style, only under the most recent
-  // non-unsent message, only the people who've read AT OR AFTER it was
-  // sent (and excluding its own sender).
-  const lastMsg = messages.slice().reverse().find(m => !m.deleted);
-  if (lastMsg && receipts && receipts.length) {
-    const seenBy = receipts.filter(r =>
-      r.share_key !== lastMsg.sender_share_key && new Date(r.last_read_at) >= new Date(lastMsg.created_at)
-    );
-    if (seenBy.length) {
-      const seenRow = document.createElement('div');
-      seenRow.className = 'wds-chat-seen-row';
-      seenRow.innerHTML = seenBy.slice(0, 8).map(r => {
-        const photo = avatarsByKey[r.share_key];
-        return `<span class="wds-chat-seen-avatar" title="Seen by ${escapeHtml(r.code_name || '?')}"${wdsAvatarStyleAttr(photo)}>${photo ? '' : escapeHtml((r.code_name || '?').charAt(0).toUpperCase())}</span>`;
-      }).join('');
-      list.appendChild(seenRow);
-    }
-  }
-
-  list.scrollTop = list.scrollHeight;
-}
-
-let wdsChatReactionTargetId = null;
-
-function wdsCloseChatReactionMenu() {
-  const menu = document.getElementById('wdsChatReactionMenu');
-  if (menu) menu.hidden = true;
-  wdsChatReactionTargetId = null;
-}
-
-function wdsOpenChatReactionMenu(bubble, x, y) {
-  const menu = document.getElementById('wdsChatReactionMenu');
-  if (!menu) return;
-  const messageId = Number(bubble.dataset.msgId);
-  const isOwn = bubble.dataset.own === '1';
-  const myReaction = bubble.dataset.myReaction || '';
-  wdsChatReactionTargetId = messageId;
-  const emojiRow = `<div class="chat-reaction-emoji-row">${QUICK_REACTIONS.map(e =>
-    `<button type="button" class="chat-reaction-emoji-btn${myReaction === e ? ' is-active' : ''}" data-emoji="${e}">${e}</button>`
-  ).join('')}</div>`;
-  const unsendBtn = isOwn ? `<button type="button" class="chat-room-menu-item chat-room-menu-item--danger" id="btnWdsUnsendChat">Unsend</button>` : '';
-  menu.innerHTML = emojiRow + unsendBtn;
-  menu.hidden = false;
-  const menuWidth = 240;
-  menu.style.left = Math.max(8, Math.min(x, window.innerWidth - menuWidth - 12)) + 'px';
-  menu.style.top = Math.max(8, Math.min(y, window.innerHeight - 140)) + 'px';
-}
-
-// Press-and-hold (mousedown, same as mobile's touch long-press) or
-// double-click a bubble to react/unsend — event-delegated on the list
-// container so it survives every renderWdsChatMessages() re-render.
-function wdsBindChatReactions(list) {
-  const HOLD_MS = 450;
-  let pressTimer = null;
-  const start = (bubble, x, y) => {
-    if (bubble.dataset.deleted === '1') return;
-    pressTimer = setTimeout(() => { pressTimer = null; wdsOpenChatReactionMenu(bubble, x, y); }, HOLD_MS);
-  };
-  const cancel = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } };
-  list.addEventListener('mousedown', e => {
-    const bubble = e.target.closest('.chat-bubble');
-    if (!bubble) return;
-    start(bubble, e.clientX, e.clientY);
-  });
-  list.addEventListener('mouseup', cancel);
-  list.addEventListener('mouseleave', cancel);
-  list.addEventListener('dblclick', e => {
-    const bubble = e.target.closest('.chat-bubble');
-    if (!bubble || bubble.dataset.deleted === '1') return;
-    wdsOpenChatReactionMenu(bubble, e.clientX, e.clientY);
-  });
-}
-
-function initWdsChatReactionMenu() {
-  const list = document.getElementById('wdsChatList');
-  const menu = document.getElementById('wdsChatReactionMenu');
-  if (!list || !menu) return;
-  wdsBindChatReactions(list);
-  menu.addEventListener('click', e => {
-    const shareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
-    const emojiBtn = e.target.closest('.chat-reaction-emoji-btn');
-    if (emojiBtn) {
-      const isActive = emojiBtn.classList.contains('is-active');
-      const messageId = wdsChatReactionTargetId;
-      wdsCloseChatReactionMenu();
-      setChatReaction(messageId, isActive ? null : emojiBtn.dataset.emoji, shareKey, refreshWdsChat);
-      return;
-    }
-    if (e.target.id === 'btnWdsUnsendChat') {
-      const messageId = wdsChatReactionTargetId;
-      wdsCloseChatReactionMenu();
-      unsendChatMessage(messageId, shareKey, refreshWdsChat);
-    }
-  });
-  document.addEventListener('click', e => {
-    if (!menu.hidden && !menu.contains(e.target) && !e.target.closest('.chat-bubble')) wdsCloseChatReactionMenu();
-  });
-}
-
 let wdsChatPollId = null;
 // refreshWdsChatRooms is what actually populates wdsChatRoomMeta (and so
 // the navbar chat badge's unread count) -- it used to only ever run when
@@ -4306,12 +4058,12 @@ let wdsChatPollId = null;
 // was closed never showed the green dot until AFTER opening it once (which
 // then made it look like the dot only appears retroactively). Not just a
 // polling-interval delay -- without this, there was no polling for it at
-// all. refreshWdsChat (Nexus Com's own messages) is a separate concern,
-// polled the same 5s cadence for simplicity.
+// all. Also refreshes Nexus Com's pinned-entry preview (wdsNexusComPreview),
+// same 5s cadence, since it's the same function now.
 function startWdsChatPolling() {
   stopWdsChatPolling();
   refreshWdsChatRooms();
-  wdsChatPollId = setInterval(() => { refreshWdsChat(); refreshWdsChatRooms(); }, 5000);
+  wdsChatPollId = setInterval(() => { refreshWdsChatRooms(); }, 5000);
 }
 function stopWdsChatPolling() {
   if (wdsChatPollId) { clearInterval(wdsChatPollId); wdsChatPollId = null; }
@@ -4664,9 +4416,9 @@ const wdsFeedExpandedReplies = new Set();
 async function refreshWdsFeed(force) {
   const listEl = document.getElementById('wdsFeedList');
   if (!listEl) return;
-  // Same reasoning as refreshWdsChat's guard above — a poll-triggered
-  // rebuild would restart any playing video embed from scratch, which is
-  // exactly why a shared video never finished playing before this fix.
+  // A poll-triggered rebuild would restart any playing video embed from
+  // scratch, which is exactly why a shared video never finished playing
+  // before this fix.
   // But that's only the right tradeoff for a PASSIVE poll — an explicit
   // action (liking, commenting, sharing, posting) needs its own result to
   // actually show up, so every one of those call sites passes force=true
@@ -5592,9 +5344,9 @@ function initWdsFeed() {
 // Facebook-style reaction picker for feed posts/comments — press-and-hold
 // (or double-click) a Like button to choose a specific reaction; a plain
 // quick click applies the default 👍 (handled in initWdsFeed's click
-// delegation above). Mirrors wdsBindChatReactions/wdsOpenChatReactionMenu
-// exactly, just targeting [data-action="like"/"like-comment"] instead of
-// .chat-bubble, and its own #wdsFeedReactionMenu popover.
+// delegation above). Press-and-hold/double-click pattern, targeting
+// [data-action="like"/"like-comment"], with its own #wdsFeedReactionMenu
+// popover.
 let wdsFeedReactionTarget = null; // { type: 'post'|'comment', id }
 let wdsFeedJustLongPressed = false;
 const WDS_LIKE_CLICK_DELAY_MS = 280;
