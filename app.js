@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.5.3';
+const APP_VERSION = 'WF_SYS_V.1.5.4';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -166,6 +166,19 @@ function initDesktopShell() {
   let wdsInitialRouteChecked = false;
   let wdsPushResubscribeChecked = false;
 
+  // Feeds wdsRestoreLastView (see its own comment, near wdsHideProfilePage)
+  // — only saves feed scroll position while actually ON the feed (a
+  // profile page open has its own save point in wdsShowProfilePage/
+  // wdsHideProfilePage instead), debounced so a scroll doesn't hit
+  // localStorage on every frame.
+  let wdsScrollSaveTimer = null;
+  window.addEventListener('scroll', () => {
+    const profilePage = document.getElementById('wdsProfilePage');
+    if (profilePage && !profilePage.hidden) return;
+    clearTimeout(wdsScrollSaveTimer);
+    wdsScrollSaveTimer = setTimeout(() => wdsSaveLastView({ type: 'feed', scrollY: window.scrollY }), 400);
+  }, { passive: true });
+
   // A photo shared into FT via Android's share sheet lands here as
   // ?shared-image=<public URL>&shared-dest=feed|myday (see FT's own
   // initShareTargetHandling, which uploads the shared photo and hands off
@@ -270,6 +283,7 @@ function initDesktopShell() {
       wdsInitialRouteChecked = true;
       const path = location.pathname.replace(/^\/|\/$/g, '');
       if (path && path.toUpperCase() === cleanId.toUpperCase()) wdsShowProfilePage();
+      else wdsRestoreLastView();
     }
     startWdsDashboardPolling();
     startWdsChatPolling();
@@ -356,6 +370,7 @@ function initDesktopShell() {
     const banner = document.getElementById('wdsGuestBanner');
     if (banner) banner.hidden = false;
     applyWdsPendingShareIfAny();
+    if (!wdsInitialRouteChecked) { wdsInitialRouteChecked = true; wdsRestoreLastView(); }
   };
   if (guestLoginBtn) guestLoginBtn.addEventListener('click', enterGuestDashboard);
 
@@ -1296,7 +1311,9 @@ function initDesktopShell() {
     } catch (e) {
       console.error('wdsSendFriendRequest failed:', e);
       viewedAddFriendBtn.disabled = false;
+      const msg = (e && e.message) || 'Could not send — try again';
       viewedAddFriendBtn.textContent = 'Could not send — try again';
+      showRestToast(msg);
       setTimeout(() => { if (viewedAddFriendBtn.textContent === 'Could not send — try again') viewedAddFriendBtn.textContent = '+ Add Friend'; }, 3000);
     }
   });
@@ -3991,9 +4008,18 @@ function initWdsChatReactionMenu() {
 }
 
 let wdsChatPollId = null;
+// refreshWdsChatRooms is what actually populates wdsChatRoomMeta (and so
+// the navbar chat badge's unread count) -- it used to only ever run when
+// the chat dropdown was clicked open, so a message that arrived while it
+// was closed never showed the green dot until AFTER opening it once (which
+// then made it look like the dot only appears retroactively). Not just a
+// polling-interval delay -- without this, there was no polling for it at
+// all. refreshWdsChat (Nexus Com's own messages) is a separate concern,
+// polled the same 5s cadence for simplicity.
 function startWdsChatPolling() {
   stopWdsChatPolling();
-  wdsChatPollId = setInterval(refreshWdsChat, 5000);
+  refreshWdsChatRooms();
+  wdsChatPollId = setInterval(() => { refreshWdsChat(); refreshWdsChatRooms(); }, 5000);
 }
 function stopWdsChatPolling() {
   if (wdsChatPollId) { clearInterval(wdsChatPollId); wdsChatPollId = null; }
@@ -5008,6 +5034,7 @@ async function wdsShowProfilePage(targetShareKey) {
   if (isOwn) await refreshWdsPendingFriendRequestsList();
   else await wdsRefreshViewedProfileFriendButton(targetShareKey);
   renderWdsProfileVisuals();
+  wdsSaveLastView({ type: 'profile', shareKey: isOwn ? 'own' : targetShareKey });
 }
 // Sets the "+ Add Friend" button's actual state (none/pending/already
 // friends/declined) against the real friendships row for this exact pair,
@@ -5041,6 +5068,33 @@ function wdsHideProfilePage() {
   const page = document.getElementById('wdsProfilePage');
   if (page) page.hidden = true;
   wdsViewedProfile = null;
+  wdsSaveLastView({ type: 'feed', scrollY: window.scrollY });
+}
+
+// Pull-to-refresh (and any other full page reload) wipes all JS state by
+// definition, so "stay on the same page after a refresh" has to work by
+// continuously persisting where you are, then restoring it on the next
+// boot -- there's no event to intercept the native gesture itself. Takes
+// priority-loses to the explicit /<DigitalID> deep-link check in
+// enterDashboard (an intentional bookmark/share always wins), and only
+// ever applied once per sign-in via wdsInitialRouteChecked, same guard as
+// that deep-link check, so a later 2-minute poll refresh can't yank the
+// page back to a stale saved position.
+const WDS_LAST_VIEW_KEY = 'wft_web_last_view';
+function wdsSaveLastView(view) {
+  try { localStorage.setItem(WDS_LAST_VIEW_KEY, JSON.stringify(view)); } catch (e) { /* best effort */ }
+}
+function wdsRestoreLastView() {
+  let saved;
+  try { saved = JSON.parse(localStorage.getItem(WDS_LAST_VIEW_KEY)); } catch (e) { return; }
+  if (!saved) return;
+  if (saved.type === 'profile' && saved.shareKey) {
+    wdsShowProfilePage(saved.shareKey === 'own' ? undefined : saved.shareKey);
+  } else if (saved.type === 'feed' && saved.scrollY) {
+    // Feed posts/dashboard tiles need a moment to actually render before
+    // there's anything at that height to scroll to.
+    setTimeout(() => window.scrollTo(0, saved.scrollY), 300);
+  }
 }
 
 // Cosmetic/shareable URL only — wellness.winfinityfitness.com is a static
