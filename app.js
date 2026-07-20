@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.1';
+const APP_VERSION = 'WF_SYS_V.1.7.2';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1308,10 +1308,31 @@ function initDesktopShell() {
     if (!ok) setTimeout(() => { if (viewedMessageBtn.textContent === 'Could not open — try again') viewedMessageBtn.textContent = '💬 Message'; }, 3000);
   });
 
-  // Own-profile action row — only shown when wdsViewedProfile is null
-  // (renderWdsProfileHeader toggles this).
-  const addStoryBtn = document.getElementById('btnWdsProfileAddStory');
-  if (addStoryBtn) addStoryBtn.addEventListener('click', openStoryComposerForNewStory);
+  // Avatar "+" badge — only shown on your own profile (renderWdsProfileHeader
+  // toggles this) — opens a tiny 2-item menu instead of a single fixed
+  // action, since it now covers both Add Story and the new Add Shout.
+  const avatarAddBtn = document.getElementById('btnWdsProfileAvatarAdd');
+  const avatarAddMenu = document.getElementById('wdsProfileAvatarAddMenu');
+  if (avatarAddBtn && avatarAddMenu) {
+    avatarAddBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      avatarAddMenu.hidden = !avatarAddMenu.hidden;
+    });
+    document.getElementById('btnWdsProfileAvatarAddStory').addEventListener('click', () => {
+      avatarAddMenu.hidden = true;
+      openStoryComposerForNewStory();
+    });
+    document.getElementById('btnWdsProfileAvatarAddShout').addEventListener('click', () => {
+      avatarAddMenu.hidden = true;
+      wdsOpenShoutComposer();
+    });
+    document.addEventListener('click', e => {
+      if (!avatarAddMenu.hidden && !avatarAddMenu.contains(e.target) && e.target !== avatarAddBtn) {
+        avatarAddMenu.hidden = true;
+      }
+    });
+  }
+  initWdsShoutComposer();
 
   // Who-can-post-on-my-wall — only visible/enabled on your own profile
   // (renderWdsProfileHeader hides it when wdsViewedProfile is set).
@@ -1558,7 +1579,6 @@ function initDesktopShell() {
     if (closeBtn) {
       e.stopPropagation();
       const roomId = closeBtn.dataset.closeRail;
-      wdsDismissedRailIds.add(String(roomId));
       wdsCloseChatPopup(roomId);
       renderWdsChatContactRail();
       return;
@@ -4731,6 +4751,9 @@ let wdsProfileManageMode = false;
 // whichever other operator's name/avatar was clicked.
 let wdsViewedProfile = null;
 let wdsOwnWallPermission = 'friends';
+// Own profile's current Shout text — mirrors wdsViewedProfile.shoutText for
+// the signed-in operator's own profile, since wdsViewedProfile is null there.
+let wdsOwnShoutText = null;
 
 function renderWdsProfilePosts() {
   const list = document.getElementById('wdsProfilePostsList');
@@ -4809,8 +4832,9 @@ function renderWdsProfileHeader() {
   if (coverEditBtn) coverEditBtn.hidden = !isOwn;
   const viewedActionsEl = document.getElementById('wdsProfileViewedActions');
   if (viewedActionsEl) viewedActionsEl.hidden = isOwn;
-  const ownActionsEl = document.getElementById('wdsProfileOwnActions');
-  if (ownActionsEl) ownActionsEl.hidden = !isOwn;
+  const avatarAddBtnEl = document.getElementById('btnWdsProfileAvatarAdd');
+  if (avatarAddBtnEl) avatarAddBtnEl.hidden = !isOwn;
+  wdsRenderShoutBubble(isOwn ? wdsOwnShoutText : (wdsViewedProfile ? wdsViewedProfile.shoutText : null));
   const wallPermissionLabel = document.getElementById('wdsWallPermissionLabel');
   if (wallPermissionLabel) wallPermissionLabel.hidden = !isOwn;
   const manageBtn = document.getElementById('btnWdsProfileManage');
@@ -4854,6 +4878,64 @@ function renderWdsProfileHeader() {
   }
 }
 
+function wdsRenderShoutBubble(text) {
+  const bubble = document.getElementById('wdsProfileShoutBubble');
+  if (!bubble) return;
+  if (text) { bubble.textContent = text; bubble.hidden = false; }
+  else { bubble.textContent = ''; bubble.hidden = true; }
+}
+
+function wdsOpenShoutComposer() {
+  const overlay = document.getElementById('wdsShoutComposerOverlay');
+  const input = document.getElementById('wdsShoutInput');
+  const errorEl = document.getElementById('wdsShoutError');
+  const clearBtn = document.getElementById('btnWdsShoutClear');
+  if (!overlay || !input) return;
+  input.value = wdsOwnShoutText || '';
+  document.getElementById('wdsShoutCharCount').textContent = `${input.value.length} / 60`;
+  if (errorEl) errorEl.hidden = true;
+  if (clearBtn) clearBtn.hidden = !wdsOwnShoutText;
+  overlay.hidden = false;
+  input.focus();
+}
+
+function initWdsShoutComposer() {
+  const overlay = document.getElementById('wdsShoutComposerOverlay');
+  const input = document.getElementById('wdsShoutInput');
+  const charCount = document.getElementById('wdsShoutCharCount');
+  const errorEl = document.getElementById('wdsShoutError');
+  const postBtn = document.getElementById('btnWdsShoutPost');
+  const clearBtn = document.getElementById('btnWdsShoutClear');
+  const closeBtn = document.getElementById('btnWdsShoutComposerClose');
+  if (!overlay || !input || !postBtn) return;
+  const close = () => { overlay.hidden = true; };
+  if (closeBtn) closeBtn.addEventListener('click', close);
+  bindOverlayBackdropClose(overlay, close);
+  input.addEventListener('input', () => { charCount.textContent = `${input.value.length} / 60`; });
+  const submit = async (text) => {
+    if (!wdsRemoteData) return;
+    postBtn.disabled = true;
+    if (errorEl) errorEl.hidden = true;
+    try {
+      const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
+      const { error } = await sb.rpc('set_leaderboard_shout', {
+        p_share_key: wdsRemoteData.shareKey, p_shout_text: text,
+        p_code_name: codeName, p_public_id: wdsRemoteData.publicId,
+      });
+      if (error) throw error;
+      wdsOwnShoutText = text ? text.trim() : null;
+      wdsRenderShoutBubble(wdsOwnShoutText);
+      close();
+    } catch (e) {
+      if (errorEl) { errorEl.textContent = (e && e.message) || 'Could not save — try again.'; errorEl.hidden = false; }
+    } finally {
+      postBtn.disabled = false;
+    }
+  };
+  postBtn.addEventListener('click', () => submit(input.value));
+  if (clearBtn) clearBtn.addEventListener('click', () => submit(''));
+}
+
 // Same gauge/chart visuals as the dashboard's own Status tab — reuses
 // getModeProgress()/computeTrendSeries() unchanged, just writes into the
 // Profile Page's own wdsProfile*-prefixed element ids so it doesn't
@@ -4878,6 +4960,7 @@ async function refreshWdsProfilePosts() {
     const shareKey = wdsViewedProfile ? wdsViewedProfile.shareKey : wdsRemoteData.shareKey;
     wdsProfilePostsCache = await fetchFeedPostsByUser(shareKey);
     renderWdsProfilePosts();
+    if (wdsProfileActiveTab === 'photos') renderWdsProfilePhotosGrid();
   } catch (e) {
     listEl.innerHTML = '<p class="empty-note">Could not load posts.</p>';
   }
@@ -4888,6 +4971,10 @@ async function refreshWdsProfilePosts() {
 // public_id lookup + the new avatar_data_url column for the "profile
 // photo" the user asked the friends list to show.
 // ---------------------------------------------------------------------
+// Cached from the same fetch that populates the sidebar list, so the
+// dedicated Friends tab grid (renderWdsProfileFriendsGrid) can render
+// without a second round-trip.
+let wdsProfileFriendsCache = [];
 async function refreshWdsFriendsList(targetShareKey) {
   const listEl = document.getElementById('wdsProfileFriendsList');
   if (!listEl || !wdsRemoteData) return;
@@ -4895,6 +4982,8 @@ async function refreshWdsFriendsList(targetShareKey) {
   try {
     const { data, error } = await sb.rpc('list_friends', { p_share_key: shareKey });
     if (error) throw error;
+    wdsProfileFriendsCache = data || [];
+    if (wdsProfileActiveTab === 'friends') renderWdsProfileFriendsGrid();
     // The Add Friend button's own state (none/pending/friends) is handled
     // separately by wdsRefreshViewedProfileFriendButton — this used to also
     // reset it here based only on "are we already friends," which fired on
@@ -4911,6 +5000,71 @@ async function refreshWdsFriendsList(targetShareKey) {
     listEl.innerHTML = '<p class="empty-note">Could not load friends.</p>';
   }
 }
+
+function renderWdsProfileFriendsGrid() {
+  const grid = document.getElementById('wdsProfileFriendsGrid');
+  if (!grid) return;
+  if (!wdsProfileFriendsCache.length) { grid.innerHTML = '<p class="empty-note">No friends yet.</p>'; return; }
+  grid.innerHTML = wdsProfileFriendsCache.map(f => `
+    <div class="wds-profile-friend-card" data-view-profile="${escapeHtml(f.share_key)}">
+      <span class="wds-profile-friend-avatar"${f.avatar_data_url ? ` style="background-image:url(${escapeHtml(f.avatar_data_url)});"` : ''}>${f.avatar_data_url ? '' : escapeHtml((f.code_name || '?').charAt(0).toUpperCase())}</span>
+      <span class="wds-profile-friend-name">${escapeHtml(f.code_name || 'Unknown')}</span>
+    </div>`).join('');
+}
+
+// Every image from this profile's own posts (wdsProfilePostsCache, already
+// fetched by refreshWdsProfilePosts) newest-first — no albums/tagging
+// sub-tabs since this app has no data model backing either.
+function renderWdsProfilePhotosGrid() {
+  const grid = document.getElementById('wdsProfilePhotosGrid');
+  if (!grid) return;
+  const images = [];
+  wdsProfilePostsCache.forEach(p => {
+    if (p.deleted) return;
+    if (p.image_urls && p.image_urls.length) images.push(...p.image_urls);
+    else if (p.image_url) images.push(p.image_url);
+  });
+  if (!images.length) { grid.innerHTML = '<p class="empty-note">No photos yet.</p>'; return; }
+  grid.innerHTML = images.map(url =>
+    `<div class="wds-profile-photo-tile" data-lightbox="${escapeHtml(url)}"><img src="${escapeHtml(url)}" alt="" loading="lazy"></div>`
+  ).join('');
+}
+
+let wdsProfileActiveTab = 'all';
+function wdsSwitchProfileTab(tab) {
+  wdsProfileActiveTab = tab;
+  const tabsEl = document.getElementById('wdsProfileTabs');
+  if (tabsEl) tabsEl.querySelectorAll('[data-profile-tab]').forEach(btn => {
+    btn.classList.toggle('is-active', btn.dataset.profileTab === tab);
+  });
+  const allEl = document.getElementById('wdsProfileTabAll');
+  const photosEl = document.getElementById('wdsProfileTabPhotos');
+  const friendsEl = document.getElementById('wdsProfileTabFriends');
+  if (allEl) allEl.hidden = tab !== 'all';
+  if (photosEl) photosEl.hidden = tab !== 'photos';
+  if (friendsEl) friendsEl.hidden = tab !== 'friends';
+  if (tab === 'photos') renderWdsProfilePhotosGrid();
+  else if (tab === 'friends') renderWdsProfileFriendsGrid();
+}
+function initWdsProfileTabs() {
+  const tabsEl = document.getElementById('wdsProfileTabs');
+  if (!tabsEl) return;
+  tabsEl.addEventListener('click', e => {
+    const btn = e.target.closest('[data-profile-tab]');
+    if (btn) wdsSwitchProfileTab(btn.dataset.profileTab);
+  });
+  const photosGrid = document.getElementById('wdsProfilePhotosGrid');
+  if (photosGrid) photosGrid.addEventListener('click', e => {
+    const img = e.target.closest('[data-lightbox]');
+    if (img) openChatLightbox(img.dataset.lightbox);
+  });
+  const friendsGrid = document.getElementById('wdsProfileFriendsGrid');
+  if (friendsGrid) friendsGrid.addEventListener('click', e => {
+    const card = e.target.closest('[data-view-profile]');
+    if (card) wdsOpenOtherProfile(card.dataset.viewProfile);
+  });
+}
+initWdsProfileTabs();
 
 // Own-profile-only, always-visible pending-requests list — see the
 // comment on #wdsPendingFriendRequestsList in index.html for why this
@@ -5067,7 +5221,17 @@ async function wdsShowProfilePage(targetShareKey) {
     if (!isOwn) return;
     wdsViewedProfile = null;
   }
+  // Shout — public/anon-readable straight off leaderboard, same trust
+  // model as avatar_data_url/code_name there; no RPC needed for a read.
+  try {
+    const shoutShareKey = isOwn ? wdsRemoteData.shareKey : targetShareKey;
+    const { data: shoutRow } = await sb.from('leaderboard').select('shout_text').eq('share_key', shoutShareKey).maybeSingle();
+    const shoutText = (shoutRow && shoutRow.shout_text) || null;
+    if (isOwn) wdsOwnShoutText = shoutText;
+    else if (wdsViewedProfile) wdsViewedProfile.shoutText = shoutText;
+  } catch (e) { /* best effort — bubble just stays hidden */ }
   page.hidden = false;
+  wdsSwitchProfileTab('all');
   renderWdsProfileHeader();
   await refreshWdsProfilePosts();
   await refreshWdsFriendsList(isOwn ? null : targetShareKey);

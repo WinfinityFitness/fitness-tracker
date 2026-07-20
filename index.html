@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.1">
+<link rel="stylesheet" href="style.css?v=1.7.2">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3805,6 +3805,29 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
     </div>
   </div>
 
+  <!-- Shout composer — short (60-char) status bubble shown above the
+       profile avatar, opened from the avatar's own "+" badge menu.
+       Persistent (no expiry) unlike Stories; Clear only shows once a
+       shout is already set (see initWdsShoutComposer's open()). -->
+  <div class="wds-story-overlay" id="wdsShoutComposerOverlay" hidden>
+    <div class="wds-story-modal">
+      <div class="wds-story-modal-head">
+        <strong>Add Shout</strong>
+        <button type="button" class="wds-icon-btn" id="btnWdsShoutComposerClose" aria-label="Close">✕</button>
+      </div>
+      <label class="field">
+        <span>What's on your mind? (max 60 characters)</span>
+        <textarea id="wdsShoutInput" rows="2" maxlength="60" placeholder="e.g. Leg day 💪"></textarea>
+      </label>
+      <p class="hint hint--sm" id="wdsShoutCharCount">0 / 60</p>
+      <div class="wds-composer-actions">
+        <button type="button" class="wds-composer-action-btn wds-composer-action-btn--danger" id="btnWdsShoutClear" hidden>Clear Shout</button>
+        <button type="button" class="wds-composer-action-btn wds-composer-post-btn" id="btnWdsShoutPost">Post</button>
+      </div>
+      <p class="wds-gate-error" id="wdsShoutError" hidden></p>
+    </div>
+  </div>
+
   <!-- Per-user chat context menu — click a name in any Winfinity chat
        surface (Global Chat or a DM/Group popup). -->
   <!-- Feed post ⋮ menu — Share to My Day always offered; Edit/Delete
@@ -3847,7 +3870,15 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
     </div>
     <p class="wds-gate-error wds-profile-cover-error" id="wdsProfileCoverError" hidden></p>
     <div class="wds-profile-header">
-      <div class="wds-profile-avatar" id="wdsProfilePageAvatar">–</div>
+      <div class="wds-profile-avatar-wrap">
+        <p class="wds-profile-shout-bubble" id="wdsProfileShoutBubble" hidden></p>
+        <div class="wds-profile-avatar" id="wdsProfilePageAvatar">–</div>
+        <button type="button" class="wds-profile-avatar-add" id="btnWdsProfileAvatarAdd" aria-label="Add Story or Shout" title="Add Story or Shout" hidden>+</button>
+        <div class="chat-user-menu wds-profile-avatar-add-menu" id="wdsProfileAvatarAddMenu" hidden>
+          <button type="button" class="chat-room-menu-item" id="btnWdsProfileAvatarAddStory">📷 Add Story</button>
+          <button type="button" class="chat-room-menu-item" id="btnWdsProfileAvatarAddShout">💬 Add Shout</button>
+        </div>
+      </div>
       <div class="wds-profile-identity">
         <h2 id="wdsProfilePageName">Operator</h2>
         <p id="wdsProfilePageSubtitle">—</p>
@@ -3856,9 +3887,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         <button type="button" class="btn btn--sm" id="btnWdsProfileAddFriendDirect">+ Add Friend</button>
         <button type="button" class="btn btn--sm" id="btnWdsProfileMessage">💬 Message</button>
       </div>
-      <div class="wds-profile-own-actions" id="wdsProfileOwnActions" hidden>
-        <button type="button" class="wds-profile-action-btn wds-profile-action-btn--primary" id="btnWdsProfileAddStory">+ Add to Story</button>
-      </div>
+    </div>
+    <div class="wds-profile-tabs" id="wdsProfileTabs">
+      <button type="button" class="wds-profile-tab is-active" data-profile-tab="all">All</button>
+      <button type="button" class="wds-profile-tab" data-profile-tab="photos">Photos</button>
+      <button type="button" class="wds-profile-tab" data-profile-tab="friends">Friends</button>
     </div>
     <div class="wds-profile-body">
       <div class="wds-profile-side">
@@ -3922,43 +3955,65 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         </div>
       </div>
       <div class="wds-profile-main">
-        <div class="wds-card">
-          <div class="wds-composer">
-            <span class="wds-user-avatar" id="wdsProfileComposerAvatar">–</span>
-            <div class="wds-composer-box">
-              <textarea class="wds-composer-input" id="wdsProfileComposerInput" rows="2" maxlength="2000" placeholder="What's on your mind?"></textarea>
-              <div class="wds-composer-pending-image" id="wdsProfileComposerPendingImage" hidden></div>
-              <div class="wds-composer-actions">
-                <button type="button" class="wds-composer-action-btn" id="btnWdsProfileComposerAttach">📷 Photo</button>
-                <input type="file" id="wdsProfileComposerImageInput" accept="image/*" multiple hidden>
-                <button type="button" class="wds-composer-action-btn wds-composer-post-btn" id="btnWdsProfileComposerPost">Post</button>
+        <div class="wds-profile-tab-panel" id="wdsProfileTabAll">
+          <div class="wds-card">
+            <div class="wds-composer">
+              <span class="wds-user-avatar" id="wdsProfileComposerAvatar">–</span>
+              <div class="wds-composer-box">
+                <textarea class="wds-composer-input" id="wdsProfileComposerInput" rows="2" maxlength="2000" placeholder="What's on your mind?"></textarea>
+                <div class="wds-composer-pending-image" id="wdsProfileComposerPendingImage" hidden></div>
+                <div class="wds-composer-actions">
+                  <button type="button" class="wds-composer-action-btn" id="btnWdsProfileComposerAttach">📷 Photo</button>
+                  <input type="file" id="wdsProfileComposerImageInput" accept="image/*" multiple hidden>
+                  <button type="button" class="wds-composer-action-btn wds-composer-post-btn" id="btnWdsProfileComposerPost">Post</button>
+                </div>
+                <p class="wds-gate-error" id="wdsProfileComposerError" hidden></p>
               </div>
-              <p class="wds-gate-error" id="wdsProfileComposerError" hidden></p>
             </div>
           </div>
-        </div>
 
-        <div class="wds-profile-posts-head">
-          <label class="wds-wall-permission-label" id="wdsWallPermissionLabel" hidden>
-            Who can post on my wall:
-            <select id="wdsWallPermissionSelect">
-              <option value="anyone">🌐 Anyone</option>
-              <option value="friends_of_friends">🤝 Friends of Friends</option>
-              <option value="friends" selected>👥 Friends</option>
-              <option value="only_me">🔒 Only Me</option>
-            </select>
-          </label>
-          <div class="wds-profile-posts-controls">
-            <button type="button" class="wds-mini-btn" id="btnWdsProfileFilters">⇅ Filters: Newest</button>
-            <button type="button" class="wds-mini-btn" id="btnWdsProfileManage">⚙ Manage posts</button>
+          <div class="wds-profile-posts-head">
+            <label class="wds-wall-permission-label" id="wdsWallPermissionLabel" hidden>
+              Who can post on my wall:
+              <select id="wdsWallPermissionSelect">
+                <option value="anyone">🌐 Anyone</option>
+                <option value="friends_of_friends">🤝 Friends of Friends</option>
+                <option value="friends" selected>👥 Friends</option>
+                <option value="only_me">🔒 Only Me</option>
+              </select>
+            </label>
+            <div class="wds-profile-posts-controls">
+              <button type="button" class="wds-mini-btn" id="btnWdsProfileFilters">⇅ Filters: Newest</button>
+              <button type="button" class="wds-mini-btn" id="btnWdsProfileManage">⚙ Manage posts</button>
+            </div>
           </div>
-        </div>
-        <div class="wds-profile-view-toggle">
-          <button type="button" class="wds-profile-view-btn is-active" id="btnWdsProfileViewList" data-view="list">☰ List view</button>
-          <button type="button" class="wds-profile-view-btn" id="btnWdsProfileViewGrid" data-view="grid">▦ Grid view</button>
+          <div class="wds-profile-view-toggle">
+            <button type="button" class="wds-profile-view-btn is-active" id="btnWdsProfileViewList" data-view="list">☰ List view</button>
+            <button type="button" class="wds-profile-view-btn" id="btnWdsProfileViewGrid" data-view="grid">▦ Grid view</button>
+          </div>
+
+          <div id="wdsProfilePostsList" class="wds-feed-list"><p class="empty-note">Loading…</p></div>
         </div>
 
-        <div id="wdsProfilePostsList" class="wds-feed-list"><p class="empty-note">Loading…</p></div>
+        <!-- Photos — every image from this profile's own posts, newest
+             first. No albums/tagging sub-tabs (Facebook's "Photos of
+             you"/"Albums") since this app has no tagging or album data
+             model to back them. -->
+        <div class="wds-profile-tab-panel" id="wdsProfileTabPhotos" hidden>
+          <div class="wds-profile-photos-head">
+            <h3 class="wds-card-title" style="margin:0;">Photos</h3>
+          </div>
+          <div id="wdsProfilePhotosGrid" class="wds-profile-photos-grid"><p class="empty-note">Loading…</p></div>
+        </div>
+
+        <!-- Friends — same list_friends data as the sidebar card, just a
+             bigger dedicated grid when this tab is active. -->
+        <div class="wds-profile-tab-panel" id="wdsProfileTabFriends" hidden>
+          <div class="wds-profile-photos-head">
+            <h3 class="wds-card-title" style="margin:0;">Friends</h3>
+          </div>
+          <div id="wdsProfileFriendsGrid" class="wds-profile-friends-grid"><p class="empty-note">Loading…</p></div>
+        </div>
       </div>
     </div>
   </div>
@@ -4207,10 +4262,10 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
-<script src="config.js?v=1.7.1"></script>
+<script src="config.js?v=1.7.2"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.7.1"></script>
+<script src="app.js?v=1.7.2"></script>
 </body>
 </html>
