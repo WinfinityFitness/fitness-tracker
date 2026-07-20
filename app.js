@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.5.5';
+const APP_VERSION = 'WF_SYS_V.1.5.7';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -38,7 +38,20 @@ initCleanVariantFlag();
 // mobile app's DOM, storage keys, or init flow, so the mobile app and plain
 // GitHub Pages URL run completely unaffected by any of this.
 const DESKTOP_SHELL_HOST = 'wellness.winfinityfitness.com';
-const isDesktopShellSite = location.hostname === DESKTOP_SHELL_HOST;
+// ?wdsPreview=1 is a local-only escape hatch (see matching check in
+// index.html's <head>) so the desktop shell can be previewed without the
+// real hostname — no real visitor will ever pass this query param.
+const isDesktopShellSite = location.hostname === DESKTOP_SHELL_HOST || new URLSearchParams(location.search).has('wdsPreview');
+
+// Messenger Shell (messenger.winfinityfitness.com only) — a separate,
+// mobile-only Messenger-style app on its own subdomain, same static files
+// (see wordpress-proxy/) and same Supabase chat backend as the desktop
+// shell above, reached via a silent token handoff from wellness's mobile
+// view rather than its own Digital ID + PIN entry (see
+// supabase_messenger_handoff_migration.sql). Never active at the same time
+// as isDesktopShellSite — each is pinned to its own exact hostname.
+const MESSENGER_SHELL_HOST = 'messenger.winfinityfitness.com';
+const isMessengerShellSite = location.hostname === MESSENGER_SHELL_HOST || new URLSearchParams(location.search).has('wdsMsgPreview');
 
 // Set only after a successful desktop sign-in (see signInWithWebSync below)
 // to the payload returned by web_sync_get_dashboard — {profile, theme, skin,
@@ -792,13 +805,6 @@ function initDesktopShell() {
     const storyId = Number(target.dataset.storyId);
     if (storyId) wdsOpenStoryViewer(storyId);
   });
-  document.getElementById('wdsChatListStories').addEventListener('click', e => {
-    const target = e.target.closest('[data-action]');
-    if (!target) return;
-    if (target.dataset.action === 'add-story') { openStoryComposerForNewStory(); return; }
-    const storyId = Number(target.dataset.storyId);
-    if (storyId) wdsOpenStoryViewer(storyId);
-  });
   document.getElementById('btnWdsStoryViewerClose').addEventListener('click', wdsCloseStoryViewer);
   document.getElementById('wdsStoryViewerOverlay').addEventListener('click', e => {
     if (e.target.id === 'wdsStoryViewerOverlay') wdsCloseStoryViewer();
@@ -1384,14 +1390,33 @@ function initDesktopShell() {
 
   const chatListBtn = document.getElementById('wdsChatListBtn');
   const chatListPop = document.getElementById('wdsChatListPop');
-  chatListBtn.addEventListener('click', e => {
+  // On a mobile viewport, tapping the chat icon hands off to the separate
+  // Messenger app (messenger.winfinityfitness.com) instead of opening the
+  // in-page dropdown — see MESSENGER_SHELL_HOST/initMessengerShell and
+  // supabase_messenger_handoff_migration.sql. Desktop viewport keeps the
+  // dropdown exactly as before; guest mode (no real account to hand off)
+  // also keeps the dropdown even on mobile.
+  chatListBtn.addEventListener('click', async e => {
     e.stopPropagation();
+    if (isWdsMobileViewport() && !wdsGuestMode && wdsRemoteData && wdsRemoteData.publicId) {
+      const pin = localStorage.getItem(SESSION_PIN_KEY);
+      let url = 'https://messenger.winfinityfitness.com/';
+      if (pin) {
+        try {
+          const { data: token, error } = await sb.rpc('create_web_handoff_token', {
+            p_public_id: wdsRemoteData.publicId, p_pin: pin,
+          });
+          if (!error && token) url += '?handoff=' + encodeURIComponent(token);
+        } catch (err) { /* fall through to a plain (signed-out) link below */ }
+      }
+      location.href = url;
+      return;
+    }
     chatListPop.hidden = !chatListPop.hidden;
     if (!chatListPop.hidden) {
       const notifPopEl = document.getElementById('wdsNotifPop');
       if (notifPopEl) notifPopEl.hidden = true;
       refreshWdsChatRooms();
-      if (wdsStoryGroups.length) renderWdsChatListStories(); else refreshWdsMyday();
     }
   });
 
@@ -1504,85 +1529,9 @@ function initDesktopShell() {
   });
 
   // Floating popup windows — delegated since they're created dynamically.
-  const chatPopupsWrap = document.getElementById('wdsChatPopupsWrap');
-  const readWdsPopupImageFile = (roomId, file) => {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      wdsPopupPendingImages[roomId] = reader.result;
-      const preview = chatPopupsWrap.querySelector(`[data-popup-pending-image-preview="${roomId}"]`);
-      const wrap = chatPopupsWrap.querySelector(`[data-popup-pending-image="${roomId}"]`);
-      if (preview) preview.src = reader.result;
-      if (wrap) wrap.hidden = false;
-    };
-    reader.readAsDataURL(file);
-  };
-  chatPopupsWrap.addEventListener('click', async e => {
-    const closeBtn = e.target.closest('[data-close-popup]');
-    if (closeBtn) { wdsCloseChatPopup(closeBtn.dataset.closePopup); return; }
-    const lightboxImg = e.target.closest('[data-lightbox]');
-    if (lightboxImg) { e.stopPropagation(); openChatLightbox(lightboxImg.dataset.lightbox); return; }
-    const nameEl = e.target.closest('[data-dm-name]');
-    if (nameEl) { wdsOpenChatUserMenu(nameEl.dataset.dmName, e.clientX, e.clientY, nameEl.dataset.dmKey); return; }
-    const attachBtn = e.target.closest('[data-popup-attach]');
-    if (attachBtn) {
-      const roomId = attachBtn.dataset.popupAttach;
-      const fileInput = chatPopupsWrap.querySelector(`[data-popup-image-input="${roomId}"]`);
-      if (fileInput) fileInput.click();
-      return;
-    }
-    const removeImgBtn = e.target.closest('[data-popup-remove-image]');
-    if (removeImgBtn) {
-      const roomId = removeImgBtn.dataset.popupRemoveImage;
-      delete wdsPopupPendingImages[roomId];
-      const wrap = chatPopupsWrap.querySelector(`[data-popup-pending-image="${roomId}"]`);
-      if (wrap) wrap.hidden = true;
-      const fileInput = chatPopupsWrap.querySelector(`[data-popup-image-input="${roomId}"]`);
-      if (fileInput) fileInput.value = '';
-      return;
-    }
-    const sendBtn = e.target.closest('[data-popup-send]');
-    if (sendBtn) {
-      const roomId = sendBtn.dataset.popupSend;
-      const input = chatPopupsWrap.querySelector(`[data-popup-input="${roomId}"]`);
-      const image = wdsPopupPendingImages[roomId] || null;
-      if (!input || (!input.value.trim() && !image) || !wdsRemoteData) return;
-      const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
-      const text = input.value;
-      input.value = '';
-      delete wdsPopupPendingImages[roomId];
-      const pendingWrap = chatPopupsWrap.querySelector(`[data-popup-pending-image="${roomId}"]`);
-      if (pendingWrap) pendingWrap.hidden = true;
-      const fileInput = chatPopupsWrap.querySelector(`[data-popup-image-input="${roomId}"]`);
-      if (fileInput) fileInput.value = '';
-      wdsChatPopupLastActive[roomId] = Date.now();
-      try {
-        await postChatMessage(text, image, wdsRemoteData.shareKey, codeName, roomId);
-        await wdsRefreshChatPopup(roomId);
-        await refreshWdsChatRooms();
-      } catch (err) { console.error('Popup send failed:', err); }
-      return;
-    }
-    const popupEl = e.target.closest('.wds-chat-popup');
-    if (popupEl) wdsChatPopupLastActive[popupEl.dataset.roomId] = Date.now();
-  });
-  chatPopupsWrap.addEventListener('change', e => {
-    const fileInput = e.target.closest('[data-popup-image-input]');
-    if (fileInput) readWdsPopupImageFile(fileInput.dataset.popupImageInput, fileInput.files[0]);
-  });
-  chatPopupsWrap.addEventListener('paste', e => {
-    const input = e.target.closest('[data-popup-input]');
-    if (!input) return;
-    const file = wdsGetPastedImageFile(e);
-    if (file) { e.preventDefault(); readWdsPopupImageFile(input.dataset.popupInput, file); }
-  });
-  chatPopupsWrap.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && e.target.matches('[data-popup-input]')) {
-      const roomId = e.target.dataset.popupInput;
-      const sendBtn = chatPopupsWrap.querySelector(`[data-popup-send="${roomId}"]`);
-      if (sendBtn) sendBtn.click();
-    }
-  });
+  // Shared with the Messenger Shell (see wdsWireChatPopups/initMessengerShell)
+  // since both surfaces reuse the exact same #wdsChatPopupsWrap component.
+  wdsWireChatPopups();
 
   // Full-size image lightbox (used by chat photos and feed post photos
   // alike) — clicking the backdrop or the ✕ minimizes it back to the
@@ -2640,34 +2589,6 @@ function renderWdsMyday() {
     return `<div class="wds-myday-item wds-myday-item--has-story" data-action="view-story" data-story-id="${g.stories[0].id}">${thumbHtml(newest)}<span class="wds-myday-avatar-badge">${initial(name)}</span><span class="wds-myday-name">${escapeHtml(name)}</span></div>`;
   }).join('');
   el.innerHTML = youItem + otherItems;
-  renderWdsChatListStories();
-}
-
-// Compact version of the My Day rail (same wdsStoryGroups data, same
-// view-story/add-story click contract) for the top of the Chats dropdown —
-// the "bubble note on an avatar" row from the Messenger reference.
-function renderWdsChatListStories() {
-  const el = document.getElementById('wdsChatListStories');
-  if (!el) return;
-  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
-  const myPhoto = wdsRemoteData && wdsRemoteData.profile && wdsRemoteData.profile.photoDataUrl;
-  const myName = (wdsRemoteData && wdsRemoteData.profile && wdsRemoteData.profile.name) || (wdsRemoteData && wdsRemoteData.publicId) || '?';
-  const initial = (name) => escapeHtml((name || '?').trim().charAt(0).toUpperCase() || '?');
-  const mineGroup = wdsStoryGroups.find(g => g.shareKey === myShareKey);
-  const otherGroups = wdsStoryGroups.filter(g => g.shareKey !== myShareKey);
-
-  const myAvatar = myPhoto
-    ? `<span class="wds-chat-list-story-avatar" style="background-image:url(${escapeHtml(myPhoto)});background-size:cover;background-position:center;"></span>`
-    : `<span class="wds-chat-list-story-avatar">${initial(myName)}</span>`;
-  const youItem = mineGroup
-    ? `<div class="wds-chat-list-story-item is-active" data-action="view-story" data-story-id="${mineGroup.stories[0].id}">${myAvatar}<span class="wds-chat-list-story-name">Your Day</span></div>`
-    : `<div class="wds-chat-list-story-item" data-action="add-story">${myAvatar}<span class="wds-chat-list-story-add">+</span><span class="wds-chat-list-story-name">Your Day</span></div>`;
-
-  const otherItems = otherGroups.map(g => {
-    const name = g.codeName || '?';
-    return `<div class="wds-chat-list-story-item is-active" data-action="view-story" data-story-id="${g.stories[0].id}"><span class="wds-chat-list-story-avatar">${initial(name)}</span><span class="wds-chat-list-story-name">${escapeHtml(name)}</span></div>`;
-  }).join('');
-  el.innerHTML = youItem + otherItems;
 }
 
 // Facebook/Instagram-style story playback: auto-advances every 5s through
@@ -3505,6 +3426,7 @@ async function refreshWdsChatRooms() {
 }
 
 function renderWdsChatListPanel() {
+  renderWdsMessengerInbox();
   renderWdsChatContactRail();
   const listEl = document.getElementById('wdsChatListItems');
   const badge = document.getElementById('wdsChatListBadge');
@@ -3542,6 +3464,139 @@ function renderWdsChatListPanel() {
       <span class="wds-chat-thread-time">${t.lastMessageAt ? wdsRelativeTime(t.lastMessageAt) : ''}</span>
     </div>`;
   }).join('');
+}
+
+// Messenger Shell inbox — same wdsChatThreadList()/wdsChatRoomMeta data as
+// the wellness dropdown above, own DOM/IDs (wdm*) since both blocks of
+// markup live in the same served index.html, just one hidden via CSS
+// depending on hostname; own filter state so switching tabs here can never
+// affect the wellness dropdown's remembered tab.
+let wdmTab = 'all';
+let wdmSearchText = '';
+function renderWdsMessengerInbox() {
+  const listEl = document.getElementById('wdmThreadList');
+  if (!listEl) return;
+  let threads = wdsChatThreadList();
+
+  const pending = Object.entries(wdsChatRoomMeta).filter(([id, m]) => !m.isDm && !m.joinedByMe);
+  const pendingHtml = pending.length ? `<div class="wds-chat-thread-item" style="cursor:default;">
+      <div class="wds-chat-thread-avatar wds-chat-thread-avatar--group">👥</div>
+      <div class="wds-chat-thread-body">
+        <div class="wds-chat-thread-name">${pending.length} group invite${pending.length === 1 ? '' : 's'}</div>
+        <div class="wds-chat-thread-preview">${pending.map(([id, m]) =>
+          `<span data-accept-invite="${id}" style="text-decoration:underline;cursor:pointer;margin-right:8px;">${escapeHtml(m.name)}: Accept</span><span data-decline-invite="${id}" style="text-decoration:underline;cursor:pointer;color:var(--critical);">Decline</span>`
+        ).join(' · ')}</div>
+      </div>
+    </div>` : '';
+
+  if (wdmTab === 'unread') threads = threads.filter(t => wdsIsRoomUnread(t.id, t));
+  else if (wdmTab === 'groups') threads = threads.filter(t => !t.isDm);
+  const q = wdmSearchText.trim().toLowerCase();
+  if (q) threads = threads.filter(t => (t.name || '').toLowerCase().includes(q));
+
+  if (!threads.length && !pendingHtml) { listEl.innerHTML = '<p class="empty-note">No conversations yet.</p>'; return; }
+  listEl.innerHTML = pendingHtml + threads.map(t => {
+    const unread = wdsIsRoomUnread(t.id, t);
+    const initial = escapeHtml((t.name || '?').charAt(0).toUpperCase());
+    return `<div class="wds-chat-thread-item${unread ? ' is-unread' : ''}" data-room-id="${t.id}">
+      <div class="wds-chat-thread-avatar${t.isDm ? '' : ' wds-chat-thread-avatar--group'}"${wdsAvatarStyleAttr(t.avatarDataUrl)}>${t.avatarDataUrl ? '' : (t.isDm ? initial : '👥')}</div>
+      <div class="wds-chat-thread-body">
+        <div class="wds-chat-thread-name">${escapeHtml(t.name || 'Unknown')}${unread ? '<span class="wds-chat-thread-dot"></span>' : ''}</div>
+        <div class="wds-chat-thread-preview">${escapeHtml(t.lastMessage || 'No messages yet')}</div>
+      </div>
+      <span class="wds-chat-thread-time">${t.lastMessageAt ? wdsRelativeTime(t.lastMessageAt) : ''}</span>
+    </div>`;
+  }).join('');
+}
+
+const WDM_SHARE_KEY_STORAGE = 'wft_msg_share_key';
+function wdmSetIdentity(payload) {
+  wdsRemoteData = {
+    publicId: payload.publicId || null,
+    shareKey: payload.shareKey || null,
+    profile: payload.profile || null,
+    theme: payload.theme || 'dark',
+    skin: payload.skin || 'default',
+    logsObj: {}, reviewsObj: {}, dailyReviewsObj: {},
+  };
+  document.documentElement.setAttribute('data-theme', wdsRemoteData.theme);
+  document.documentElement.setAttribute('data-skin', wdsRemoteData.skin);
+  if (wdsRemoteData.shareKey) localStorage.setItem(WDM_SHARE_KEY_STORAGE, wdsRemoteData.shareKey);
+}
+async function initMessengerShell() {
+  const statusEl = document.getElementById('wdmStatus');
+  const statusText = document.getElementById('wdmStatusText');
+  const appEl = document.getElementById('wdmApp');
+
+  // #wdsChatPopupsWrap (wdsOpenChatPopup's mount point) lives inside
+  // #wdsShell in the markup, which is display:none outside the wellness
+  // desktop shell — a display:none ancestor hides everything under it
+  // regardless of the child's own CSS, so a popup opened from here would
+  // render invisibly if left in place. Reparent it to <body> once, up
+  // front, so it's governed only by its own (messenger-specific) styling.
+  const popupsWrap = document.getElementById('wdsChatPopupsWrap');
+  if (popupsWrap && popupsWrap.parentElement !== document.body) document.body.appendChild(popupsWrap);
+  const userMenuEl = document.getElementById('wdsChatUserMenu');
+  if (userMenuEl && userMenuEl.parentElement !== document.body) document.body.appendChild(userMenuEl);
+  wdsWireChatPopups();
+
+  const handoffToken = new URLSearchParams(location.search).get('handoff');
+  try {
+    if (handoffToken) {
+      const { data, error } = await sb.rpc('redeem_web_handoff_token', { p_token: handoffToken });
+      if (error) throw error;
+      wdmSetIdentity(data);
+      history.replaceState({}, '', location.pathname);
+    } else {
+      const savedShareKey = localStorage.getItem(WDM_SHARE_KEY_STORAGE);
+      if (!savedShareKey) throw new Error('no-session');
+      const { data, error } = await sb.rpc('get_chat_identity_by_share_key', { p_share_key: savedShareKey });
+      if (error) throw error;
+      wdmSetIdentity(data);
+    }
+  } catch (e) {
+    if (statusText) statusText.textContent = (e && e.message === 'no-session')
+      ? 'Open Messenger from the Wellness app on your phone to sign in.'
+      : 'Sign-in link expired — go back to Wellness and try again.';
+    return;
+  }
+
+  if (statusEl) statusEl.hidden = true;
+  if (appEl) appEl.hidden = false;
+
+  document.getElementById('wdmSearch').addEventListener('input', e => {
+    wdmSearchText = e.target.value;
+    renderWdsMessengerInbox();
+  });
+  ['wdmTabAll', 'wdmTabUnread', 'wdmTabGroups'].forEach(id => {
+    const btn = document.getElementById(id);
+    btn.addEventListener('click', () => {
+      wdmTab = btn.dataset.tab;
+      document.querySelectorAll('.wdm-tab').forEach(t => t.classList.toggle('is-active', t.id === id));
+      renderWdsMessengerInbox();
+    });
+  });
+  document.getElementById('wdmThreadList').addEventListener('click', async e => {
+    const acceptEl = e.target.closest('[data-accept-invite]');
+    if (acceptEl) {
+      if (!wdsRemoteData) return;
+      await sb.rpc('accept_chat_room_invite', { p_room_id: acceptEl.dataset.acceptInvite, p_share_key: wdsRemoteData.shareKey });
+      await refreshWdsChatRooms();
+      return;
+    }
+    const declineEl = e.target.closest('[data-decline-invite]');
+    if (declineEl) {
+      if (!wdsRemoteData) return;
+      await sb.rpc('decline_chat_room_invite', { p_room_id: declineEl.dataset.declineInvite, p_share_key: wdsRemoteData.shareKey });
+      await refreshWdsChatRooms();
+      return;
+    }
+    const item = e.target.closest('[data-room-id]');
+    if (item) wdsOpenChatPopup(item.dataset.roomId);
+  });
+
+  await refreshWdsChatRooms();
+  startWdsChatPolling();
 }
 
 async function wdsFetchRoomMessages(roomId) {
@@ -3650,6 +3705,96 @@ function wdsCloseChatPopup(roomId) {
   wdsOpenChatPopupIds = wdsOpenChatPopupIds.filter(id => id !== roomId);
   delete wdsPopupPendingImages[roomId];
   renderWdsChatContactRail();
+}
+
+// Extracted out of initDesktopShell so both it and initMessengerShell can
+// wire the same #wdsChatPopupsWrap component — see the call sites. Safe to
+// call more than once only if wdsChatPopupsWrap itself is fresh each time,
+// which it is here (each shell's own init runs this exactly once).
+let wdsChatPopupsWired = false;
+function wdsWireChatPopups() {
+  if (wdsChatPopupsWired) return;
+  wdsChatPopupsWired = true;
+  const chatPopupsWrap = document.getElementById('wdsChatPopupsWrap');
+  if (!chatPopupsWrap) return;
+  const readWdsPopupImageFile = (roomId, file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      wdsPopupPendingImages[roomId] = reader.result;
+      const preview = chatPopupsWrap.querySelector(`[data-popup-pending-image-preview="${roomId}"]`);
+      const wrap = chatPopupsWrap.querySelector(`[data-popup-pending-image="${roomId}"]`);
+      if (preview) preview.src = reader.result;
+      if (wrap) wrap.hidden = false;
+    };
+    reader.readAsDataURL(file);
+  };
+  chatPopupsWrap.addEventListener('click', async e => {
+    const closeBtn = e.target.closest('[data-close-popup]');
+    if (closeBtn) { wdsCloseChatPopup(closeBtn.dataset.closePopup); return; }
+    const lightboxImg = e.target.closest('[data-lightbox]');
+    if (lightboxImg) { e.stopPropagation(); openChatLightbox(lightboxImg.dataset.lightbox); return; }
+    const nameEl = e.target.closest('[data-dm-name]');
+    if (nameEl) { wdsOpenChatUserMenu(nameEl.dataset.dmName, e.clientX, e.clientY, nameEl.dataset.dmKey); return; }
+    const attachBtn = e.target.closest('[data-popup-attach]');
+    if (attachBtn) {
+      const roomId = attachBtn.dataset.popupAttach;
+      const fileInput = chatPopupsWrap.querySelector(`[data-popup-image-input="${roomId}"]`);
+      if (fileInput) fileInput.click();
+      return;
+    }
+    const removeImgBtn = e.target.closest('[data-popup-remove-image]');
+    if (removeImgBtn) {
+      const roomId = removeImgBtn.dataset.popupRemoveImage;
+      delete wdsPopupPendingImages[roomId];
+      const wrap = chatPopupsWrap.querySelector(`[data-popup-pending-image="${roomId}"]`);
+      if (wrap) wrap.hidden = true;
+      const fileInput = chatPopupsWrap.querySelector(`[data-popup-image-input="${roomId}"]`);
+      if (fileInput) fileInput.value = '';
+      return;
+    }
+    const sendBtn = e.target.closest('[data-popup-send]');
+    if (sendBtn) {
+      const roomId = sendBtn.dataset.popupSend;
+      const input = chatPopupsWrap.querySelector(`[data-popup-input="${roomId}"]`);
+      const image = wdsPopupPendingImages[roomId] || null;
+      if (!input || (!input.value.trim() && !image) || !wdsRemoteData) return;
+      const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
+      const text = input.value;
+      input.value = '';
+      delete wdsPopupPendingImages[roomId];
+      const pendingWrap = chatPopupsWrap.querySelector(`[data-popup-pending-image="${roomId}"]`);
+      if (pendingWrap) pendingWrap.hidden = true;
+      const fileInput = chatPopupsWrap.querySelector(`[data-popup-image-input="${roomId}"]`);
+      if (fileInput) fileInput.value = '';
+      wdsChatPopupLastActive[roomId] = Date.now();
+      try {
+        await postChatMessage(text, image, wdsRemoteData.shareKey, codeName, roomId);
+        await wdsRefreshChatPopup(roomId);
+        await refreshWdsChatRooms();
+      } catch (err) { console.error('Popup send failed:', err); }
+      return;
+    }
+    const popupEl = e.target.closest('.wds-chat-popup');
+    if (popupEl) wdsChatPopupLastActive[popupEl.dataset.roomId] = Date.now();
+  });
+  chatPopupsWrap.addEventListener('change', e => {
+    const fileInput = e.target.closest('[data-popup-image-input]');
+    if (fileInput) readWdsPopupImageFile(fileInput.dataset.popupImageInput, fileInput.files[0]);
+  });
+  chatPopupsWrap.addEventListener('paste', e => {
+    const input = e.target.closest('[data-popup-input]');
+    if (!input) return;
+    const file = wdsGetPastedImageFile(e);
+    if (file) { e.preventDefault(); readWdsPopupImageFile(input.dataset.popupInput, file); }
+  });
+  chatPopupsWrap.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.matches('[data-popup-input]')) {
+      const roomId = e.target.dataset.popupInput;
+      const sendBtn = chatPopupsWrap.querySelector(`[data-popup-send="${roomId}"]`);
+      if (sendBtn) sendBtn.click();
+    }
+  });
 }
 
 // Right-edge rail — ONLY the threads you've actually opened a popup for
@@ -5443,6 +5588,7 @@ function stopWdsFeedPolling() {
 // call, and `sb` is a module-level `let` declared much further down this
 // file — reading it this early would throw (temporal dead zone).
 if (isDesktopShellSite) setTimeout(initDesktopShell, 0);
+if (isMessengerShellSite) setTimeout(initMessengerShell, 0);
 
 // Deferred via setTimeout (not called directly) so it runs after the rest of
 // this script finishes its first synchronous pass — sbConfigured() reads the
@@ -10594,7 +10740,7 @@ function initPushNotifications() {
   // subscribing under the mobile app's device-anonymous getOrCreateShareKey()
   // and silently overwriting the correct account-keyed subscription row on
   // every wellness reload.
-  if (isDesktopShellSite) return;
+  if (isDesktopShellSite || isMessengerShellSite) return;
   const toggle = document.getElementById('pushNotifToggle');
   const hint = document.getElementById('pushNotifHint');
   if (!toggle) return;
@@ -18154,9 +18300,17 @@ function initAnnouncementWidget() {
       assignOverlay.hidden = true;
       showRestToast(`Targets assigned to ${targetId}.`);
     } catch (e) {
-      noteEl.textContent = (e.message && e.message.includes('No user found'))
-        ? 'No user found with that Digital ID.'
-        : 'Failed to assign — try again.';
+      if (e.message && e.message.includes('No user found')) {
+        noteEl.textContent = 'No user found with that Digital ID.';
+      } else {
+        // Was its own bespoke catch that never used the same stale-session
+        // handling Post Announcement already had (handleAdminRpcError) --
+        // meaning a wrong/out-of-date cached admin session (e.g. after the
+        // admin password was changed) failed here with the same generic
+        // "Failed to assign" text every time, with no indication a re-login
+        // was actually what was needed.
+        handleAdminRpcError('assign_targets', e, noteEl);
+      }
     }
   });
 

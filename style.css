@@ -4811,6 +4811,44 @@ html.wf-desktop-shell #wdsShell {
   overflow-y: auto;
 }
 
+/* Messenger Shell (messenger.winfinityfitness.com) — full-viewport, mobile
+   only, same isolation approach as #wdsShell above. */
+#wdsMessengerShell { display: none; }
+html.wf-messenger-shell #wdsMessengerShell {
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  background: var(--bg);
+  font-family: var(--font-display);
+}
+.wdm-status { flex: 1; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--text-secondary); }
+.wdm-app { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.wdm-header { padding: 16px 16px 8px; }
+.wdm-header strong { font-size: 1.4rem; color: var(--text-primary); }
+.wdm-search-wrap { position: relative; margin: 4px 16px 8px; }
+.wdm-search-wrap svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
+.wdm-search {
+  width: 100%; box-sizing: border-box; background: var(--surface-2); border: 1px solid var(--border-soft);
+  border-radius: 20px; padding: 10px 14px 10px 34px; color: var(--text-primary); font-size: 0.9rem;
+}
+.wdm-tabs { display: flex; gap: 4px; padding: 0 16px 8px; border-bottom: 1px solid var(--border-soft); }
+.wdm-tab {
+  background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-secondary);
+  padding: 8px 10px; font-size: 0.84rem; font-weight: 600; cursor: pointer;
+}
+.wdm-tab.is-active { color: var(--cyan); border-bottom-color: var(--cyan); }
+.wdm-thread-list { flex: 1; overflow-y: auto; padding: 4px 8px 16px; }
+
+/* Opening a thread still reuses the existing floating chat-popup component
+   (see wdsOpenChatPopup) rather than a rebuilt conversation view — that
+   redesign (bubbles/reactions/replies) is a separate follow-up. This just
+   makes that same component fill the screen instead of floating at
+   300x400 bottom-right, so it's usable on a phone in the meantime. */
+html.wf-messenger-shell .wds-chat-popups-wrap { position: fixed; inset: 0; z-index: 1000000; flex-direction: column; right: auto; bottom: auto; }
+html.wf-messenger-shell .wds-chat-popup { width: 100%; height: 100%; border-radius: 0; }
+
 /* ---------- Sign-in gate ---------- */
 .wds-gate {
   min-height: 100vh;
@@ -4955,26 +4993,6 @@ html.wf-resume-session .wds-reload-splash { display: flex !important; }
 .wds-chat-list-pop { width: 320px; max-height: 70vh; display: flex; flex-direction: column; padding: 12px; }
 .wds-chat-list-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .wds-chat-list-head strong { font-size: 0.92rem; color: var(--text-primary); }
-.wds-chat-list-stories { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 10px; }
-.wds-chat-list-story-item {
-  position: relative; flex-shrink: 0; width: 54px; display: flex; flex-direction: column; align-items: center;
-  gap: 4px; cursor: pointer;
-}
-.wds-chat-list-story-avatar {
-  width: 48px; height: 48px; border-radius: 50%; background: var(--gradient-bar); color: #060a0d;
-  font-weight: 700; font-size: 1rem; display: grid; place-items: center; box-sizing: border-box;
-  background-size: cover; background-position: center;
-}
-.wds-chat-list-story-item.is-active .wds-chat-list-story-avatar { box-shadow: 0 0 0 2px var(--accent); }
-.wds-chat-list-story-add {
-  position: absolute; right: 0; bottom: 14px; width: 17px; height: 17px; border-radius: 50%;
-  background: var(--accent); color: var(--surface-1); display: grid; place-items: center;
-  font-weight: 800; font-size: 0.72rem; box-shadow: 0 0 0 2px var(--surface-1);
-}
-.wds-chat-list-story-name {
-  font-size: 0.64rem; color: var(--text-secondary); text-align: center; white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis; max-width: 54px;
-}
 .wds-chat-list-search-wrap { position: relative; margin-bottom: 8px; }
 .wds-chat-list-search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
 .wds-chat-list-search {

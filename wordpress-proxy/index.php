@@ -99,37 +99,54 @@ foreach (preg_split('/\r\n/', $result['rawHeaders']) as $line) {
 header('Cache-Control: no-store, must-revalidate');
 
 $body = $result['body'];
-// Swap in wellness-specific branding for HTML responses only, so
-// "Add to Home Screen"/"Install" on this domain installs as its own app
-// ("Winfinity Nexus", manifest-wellness.webmanifest) instead of reusing
-// the mobile app's own name/manifest — installing both would otherwise
-// put two identically-named/-iconed shortcuts on the same home screen
-// with no way to tell them apart. The title tag and
-// apple-mobile-web-app-title cover Android/desktop and iOS Safari's home
-// screen naming respectively; the manifest link covers the rest.
-if ($result['contentType'] && stripos($result['contentType'], 'text/html') !== false) {
+// Swap in per-subdomain branding for HTML responses only, so "Add to Home
+// Screen"/"Install" on each domain installs as its own distinctly-named app
+// instead of all three reusing the mobile app's own name/manifest —
+// installing more than one would otherwise put identically-named/-iconed
+// shortcuts on the same home screen with no way to tell them apart. The
+// title tag and apple-mobile-web-app-title cover Android/desktop and iOS
+// Safari's home screen naming respectively; the manifest link covers the
+// rest. This same script/upstream is now reused by THREE hostnames
+// (wellness.*, messenger.*, and whatever else points here later), so the
+// branding to apply is chosen by $_SERVER['HTTP_HOST'] rather than assumed.
+$host = isset($_SERVER['HTTP_HOST']) ? strtolower($_SERVER['HTTP_HOST']) : '';
+$brand = null;
+if ($host === 'wellness.winfinityfitness.com') {
+    $brand = [
+        'manifest' => 'manifest-wellness.webmanifest',
+        'title' => 'Winfinity Nexus',
+        'icon' => 'icons/icon-nexus-192.png',
+    ];
+} elseif ($host === 'messenger.winfinityfitness.com') {
+    $brand = [
+        'manifest' => 'manifest-messenger.webmanifest',
+        'title' => 'Winfinity Messenger',
+        'icon' => 'icons/icon-192.png',
+    ];
+}
+if ($brand && $result['contentType'] && stripos($result['contentType'], 'text/html') !== false) {
     $body = str_replace(
         '<link rel="manifest" href="manifest.webmanifest">',
-        '<link rel="manifest" href="manifest-wellness.webmanifest">',
+        '<link rel="manifest" href="' . $brand['manifest'] . '">',
         $body
     );
     $body = str_replace(
         '<title>Winfinity Tracker</title>',
-        '<title>Winfinity Nexus</title>',
+        '<title>' . $brand['title'] . '</title>',
         $body
     );
     $body = str_replace(
         '<meta name="apple-mobile-web-app-title" content="Winfinity">',
-        '<meta name="apple-mobile-web-app-title" content="Winfinity Nexus">',
+        '<meta name="apple-mobile-web-app-title" content="' . $brand['title'] . '">',
         $body
     );
     // iOS Safari's "Add to Home Screen" reads this tag directly rather than
     // the manifest's icons array (which iOS ignores) — without this swap
     // too, an iPhone install would still pick up the mobile app's icon
-    // despite everything else above already being Nexus-branded.
+    // despite everything else above already being re-branded.
     $body = str_replace(
         '<link rel="apple-touch-icon" href="icons/icon-192.png">',
-        '<link rel="apple-touch-icon" href="icons/icon-nexus-192.png">',
+        '<link rel="apple-touch-icon" href="' . $brand['icon'] . '">',
         $body
     );
 }

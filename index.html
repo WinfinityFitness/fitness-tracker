@@ -13,8 +13,14 @@
 // this class (and everything scoped under it in style.css/app.js) never
 // applies to them. Set synchronously here, before first paint, so there's
 // no flash of the mobile layout before app.js runs.
-if (location.hostname === 'wellness.winfinityfitness.com') {
+if (location.hostname === 'wellness.winfinityfitness.com' || new URLSearchParams(location.search).has('wdsPreview')) {
   document.documentElement.classList.add('wf-desktop-shell');
+}
+// messenger.winfinityfitness.com — the separate, mobile-only Messenger app
+// (see MESSENGER_SHELL_HOST in app.js). Same reverse-proxied static file,
+// same "set the class before first paint" reasoning as wf-desktop-shell.
+if (location.hostname === 'messenger.winfinityfitness.com' || new URLSearchParams(location.search).has('wdsMsgPreview')) {
+  document.documentElement.classList.add('wf-messenger-shell');
 }
 // If a Digital ID + PIN were remembered from an earlier sign-in on this
 // browser (see SESSION_ID_KEY/SESSION_PIN_KEY and the auto-resume block at
@@ -48,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.5.5">
+<link rel="stylesheet" href="style.css?v=1.5.7">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3364,7 +3370,6 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
             <strong>Chats</strong>
             <button type="button" class="wds-mini-btn" id="btnWdsNewGroup">+ New Group</button>
           </div>
-          <div class="wds-chat-list-stories" id="wdsChatListStories"></div>
           <div class="wds-chat-list-search-wrap">
             <svg class="wds-chat-list-search-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
             <input type="text" id="wdsChatListSearch" placeholder="Search Messenger…" class="wds-chat-list-search">
@@ -4175,10 +4180,35 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <img id="chatLightboxImg" alt="">
 </div>
 
-<script src="config.js?v=1.5.5"></script>
+<!-- Messenger Shell (messenger.winfinityfitness.com only) — a separate,
+     mobile-only Messenger-style app. See MESSENGER_SHELL_HOST/initMessengerShell
+     in app.js and supabase_messenger_handoff_migration.sql for the sign-in
+     handoff this depends on. -->
+<div id="wdsMessengerShell" hidden>
+  <div class="wdm-status" id="wdmStatus">
+    <p id="wdmStatusText">Connecting…</p>
+  </div>
+  <div class="wdm-app" id="wdmApp" hidden>
+    <header class="wdm-header">
+      <strong>Chats</strong>
+    </header>
+    <div class="wdm-search-wrap">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="text" id="wdmSearch" placeholder="Search Messenger…" class="wdm-search">
+    </div>
+    <div class="wdm-tabs">
+      <button type="button" class="wdm-tab is-active" id="wdmTabAll" data-tab="all">All</button>
+      <button type="button" class="wdm-tab" id="wdmTabUnread" data-tab="unread">Unread</button>
+      <button type="button" class="wdm-tab" id="wdmTabGroups" data-tab="groups">Groups</button>
+    </div>
+    <div class="wdm-thread-list" id="wdmThreadList"><p class="empty-note">Loading…</p></div>
+  </div>
+</div>
+
+<script src="config.js?v=1.5.7"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.5.5"></script>
+<script src="app.js?v=1.5.7"></script>
 </body>
 </html>
