@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.22';
+const APP_VERSION = 'WF_SYS_V.1.7.24';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1105,10 +1105,8 @@ function initDesktopShell() {
   });
 
 
-  // Menu tab — sign out (duplicate of the topnav button, for convenience)
-  // and a local-only theme toggle (does not touch the synced profile).
-  const menuSignOutBtn = document.getElementById('btnWdsMenuSignOut');
-  if (menuSignOutBtn) menuSignOutBtn.addEventListener('click', () => signOutBtn.click());
+  // Menu tab — local-only theme toggle (does not touch the synced profile).
+  // Its own Log Out button was removed (redundant with the topnav's).
   const themeToggleEl = document.getElementById('wdsThemeToggle');
   if (themeToggleEl) themeToggleEl.addEventListener('change', () => {
     const theme = themeToggleEl.checked ? 'light' : 'dark';
@@ -6807,8 +6805,25 @@ function initBackButtonNav() {
       const prevTab = tabHistory[tabHistory.length - 1];
       const prevBtn = prevTab && document.querySelector(`.tab-btn[data-target="${prevTab}"]`);
       if (prevBtn) prevBtn.click();
-      // Else: no previous tab left (the true "root") — let the browser/TWA's
-      // own back behavior proceed (backgrounds/exits the app).
+      // Both branches below re-push a state, same reasoning as the
+      // scroll-reset case above: the back press that got us into this
+      // handler already consumed the ONE reserve entry from
+      // history.replaceState at the top of this function (or a previous
+      // tab-switch push), and neither branch here creates a new one on
+      // its own (the tab button's own click handler skips pushing while
+      // handlingPopstate is true, and there's nothing left to push when
+      // tabHistory is empty). Without this, the reserve silently runs out
+      // after enough back presses -- once it does, the NEXT back press has
+      // nothing left for the browser to pop, so the TWA closes/backgrounds
+      // immediately instead of ever reaching this handler again. Tapping
+      // back must never close the app outright, so even the true "root"
+      // (tabHistory empty, no prevTab left) just re-arms another entry and
+      // absorbs the press instead of letting native back proceed.
+      if (!prevBtn) {
+        const stillActive = document.querySelector('.tab-btn.is-active');
+        tabHistory = stillActive ? [stillActive.dataset.target] : [];
+      }
+      history.pushState({ wftNav: true }, '');
     }
     // MutationObserver callbacks run as a microtask (before this timeout's
     // macrotask), so it still sees handlingPopstate=true and correctly
