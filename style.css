@@ -5429,9 +5429,14 @@ html.wf-resume-session .wds-reload-splash { display: flex !important; }
 .wds-topnav-spacer { flex: 1; }
 .wds-unified {
   display: grid;
-  grid-template-columns: 20% 60% 20%;
+  /* Side columns widened +2cm each ("widen to outside", Facebook-layout
+     style) on top of their normal 20% share; center stays 1fr so it keeps
+     the rest instead of getting squeezed by the sides' extra width. Overall
+     max-width grows by the same 2 * 2cm so that extra room is actually
+     available to grow into, rather than coming out of the center. */
+  grid-template-columns: calc(20% + 2cm) 1fr calc(20% + 2cm);
   gap: 18px;
-  max-width: 1500px;
+  max-width: calc(1500px + 4cm);
   min-width: 960px;
   margin: 0 auto;
   padding: 20px 24px 50px;
