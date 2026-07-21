@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.3">
+<link rel="stylesheet" href="style.css?v=1.7.4">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -1496,36 +1496,30 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       </div>
       <p class="hint" id="backupModeHint">Manual — tap "Back Up Now" whenever you want to save a JSON backup.</p>
       <div class="btn-row">
-        <button class="btn" id="btnBackup">Back Up Now</button>
-        <label class="btn btn--file">
-          Restore backup
+        <div class="announcement-menu-wrap">
+          <button class="btn" id="btnBackup">Back Up Now</button>
+          <div class="announcement-menu" id="backupChoiceMenu" hidden>
+            <button type="button" class="announcement-menu-item" id="btnBackupChoicePhone">📱 On Phone</button>
+            <button type="button" class="announcement-menu-item" id="btnBackupChoiceDrive">☁️ Google Drive</button>
+          </div>
+        </div>
+        <div class="announcement-menu-wrap">
+          <button class="btn" id="btnRestore">Restore Backup</button>
           <input type="file" id="fileRestore" accept="application/json" hidden>
-        </label>
+          <div class="announcement-menu" id="restoreChoiceMenu" hidden>
+            <button type="button" class="announcement-menu-item" id="btnRestoreChoicePhone">📱 On Phone</button>
+            <button type="button" class="announcement-menu-item" id="btnRestoreChoiceDrive">☁️ Google Drive</button>
+          </div>
+        </div>
       </div>
-      <p class="hint">Your data lives only on this device. Save a backup occasionally in case you clear browser data or switch phones. Restoring a backup overwrites your current profile, logs, reviews, and daily reviews on this device — you'll be asked to confirm first.</p>
-    </div>
-
-    <div class="sheet-section sheet-section--compact">
-      <p class="mod-tag">Mod_gdrive_15</p>
-      <p class="field-group-heading">Google Drive Backup</p>
-      <p class="hint" id="driveStatus">Not connected.</p>
-      <div class="btn-row">
-        <button class="btn btn--primary" id="btnDriveConnect">Sign in with Google</button>
-        <button class="btn" id="btnDriveSyncNow" hidden>Backup now</button>
-        <button class="btn" id="btnDriveRestore" hidden>Restore from Drive</button>
-      </div>
-      <p class="hint">Once connected, finishing a workout automatically backs up your data to a file named "winfinity-fitness-backup.json" in your Drive. Requires an internet connection.</p>
+      <p class="hint" id="driveStatus">Google Drive: not connected.</p>
+      <p class="hint">Your data lives only on this device unless you back up to Google Drive too. Save a backup occasionally in case you clear browser data or switch phones. Restoring a backup overwrites your current profile, logs, reviews, and daily reviews on this device — you'll be asked to confirm first.</p>
     </div>
 
     <div class="sheet-section sheet-section--compact">
       <p class="mod-tag">Mod_cleardata_16</p>
       <p class="field-group-heading">Clear All Data</p>
-      <label class="field field--checkbox">
-        <input type="checkbox" id="clearDataKeepDigitalId" checked>
-        <span>Keep Digital ID</span>
-      </label>
-      <p class="hint hint--sm">Unchecked, your Digital ID and all its server-side data (leaderboard entry, chat messages, reminders, coach assignment) are permanently deleted from Nexus too, and you're issued a brand-new Digital ID.</p>
-      <p class="hint">Wipes all logs, reviews, and history from this device. Your Entity Identity profile is kept — you'll go straight into logging your own data afterward. This cannot be undone unless you've saved a backup.</p>
+      <p class="hint">Wipes all logs, reviews, and history from this device. Your Entity Identity profile and Digital ID are kept — you'll go straight into logging your own data afterward. This cannot be undone unless you've saved a backup.</p>
       <button type="button" class="btn btn--danger" id="btnClearAllData">Clear all data</button>
       <p class="save-note" id="clearAllDataNote"></p>
 
@@ -4262,10 +4256,10 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
-<script src="config.js?v=1.7.3"></script>
+<script src="config.js?v=1.7.4"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.7.3"></script>
+<script src="app.js?v=1.7.4"></script>
 </body>
 </html>

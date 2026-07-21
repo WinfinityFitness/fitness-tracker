@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.3';
+const APP_VERSION = 'WF_SYS_V.1.7.4';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -14597,7 +14597,46 @@ function initExport() {
     exportCSV(sortedLogsArray(), 'fitness-log-all');
   });
 
-  document.getElementById('btnBackup').addEventListener('click', downloadBackupJSON);
+  // Backup/Restore — a single button each, opening a small "On Phone /
+  // Google Drive" choice menu instead of separate always-visible buttons
+  // per destination (same popup pattern as the announcement "⋮" menu,
+  // .announcement-menu-wrap/.announcement-menu, reused as-is).
+  const backupBtn = document.getElementById('btnBackup');
+  const backupMenu = document.getElementById('backupChoiceMenu');
+  backupBtn.addEventListener('click', e => { e.stopPropagation(); backupMenu.hidden = !backupMenu.hidden; });
+  document.getElementById('btnBackupChoicePhone').addEventListener('click', () => {
+    backupMenu.hidden = true;
+    downloadBackupJSON();
+    // The download itself has no visible browser UI in a lot of
+    // installed-PWA/TWA contexts (no "Save As" prompt, no toast from the
+    // OS) — without this, tapping the button looked like it did nothing
+    // even when the file saved correctly.
+    showRestToast('Backup saved to your device.');
+  });
+  document.getElementById('btnBackupChoiceDrive').addEventListener('click', () => {
+    backupMenu.hidden = true;
+    if (!driveConfigured()) { showRestToast('Google Drive backup isn\'t set up for this app yet.'); return; }
+    if (!localStorage.getItem('wft_drive_connected')) connectDrive();
+    else saveToDrive(true);
+  });
+  const restoreBtn = document.getElementById('btnRestore');
+  const restoreMenu = document.getElementById('restoreChoiceMenu');
+  restoreBtn.addEventListener('click', e => { e.stopPropagation(); restoreMenu.hidden = !restoreMenu.hidden; });
+  document.getElementById('btnRestoreChoicePhone').addEventListener('click', () => {
+    restoreMenu.hidden = true;
+    document.getElementById('fileRestore').click();
+  });
+  document.getElementById('btnRestoreChoiceDrive').addEventListener('click', () => {
+    restoreMenu.hidden = true;
+    if (!driveConfigured()) { showRestToast('Google Drive backup isn\'t set up for this app yet.'); return; }
+    if (!localStorage.getItem('wft_drive_connected')) { showRestToast('Connect Google Drive first — tap Back Up Now → Google Drive.'); return; }
+    if (!localStorage.getItem('wft_drive_file_id')) { showRestToast('No Drive backup found yet.'); return; }
+    restoreFromDrive();
+  });
+  document.addEventListener('click', e => {
+    if (!backupMenu.hidden && !e.target.closest('.announcement-menu-wrap')) backupMenu.hidden = true;
+    if (!restoreMenu.hidden && !e.target.closest('.announcement-menu-wrap')) restoreMenu.hidden = true;
+  });
 
   const backupModeButtons = document.querySelectorAll('#backupModeSwitch .unit-switch-btn');
   const backupModeHint = document.getElementById('backupModeHint');
@@ -14644,33 +14683,11 @@ function driveConfigured() {
   return typeof GOOGLE_CLIENT_ID === 'string' && GOOGLE_CLIENT_ID && !GOOGLE_CLIENT_ID.startsWith('YOUR_CLIENT_ID');
 }
 
-// Only worth offering once a backup file actually exists to restore from —
-// wft_drive_file_id (set in saveToDrive, once the first upload succeeds)
-// is the same id "Restore from Drive" fetches by, so its presence is
-// exactly the right condition.
-function refreshDriveRestoreButtonVisibility() {
-  const btn = document.getElementById('btnDriveRestore');
-  if (btn) btn.hidden = !localStorage.getItem('wft_drive_file_id');
-}
-
 function initDrive() {
-  const connectBtn = document.getElementById('btnDriveConnect');
-  const syncBtn = document.getElementById('btnDriveSyncNow');
-
   if (!driveConfigured()) {
-    setDriveStatus('Not set up yet — add your Google Client ID in config.js to enable Drive backup.');
-    connectBtn.disabled = true;
+    setDriveStatus('Google Drive backup isn\'t set up for this app yet.');
     return;
   }
-
-  connectBtn.addEventListener('click', () => connectDrive());
-  syncBtn.addEventListener('click', () => {
-    saveToDrive(true);
-    if (localStorage.getItem('wft_lb_optin') === '1' && sbConfigured()) updateLeaderboard();
-  });
-  const restoreBtn = document.getElementById('btnDriveRestore');
-  if (restoreBtn) restoreBtn.addEventListener('click', () => restoreFromDrive());
-  refreshDriveRestoreButtonVisibility();
 
   // Native Android app: Google Identity Services (the web flow below)
   // deliberately refuses to run inside any embedded WebView as an
@@ -14680,13 +14697,7 @@ function initDrive() {
   // it's wired in via the GoogleAuth Capacitor plugin instead.
   if (isNativeApp() && window.Capacitor.Plugins.GoogleAuth) {
     window.Capacitor.Plugins.GoogleAuth.initialize().catch(() => {});
-    if (localStorage.getItem('wft_drive_connected')) {
-      connectBtn.hidden = true;
-      syncBtn.hidden = false;
-      setDriveStatus('Connected. Tap Backup now to sync.');
-    } else {
-      setDriveStatus('Not connected.');
-    }
+    setDriveStatus(localStorage.getItem('wft_drive_connected') ? 'Google Drive: connected.' : 'Google Drive: not connected.');
     return;
   }
 
@@ -14702,20 +14713,12 @@ function initDrive() {
         if (resp.error) { setDriveStatus('Sign-in failed: ' + resp.error); return; }
         driveAccessToken = resp.access_token;
         localStorage.setItem('wft_drive_connected', '1');
-        connectBtn.hidden = true;
-        syncBtn.hidden = false;
         setDriveStatus('Connected. Syncing…');
         saveToDrive();
         syncAccountLogFromGoogle(driveAccessToken);
       },
     });
-    if (localStorage.getItem('wft_drive_connected')) {
-      connectBtn.hidden = true;
-      syncBtn.hidden = false;
-      setDriveStatus('Connected. Tap Backup now to sync.');
-    } else {
-      setDriveStatus('Not connected.');
-    }
+    setDriveStatus(localStorage.getItem('wft_drive_connected') ? 'Google Drive: connected.' : 'Google Drive: not connected.');
     return true;
   };
 
@@ -14729,8 +14732,6 @@ function connectDrive() {
     window.Capacitor.Plugins.GoogleAuth.signIn().then(user => {
       driveAccessToken = user.authentication.accessToken;
       localStorage.setItem('wft_drive_connected', '1');
-      document.getElementById('btnDriveConnect').hidden = true;
-      document.getElementById('btnDriveSyncNow').hidden = false;
       setDriveStatus('Connected. Syncing…');
       saveToDrive();
       syncAccountLogFromGoogle(driveAccessToken);
@@ -14803,7 +14804,6 @@ async function saveToDrive(manual) {
     }
     localStorage.setItem('wft_drive_last_backup', todayISO());
     setDriveStatus('Last synced ' + new Date().toLocaleTimeString());
-    refreshDriveRestoreButtonVisibility();
     renderDashboard();
     activateNexusFastChat();
     autoSyncDriveBackupToNexus();
@@ -14819,7 +14819,7 @@ async function saveToDrive(manual) {
 // not just blindly overwriting on tap).
 async function restoreFromDrive() {
   if (!driveAccessToken) {
-    alert('Not connected to Google Drive right now — tap "Backup now" first to reconnect, then try Restore again.');
+    alert('Not connected to Google Drive right now — tap "Back Up Now" → Google Drive first to reconnect, then try Restore again.');
     return;
   }
   const fileId = localStorage.getItem('wft_drive_file_id');
@@ -18929,34 +18929,16 @@ function initWelcomeDemoOverlay() {
 function initClearAllData() {
   const btn = document.getElementById('btnClearAllData');
   const note = document.getElementById('clearAllDataNote');
-  const keepIdCheckbox = document.getElementById('clearDataKeepDigitalId');
   if (!btn) return;
   btn.addEventListener('click', async () => {
-    const keepId = keepIdCheckbox.checked;
-    if (!confirm('Clear ALL logs, reviews, and history? Your Entity Identity profile is kept, but every day you\'ve logged will be gone unless you\'ve saved a backup. This cannot be undone.')) return;
-    if (!keepId) {
-      if (!confirm('"Keep Digital ID" is unchecked — this will ALSO permanently delete your leaderboard entry, chat messages, reminders, and coach assignment from the Nexus server, then issue you a brand-new Digital ID. This cannot be undone. Continue?')) return;
-    }
+    if (!confirm('Clear ALL logs, reviews, and history? Your Entity Identity profile and Digital ID are kept, but every day you\'ve logged will be gone unless you\'ve saved a backup. This cannot be undone.')) return;
     if (!confirm('Really sure? This is permanent — tap OK only if you have a backup or genuinely want to start over.')) return;
-
-    if (!keepId) {
-      const oldShareKey = localStorage.getItem('wft_lb_share_key');
-      if (oldShareKey && sbConfigured()) {
-        try { await sb.rpc('delete_account_data', { p_share_key: oldShareKey }); }
-        catch (e) { /* best effort — local reset still proceeds even if the server call fails */ }
-      }
-      localStorage.removeItem('wft_lb_share_key');
-      localStorage.removeItem('wft_public_id');
-      localStorage.setItem('wft_lb_optin', '0');
-      getOrCreateShareKey();
-      getOrCreatePublicId();
-    }
 
     saveLogs({});
     saveReviews({});
     saveDailyReviews({});
     localStorage.removeItem('wft_demo_seeded_at');
-    note.textContent = keepId ? 'All data cleared. Your Entity Identity profile is untouched.' : 'All data cleared, including your Nexus server data. You now have a new Digital ID.';
+    note.textContent = 'All data cleared. Your Entity Identity profile and Digital ID are untouched.';
     setTimeout(() => { note.textContent = ''; }, 6000);
     renderDashboard();
     renderHistory();
