@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.5">
+<link rel="stylesheet" href="style.css?v=1.7.6">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -1827,7 +1827,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         </div>
       </label>
       <label class="field" style="margin-top:10px;" id="skinSelectField">
-        <span>Theme</span>
+        <span class="is-hint-trigger" id="themeLabelSpan">Theme</span>
         <select id="skinSelect">
           <option value="default">Winfinity Default</option>
           <option value="default-core">Default Core</option>
@@ -1851,7 +1851,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
           <option value="steampunk-core">Steampunk Core colors</option>
         </select>
       </label>
-      <p class="hint">Themes work with the light/dark switch above — pick a theme, then toggle light or dark within it. Grand Core is designed for light mode. Minimalist mode keeps Default Core's plain layout and lets you layer just the accent color from any Digital theme.</p>
+      <p class="hint" id="themeDescHint">Themes work with the light/dark switch above — pick a theme, then toggle light or dark within it. Grand Core is designed for light mode. Minimalist mode keeps Default Core's plain layout and lets you layer just the accent color from any Digital theme.</p>
       <label class="field" style="margin-top:10px;">
         <span>Text Size</span>
         <input type="range" id="textSizeSlider" min="90" max="115" step="5" value="100">
@@ -1862,8 +1862,8 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
     </div>
 
     <div class="sheet-section">
-      <p class="field-group-heading">Custom Background</p>
-      <p class="hint">Upload a photo to use as the app background — auto-resized to a size that's plenty sharp for a phone screen without eating your storage.</p>
+      <p class="field-group-heading is-hint-trigger" id="customBgHeading">Custom Background</p>
+      <p class="hint" id="customBgDescHint">Upload a photo to use as the app background — auto-resized to a size that's plenty sharp for a phone screen without eating your storage.</p>
 
       <div class="opacity-preview-row">
         <div class="opacity-preview-swatch" id="widgetOpacityPreviewSwatch" aria-hidden="true">
@@ -1931,8 +1931,8 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
     </div>
 
     <div class="sheet-section">
-      <p class="field-group-heading">Reminder Alarm Tone</p>
-      <p class="hint">Browsers can't read your phone's actual ringtone library, so pick from these built-in alarm tones instead — used for rest timers and reminders.</p>
+      <p class="field-group-heading is-hint-trigger" id="alarmToneHeading">Reminder Alarm Tone</p>
+      <p class="hint" id="alarmToneDescHint">Browsers can't read your phone's actual ringtone library, so pick from these built-in alarm tones instead — used for rest timers and reminders.</p>
       <div class="tone-picker-compact" id="tonePicker">
         <select id="alarmToneSelect">
           <option value="chime">Chime</option>
@@ -1945,8 +1945,8 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
     </div>
 
     <div class="sheet-section">
-      <p class="field-group-heading">Push Notifications</p>
-      <p class="hint">Delivered even when the app is fully closed and your phone is locked — unlike the reminders below, which only fire while the app is open. Currently powers new direct message alerts.</p>
+      <p class="field-group-heading is-hint-trigger" id="pushNotifHeading">Push Notifications</p>
+      <p class="hint" id="pushNotifDescHint">Delivered even when the app is fully closed and your phone is locked — unlike the reminders below, which only fire while the app is open. Currently powers new direct message alerts.</p>
       <div class="theme-toggle-row">
         <span>Enable push notifications</span>
         <label class="switch">
@@ -1960,8 +1960,8 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
 
 
     <div class="sheet-section">
-      <p class="field-group-heading">Hydration Reminders</p>
-      <p class="hint">Best-effort: a PWA can't wake up in the background at an exact time, so these fire while the app is open (checked every few minutes) using the schedule below, based on general hydration guidance.</p>
+      <p class="field-group-heading is-hint-trigger" id="hydroRemindersHeading">Hydration Reminders</p>
+      <p class="hint" id="hydroRemindersDescHint">Best-effort: a PWA can't wake up in the background at an exact time, so these fire while the app is open (checked every few minutes) using the schedule below, based on general hydration guidance.</p>
       <div class="theme-toggle-row">
         <span>Enable reminders</span>
         <label class="switch">
@@ -1998,17 +1998,17 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
           <input type="checkbox" id="hydroHourlyEnabled" checked>
           <span>Remind me hourly during waking hours</span>
         </label>
-        <p class="hint">Also reminds you to sip water every ~12 min during a tracked run/walk/ride, and to rehydrate right after it ends.</p>
+        <p class="hint" id="hydroHourlyDescHint">Also reminds you to sip water every ~12 min during a tracked run/walk/ride, and to rehydrate right after it ends.</p>
         <label class="field field--checkbox">
           <input type="checkbox" id="logRemindersEnabled">
           <span>Also remind me to log (Start/End Day) at wake-up and bedtime</span>
         </label>
-        <p class="hint hint--sm">Uses the same wake-up/bedtime above, as a separate notification — tapping it opens the log directly instead of just the app.</p>
+        <p class="hint hint--sm" id="logRemindersDescHint">Uses the same wake-up/bedtime above, as a separate notification — tapping it opens the log directly instead of just the app.</p>
         <label class="field field--checkbox">
           <input type="checkbox" id="progressPhotoReminderEnabled">
           <span>Remind me to take Progress Photo &amp; Measurements (Sundays only, at wake-up time)</span>
         </label>
-        <p class="hint hint--sm">Fires once a week, Sunday at your wake-up time above, as two separate notifications — tapping "Progress Photo" opens your camera, tapping "Take Measurements" opens Measurement Entry directly.</p>
+        <p class="hint hint--sm" id="progressPhotoDescHint">Fires once a week, Sunday at your wake-up time above, as two separate notifications — tapping "Progress Photo" opens your camera, tapping "Take Measurements" opens Measurement Entry directly.</p>
         <input type="file" accept="image/*" capture="environment" id="progressPhotoCameraInput" hidden>
         <button type="button" class="btn btn--sm" id="btnSaveHydroReminders">Save reminder schedule</button>
         <p class="hint" id="hydroSaveNote"></p>
@@ -2016,8 +2016,8 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
     </div>
 
     <div class="sheet-section">
-      <p class="field-group-heading">Web Dashboard Sync</p>
-      <p class="hint">Uploads your full history (training, nutrition, sleep, measurements — everything in your local logs) so you can sign in with your Digital ID at wellness.winfinityfitness.com and see your real data on a desktop dashboard. Nothing is uploaded automatically — you choose when to sync.</p>
+      <p class="field-group-heading is-hint-trigger" id="webSyncHeading">Web Dashboard Sync</p>
+      <p class="hint" id="webSyncDescHint">Uploads your full history (training, nutrition, sleep, measurements — everything in your local logs) so you can sign in with your Digital ID at wellness.winfinityfitness.com and see your real data on a desktop dashboard. Nothing is uploaded automatically — you choose when to sync.</p>
       <div class="theme-toggle-row">
         <span>Enable web sync</span>
         <label class="switch">
@@ -4133,6 +4133,13 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         </label>
       </div>
       <label class="field wds-theme-popup-row">
+        <span>Mode</span>
+        <div class="unit-switch" id="wdsThemeModeSwitchMobile" style="width:100%;">
+          <button type="button" class="unit-switch-btn is-active" data-theme-mode="digital" style="flex:1;">Digital</button>
+          <button type="button" class="unit-switch-btn" data-theme-mode="minimalist" style="flex:1;">Minimalist</button>
+        </div>
+      </label>
+      <label class="field wds-theme-popup-row" id="wdsSkinSelectMobileField">
         <span>Theme</span>
         <select id="wdsSkinSelectMobile" class="wds-theme-popup-select">
           <option value="default">Winfinity Default</option>
@@ -4143,6 +4150,18 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
           <option value="hashira-core">Hashira Core</option>
           <option value="asanoha-digital">Nezuko Digital</option>
           <option value="steampunk-core">Steampunk Core</option>
+        </select>
+      </label>
+      <label class="field wds-theme-popup-row" id="wdsCoreColorFieldMobile" hidden>
+        <span>Minimalist Color</span>
+        <select id="wdsCoreColorSelectMobile" class="wds-theme-popup-select">
+          <option value="">Neutral (default)</option>
+          <option value="shinobi-core">Shinobi Core colors</option>
+          <option value="grand-core">Grand Core colors</option>
+          <option value="sovereign-core">Sovereign Core colors</option>
+          <option value="hashira-core">Hashira Core colors</option>
+          <option value="asanoha-digital">Nezuko Digital colors</option>
+          <option value="steampunk-core">Steampunk Core colors</option>
         </select>
       </label>
       <p class="hint hint--sm wds-theme-popup-row">Web-only — separate from the app's own theme, doesn't affect your phone.</p>
@@ -4278,10 +4297,10 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
-<script src="config.js?v=1.7.5"></script>
+<script src="config.js?v=1.7.6"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.7.5"></script>
+<script src="app.js?v=1.7.6"></script>
 </body>
 </html>

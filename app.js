@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.5';
+const APP_VERSION = 'WF_SYS_V.1.7.6';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1094,10 +1094,46 @@ function initDesktopShell() {
     localStorage.setItem(WDS_THEME_OVERRIDE_KEY, theme);
   });
   const skinSelectEl = document.getElementById('wdsSkinSelect');
+  const coreColorSelectEl = document.getElementById('wdsCoreColorSelect');
+  const coreColorFieldEl = document.getElementById('wdsCoreColorField');
+  const modeSwitchEl = document.getElementById('wdsThemeModeSwitch');
+  const syncWdsModeUI = () => {
+    if (!skinSelectEl) return;
+    const isMinimalist = skinSelectEl.value === 'default-core';
+    if (modeSwitchEl) modeSwitchEl.querySelectorAll('[data-theme-mode]').forEach(btn => {
+      btn.classList.toggle('is-active', (btn.dataset.themeMode === 'minimalist') === isMinimalist);
+    });
+    if (coreColorFieldEl) coreColorFieldEl.hidden = !isMinimalist;
+  };
   if (skinSelectEl) skinSelectEl.addEventListener('change', () => {
     document.documentElement.setAttribute('data-skin', skinSelectEl.value);
     localStorage.setItem(WDS_SKIN_OVERRIDE_KEY, skinSelectEl.value);
+    syncWdsModeUI();
   });
+  if (coreColorSelectEl) coreColorSelectEl.addEventListener('change', () => {
+    wdsApplyCoreColor(coreColorSelectEl.value);
+    localStorage.setItem(WDS_CORE_COLOR_OVERRIDE_KEY, coreColorSelectEl.value);
+    const mobileColorSel = document.getElementById('wdsCoreColorSelectMobile');
+    if (mobileColorSel) mobileColorSel.value = coreColorSelectEl.value;
+  });
+  if (modeSwitchEl) modeSwitchEl.addEventListener('click', e => {
+    const btn = e.target.closest('[data-theme-mode]');
+    if (!btn || !skinSelectEl) return;
+    if (btn.dataset.themeMode === 'minimalist') {
+      skinSelectEl.value = 'default-core';
+      document.documentElement.setAttribute('data-skin', 'default-core');
+      localStorage.setItem(WDS_SKIN_OVERRIDE_KEY, 'default-core');
+    } else if (skinSelectEl.value === 'default-core') {
+      skinSelectEl.value = 'default';
+      document.documentElement.setAttribute('data-skin', 'default');
+      localStorage.setItem(WDS_SKIN_OVERRIDE_KEY, 'default');
+      wdsApplyCoreColor('');
+      localStorage.setItem(WDS_CORE_COLOR_OVERRIDE_KEY, '');
+      if (coreColorSelectEl) coreColorSelectEl.value = '';
+    }
+    syncWdsModeUI();
+  });
+  syncWdsModeUI();
 
   // Theme popup (dial's Theme item, mobile viewports only — see
   // initWdsDial) — mirrors the Account card's own theme controls above
@@ -1106,6 +1142,17 @@ function initDesktopShell() {
   const themePopup = document.getElementById('wdsThemePopup');
   const themeToggleMobileEl = document.getElementById('wdsThemeToggleMobile');
   const skinSelectMobileEl = document.getElementById('wdsSkinSelectMobile');
+  const coreColorSelectMobileEl = document.getElementById('wdsCoreColorSelectMobile');
+  const coreColorFieldMobileEl = document.getElementById('wdsCoreColorFieldMobile');
+  const modeSwitchMobileEl = document.getElementById('wdsThemeModeSwitchMobile');
+  const syncWdsModeUIMobile = () => {
+    if (!skinSelectMobileEl) return;
+    const isMinimalist = skinSelectMobileEl.value === 'default-core';
+    if (modeSwitchMobileEl) modeSwitchMobileEl.querySelectorAll('[data-theme-mode]').forEach(btn => {
+      btn.classList.toggle('is-active', (btn.dataset.themeMode === 'minimalist') === isMinimalist);
+    });
+    if (coreColorFieldMobileEl) coreColorFieldMobileEl.hidden = !isMinimalist;
+  };
   if (themeToggleMobileEl) themeToggleMobileEl.addEventListener('change', () => {
     const theme = themeToggleMobileEl.checked ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', theme);
@@ -1115,8 +1162,34 @@ function initDesktopShell() {
   if (skinSelectMobileEl) skinSelectMobileEl.addEventListener('change', () => {
     document.documentElement.setAttribute('data-skin', skinSelectMobileEl.value);
     localStorage.setItem(WDS_SKIN_OVERRIDE_KEY, skinSelectMobileEl.value);
-    if (skinSelectEl) skinSelectEl.value = skinSelectMobileEl.value;
+    if (skinSelectEl) { skinSelectEl.value = skinSelectMobileEl.value; syncWdsModeUI(); }
+    syncWdsModeUIMobile();
   });
+  if (coreColorSelectMobileEl) coreColorSelectMobileEl.addEventListener('change', () => {
+    wdsApplyCoreColor(coreColorSelectMobileEl.value);
+    localStorage.setItem(WDS_CORE_COLOR_OVERRIDE_KEY, coreColorSelectMobileEl.value);
+    if (coreColorSelectEl) coreColorSelectEl.value = coreColorSelectMobileEl.value;
+  });
+  if (modeSwitchMobileEl) modeSwitchMobileEl.addEventListener('click', e => {
+    const btn = e.target.closest('[data-theme-mode]');
+    if (!btn || !skinSelectMobileEl) return;
+    if (btn.dataset.themeMode === 'minimalist') {
+      skinSelectMobileEl.value = 'default-core';
+      document.documentElement.setAttribute('data-skin', 'default-core');
+      localStorage.setItem(WDS_SKIN_OVERRIDE_KEY, 'default-core');
+      if (skinSelectEl) { skinSelectEl.value = 'default-core'; syncWdsModeUI(); }
+    } else if (skinSelectMobileEl.value === 'default-core') {
+      skinSelectMobileEl.value = 'default';
+      document.documentElement.setAttribute('data-skin', 'default');
+      localStorage.setItem(WDS_SKIN_OVERRIDE_KEY, 'default');
+      wdsApplyCoreColor('');
+      localStorage.setItem(WDS_CORE_COLOR_OVERRIDE_KEY, '');
+      if (coreColorSelectMobileEl) coreColorSelectMobileEl.value = '';
+      if (skinSelectEl) { skinSelectEl.value = 'default'; syncWdsModeUI(); }
+    }
+    syncWdsModeUIMobile();
+  });
+  syncWdsModeUIMobile();
   const closeThemePopupBtn = document.getElementById('btnWdsThemePopupClose');
   if (closeThemePopupBtn) closeThemePopupBtn.addEventListener('click', () => { themePopup.hidden = true; });
   if (themePopup) themePopup.addEventListener('click', e => { if (e.target === themePopup) themePopup.hidden = true; });
@@ -1823,7 +1896,18 @@ function renderWdsMenu() {
   const themeToggle = document.getElementById('wdsThemeToggle');
   if (themeToggle) themeToggle.checked = document.documentElement.getAttribute('data-theme') === 'light';
   const skinSelect = document.getElementById('wdsSkinSelect');
-  if (skinSelect) skinSelect.value = document.documentElement.getAttribute('data-skin') || 'default';
+  if (skinSelect) {
+    skinSelect.value = document.documentElement.getAttribute('data-skin') || 'default';
+    const colorSelect = document.getElementById('wdsCoreColorSelect');
+    const colorField = document.getElementById('wdsCoreColorField');
+    const modeSwitch = document.getElementById('wdsThemeModeSwitch');
+    const isMinimalist = skinSelect.value === 'default-core';
+    if (colorSelect) colorSelect.value = document.documentElement.getAttribute('data-core-color') || '';
+    if (colorField) colorField.hidden = !isMinimalist;
+    if (modeSwitch) modeSwitch.querySelectorAll('[data-theme-mode]').forEach(btn => {
+      btn.classList.toggle('is-active', (btn.dataset.themeMode === 'minimalist') === isMinimalist);
+    });
+  }
 
   const profile = getProfile();
   const daysEl = document.getElementById('wdsMenuDaysActive');
@@ -2783,6 +2867,15 @@ function wdsCloseStoryComposer() {
 const WDS_DIAL_POS_KEY = 'wft_web_dial_pos';
 const WDS_THEME_OVERRIDE_KEY = 'wft_web_theme_override';
 const WDS_SKIN_OVERRIDE_KEY = 'wft_web_skin_override';
+const WDS_CORE_COLOR_OVERRIDE_KEY = 'wft_web_core_color_override';
+// data-core-color only matters while data-skin="default-core" (Minimalist
+// mode) -- see the Default Core skin block in style.css. Shared attribute,
+// set the same way regardless of which theme control (mobile FT's own
+// coreColorSelect, or either of wellness's two) last changed it.
+function wdsApplyCoreColor(color) {
+  if (color) document.documentElement.setAttribute('data-core-color', color);
+  else document.documentElement.removeAttribute('data-core-color');
+}
 const WDS_DIAL_ITEM_RADIUS = 78;
 let wdsDialOpen = false;
 
@@ -2792,8 +2885,10 @@ let wdsDialOpen = false;
 function wdsApplyThemeOverride() {
   const themeOverride = localStorage.getItem(WDS_THEME_OVERRIDE_KEY);
   const skinOverride = localStorage.getItem(WDS_SKIN_OVERRIDE_KEY);
+  const coreColorOverride = localStorage.getItem(WDS_CORE_COLOR_OVERRIDE_KEY);
   if (themeOverride) document.documentElement.setAttribute('data-theme', themeOverride);
   if (skinOverride) document.documentElement.setAttribute('data-skin', skinOverride);
+  if (coreColorOverride) wdsApplyCoreColor(coreColorOverride);
 }
 
 function wdsApplyDialPosition() {
@@ -3059,7 +3154,18 @@ function wdsOpenThemePopup() {
   const toggle = document.getElementById('wdsThemeToggleMobile');
   const select = document.getElementById('wdsSkinSelectMobile');
   if (toggle) toggle.checked = document.documentElement.getAttribute('data-theme') === 'light';
-  if (select) select.value = document.documentElement.getAttribute('data-skin') || 'default';
+  if (select) {
+    select.value = document.documentElement.getAttribute('data-skin') || 'default';
+    const colorSelect = document.getElementById('wdsCoreColorSelectMobile');
+    const colorField = document.getElementById('wdsCoreColorFieldMobile');
+    const modeSwitch = document.getElementById('wdsThemeModeSwitchMobile');
+    const isMinimalist = select.value === 'default-core';
+    if (colorSelect) colorSelect.value = document.documentElement.getAttribute('data-core-color') || '';
+    if (colorField) colorField.hidden = !isMinimalist;
+    if (modeSwitch) modeSwitch.querySelectorAll('[data-theme-mode]').forEach(btn => {
+      btn.classList.toggle('is-active', (btn.dataset.themeMode === 'minimalist') === isMinimalist);
+    });
+  }
   popup.hidden = false;
 }
 
@@ -14587,6 +14693,41 @@ function startAutoBackupTimer() {
   }, 6 * 60 * 60 * 1000);
 }
 
+// Several Settings sections had a permanent explanatory paragraph sitting
+// under their title/toggle, taking up space even once you already know
+// what it says. These now stay hidden by default and flash on for 5s
+// whenever their trigger fires — tapping the section's title/label text,
+// or the checkbox/select itself — then hide again on their own. Restarts
+// the timer on repeat interaction so it doesn't vanish mid-read.
+const AUTO_HIDE_HINT_MS = 5000;
+function wireAutoHideHint(hintEl, triggerEls) {
+  if (!hintEl) return;
+  hintEl.hidden = true;
+  let timer = null;
+  const reveal = () => {
+    hintEl.hidden = false;
+    clearTimeout(timer);
+    timer = setTimeout(() => { hintEl.hidden = true; }, AUTO_HIDE_HINT_MS);
+  };
+  triggerEls.filter(Boolean).forEach(el => el.addEventListener('click', reveal));
+}
+
+function initAutoHideHints() {
+  const $ = id => document.getElementById(id);
+  // Checkbox-driven rows only need the checkbox wired — clicking a <label>'s
+  // own text natively forwards a click to the checkbox/select it wraps, so
+  // "tap the label" and "tick the box" are already the same event here.
+  wireAutoHideHint($('pushNotifDescHint'), [$('pushNotifHeading'), $('pushNotifToggle')]);
+  wireAutoHideHint($('alarmToneDescHint'), [$('alarmToneHeading')]);
+  wireAutoHideHint($('hydroRemindersDescHint'), [$('hydroRemindersHeading'), $('hydroRemindersEnabled')]);
+  wireAutoHideHint($('hydroHourlyDescHint'), [$('hydroHourlyEnabled')]);
+  wireAutoHideHint($('logRemindersDescHint'), [$('logRemindersEnabled')]);
+  wireAutoHideHint($('progressPhotoDescHint'), [$('progressPhotoReminderEnabled')]);
+  wireAutoHideHint($('webSyncDescHint'), [$('webSyncHeading'), $('webSyncEnabled')]);
+  wireAutoHideHint($('customBgDescHint'), [$('customBgHeading')]);
+  wireAutoHideHint($('themeDescHint'), [$('themeLabelSpan'), $('skinSelect')]);
+}
+
 function initExport() {
   document.getElementById('btnExportWeek').addEventListener('click', () => {
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 6); cutoff.setHours(0,0,0,0);
@@ -19388,11 +19529,55 @@ function applySkin(skin) {
   localStorage.setItem('wft_skin', skin);
 }
 
+const WFT_CORE_COLOR_KEY = 'wft_core_color';
+function applyCoreColor(color) {
+  if (color) document.documentElement.setAttribute('data-core-color', color);
+  else document.documentElement.removeAttribute('data-core-color');
+  localStorage.setItem(WFT_CORE_COLOR_KEY, color || '');
+}
+
 function initSkinSelector() {
   applySkin(localStorage.getItem('wft_skin') || 'default-core');
-  document.getElementById('skinSelect').addEventListener('change', e => {
+  applyCoreColor(localStorage.getItem(WFT_CORE_COLOR_KEY) || '');
+
+  const skinSelect = document.getElementById('skinSelect');
+  const modeSwitch = document.getElementById('themeModeSwitch');
+  const colorField = document.getElementById('coreColorField');
+  const colorSelect = document.getElementById('coreColorSelect');
+
+  const syncModeUI = () => {
+    const isMinimalist = skinSelect.value === 'default-core';
+    if (modeSwitch) modeSwitch.querySelectorAll('[data-theme-mode]').forEach(btn => {
+      btn.classList.toggle('is-active', (btn.dataset.themeMode === 'minimalist') === isMinimalist);
+    });
+    if (colorField) colorField.hidden = !isMinimalist;
+  };
+
+  skinSelect.addEventListener('change', e => {
     applySkin(e.target.value);
+    syncModeUI();
   });
+  if (colorSelect) {
+    colorSelect.value = localStorage.getItem(WFT_CORE_COLOR_KEY) || '';
+    colorSelect.addEventListener('change', () => applyCoreColor(colorSelect.value));
+  }
+  if (modeSwitch) modeSwitch.addEventListener('click', e => {
+    const btn = e.target.closest('[data-theme-mode]');
+    if (!btn) return;
+    if (btn.dataset.themeMode === 'minimalist') {
+      applySkin('default-core');
+      skinSelect.value = 'default-core';
+    } else if (skinSelect.value === 'default-core') {
+      // Leaving Minimalist -- fall back to the plain base look rather
+      // than leaving Default Core active under the Digital label.
+      applySkin('default');
+      skinSelect.value = 'default';
+      applyCoreColor('');
+      if (colorSelect) colorSelect.value = '';
+    }
+    syncModeUI();
+  });
+  syncModeUI();
 }
 initSkinSelector();
 
@@ -19819,6 +20004,7 @@ safeInit(initReviewForm, 'initReviewForm');
 safeInit(initReviewToggles, 'initReviewToggles');
 safeInit(initHistoryLogsToggle, 'initHistoryLogsToggle');
 safeInit(initExport, 'initExport');
+safeInit(initAutoHideHints, 'initAutoHideHints');
 safeInit(initDrive, 'initDrive');
 safeInit(initClearAllData, 'initClearAllData');
 safeInit(initWelcomeDemoOverlay, 'initWelcomeDemoOverlay');

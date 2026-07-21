@@ -916,6 +916,11 @@ button.mission-log-day:hover { border-color: var(--cyan); }
   color: var(--text-primary);
   margin: 0 0 10px;
 }
+/* Tappable title that toggles a description hint below it (see
+   wireAutoHideHint in app.js) — a subtle dotted underline is the only
+   visual cue it does something, so it doesn't look like every other
+   plain section heading. */
+.is-hint-trigger { cursor: pointer; border-bottom: 1px dotted var(--border); width: fit-content; }
 
 /* Compact variant — Training tab Session templates fieldset */
 .field-group--compact { padding: 10px; }
