@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.14';
+const APP_VERSION = 'WF_SYS_V.1.7.15';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -11417,6 +11417,21 @@ function initManualIntake() {
   document.getElementById('btnCloseManualIntake').addEventListener('click', () => { overlay.hidden = true; });
   bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
   document.getElementById('manualIntakeDate').addEventListener('change', e => loadManualIntakeFields(e.target.value || todayISO()));
+
+  // Auto-corrects Calories from the macro grams whenever Protein/Carbs/Fat
+  // change -- 4 kcal/g protein, 4 kcal/g carbs, 9 kcal/g fat, the top end
+  // of each macro's commonly-cited kcal/g range (vs. e.g. 3.5-4 for
+  // protein), so this never under-counts. Still hand-editable afterward
+  // for anyone entering the exact number off a nutrition label.
+  const recomputeManualCalories = () => {
+    const protein = parseFloat(document.getElementById('manualIntakeProtein').value) || 0;
+    const carbs = parseFloat(document.getElementById('manualIntakeCarbs').value) || 0;
+    const fat = parseFloat(document.getElementById('manualIntakeFat').value) || 0;
+    document.getElementById('manualIntakeCalories').value = Math.round(protein * 4 + carbs * 4 + fat * 9);
+  };
+  ['manualIntakeProtein', 'manualIntakeCarbs', 'manualIntakeFat'].forEach(id => {
+    document.getElementById(id).addEventListener('input', recomputeManualCalories);
+  });
 
   document.getElementById('btnManualOverrideSubmit').addEventListener('click', () => {
     const date = document.getElementById('manualIntakeDate').value || todayISO();
