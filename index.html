@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.19">
+<link rel="stylesheet" href="style.css?v=1.7.20">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3473,28 +3473,29 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <!-- ===================== LEFT: condensed data widgets ===================== -->
       <div class="wds-uni-col wds-uni-left">
 
-        <div class="wds-card wds-card--gauge">
-          <h3 class="wds-card-title">Consistency Index</h3>
-          <div class="wds-gauge wds-gauge--mini" id="wdsConsistencyGauge" style="--pct:0;">
-            <span class="wds-gauge-value" id="wdsConsistencyValue">–<small>%</small></span>
+        <div class="datetime-card">
+          <div class="datetime-info">
+            <p class="datetime-label"><span>Current Date &amp; Time</span></p>
+            <p class="datetime-date" id="wdsDtDate">–</p>
+            <p class="datetime-clock" id="wdsDtClock">--:--:--</p>
           </div>
-          <p class="wds-card-foot" id="wdsConsistencyFoot">No data yet</p>
-        </div>
-
-        <div class="wds-card">
-          <h3 class="wds-card-title">Today</h3>
-          <div class="wds-mini-stat-grid">
-            <div class="wds-mini-stat"><span>Sleep</span><strong id="wdsTileSleepValue">–</strong><small id="wdsTileSleepSub"></small></div>
-            <div class="wds-mini-stat"><span>Hydration</span><strong id="wdsTileHydrationValue">–</strong><small id="wdsTileHydrationSub"></small></div>
-            <div class="wds-mini-stat"><span>Steps</span><strong id="wdsTileStepsValue">–</strong><small id="wdsTileStepsSub"></small></div>
-            <div class="wds-mini-stat"><span>Mental Load</span><strong id="wdsTileStressValue">–</strong><small id="wdsTileStressSub"></small></div>
+          <div class="datetime-divider"></div>
+          <div class="weather-widget" id="wdsWeatherWidget">
+            <p class="datetime-label"><span>Weather</span></p>
+            <div class="weather-icon" id="wdsWeatherIcon">⛅</div>
+            <div class="weather-temp" id="wdsWeatherTemp">--°</div>
           </div>
         </div>
 
-        <div class="wds-card wds-card--chart">
-          <div class="wds-card-head">
-            <h3 class="wds-card-title">Weight Trend</h3>
-            <span class="wds-card-sub" id="wdsWeightChartSub">90d</span>
+        <div class="chart-card" id="wdsGoalProgressCard">
+          <div class="chart-card-head"><span class="chart-card-title">Goal Progress</span></div>
+          <p class="empty-note" id="wdsGoalEmptyNote">Set your weights in the Bio tab and log a weight entry to see progress.</p>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-card-head">
+            <span class="chart-card-title">Entity Weight Journey</span>
+            <span class="chart-card-sub" id="wdsWeightChartEntries"></span>
           </div>
           <svg class="wds-linechart wds-linechart--mini" viewBox="0 0 560 160" preserveAspectRatio="none" id="wdsWeightChartSvg">
             <defs>
@@ -3507,61 +3508,87 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
             <path id="wdsWeightChartLine" d="" fill="none" stroke="var(--cyan)" stroke-width="2.5" stroke-linecap="round"/>
             <circle id="wdsWeightChartDot" cx="0" cy="0" r="4.5" fill="var(--cyan)" visibility="hidden"/>
           </svg>
+          <div class="chart-legend" id="wdsWeightChartLegend"></div>
           <p class="hint hint--sm" id="wdsWeightChartEmpty" hidden>No weight entries logged yet.</p>
         </div>
 
-        <div class="wds-card wds-card--gauge">
-          <h3 class="wds-card-title">Fatigue Level</h3>
-          <div class="wds-gauge wds-gauge--mini wds-gauge--warning" id="wdsFatigueGauge" style="--pct:0;">
-            <span class="wds-gauge-value" id="wdsFatigueValue">–<small>%</small></span>
-          </div>
-          <p class="wds-card-foot" id="wdsFatigueFoot">No data yet</p>
+        <div class="ring-row">
+          <div class="ring-card" id="wdsRingHabitCard"></div>
+          <div class="ring-card" id="wdsRingHydrationCard"></div>
         </div>
 
-        <div class="wds-card">
-          <h3 class="wds-card-title">Training</h3>
-          <div class="wds-mini-stat-grid">
-            <div class="wds-mini-stat"><span>Volume</span><strong id="wdsTileVolumeValue">–</strong></div>
-            <div class="wds-mini-stat"><span>Heaviest Set</span><strong id="wdsTileHeaviestValue">–</strong></div>
-            <div class="wds-mini-stat"><span>Longest Run</span><strong id="wdsTileLongestRunValue">–</strong></div>
-            <div class="wds-mini-stat"><span>Fastest Pace</span><strong id="wdsTileFastestPaceValue">–</strong></div>
-          </div>
-        </div>
+        <h2 class="section-title">Recent performance (7-day avg)</h2>
+        <div class="perf-grid" id="wdsPerfGrid"></div>
 
-        <div class="wds-card">
-          <h3 class="wds-card-title">Fuel Today</h3>
-          <div class="wds-macro-row">
-            <div class="wds-macro">
-              <div class="wds-macro-head"><span>Protein</span><span id="wdsMacroProteinText">– / –g</span></div>
-              <div class="wds-progress"><div class="wds-progress-fill" id="wdsMacroProteinBar" style="width:0%;background:var(--cyan)"></div></div>
-            </div>
-            <div class="wds-macro">
-              <div class="wds-macro-head"><span>Carbs</span><span id="wdsMacroCarbsText">– / –g</span></div>
-              <div class="wds-progress"><div class="wds-progress-fill" id="wdsMacroCarbsBar" style="width:0%;background:var(--violet)"></div></div>
-            </div>
-            <div class="wds-macro">
-              <div class="wds-macro-head"><span>Fat</span><span id="wdsMacroFatText">– / –g</span></div>
-              <div class="wds-progress"><div class="wds-progress-fill" id="wdsMacroFatBar" style="width:0%;background:var(--magenta)"></div></div>
-            </div>
+        <div class="chart-card">
+          <div class="chart-card-head"><span class="chart-card-title">Steps vs Calories (7D)</span></div>
+          <div class="dual-bar-chart" id="wdsStepsCaloriesChart"></div>
+          <div class="bar-chart-labels" id="wdsStepsCaloriesLabels"></div>
+          <div class="chart-legend">
+            <span><span class="legend-swatch" style="background:var(--cyan)"></span>Steps</span>
+            <span><span class="legend-swatch" style="background:var(--violet)"></span>Calories</span>
           </div>
         </div>
 
-        <div class="wds-card wds-card--list">
-          <h3 class="wds-card-title">Bio-Markers</h3>
-          <div class="wds-marker-row">
-            <div class="wds-macro">
-              <div class="wds-macro-head"><span>Body Fat %</span><span id="wdsMarkerBodyFatText">–</span></div>
-              <div class="wds-progress"><div class="wds-progress-fill" id="wdsMarkerBodyFatBar" style="width:0%;background:var(--cyan)"></div></div>
+        <div class="chart-card">
+          <div class="chart-card-head">
+            <span class="chart-card-title">Total Lift Volume</span>
+            <span class="chart-card-sub" id="wdsVolumeTrendTotal"></span>
+          </div>
+          <svg viewBox="0 0 280 90" preserveAspectRatio="none" id="wdsVolumeTrendChart"></svg>
+          <div class="bar-chart-labels" id="wdsVolumeTrendLabels"></div>
+          <p class="hint hint--sm" id="wdsVolumeTrendEmptyNote" hidden>No training days logged yet.</p>
+        </div>
+
+        <div class="hero-card fuel-status-card" id="wdsFuelStatusCard">
+          <h3 class="fuel-status-title">Daily Fuel Status</h3>
+          <div class="fuel-cal-row">
+            <div class="fuel-cal-col">
+              <div class="fuel-cal-ring" id="wdsFuelCalorieRing"></div>
+              <ul class="fuel-macro-legend" id="wdsFuelMacroLegend"></ul>
             </div>
-            <div class="wds-macro">
-              <div class="wds-macro-head"><span>Weight Progress</span><span id="wdsMarkerWeightProgressText">–</span></div>
-              <div class="wds-progress"><div class="wds-progress-fill" id="wdsMarkerWeightProgressBar" style="width:0%;background:var(--good)"></div></div>
-            </div>
-            <div class="wds-macro">
-              <div class="wds-macro-head"><span>Habit Completion (Today)</span><span id="wdsMarkerHabitText">–</span></div>
-              <div class="wds-progress"><div class="wds-progress-fill" id="wdsMarkerHabitBar" style="width:0%;background:var(--violet)"></div></div>
+            <div class="fuel-water-col">
+              <div class="water-pill-row">
+                <div class="water-pill"><div class="water-pill-fill" id="wdsFuelWaterOrbFill"></div></div>
+              </div>
+              <div class="water-pill-tags">
+                <p class="mod-tag">Mod_hydration_track</p>
+                <p class="water-orb-target-label"><span id="wdsFuelWaterOrbAmount">0</span> / <span id="wdsFuelWaterOrbTarget">3000</span> mL</p>
+              </div>
             </div>
           </div>
+          <div class="gradient-stat-row">
+            <div class="gradient-stat-row-head"><span>Protein</span><span><strong id="wdsFuelProteinNow">0g</strong> <span>/ <span id="wdsFuelProteinTarget">–</span></span></span></div>
+            <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="wdsFuelProteinBar" style="width:0%"><span class="gradient-bar-dot"></span></div></div>
+          </div>
+          <div class="gradient-stat-row">
+            <div class="gradient-stat-row-head"><span>Carbs</span><span><strong id="wdsFuelCarbsNow">0g</strong> <span>/ <span id="wdsFuelCarbsTarget">–</span></span></span></div>
+            <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="wdsFuelCarbsBar" style="width:0%"><span class="gradient-bar-dot"></span></div></div>
+          </div>
+          <div class="gradient-stat-row">
+            <div class="gradient-stat-row-head"><span>Fat</span><span><strong id="wdsFuelFatNow">0g</strong> <span>/ <span id="wdsFuelFatTarget">–</span></span></span></div>
+            <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="wdsFuelFatBar" style="width:0%"><span class="gradient-bar-dot"></span></div></div>
+          </div>
+          <div class="gradient-stat-row">
+            <div class="gradient-stat-row-head"><span>Fiber</span><span><strong id="wdsFuelFiberNow">0g</strong> <span>/ <span id="wdsFuelFiberTarget">–</span></span></span></div>
+            <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="wdsFuelFiberBar" style="width:0%"><span class="gradient-bar-dot"></span></div></div>
+          </div>
+          <div class="gradient-stat-row">
+            <div class="gradient-stat-row-head"><span>Sodium</span><span><strong id="wdsFuelSodiumNow">0mg</strong> <span>/ <span id="wdsFuelSodiumTarget">–</span></span></span></div>
+            <div class="gradient-bar gradient-bar--sm"><div class="gradient-bar-fill" id="wdsFuelSodiumBar" style="width:0%"><span class="gradient-bar-dot"></span></div></div>
+          </div>
+          <p class="hint hint--sm" id="wdsFuelTargetsEmpty" hidden>Complete your Bio profile on the phone app to calibrate targets.</p>
+        </div>
+
+        <div class="ring-row ring-row--3">
+          <div class="ring-card" id="wdsAvgCaloriesRing"></div>
+          <div class="ring-card" id="wdsAvgProteinRing"></div>
+          <div class="ring-card" id="wdsAvgWaterRing"></div>
+        </div>
+
+        <div class="ring-row">
+          <div class="ring-card" id="wdsBodyFatRing"></div>
+          <div class="ring-card" id="wdsEdemaRing"></div>
         </div>
 
         <div class="wds-card" id="wdsAccountCard">
@@ -3822,6 +3849,44 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
           </div>
           <div class="rank-list" id="wdsLbConscientiousRanking"></div>
         </div>
+
+        <footer class="app-footer wds-card">
+          <div class="footer-share-row">
+            <button type="button" class="footer-share-btn" id="btnWdsFooterDonate" aria-label="Donate">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
+              Donate
+            </button>
+            <button type="button" class="footer-share-btn" id="btnWdsFooterShare" aria-label="Share app">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
+              Share
+            </button>
+          </div>
+          <div class="footer-brand">
+            <img src="icons/icon-192.png" alt="" width="40" height="40">
+            <div class="footer-brand-name">WINFINITYFITNESS</div>
+            <p class="footer-tagline" id="wdsFooterTagline">"It does not matter how slowly you go as long as you do not stop."</p>
+          </div>
+          <div class="footer-links">
+            <div class="footer-col">
+              <h4>About</h4>
+              <span class="footer-link-static">Team</span>
+              <a class="footer-link" href="http://www.facebook.com/aldruz3dsign" target="_blank" rel="noopener noreferrer">Affiliate</a>
+              <span class="footer-link-static">Careers</span>
+            </div>
+            <div class="footer-col">
+              <h4>Privacy</h4>
+              <button type="button" class="footer-link-btn" id="btnWdsFooterPrivacy">Privacy Policy</button>
+              <button type="button" class="footer-link-btn" id="btnWdsFooterTerms">Terms and Services</button>
+              <button type="button" class="footer-link-btn" id="btnWdsFooterContact">Contact Us</button>
+            </div>
+            <div class="footer-col">
+              <h4>Social</h4>
+              <a class="footer-link" href="http://wellness.winfinityfitness.com" target="_blank" rel="noopener noreferrer">Webpage</a>
+              <a class="footer-link" href="https://www.facebook.com/winfinityfit/" target="_blank" rel="noopener noreferrer" id="wdsFooterFacebookLink">Facebook</a>
+              <a class="footer-link" href="https://www.instagram.com/windalchamp/" target="_blank" rel="noopener noreferrer" id="wdsFooterInstagramLink">Instagram</a>
+            </div>
+          </div>
+        </footer>
 
       </div>
 
@@ -4345,10 +4410,10 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
-<script src="config.js?v=1.7.19"></script>
+<script src="config.js?v=1.7.20"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.7.19"></script>
+<script src="app.js?v=1.7.20"></script>
 </body>
 </html>

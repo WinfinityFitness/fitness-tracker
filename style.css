@@ -5040,6 +5040,16 @@ html.wf-desktop-shell #wdsShell {
   font-family: var(--font-display);
   overflow-y: auto;
 }
+/* The wellness footer (wds-uni-right, under the leaderboard) reuses FT's
+   own Donate/Privacy/Terms/Contact overlays rather than duplicating them —
+   those are mobile-app .sheet-overlay markup (z-index 150), which would
+   render invisibly BEHIND #wdsShell's own z-index 999999 without this. */
+html.wf-desktop-shell #donationOverlay,
+html.wf-desktop-shell #privacyOverlay,
+html.wf-desktop-shell #termsOverlay,
+html.wf-desktop-shell #contactOverlay {
+  z-index: 1000001;
+}
 
 /* Messenger Shell (messenger.winfinityfitness.com) — full-viewport, mobile
    only, same isolation approach as #wdsShell above. */

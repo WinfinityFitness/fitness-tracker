@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.19';
+const APP_VERSION = 'WF_SYS_V.1.7.20';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1846,7 +1846,11 @@ function wdsTodayHabitPct(profile, entry) {
 }
 
 function renderWdsDashboard() {
+  initWdsDateTimeWeather();
+  renderWdsGoalProgress();
   renderWdsStatus();
+  renderWdsPerfGrid();
+  renderWdsStepsCaloriesChart();
   renderWdsTraining();
   renderWdsNutrition();
   renderWdsBio();
@@ -1857,6 +1861,7 @@ function renderWdsDashboard() {
   refreshWdsLeaderboardList().catch(() => {});
   renderWdsMenu();
   renderWdsNotifications();
+  initFooterSocialLinks();
 }
 
 // Third-column sidebar widget, under Notifications — the exact same six
@@ -1929,98 +1934,455 @@ function renderWdsMenu() {
   if (goalModeEl) goalModeEl.textContent = profile ? (profile.goalMode === 'bulk' ? 'Bulk' : 'Cut') : '–';
 }
 
+// ---------------------------------------------------------------------
+// Column 1 (wds-uni-left) — mirrors FT's own dashboard widgets, each as a
+// thin wrapper: reuse the same pure compute helpers FT's own tab uses
+// (already wellness-aware via getProfile/getLogs's dual-mode fallback to
+// wdsRemoteData), target fresh wds-prefixed containers via the generic
+// renderRing()/wdsSetChartPaths() renderers. FT's own render functions
+// (renderWeightChart, renderGoalProgress, etc.) are never called directly
+// — they're hardcoded to FT's own container ids/DOM shape (some also read
+// mobile-only inputs like #nutDate/#skinfoldDate), and FT's own DOM stays
+// live underneath #wdsShell regardless of site, so reusing those ids here
+// would collide with it. See supabase/-adjacent session notes for the
+// established precedent (renderWdsNutrition already shares
+// computeMacroTargets with FT's renderNutritionTargets for this reason).
+// ---------------------------------------------------------------------
+let wdsDateTimeWeatherInited = false;
+function renderWdsDateTimeClock() {
+  const tz = getSavedTimezone();
+  const now = new Date();
+  const dateEl = document.getElementById('wdsDtDate');
+  const clockEl = document.getElementById('wdsDtClock');
+  if (!dateEl || !clockEl) return;
+  try {
+    dateEl.textContent = now.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', timeZone: tz });
+    clockEl.textContent = now.toLocaleTimeString('en-GB', { timeZone: tz });
+  } catch (e) {
+    dateEl.textContent = now.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+    clockEl.textContent = now.toLocaleTimeString('en-GB');
+  }
+}
+// FT's own weather widget (initWeatherWidget) already fetches real weather
+// via device geolocation on every load, including on wellness (its DOM
+// stays live underneath #wdsShell) — mirroring its already-rendered output
+// here avoids a second geolocation prompt/API call for the same data.
+function initWdsDateTimeWeather() {
+  if (wdsDateTimeWeatherInited) return;
+  wdsDateTimeWeatherInited = true;
+  renderWdsDateTimeClock();
+  setInterval(renderWdsDateTimeClock, 1000);
+  const srcIcon = document.getElementById('weatherIcon');
+  const srcTemp = document.getElementById('weatherTemp');
+  if (srcIcon && srcTemp) {
+    const sync = () => {
+      const wdsIcon = document.getElementById('wdsWeatherIcon');
+      const wdsTemp = document.getElementById('wdsWeatherTemp');
+      if (wdsIcon) wdsIcon.innerHTML = srcIcon.innerHTML;
+      if (wdsTemp) wdsTemp.textContent = srcTemp.textContent;
+    };
+    sync();
+    new MutationObserver(sync).observe(srcTemp, { childList: true });
+    new MutationObserver(sync).observe(srcIcon, { childList: true });
+  }
+}
+
+function renderWdsGoalProgress() {
+  const card = document.getElementById('wdsGoalProgressCard');
+  const emptyNote = document.getElementById('wdsGoalEmptyNote');
+  if (!card) return;
+  card.querySelectorAll('.goal-track, .goal-now-lowest-row').forEach(el => el.remove());
+
+  const profile = getProfile();
+  const wu = (profile && profile.weightUnit) || 'kg';
+  const kgNow = currentWeightKg(profile);
+  const logsArr = sortedLogsArray();
+
+  if (!profile || kgNow == null || profile.goalTargetKg == null) {
+    if (emptyNote) emptyNote.hidden = false;
+    return;
+  }
+  if (emptyNote) emptyNote.hidden = true;
+
+  const lowestKg7d = logsArr ? minOfLastNDays(logsArr, 'weightKg', 7) : null;
+  const points = [
+    { label: 'Start', kg: profile.startWeightKg },
+    { label: 'Min goal', kg: profile.goalMinKg },
+    { label: 'Target', kg: profile.goalTargetKg },
+    { label: 'Dream', kg: profile.goalDreamKg },
+  ].filter(p => p.kg != null);
+
+  const allKg = points.map(p => p.kg).concat([kgNow]);
+  if (lowestKg7d != null) allKg.push(lowestKg7d);
+  let min = Math.min(...allKg), max = Math.max(...allKg);
+  if (min === max) { min -= 1; max += 1; }
+  const range = max - min;
+  const pctFor = kg => ((kg - min) / range) * 100;
+
+  const track = document.createElement('div');
+  track.className = 'goal-track';
+  const startPct = points.length ? pctFor(points[0].kg) : 0;
+  const nowPct = pctFor(kgNow);
+  const fill = document.createElement('div');
+  fill.className = 'goal-fill';
+  fill.style.left = Math.min(startPct, nowPct) + '%';
+  fill.style.width = Math.abs(nowPct - startPct) + '%';
+  track.appendChild(fill);
+
+  points.forEach(p => {
+    const marker = document.createElement('div');
+    marker.className = 'goal-marker';
+    marker.style.left = pctFor(p.kg) + '%';
+    marker.textContent = `${p.label}: ${round2(fromKg(p.kg, wu))}${wu}`;
+    track.appendChild(marker);
+  });
+  card.appendChild(track);
+
+  const summaryRow = document.createElement('div');
+  summaryRow.className = 'goal-now-lowest-row';
+  const nowEl = document.createElement('span');
+  nowEl.className = 'goal-now';
+  nowEl.textContent = `Now: ${round2(fromKg(kgNow, wu))}${wu}`;
+  summaryRow.appendChild(nowEl);
+  if (lowestKg7d != null) {
+    const lowest = document.createElement('span');
+    lowest.className = 'goal-lowest';
+    lowest.textContent = `Lowest (7d): ${round2(fromKg(lowestKg7d, wu))}${wu}`;
+    summaryRow.appendChild(lowest);
+  }
+  card.appendChild(summaryRow);
+}
+
+// Entity Weight Journey chart.
 function renderWdsStatus() {
   const logsArr = sortedLogsArray();
-  const mp = getModeProgress();
-  const today = todayISO();
-  const todayEntry = getLogs()[today] || {};
-
-  const pct = mp.target ? Math.round((mp.completeCount / mp.target) * 100) : 0;
-  document.getElementById('wdsConsistencyGauge').style.setProperty('--pct', Math.min(100, pct));
-  document.getElementById('wdsConsistencyValue').innerHTML = pct + '<small>%</small>';
-  const foot = document.getElementById('wdsConsistencyFoot');
-  foot.textContent = `${mp.completeCount} of ${mp.target} days logged this cycle`;
-  foot.className = 'wds-card-foot ' + (pct >= 70 ? 'wds-foot-good' : pct >= 40 ? 'wds-foot-warning' : '');
-
-  const sleepAvg = avgOfLastNDays(logsArr, 'sleep', 7);
-  document.getElementById('wdsTileSleepValue').textContent = sleepAvg != null ? sleepAvg.toFixed(1) + ' / 5' : '–';
-  document.getElementById('wdsTileSleepSub').textContent = sleepAvg != null ? '7d avg' : 'No data';
-
-  const waterTarget = effectiveWaterTargetML(today);
-  const waterNow = todayEntry.water || 0;
-  document.getElementById('wdsTileHydrationValue').textContent = (waterNow / 1000).toFixed(1) + 'L';
-  document.getElementById('wdsTileHydrationSub').textContent = waterTarget ? Math.round((waterNow / waterTarget) * 100) + '% of target' : '';
-
-  const stepsAvg = avgOfLastNDays(logsArr, 'steps', 7);
-  document.getElementById('wdsTileStepsValue').textContent = stepsAvg != null ? Math.round(stepsAvg).toLocaleString() : '–';
-  document.getElementById('wdsTileStepsSub').textContent = stepsAvg != null ? '7d avg' : 'No data';
-
-  const stressAvg = avgOfLastNDays(logsArr, 'stress', 7);
-  document.getElementById('wdsTileStressValue').textContent = stressAvg != null ? stressAvg.toFixed(1) + ' / 5' : '–';
-  document.getElementById('wdsTileStressSub').textContent = stressAvg != null ? '7d avg' : 'No data';
-
   const series = computeTrendSeries(logsArr).slice(-90);
   wdsSetChartPaths('wdsWeightChartArea', 'wdsWeightChartLine', 'wdsWeightChartDot', 'wdsWeightChartEmpty', series.map(s => s.trendKg));
+  const entriesEl = document.getElementById('wdsWeightChartEntries');
+  if (entriesEl) entriesEl.textContent = series.length ? `${series.length} entries` : '';
+  const legendEl = document.getElementById('wdsWeightChartLegend');
+  if (legendEl) legendEl.innerHTML = series.length
+    ? `<span><span class="legend-swatch" style="background:var(--cyan)"></span>Actual weight</span><span><span class="legend-swatch" style="background:var(--text-muted)"></span>Trend (7-day avg)</span>`
+    : '';
 }
 
+function renderWdsPerfGrid() {
+  const perfGrid = document.getElementById('wdsPerfGrid');
+  if (!perfGrid) return;
+  perfGrid.innerHTML = '';
+  const logsArr = sortedLogsArray();
+  const perfItems = [
+    ['Sleep quality', avgOfLastNDays(logsArr, 'sleep', 7), 'sleep'],
+    ['Stress', avgOfLastNDays(logsArr, 'stress', 7), 'stress'],
+    ['Fatigue', avgOfLastNDays(logsArr, 'fatigue', 7), 'fatigue'],
+    ['Hunger', avgOfLastNDays(logsArr, 'hunger', 7), 'hunger'],
+  ];
+  perfItems.forEach(([label, val, field]) => {
+    const status = statusForLevel(field, val);
+    const days = last7DailyValues(field);
+    const bars = days.map((v, i) => {
+      const h = v != null ? Math.max(6, Math.round((v / 5) * 100)) : 4;
+      const dayStatus = statusForLevel(field, v);
+      const today = i === days.length - 1;
+      return `<div class="perf-spark-bar status-${dayStatus}${today ? ' is-today' : ''}" style="height:${h}%"></div>`;
+    }).join('');
+    const tile = document.createElement('div');
+    tile.className = 'perf-tile';
+    tile.innerHTML = `<div class="perf-tile-head">
+        <span class="perf-tile-label">${label}</span>
+        <span class="perf-tile-value"><span class="status-dot status-${status}"></span>${labelForLevel(field, val)}</span>
+      </div>
+      <div class="perf-spark">${bars}</div>`;
+    perfGrid.appendChild(tile);
+  });
+}
+
+function renderWdsStepsCaloriesChart() {
+  const profile = getProfile();
+  const stepGoal = getEffectiveStepGoal(profile);
+  const calorieTarget = getEffectiveCalorieTarget(profile) || 2000;
+  const logsArr = sortedLogsArray();
+  const MAX_SCALE = 130;
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const entry = logsArr.find(l => l.date === iso);
+    const stepsPct = entry && entry.steps != null ? (entry.steps / stepGoal) * 100 : 0;
+    const calPct = entry && entry.calories != null ? (entry.calories / calorieTarget) * 100 : 0;
+    days.push({ dateObj: d, stepsPct, calPct });
+  }
+  const container = document.getElementById('wdsStepsCaloriesChart');
+  const labels = document.getElementById('wdsStepsCaloriesLabels');
+  if (!container || !labels) return;
+  container.innerHTML = ''; labels.innerHTML = '';
+  const buildBar = (modifierClass, pct, title) => {
+    const bar = document.createElement('div');
+    bar.className = 'dual-bar ' + modifierClass;
+    bar.title = title;
+    const base = document.createElement('div');
+    base.className = 'dual-bar-base';
+    base.style.height = `${(Math.min(100, pct) / MAX_SCALE) * 100}%`;
+    bar.appendChild(base);
+    if (pct > 100) {
+      const over = document.createElement('div');
+      over.className = 'dual-bar-over';
+      over.style.height = `${(Math.min(MAX_SCALE, pct) - 100) / MAX_SCALE * 100}%`;
+      bar.appendChild(over);
+    }
+    return bar;
+  };
+  days.forEach(d => {
+    const col = document.createElement('div');
+    col.className = 'dual-bar-day';
+    col.appendChild(buildBar('dual-bar--steps', d.stepsPct, `Steps: ${round0(d.stepsPct)}% of daily goal`));
+    col.appendChild(buildBar('dual-bar--calories', d.calPct, `Calories: ${round0(d.calPct)}% of daily target`));
+    container.appendChild(col);
+    const lbl = document.createElement('span');
+    lbl.textContent = d.dateObj.toLocaleDateString(undefined, { weekday: 'narrow' });
+    labels.appendChild(lbl);
+  });
+}
+
+// Total Lift Volume chart (fixed 7-day window — no full-journey toggle,
+// unlike FT's own volumeChartFullJourney version, to keep this simple).
 function renderWdsTraining() {
   const profile = getProfile();
-  const logsArr = sortedLogsArray();
-  const stats = computeLeaderboardStats();
-  const todayEntry = getLogs()[todayISO()];
-
-  const fatigue = todayEntry && todayEntry.fatigue != null ? todayEntry.fatigue : null;
-  const fatiguePct = fatigue != null ? Math.round((fatigue / 5) * 100) : 0;
-  document.getElementById('wdsFatigueGauge').style.setProperty('--pct', fatiguePct);
-  document.getElementById('wdsFatigueValue').innerHTML = (fatigue != null ? fatiguePct : '–') + '<small>%</small>';
-  document.getElementById('wdsFatigueFoot').textContent = fatigue != null
-    ? (fatigue <= 2 ? 'Well recovered' : fatigue <= 3 ? 'Moderate fatigue' : 'High fatigue — consider recovery')
-    : 'Not logged today';
-
-  document.getElementById('wdsTileVolumeValue').textContent = stats.volume != null ? `${stats.volume.toLocaleString()} ${stats.volumeUnit}` : '–';
-  const heaviestKg = wdsHeaviestSetThisWeekKg(logsArr);
   const wu = (profile && profile.weightUnit) || 'kg';
-  document.getElementById('wdsTileHeaviestValue').textContent = heaviestKg != null ? `${round0(fromKg(heaviestKg, wu))} ${wu}` : '–';
-  document.getElementById('wdsTileLongestRunValue').textContent = stats.furthestRunKm != null ? `${stats.furthestRunKm} km` : '–';
-  document.getElementById('wdsTileFastestPaceValue').textContent = stats.fastestRunPaceSec != null ? wdsFormatPace(stats.fastestRunPaceSec) : '–';
+  const logsArr = sortedLogsArray();
+  const gymDays = allGymDays(logsArr).slice(-7);
+  const chart = document.getElementById('wdsVolumeTrendChart');
+  const labels = document.getElementById('wdsVolumeTrendLabels');
+  const emptyNote = document.getElementById('wdsVolumeTrendEmptyNote');
+  const totalLabel = document.getElementById('wdsVolumeTrendTotal');
+  if (!chart || !labels) return;
+  chart.innerHTML = ''; labels.innerHTML = '';
+  if (!gymDays.length) {
+    if (emptyNote) emptyNote.hidden = false;
+    if (totalLabel) totalLabel.textContent = '';
+    return;
+  }
+  if (emptyNote) emptyNote.hidden = true;
+  const volumes = gymDays.map(l => fromKg(computeDayVolumeKg(l), wu));
+  if (totalLabel) totalLabel.textContent = `${round0(volumes.reduce((s, v) => s + v, 0)).toLocaleString()} ${wu} total`;
+  const max = Math.max(...volumes, 1);
+  const w = 280, h = 90, pad = 6;
+  const stepX = gymDays.length > 1 ? w / (gymDays.length - 1) : 0;
+  const points = volumes.map((v, i) => ({
+    x: gymDays.length > 1 ? i * stepX : w / 2,
+    y: h - pad - (v / max) * (h - pad * 2),
+  }));
+  const linePath = points.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const areaPath = `M${points[0].x.toFixed(1)},${h} ${linePath.replace(/^M/, 'L')} L${points[points.length - 1].x.toFixed(1)},${h} Z`;
+  const dots = points.map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4"></circle>`).join('');
+  chart.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  chart.innerHTML = `
+    <path d="${areaPath}" fill="var(--cyan)" opacity="0.12"></path>
+    <path d="${linePath}" fill="none" stroke="var(--cyan)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path>
+    <g fill="var(--cyan)">${dots}</g>
+  `;
+  gymDays.forEach(l => {
+    const lbl = document.createElement('span');
+    const d = parseISO(l.date);
+    lbl.textContent = `${d.getMonth() + 1}/${d.getDate()}`;
+    labels.appendChild(lbl);
+  });
 }
 
+// Daily Fuel Status (ring + hydration bar + macros incl. fiber/sodium).
 function renderWdsNutrition() {
   const profile = getProfile();
   const date = todayISO();
   const entry = getLogs()[date] || {};
   const mt = profile ? computeMacroTargets(profile, date) : null;
+  const emptyEl = document.getElementById('wdsFuelTargetsEmpty');
 
-  if (mt) {
-    const proteinNow = entry.protein ?? 0, carbsNow = entry.carbs ?? 0, fatNow = entry.fat ?? 0;
-    document.getElementById('wdsMacroProteinText').textContent = `${proteinNow} / ${mt.proteinTarget}g`;
-    document.getElementById('wdsMacroProteinBar').style.width = Math.min(100, (proteinNow / mt.proteinTarget) * 100) + '%';
-    document.getElementById('wdsMacroCarbsText').textContent = `${carbsNow} / ${mt.carbTarget}g`;
-    document.getElementById('wdsMacroCarbsBar').style.width = Math.min(100, (carbsNow / mt.carbTarget) * 100) + '%';
-    document.getElementById('wdsMacroFatText').textContent = `${fatNow} / ${mt.fatTarget}g`;
-    document.getElementById('wdsMacroFatBar').style.width = Math.min(100, (fatNow / mt.fatTarget) * 100) + '%';
-  } else {
-    ['wdsMacroProteinText', 'wdsMacroCarbsText', 'wdsMacroFatText'].forEach(id => { document.getElementById(id).textContent = '– / –g'; });
+  if (!mt) {
+    if (emptyEl) emptyEl.hidden = false;
+    renderWdsFuelAverages();
+    return;
   }
+  if (emptyEl) emptyEl.hidden = true;
+
+  const { calorieTarget, proteinTarget, carbTarget, fatTarget, fiberTarget, sodiumTarget } = mt;
+  const caloriesNow = entry.calories ?? 0;
+  const proteinNow = entry.protein ?? 0;
+  const carbsNow = entry.carbs ?? 0;
+  const fatNow = entry.fat ?? 0;
+  const fiberNow = entry.fiber ?? 0;
+  const sodiumNow = entry.sodium ?? 0;
+
+  const carryover = getCalorieCarryover(date, profile);
+  const effectiveCalorieTarget = Math.max(1, calorieTarget + carryover);
+  const caloriePctRaw = (caloriesNow / effectiveCalorieTarget) * 100;
+  const caloriePct = Math.min(100, caloriePctRaw);
+  const calorieOverflowPct = Math.max(0, caloriePctRaw - 100);
+  const isOverCalories = caloriePctRaw > 100;
+  const ringEl = document.getElementById('wdsFuelCalorieRing');
+  if (ringEl) renderRing(ringEl, caloriePct, {
+    size: 120, stroke: 10, gradient: true, overflowPct: calorieOverflowPct,
+    centerHtml: isOverCalories
+      ? `<span style="font-size:${Math.round(120 * 0.22)}px;font-weight:800;font-family:var(--font-mono);color:var(--critical);">${Math.round(caloriePctRaw)}%</span>`
+      : undefined,
+    centerText: Math.round(caloriePctRaw) + '%',
+    label: 'Calories',
+    sub: `${caloriesNow} / ${effectiveCalorieTarget} kcal${carryover !== 0 ? ` (${carryover > 0 ? '+' : '−'}${round0(Math.abs(carryover))} carried over)` : ''}`,
+  });
+
+  const proteinKcal = proteinNow * 4, carbKcal = carbsNow * 4, fatKcal = fatNow * 9;
+  const macroLegend = document.getElementById('wdsFuelMacroLegend');
+  if (macroLegend) {
+    const macros = [
+      { label: 'Protein', kcal: proteinKcal, dot: 'macro-protein' },
+      { label: 'Carbs', kcal: carbKcal, dot: 'macro-carbs' },
+      { label: 'Fat', kcal: fatKcal, dot: 'macro-fat' },
+    ];
+    macroLegend.innerHTML = macros.map(m => {
+      const pctOfIntake = caloriesNow > 0 ? Math.round((m.kcal / caloriesNow) * 100) : 0;
+      return `<li><span class="macro-dot ${m.dot}"></span>${m.label} <strong>${pctOfIntake}%</strong> of intake</li>`;
+    }).join('');
+  }
+
+  const waterTarget = effectiveWaterTargetML(date);
+  const waterNow = entry.water || 0;
+  const waterPct = waterTarget ? Math.max(0, Math.min(100, (waterNow / waterTarget) * 100)) : 0;
+  const waterFillEl = document.getElementById('wdsFuelWaterOrbFill');
+  if (waterFillEl) waterFillEl.style.height = waterPct + '%';
+  const waterAmountEl = document.getElementById('wdsFuelWaterOrbAmount');
+  if (waterAmountEl) waterAmountEl.textContent = waterNow;
+  const waterTargetEl = document.getElementById('wdsFuelWaterOrbTarget');
+  if (waterTargetEl) waterTargetEl.textContent = waterTarget;
+
+  const setRow = (prefix, now, target, unit) => {
+    const nowEl = document.getElementById(`wdsFuel${prefix}Now`);
+    const targetEl = document.getElementById(`wdsFuel${prefix}Target`);
+    const barEl = document.getElementById(`wdsFuel${prefix}Bar`);
+    if (nowEl) nowEl.textContent = now + unit;
+    if (targetEl) targetEl.textContent = target + unit;
+    if (barEl) barEl.style.width = Math.min(100, (now / target) * 100) + '%';
+  };
+  setRow('Protein', proteinNow, proteinTarget, 'g');
+  setRow('Carbs', carbsNow, carbTarget, 'g');
+  setRow('Fat', fatNow, fatTarget, 'g');
+  setRow('Fiber', fiberNow, fiberTarget, 'g');
+  setRow('Sodium', sodiumNow, sodiumTarget, 'mg');
+
+  renderWdsFuelAverages();
 }
 
+// Fuel Snapshot ring row (Calories 7-day avg, Protein/Water today).
+function renderWdsFuelAverages() {
+  const profile = getProfile();
+  const today = todayISO();
+  const todayEntry = getLogs()[today] || {};
+  const logsArr = sortedLogsArray();
+
+  const avgCalories = avgOfLastNDays(logsArr, 'calories', 7);
+  const calorieTarget = profile ? getEffectiveCalorieTarget(profile, today) : null;
+  const calRing = ringCurrentVsTarget(avgCalories ?? 0, calorieTarget, '');
+  const calRingEl = document.getElementById('wdsAvgCaloriesRing');
+  if (calRingEl) renderRing(calRingEl, avgCalories != null ? calRing.pct : 0, {
+    size: 96, stroke: 7, gradient: true,
+    centerHtml: avgCalories != null ? calRing.centerHtml : undefined,
+    label: 'Calories', sub: '7-day avg',
+  });
+
+  const kg = profile ? currentWeightKg(profile) : null;
+  const targets = (profile && kg) ? computeTargets(profile, kg) : null;
+  const proteinTarget = targets ? round0((targets.protein[0] + targets.protein[1]) / 2) : null;
+  const protRing = ringCurrentVsTarget(todayEntry.protein ?? 0, proteinTarget, 'g');
+  const protRingEl = document.getElementById('wdsAvgProteinRing');
+  if (protRingEl) renderRing(protRingEl, protRing.pct, {
+    size: 96, stroke: 7, gradient: true, centerHtml: protRing.centerHtml, label: 'Protein', sub: 'Today',
+  });
+
+  const waterTarget = effectiveWaterTargetML(today);
+  const waterRing = ringCurrentVsTarget(todayEntry.water ?? 0, waterTarget, '');
+  const waterRingEl = document.getElementById('wdsAvgWaterRing');
+  if (waterRingEl) renderRing(waterRingEl, waterRing.pct, {
+    size: 96, stroke: 7, gradient: true, centerHtml: waterRing.centerHtml, label: 'Water', sub: 'Today',
+  });
+}
+
+// Habit Completion + Life Fuel rings, Body Fat % ring, Edema ring.
 function renderWdsBio() {
   const profile = getProfile();
-  const stats = computeLeaderboardStats();
   const today = todayISO();
+  const todayEntry = getLogs()[today];
+
+  // Same checks as wdsTodayHabitPct (kept separate since the ring here also
+  // needs the raw done/total counts for its sub-label, not just a percentage).
+  const habitChecks = [
+    !!(todayEntry && todayEntry.exercises && todayEntry.exercises.length > 0),
+    !!(todayEntry && todayEntry.steps != null && todayEntry.steps >= getEffectiveStepGoal(profile)),
+    !!(todayEntry && todayEntry.weightKg != null),
+  ];
+  let habitTotal = habitChecks.length, habitDone = habitChecks.filter(Boolean).length;
+  (profile ? profile.extraHabits || [] : []).forEach((label, i) => {
+    if (!label) return;
+    habitTotal++;
+    if (todayEntry && todayEntry.extra && todayEntry.extra[i]) habitDone++;
+  });
+  const habitPct = habitTotal > 0 ? Math.round((habitDone / habitTotal) * 100) : 0;
+  const habitRingEl = document.getElementById('wdsRingHabitCard');
+  if (habitRingEl) renderRing(habitRingEl, habitPct, {
+    size: 140, stroke: 9, modTag: 'MOD_HABIT_01', centerText: habitPct + '%', label: 'Habit completion', sub: `${habitDone}/${habitTotal} today`,
+  });
+
+  const waterGoal = (profile && profile.waterGoal) || 3000;
+  const waterToday = (todayEntry && todayEntry.water != null) ? todayEntry.water : 0;
+  const waterPct = waterGoal > 0 ? (waterToday / waterGoal) * 100 : 0;
+  const calorieTarget = getEffectiveCalorieTarget(profile) || 2000;
+  const caloriesToday = (todayEntry && todayEntry.calories != null) ? todayEntry.calories : 0;
+  const caloriePct = calorieTarget > 0 ? (caloriesToday / calorieTarget) * 100 : 0;
+  const kgForFuel = currentWeightKg(profile);
+  const targetsForFuel = (profile && kgForFuel) ? computeTargets(profile, kgForFuel) : null;
+  const proteinTarget = targetsForFuel ? round0((targetsForFuel.protein[0] + targetsForFuel.protein[1]) / 2) : null;
+  const proteinToday = (todayEntry && todayEntry.protein != null) ? todayEntry.protein : 0;
+  const proteinPct = proteinTarget ? (proteinToday / proteinTarget) * 100 : 0;
+  const lifeFuelPct = Math.round((Math.min(100, waterPct) + Math.min(100, caloriePct) + Math.min(100, proteinPct)) / 3);
+  const fuelMetCount = [waterPct, caloriePct, proteinPct].filter(p => p >= 100).length;
+  const hydrationRingEl = document.getElementById('wdsRingHydrationCard');
+  if (hydrationRingEl) renderRing(hydrationRingEl, lifeFuelPct, {
+    size: 140, stroke: 9, magenta: true, modTag: 'MOD_FUEL_02', centerText: lifeFuelPct + '%', label: 'Life Fuel', sub: `${fuelMetCount}/3 today`,
+  });
 
   const bodyFatEntry = findLastBodyFatEntry(today);
   const bodyFatPct = bodyFatEntry ? computeBodyFatJP7(bodyFatEntry.skinfolds, profile ? profile.age : null, profile ? profile.gender : null) : null;
-  document.getElementById('wdsMarkerBodyFatText').textContent = bodyFatPct != null ? bodyFatPct.toFixed(1) + '%' : '–';
-  document.getElementById('wdsMarkerBodyFatBar').style.width = bodyFatPct != null ? Math.min(100, bodyFatPct * 2) + '%' : '0%';
+  const bodyFatRingEl = document.getElementById('wdsBodyFatRing');
+  if (bodyFatRingEl) renderRing(bodyFatRingEl, bodyFatPct != null ? Math.min(100, bodyFatPct * 2) : 0, {
+    size: 108, stroke: 8, centerText: bodyFatPct != null ? bodyFatPct.toFixed(1) + '%' : '–',
+    label: 'Body Fat %', sub: bodyFatEntry ? `Average · last logged ${fmtDate(parseISO(bodyFatEntry.date))}` : 'Not logged yet',
+  });
 
-  document.getElementById('wdsMarkerWeightProgressText').textContent = stats.progress != null ? `${stats.progress > 0 ? '+' : ''}${stats.progress}${stats.weightUnit}` : '–';
-  document.getElementById('wdsMarkerWeightProgressBar').style.width = stats.progressPct != null ? Math.min(100, Math.abs(stats.progressPct) * 5) + '%' : '0%';
+  renderWdsEdemaRing();
+}
 
-  const todayEntry = getLogs()[today];
-  const habitPct = wdsTodayHabitPct(profile, todayEntry);
-  document.getElementById('wdsMarkerHabitText').textContent = habitPct + '%';
-  document.getElementById('wdsMarkerHabitBar').style.width = habitPct + '%';
+function renderWdsEdemaRing() {
+  const container = document.getElementById('wdsEdemaRing');
+  if (!container) return;
+  const profile = getProfile();
+  const kg = profile ? currentWeightKg(profile) : null;
+  const tbwLiters = kg ? computeWatsonTBW(profile, kg) : null;
+  if (!tbwLiters) {
+    renderRing(container, 0, { size: 108, stroke: 8, magenta: true, centerText: '–', label: 'Edema extrapolation', sub: 'Complete Bio profile to estimate' });
+    return;
+  }
+  const date = todayISO();
+  const entry = getLogs()[date] || {};
+  const carbsG = entry.carbs || 0;
+  const sodiumG = (entry.sodium || 0) / 1000;
+  const glycogenWaterG = (carbsG + sodiumG) * 3;
+  const avgLevel = ((entry.stress ?? 3) + (entry.fatigue ?? 3) + (entry.sleep ?? 3)) / 3;
+  const stateWaterG = (avgLevel / 100) * tbwLiters * 1000;
+  const PERIOD_FLOW_BONUS_G = { mild: 1000, normal: 1750, strong: 2500 };
+  const periodDaysFactor = 1 + Math.min(entry.periodDays || 0, 7) * 0.05;
+  const periodBonusG = (profile.gender === 'female' && entry.menstruating)
+    ? Math.round((PERIOD_FLOW_BONUS_G[entry.periodFlow] ?? PERIOD_FLOW_BONUS_G.normal) * periodDaysFactor)
+    : 0;
+  const totalG = glycogenWaterG + stateWaterG + periodBonusG;
+  const gaugePct = Math.min(100, (totalG / 3500) * 100);
+  renderRing(container, gaugePct, { size: 108, stroke: 8, magenta: true, centerText: round0(totalG) + 'g', label: 'Edema extrapolation', sub: `Estimate for ${fmtDate(parseISO(date))}` });
 }
 
 async function renderWdsNexus() {
@@ -6808,6 +7170,41 @@ function initFooterTagline() {
   }, 15000);
 }
 
+// Wellness's own copy of the footer (Nexus Leaderboard column) — reuses
+// FT's own Donate/Share/Privacy/Terms/Contact overlays and handlers
+// directly (see the html.wf-desktop-shell z-index overrides in style.css
+// for why those overlays still render correctly on top of #wdsShell),
+// just wired to a second set of button ids since it's a separate DOM
+// element from FT's own footer.
+function initWdsFooter() {
+  const donateBtn = document.getElementById('btnWdsFooterDonate');
+  if (donateBtn) donateBtn.addEventListener('click', openDonationQr);
+  const shareBtn = document.getElementById('btnWdsFooterShare');
+  if (shareBtn) shareBtn.addEventListener('click', () => {
+    const shareUrl = isCleanShareVariant()
+      ? 'https://winfinityfitness.github.io/fitness-tracker?variant=clean'
+      : 'https://winfinityfitness.github.io/fitness-tracker';
+    shareViaWebShare({ title: 'Winfinity Tracker', text: 'Check out Winfinity Tracker — my fitness tracking app:', url: shareUrl });
+  });
+  const privacyBtn = document.getElementById('btnWdsFooterPrivacy');
+  if (privacyBtn) privacyBtn.addEventListener('click', () => { document.getElementById('privacyOverlay').hidden = false; });
+  const termsBtn = document.getElementById('btnWdsFooterTerms');
+  if (termsBtn) termsBtn.addEventListener('click', () => { document.getElementById('termsOverlay').hidden = false; });
+  const contactBtn = document.getElementById('btnWdsFooterContact');
+  if (contactBtn) contactBtn.addEventListener('click', () => { document.getElementById('contactOverlay').hidden = false; });
+
+  const tagEl = document.getElementById('wdsFooterTagline');
+  if (tagEl) {
+    let lastIdx = -1;
+    setInterval(() => {
+      let idx;
+      do { idx = Math.floor(Math.random() * FOOTER_TAGLINES.length); } while (idx === lastIdx && FOOTER_TAGLINES.length > 1);
+      lastIdx = idx;
+      tagEl.textContent = `"${FOOTER_TAGLINES[idx]}"`;
+    }, 15000);
+  }
+}
+
 // Facebook/Instagram footer links are visible by default for everyone, same
 // as before — an admin can selectively HIDE (or re-show) them for one
 // specific Digital ID via an Assign Targets push, a discreet per-user
@@ -6815,9 +7212,9 @@ function initFooterTagline() {
 // applied the moment that user pulls it (see
 // refreshCoachAssignmentFromServer), whether or not they save the visible
 // targets afterward.
-function applyFooterSocialLinksVisibility(visible) {
-  const fb = document.getElementById('footerFacebookLink');
-  const ig = document.getElementById('footerInstagramLink');
+function applyFooterSocialLinksVisibility(visible, fbId, igId) {
+  const fb = document.getElementById(fbId || 'footerFacebookLink');
+  const ig = document.getElementById(igId || 'footerInstagramLink');
   const show = visible && !isCleanShareVariant();
   if (fb) fb.hidden = !show;
   if (ig) ig.hidden = !show;
@@ -6827,6 +7224,12 @@ function initFooterSocialLinks() {
   const profile = getProfile();
   const visible = !profile || profile.footerSocialLinksVisible !== false;
   applyFooterSocialLinksVisibility(visible);
+  // Wellness's own copy of this footer (Nexus Leaderboard column) — same
+  // profile.footerSocialLinksVisible flag, same clean-variant check, just
+  // a second pair of ids since it's a separate DOM element from FT's own
+  // footer (never removed/hidden on the wellness site, see
+  // renderWdsMenu's own comments on why mobile's DOM stays live underneath).
+  applyFooterSocialLinksVisibility(visible, 'wdsFooterFacebookLink', 'wdsFooterInstagramLink');
 }
 
 function initPrivacyPolicy() {
@@ -14077,6 +14480,7 @@ async function refreshCoachAssignmentFromServer() {
     if (data.show_social_links !== null && data.show_social_links !== undefined) {
       profile.footerSocialLinksVisible = data.show_social_links;
       applyFooterSocialLinksVisibility(profile.footerSocialLinksVisible);
+      applyFooterSocialLinksVisibility(profile.footerSocialLinksVisible, 'wdsFooterFacebookLink', 'wdsFooterInstagramLink');
     }
     saveProfile(profile);
     loadCoachAssignment();
@@ -20209,6 +20613,7 @@ safeInit(initContact, 'initContact');
 safeInit(initFooterShare, 'initFooterShare');
 safeInit(initFooterTagline, 'initFooterTagline');
 safeInit(initFooterSocialLinks, 'initFooterSocialLinks');
+safeInit(initWdsFooter, 'initWdsFooter');
 safeInit(initPrivacyPolicy, 'initPrivacyPolicy');
 safeInit(initTermsOfService, 'initTermsOfService');
 safeInit(initPRBoardOverlay, 'initPRBoardOverlay');
