@@ -4699,162 +4699,99 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .sheet-section--compact .section-title-row { margin: 4px 0 -2px; }
 
 /* ================================================================== */
-/* SKIN: Default Core — "Minimalist." Third rebuild, now deliberately the
-   OPPOSITE of the previous two attempts: no bespoke palette, no forced
-   pill/16px-everything shape overrides, no custom webfont. This is
-   wellness's own clean, undecorated look (.wds-card/.wds-icon-btn/
-   .wds-topnav etc. are the SAME classes mobile FT uses, styled entirely
-   off these same CSS custom properties with no skin-specific shape
-   rules today) — so "copying wellness's look" IS this app's plain base
-   :root / :root[data-theme="light"] palette, verbatim, just given its
-   own selectable, nameable skin slot instead of living only in the
-   unnamed "Winfinity Default" option. No component overrides below on
-   purpose: the app's own un-skinned card/button/input CSS is already
-   the minimal look being asked for.
+/* SKIN: Default Core — "Minimalist." Fourth rebuild: strips every
+   transparency and glow effect the app's shared component CSS drives off
+   --surface-translucent/--nav-translucent/--cyan-glow/--gradient-glow, so
+   this skin renders those effects as fully opaque/inert everywhere they're
+   used (box-shadow, text-shadow, filter: drop-shadow, backdrop-filter)
+   without needing per-component overrides — cards stay on the shared
+   .wds-card/.chart-card rules, which already fill flat with var(--surface-1)
+   and pick up nothing extra from this skin. Dark mode is a cool, neutral
+   dark; light mode is pure clean white. Plain system sans-serif only, no
+   custom display font. Pairs with the Digital/Minimalist mode toggle
+   (Settings > Theme) — selecting Minimalist just applies this skin.
 
-   THE APP DEFAULT — see initSkinSelector's fallback in app.js.
-
-   Pairs with a new Digital/Minimalist mode toggle (Settings > Theme):
-   selecting Minimalist applies this skin; a second "Color" picker then
-   lets you layer just the ACCENT color variables (--cyan/--violet/
-   --magenta/--good/--warning/--serious/--critical/--gradient-bar/
-   --series-1/2/--cyan-glow/--gradient-glow) from any of the other six
-   "Digital" skins on top, via [data-core-color="<skin>"] below —
-   everything else (surfaces, borders, text, shape) stays this skin's
-   own plain values regardless of which color set is layered in. */
+   THE APP DEFAULT — see initSkinSelector's fallback in app.js. */
 /* ================================================================== */
 :root[data-skin="default-core"] {
-  --bg: #0a0e12;
-  --bg-elevated: #12181c;
-  --surface-1: #12181c;
-  --surface-2: #171f24;
-  --surface-1-rgb: 18,24,28;
-  --surface-2-rgb: 23,31,36;
-  --border: rgba(51, 200, 204, 0.12);
-  --border-soft: rgba(255,255,255,0.06);
-  --text-primary: #dde3e5;
-  --text-secondary: #7e8e95;
-  --text-muted: #5a686e;
+  --bg: #0a0d10;
+  --bg-elevated: #12161a;
+  --surface-1: #12161a;
+  --surface-2: #171c21;
+  --surface-1-rgb: 18,22,26;
+  --surface-2-rgb: 23,28,33;
+  --border: rgba(255,255,255,0.12);
+  --border-soft: rgba(255,255,255,0.07);
+  --text-primary: #e4e7e9;
+  --text-secondary: #8a949a;
+  --text-muted: #5c666c;
   --gridline: rgba(255,255,255,0.06);
   --baseline: rgba(255,255,255,0.14);
 
-  --cyan: #33c8cc;
-  --cyan-dim: #23888c;
-  --cyan-glow: rgba(51, 200, 204, 0.42);
-  --violet: #8069d6;
-  --magenta: #cf5cb8;
+  --cyan: #3fb8c4;
+  --cyan-dim: #2a7d86;
+  --cyan-glow: rgba(0,0,0,0);
+  --violet: #7c74c9;
+  --magenta: #b95fa8;
 
-  --series-1: #33c8cc;
-  --series-2: #8069d6;
-  --gradient-bar: linear-gradient(90deg, var(--violet) 0%, #3f8ff0 55%, var(--cyan) 100%);
-  --gradient-glow: rgba(63,143,240,0.36);
+  --series-1: #3fb8c4;
+  --series-2: #7c74c9;
+  --gradient-bar: linear-gradient(90deg, var(--violet) 0%, #4a8fce 55%, var(--cyan) 100%);
+  --gradient-glow: rgba(0,0,0,0);
 
   --good: #34bd7c;
   --warning: #dba52c;
   --serious: #e6824b;
   --critical: #e6516a;
 
-  --surface-translucent: rgba(10,14,18,0.88);
-  --nav-translucent: rgba(14,20,24,0.88);
+  --surface-translucent: #0a0d10;
+  --nav-translucent: #12161a;
 
   --card-radius: 8px;
   --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Roboto Mono", monospace;
-  --font-display: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: Arial, "Helvetica Neue", Helvetica, sans-serif;
   --font-headline: var(--font-display);
 }
 :root[data-skin="default-core"][data-theme="light"] {
-  --bg: #f0f3f5;
-  --bg-elevated: #fbfcfd;
-  --surface-1: #fbfcfd;
-  --surface-2: #eceff1;
-  --surface-1-rgb: 251,252,253;
-  --surface-2-rgb: 236,239,241;
-  --border: rgba(10, 163, 189, 0.2);
-  --border-soft: #e2e8f0;
-  --text-primary: #262a2c;
-  --text-secondary: #475356;
-  --text-muted: #707c80;
+  --bg: #ffffff;
+  --bg-elevated: #ffffff;
+  --surface-1: #ffffff;
+  --surface-2: #f4f5f6;
+  --surface-1-rgb: 255,255,255;
+  --surface-2-rgb: 244,245,246;
+  --border: rgba(0,0,0,0.12);
+  --border-soft: #e6e8ea;
+  --text-primary: #24282a;
+  --text-secondary: #4a5457;
+  --text-muted: #737c80;
   --gridline: rgba(25, 28, 30, 0.08);
-  --baseline: #bcc9cd;
+  --baseline: #c7ced1;
 
-  --cyan: #0aa3bd;
+  --cyan: #0b8fa3;
   --cyan-dim: #0c6d7e;
-  --cyan-glow: rgba(10, 163, 189, 0.24);
-  --violet: #6a41c2;
-  --magenta: #ab1a41;
+  --cyan-glow: rgba(0,0,0,0);
+  --violet: #5d47ab;
+  --magenta: #9c1c47;
 
-  --series-1: #0aa3bd;
-  --series-2: #6a41c2;
-  --gradient-bar: linear-gradient(90deg, var(--violet) 0%, #3f8ff0 55%, var(--cyan) 100%);
-  --gradient-glow: rgba(63, 143, 240, 0.22);
+  --series-1: #0b8fa3;
+  --series-2: #5d47ab;
+  --gradient-bar: linear-gradient(90deg, var(--violet) 0%, #4a8fce 55%, var(--cyan) 100%);
+  --gradient-glow: rgba(0,0,0,0);
 
   --good: #16805c;
   --warning: #a35714;
   --serious: #b04a1c;
   --critical: #a82929;
 
-  --surface-translucent: rgba(240,243,245,0.88);
-  --nav-translucent: rgba(251,252,253,0.88);
+  --surface-translucent: #ffffff;
+  --nav-translucent: #ffffff;
 }
 /* No decorative body pattern/radial glow — plain flat background only,
    this skin specifically (every other skin keeps its own body look). */
 [data-skin="default-core"] body { background-image: none !important; }
-
-/* ---------------------------------------------------------------------
-   Color-only overlays — [data-core-color] is set independently of
-   [data-skin], only meaningful/applied while data-skin="default-core"
-   (see the Minimalist mode's Color picker in app.js). Each block below
-   is exactly that skin's own accent-token values, copied verbatim — no
-   surface/border/text/shape properties, so the minimal layout underneath
-   never changes, only the accent hue does. */
-[data-skin="default-core"][data-core-color="shinobi-core"] {
-  --cyan: #d9720a; --cyan-dim: #a85400; --cyan-glow: rgba(217,114,10,0.28);
-  --violet: #46485a; --magenta: #b3261e;
-  --series-1: #d9720a; --series-2: #46485a;
-  --gradient-bar: linear-gradient(90deg, #46485a 0%, #d9720a 100%);
-  --gradient-glow: rgba(217,114,10,0.24);
-  --good: #3f6b21; --warning: #8a5a00; --serious: #a13d0f; --critical: #ba1a1a;
-}
-[data-skin="default-core"][data-core-color="grand-core"] {
-  --cyan: #00aeef; --cyan-dim: #00658d; --cyan-glow: rgba(0,174,239,0.35);
-  --violet: #2ae500; --magenta: #ba1a1a;
-  --series-1: #00aeef; --series-2: #2ae500;
-  --gradient-bar: linear-gradient(90deg, #2ae500 0%, #00aeef 100%);
-  --gradient-glow: rgba(0,174,239,0.3);
-  --good: #106e00; --warning: #bfa100; --serious: #b5650a; --critical: #ba1a1a;
-}
-[data-skin="default-core"][data-core-color="sovereign-core"] {
-  --cyan: #00838f; --cyan-dim: #005f66; --cyan-glow: rgba(0,131,143,0.22);
-  --violet: #0058cc; --magenta: #5b00cc;
-  --series-1: #00838f; --series-2: #0058cc;
-  --gradient-bar: linear-gradient(90deg, #0058cc 0%, #00838f 100%);
-  --gradient-glow: rgba(0,131,143,0.18);
-  --good: #00838f; --warning: #5b00cc; --serious: #a8324a; --critical: #ba1a1a;
-}
-[data-skin="default-core"][data-core-color="hashira-core"] {
-  --cyan: #92002f; --cyan-dim: #680015; --cyan-glow: rgba(146,0,47,0.22);
-  --violet: #cc4400; --magenta: #8a6d00;
-  --series-1: #92002f; --series-2: #cc4400;
-  --gradient-bar: linear-gradient(90deg, #cc4400 0%, #92002f 100%);
-  --gradient-glow: rgba(146,0,47,0.18);
-  --good: #cc4400; --warning: #8a6d00; --serious: #b23a00; --critical: #ba1a1a;
-}
-[data-skin="default-core"][data-core-color="asanoha-digital"] {
-  --cyan: #970046; --cyan-dim: #7a0038; --cyan-glow: rgba(151,0,70,0.28);
-  --violet: #416e00; --magenta: #c9184a;
-  --series-1: #970046; --series-2: #416e00;
-  --gradient-bar: linear-gradient(90deg, #416e00 0%, #970046 100%);
-  --gradient-glow: rgba(151,0,70,0.22);
-  --good: #416e00; --warning: #c9184a; --serious: #a3123f; --critical: #ba1a1a;
-}
-[data-skin="default-core"][data-core-color="steampunk-core"] {
-  --cyan: #8e4e00; --cyan-dim: #6c3a00; --cyan-glow: rgba(142,78,0,0.24);
-  --violet: #8a6b00; --magenta: #93000a;
-  --series-1: #8e4e00; --series-2: #8a6b00;
-  --gradient-bar: linear-gradient(90deg, #8e4e00 0%, #cd7f32 55%, #af8d11 100%);
-  --gradient-glow: rgba(142,78,0,0.2);
-  --good: #3f6b21; --warning: #7a5c00; --serious: #a13d0f; --critical: #93000a;
-}
+/* No glass/blur surfaces anywhere in this skin — every popup, sheet, and
+   translucent nav bar renders fully opaque instead. */
+[data-skin="default-core"] * { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
 
 /* ---------------- Custom background upload (Settings) ---------------- */
 .opacity-preview-row { display: flex; align-items: center; gap: 12px; margin: 10px 0 4px; }

@@ -1094,8 +1094,6 @@ function initDesktopShell() {
     localStorage.setItem(WDS_THEME_OVERRIDE_KEY, theme);
   });
   const skinSelectEl = document.getElementById('wdsSkinSelect');
-  const coreColorSelectEl = document.getElementById('wdsCoreColorSelect');
-  const coreColorFieldEl = document.getElementById('wdsCoreColorField');
   const modeSwitchEl = document.getElementById('wdsThemeModeSwitch');
   const syncWdsModeUI = () => {
     if (!skinSelectEl) return;
@@ -1103,18 +1101,11 @@ function initDesktopShell() {
     if (modeSwitchEl) modeSwitchEl.querySelectorAll('[data-theme-mode]').forEach(btn => {
       btn.classList.toggle('is-active', (btn.dataset.themeMode === 'minimalist') === isMinimalist);
     });
-    if (coreColorFieldEl) coreColorFieldEl.hidden = !isMinimalist;
   };
   if (skinSelectEl) skinSelectEl.addEventListener('change', () => {
     document.documentElement.setAttribute('data-skin', skinSelectEl.value);
     localStorage.setItem(WDS_SKIN_OVERRIDE_KEY, skinSelectEl.value);
     syncWdsModeUI();
-  });
-  if (coreColorSelectEl) coreColorSelectEl.addEventListener('change', () => {
-    wdsApplyCoreColor(coreColorSelectEl.value);
-    localStorage.setItem(WDS_CORE_COLOR_OVERRIDE_KEY, coreColorSelectEl.value);
-    const mobileColorSel = document.getElementById('wdsCoreColorSelectMobile');
-    if (mobileColorSel) mobileColorSel.value = coreColorSelectEl.value;
   });
   if (modeSwitchEl) modeSwitchEl.addEventListener('click', e => {
     const btn = e.target.closest('[data-theme-mode]');
@@ -1127,9 +1118,6 @@ function initDesktopShell() {
       skinSelectEl.value = 'default';
       document.documentElement.setAttribute('data-skin', 'default');
       localStorage.setItem(WDS_SKIN_OVERRIDE_KEY, 'default');
-      wdsApplyCoreColor('');
-      localStorage.setItem(WDS_CORE_COLOR_OVERRIDE_KEY, '');
-      if (coreColorSelectEl) coreColorSelectEl.value = '';
     }
     syncWdsModeUI();
   });
@@ -1142,8 +1130,6 @@ function initDesktopShell() {
   const themePopup = document.getElementById('wdsThemePopup');
   const themeToggleMobileEl = document.getElementById('wdsThemeToggleMobile');
   const skinSelectMobileEl = document.getElementById('wdsSkinSelectMobile');
-  const coreColorSelectMobileEl = document.getElementById('wdsCoreColorSelectMobile');
-  const coreColorFieldMobileEl = document.getElementById('wdsCoreColorFieldMobile');
   const modeSwitchMobileEl = document.getElementById('wdsThemeModeSwitchMobile');
   const syncWdsModeUIMobile = () => {
     if (!skinSelectMobileEl) return;
@@ -1151,7 +1137,6 @@ function initDesktopShell() {
     if (modeSwitchMobileEl) modeSwitchMobileEl.querySelectorAll('[data-theme-mode]').forEach(btn => {
       btn.classList.toggle('is-active', (btn.dataset.themeMode === 'minimalist') === isMinimalist);
     });
-    if (coreColorFieldMobileEl) coreColorFieldMobileEl.hidden = !isMinimalist;
   };
   if (themeToggleMobileEl) themeToggleMobileEl.addEventListener('change', () => {
     const theme = themeToggleMobileEl.checked ? 'light' : 'dark';
@@ -1165,11 +1150,6 @@ function initDesktopShell() {
     if (skinSelectEl) { skinSelectEl.value = skinSelectMobileEl.value; syncWdsModeUI(); }
     syncWdsModeUIMobile();
   });
-  if (coreColorSelectMobileEl) coreColorSelectMobileEl.addEventListener('change', () => {
-    wdsApplyCoreColor(coreColorSelectMobileEl.value);
-    localStorage.setItem(WDS_CORE_COLOR_OVERRIDE_KEY, coreColorSelectMobileEl.value);
-    if (coreColorSelectEl) coreColorSelectEl.value = coreColorSelectMobileEl.value;
-  });
   if (modeSwitchMobileEl) modeSwitchMobileEl.addEventListener('click', e => {
     const btn = e.target.closest('[data-theme-mode]');
     if (!btn || !skinSelectMobileEl) return;
@@ -1182,9 +1162,6 @@ function initDesktopShell() {
       skinSelectMobileEl.value = 'default';
       document.documentElement.setAttribute('data-skin', 'default');
       localStorage.setItem(WDS_SKIN_OVERRIDE_KEY, 'default');
-      wdsApplyCoreColor('');
-      localStorage.setItem(WDS_CORE_COLOR_OVERRIDE_KEY, '');
-      if (coreColorSelectMobileEl) coreColorSelectMobileEl.value = '';
       if (skinSelectEl) { skinSelectEl.value = 'default'; syncWdsModeUI(); }
     }
     syncWdsModeUIMobile();
@@ -1898,12 +1875,8 @@ function renderWdsMenu() {
   const skinSelect = document.getElementById('wdsSkinSelect');
   if (skinSelect) {
     skinSelect.value = document.documentElement.getAttribute('data-skin') || 'default';
-    const colorSelect = document.getElementById('wdsCoreColorSelect');
-    const colorField = document.getElementById('wdsCoreColorField');
     const modeSwitch = document.getElementById('wdsThemeModeSwitch');
     const isMinimalist = skinSelect.value === 'default-core';
-    if (colorSelect) colorSelect.value = document.documentElement.getAttribute('data-core-color') || '';
-    if (colorField) colorField.hidden = !isMinimalist;
     if (modeSwitch) modeSwitch.querySelectorAll('[data-theme-mode]').forEach(btn => {
       btn.classList.toggle('is-active', (btn.dataset.themeMode === 'minimalist') === isMinimalist);
     });
@@ -2867,15 +2840,6 @@ function wdsCloseStoryComposer() {
 const WDS_DIAL_POS_KEY = 'wft_web_dial_pos';
 const WDS_THEME_OVERRIDE_KEY = 'wft_web_theme_override';
 const WDS_SKIN_OVERRIDE_KEY = 'wft_web_skin_override';
-const WDS_CORE_COLOR_OVERRIDE_KEY = 'wft_web_core_color_override';
-// data-core-color only matters while data-skin="default-core" (Minimalist
-// mode) -- see the Default Core skin block in style.css. Shared attribute,
-// set the same way regardless of which theme control (mobile FT's own
-// coreColorSelect, or either of wellness's two) last changed it.
-function wdsApplyCoreColor(color) {
-  if (color) document.documentElement.setAttribute('data-core-color', color);
-  else document.documentElement.removeAttribute('data-core-color');
-}
 const WDS_DIAL_ITEM_RADIUS = 78;
 let wdsDialOpen = false;
 
@@ -2885,10 +2849,8 @@ let wdsDialOpen = false;
 function wdsApplyThemeOverride() {
   const themeOverride = localStorage.getItem(WDS_THEME_OVERRIDE_KEY);
   const skinOverride = localStorage.getItem(WDS_SKIN_OVERRIDE_KEY);
-  const coreColorOverride = localStorage.getItem(WDS_CORE_COLOR_OVERRIDE_KEY);
   if (themeOverride) document.documentElement.setAttribute('data-theme', themeOverride);
   if (skinOverride) document.documentElement.setAttribute('data-skin', skinOverride);
-  if (coreColorOverride) wdsApplyCoreColor(coreColorOverride);
 }
 
 function wdsApplyDialPosition() {
@@ -3156,12 +3118,8 @@ function wdsOpenThemePopup() {
   if (toggle) toggle.checked = document.documentElement.getAttribute('data-theme') === 'light';
   if (select) {
     select.value = document.documentElement.getAttribute('data-skin') || 'default';
-    const colorSelect = document.getElementById('wdsCoreColorSelectMobile');
-    const colorField = document.getElementById('wdsCoreColorFieldMobile');
     const modeSwitch = document.getElementById('wdsThemeModeSwitchMobile');
     const isMinimalist = select.value === 'default-core';
-    if (colorSelect) colorSelect.value = document.documentElement.getAttribute('data-core-color') || '';
-    if (colorField) colorField.hidden = !isMinimalist;
     if (modeSwitch) modeSwitch.querySelectorAll('[data-theme-mode]').forEach(btn => {
       btn.classList.toggle('is-active', (btn.dataset.themeMode === 'minimalist') === isMinimalist);
     });
@@ -19592,38 +19550,23 @@ function applySkin(skin) {
   localStorage.setItem('wft_skin', skin);
 }
 
-const WFT_CORE_COLOR_KEY = 'wft_core_color';
-function applyCoreColor(color) {
-  if (color) document.documentElement.setAttribute('data-core-color', color);
-  else document.documentElement.removeAttribute('data-core-color');
-  localStorage.setItem(WFT_CORE_COLOR_KEY, color || '');
-}
-
 function initSkinSelector() {
   applySkin(localStorage.getItem('wft_skin') || 'default-core');
-  applyCoreColor(localStorage.getItem(WFT_CORE_COLOR_KEY) || '');
 
   const skinSelect = document.getElementById('skinSelect');
   const modeSwitch = document.getElementById('themeModeSwitch');
-  const colorField = document.getElementById('coreColorField');
-  const colorSelect = document.getElementById('coreColorSelect');
 
   const syncModeUI = () => {
     const isMinimalist = skinSelect.value === 'default-core';
     if (modeSwitch) modeSwitch.querySelectorAll('[data-theme-mode]').forEach(btn => {
       btn.classList.toggle('is-active', (btn.dataset.themeMode === 'minimalist') === isMinimalist);
     });
-    if (colorField) colorField.hidden = !isMinimalist;
   };
 
   skinSelect.addEventListener('change', e => {
     applySkin(e.target.value);
     syncModeUI();
   });
-  if (colorSelect) {
-    colorSelect.value = localStorage.getItem(WFT_CORE_COLOR_KEY) || '';
-    colorSelect.addEventListener('change', () => applyCoreColor(colorSelect.value));
-  }
   if (modeSwitch) modeSwitch.addEventListener('click', e => {
     const btn = e.target.closest('[data-theme-mode]');
     if (!btn) return;
@@ -19635,8 +19578,6 @@ function initSkinSelector() {
       // than leaving Default Core active under the Digital label.
       applySkin('default');
       skinSelect.value = 'default';
-      applyCoreColor('');
-      if (colorSelect) colorSelect.value = '';
     }
     syncModeUI();
   });
