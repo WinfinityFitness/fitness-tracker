@@ -24,9 +24,24 @@ if (VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails('mailto:support@winfinityfitness.com', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 }
 
+// SUPABASE_SECRET_KEYS replaces the deprecated SUPABASE_SERVICE_ROLE_KEY --
+// a JSON dictionary (key name isn't guaranteed, so just take the first
+// value) rather than a single JWT string. Falls back to the deprecated var
+// in case a project hasn't rotated onto the new key system yet.
+function getSupabaseServiceKey(): string {
+  const dict = Deno.env.get('SUPABASE_SECRET_KEYS');
+  if (dict) {
+    try {
+      const first = Object.values(JSON.parse(dict))[0];
+      if (typeof first === 'string' && first) return first;
+    } catch { /* fall through to legacy var */ }
+  }
+  return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+}
+
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+  getSupabaseServiceKey(),
 );
 
 interface ReminderRow {

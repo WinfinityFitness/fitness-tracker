@@ -16,7 +16,9 @@
 //                              settings -> Service accounts -> Generate new
 //                              private key), pasted as one secret value.
 //                              NEVER commit this file/value anywhere.
-// SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected automatically.
+// SUPABASE_URL and SUPABASE_SECRET_KEYS (or the deprecated
+// SUPABASE_SERVICE_ROLE_KEY, kept only as a fallback) are injected
+// automatically.
 //
 // Called by the notify_dm_push() Postgres trigger on new DM messages, with
 // { share_key, title, body }.
@@ -32,9 +34,24 @@ if (VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails('mailto:support@winfinityfitness.com', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 }
 
+// SUPABASE_SECRET_KEYS replaces the deprecated SUPABASE_SERVICE_ROLE_KEY --
+// a JSON dictionary (key name isn't guaranteed, so just take the first
+// value) rather than a single JWT string. Falls back to the deprecated var
+// in case a project hasn't rotated onto the new key system yet.
+function getSupabaseServiceKey(): string {
+  const dict = Deno.env.get('SUPABASE_SECRET_KEYS');
+  if (dict) {
+    try {
+      const first = Object.values(JSON.parse(dict))[0];
+      if (typeof first === 'string' && first) return first;
+    } catch { /* fall through to legacy var */ }
+  }
+  return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+}
+
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+  getSupabaseServiceKey(),
 );
 
 // --- FCM HTTP v1 auth: sign a JWT with the service account's private key,
