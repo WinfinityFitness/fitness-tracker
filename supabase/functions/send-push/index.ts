@@ -119,14 +119,14 @@ async function sendFcm(sa: ServiceAccount, token: string, title: string, body: s
 }
 
 Deno.serve(async (req: Request) => {
-  let payload: { share_key?: string; title?: string; body?: string };
+  let payload: { share_key?: string; title?: string; body?: string; type?: string };
   try {
     payload = await req.json();
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400 });
   }
 
-  const { share_key, title, body } = payload;
+  const { share_key, title, body, type } = payload;
   if (!share_key || !title) {
     return new Response(JSON.stringify({ error: 'share_key and title are required' }), { status: 400 });
   }
@@ -141,7 +141,7 @@ Deno.serve(async (req: Request) => {
       .eq('share_key', share_key);
     if (subs && subs.length) {
       webTotal = subs.length;
-      const notifPayload = JSON.stringify({ title, body: body ?? '' });
+      const notifPayload = JSON.stringify({ title, body: body ?? '', type: type ?? undefined });
       const results = await Promise.allSettled(
         subs.map((s) => webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, notifPayload)),
       );

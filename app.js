@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.15';
+const APP_VERSION = 'WF_SYS_V.1.7.16';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1238,6 +1238,15 @@ function initDesktopShell() {
   if (pushPopup) pushPopup.addEventListener('click', e => { if (e.target === pushPopup) pushPopup.hidden = true; });
   initWdsPushNotifications();
 
+  const messengerTogglePopup = document.getElementById('wdsMessengerTogglePopup');
+  const closeMessengerToggleBtn = document.getElementById('btnWdsMessengerTogglePopupClose');
+  if (closeMessengerToggleBtn) closeMessengerToggleBtn.addEventListener('click', () => { messengerTogglePopup.hidden = true; });
+  if (messengerTogglePopup) messengerTogglePopup.addEventListener('click', e => { if (e.target === messengerTogglePopup) messengerTogglePopup.hidden = true; });
+  const messengerAutoToggle = document.getElementById('wdsMessengerAutoToggle');
+  if (messengerAutoToggle) messengerAutoToggle.addEventListener('change', () => {
+    wdsSetMessengerAutoRedirectPref(messengerAutoToggle.checked);
+  });
+
   // Notification bell — simple open/close popover, closes on outside click.
   const bellBtn = document.getElementById('wdsBellBtn');
   const notifPop = document.getElementById('wdsNotifPop');
@@ -1399,10 +1408,16 @@ function initDesktopShell() {
   // in-page dropdown — see MESSENGER_SHELL_HOST/initMessengerShell and
   // supabase_messenger_handoff_migration.sql. Desktop viewport keeps the
   // dropdown exactly as before; guest mode (no real account to hand off)
-  // also keeps the dropdown even on mobile.
+  // also keeps the dropdown even on mobile. The wdsMessengerAutoToggle
+  // setting (Settings icon above the composer) is an explicit override on
+  // top of that auto-detection — when on, it redirects unconditionally,
+  // including on desktop, since wdsIsMessengerAppInstalled() only works
+  // on Chrome/Android and can't detect an install at all otherwise.
   chatListBtn.addEventListener('click', async e => {
     e.stopPropagation();
-    if (isWdsMobileViewport() && !wdsGuestMode && wdsRemoteData && wdsRemoteData.publicId && await wdsIsMessengerAppInstalled()) {
+    const messengerAutoOn = localStorage.getItem(WDS_MESSENGER_AUTO_KEY) === '1';
+    if (!wdsGuestMode && wdsRemoteData && wdsRemoteData.publicId &&
+        (messengerAutoOn || (isWdsMobileViewport() && await wdsIsMessengerAppInstalled()))) {
       const pin = localStorage.getItem(SESSION_PIN_KEY);
       let url = 'https://messenger.winfinityfitness.com/';
       if (pin) {
@@ -1486,8 +1501,9 @@ function initDesktopShell() {
   // Icon strip above the composer. Home is the feed itself — just marks
   // itself active, nothing to navigate to. Groups opens the real Chats
   // panel already filtered to group chatrooms (the closest existing
-  // equivalent). Reels/Marketplace/Games have no backing feature in this
-  // app yet, so they surface that honestly instead of doing nothing.
+  // equivalent). Settings opens wdsMessengerTogglePopup. Reels/
+  // Marketplace have no backing feature in this app yet, so they surface
+  // that honestly instead of doing nothing.
   const nexusIconTabs = document.getElementById('wdsNexusIconTabs');
   if (nexusIconTabs) nexusIconTabs.addEventListener('click', e => {
     const tabBtn = e.target.closest('[data-nexus-tab]');
@@ -1502,6 +1518,10 @@ function initDesktopShell() {
       refreshWdsChatRooms();
       const groupsTabBtn = document.getElementById('btnWdsChatTabGroups');
       if (groupsTabBtn) groupsTabBtn.click();
+      return;
+    }
+    if (tab === 'settings') {
+      wdsOpenMessengerTogglePopup();
       return;
     }
     showRestToast(`${tabBtn.title} is coming soon.`);
@@ -3170,6 +3190,44 @@ function wdsOpenPushPopup() {
     if (toggle) { toggle.disabled = false; toggle.checked = localStorage.getItem('wft_push_enabled') === '1'; }
     if (hint) hint.textContent = 'Delivered even when this tab is closed. Powers new direct message alerts.';
   }
+  popup.hidden = false;
+}
+
+// Whether the chat icon / a chat push notification should go straight to
+// the Messenger app instead of the in-page dropdown. Independent of (and
+// an override for) wdsIsMessengerAppInstalled()'s own auto-detection —
+// see chatListBtn's click handler. Mirrored into IndexedDB, not just
+// localStorage, because sw.js's notificationclick handler (a Service
+// Worker, no localStorage access) needs to read it too when deciding
+// where a tapped chat notification should go.
+const WDS_MESSENGER_AUTO_KEY = 'wft_web_messenger_auto_redirect';
+const WDS_PREFS_DB_NAME = 'wft-web-prefs';
+const WDS_PREFS_STORE_NAME = 'kv';
+function wdsOpenPrefsDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(WDS_PREFS_DB_NAME, 1);
+    req.onupgradeneeded = () => { req.result.createObjectStore(WDS_PREFS_STORE_NAME); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function wdsSetMessengerAutoRedirectPref(enabled) {
+  localStorage.setItem(WDS_MESSENGER_AUTO_KEY, enabled ? '1' : '0');
+  try {
+    const db = await wdsOpenPrefsDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(WDS_PREFS_STORE_NAME, 'readwrite');
+      tx.objectStore(WDS_PREFS_STORE_NAME).put(enabled, 'messengerAutoRedirect');
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) { /* best effort — sw.js just won't redirect notification taps if this never wrote */ }
+}
+function wdsOpenMessengerTogglePopup() {
+  const popup = document.getElementById('wdsMessengerTogglePopup');
+  if (!popup) return;
+  const toggle = document.getElementById('wdsMessengerAutoToggle');
+  if (toggle) toggle.checked = localStorage.getItem(WDS_MESSENGER_AUTO_KEY) === '1';
   popup.hidden = false;
 }
 // Reuses FT's own subscribeToPush/unsubscribeFromPush (they now pick
