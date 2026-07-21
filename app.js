@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.9';
+const APP_VERSION = 'WF_SYS_V.1.7.10';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -19558,7 +19558,15 @@ function applyThemeMode(mode) {
   localStorage.setItem('wft_theme_mode', mode);
   const customBgSection = document.getElementById('customBgSection');
   if (customBgSection) customBgSection.hidden = mode === 'minimalist';
-  if (typeof applyCustomBg === 'function') applyCustomBg();
+  // Deferred: applyThemeMode() runs synchronously from initSkinSelector()
+  // at the very top of the script, long before applyCustomBg/
+  // BG_SETTINGS_DEFAULT (declared much further down) have initialized --
+  // calling it directly here threw a TDZ ReferenceError that killed the
+  // whole script before it ever reached the splash-hide code, leaving the
+  // splash screen stuck forever. setTimeout(..., 0) pushes the call past
+  // the current synchronous pass so those declarations exist by the time
+  // it runs, on this first call and every later mode-toggle click alike.
+  if (typeof applyCustomBg === 'function') setTimeout(applyCustomBg, 0);
 }
 
 function initSkinSelector() {
