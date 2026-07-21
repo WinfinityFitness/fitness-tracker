@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.21';
+const APP_VERSION = 'WF_SYS_V.1.7.22';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -278,10 +278,20 @@ function initDesktopShell() {
         dailyReviewsObj: wdsArrayToDateMap(data.dailyReviews),
       };
       // Source of truth is server-side (see set_messenger_auto_redirect) —
-      // this just keeps the toggle's own localStorage-backed display in
-      // sync with whatever was actually last set, possibly from another
-      // device, rather than trusting this browser's own possibly-stale copy.
-      localStorage.setItem(WDS_MESSENGER_AUTO_KEY, data.messengerAutoRedirect ? '1' : '0');
+      // this keeps the toggle's own localStorage-backed display in sync
+      // with whatever was actually last set, possibly from another device.
+      // Only on the FIRST enterDashboard() this page load, though — this
+      // function also re-runs every 2 minutes via startWdsDashboardPolling
+      // on an already-active session, and syncing on every one of those
+      // meant a toggle flip whose set_messenger_auto_redirect write hadn't
+      // reached the server yet (e.g. interrupted by an immediate reload
+      // right after toggling — browsers cancel in-flight requests on
+      // navigation) got silently reverted by the very next poll reading
+      // the still-stale server value back over the fresh local change.
+      if (!wdsMessengerPrefSyncedThisLoad) {
+        wdsMessengerPrefSyncedThisLoad = true;
+        localStorage.setItem(WDS_MESSENGER_AUTO_KEY, data.messengerAutoRedirect ? '1' : '0');
+      }
     } catch (e) {
       errorEl.textContent = (e && e.message) || 'Sign-in failed — check your Digital ID and PIN.';
       errorEl.hidden = false;
@@ -1253,18 +1263,30 @@ function initDesktopShell() {
   if (closeMessengerToggleBtn) closeMessengerToggleBtn.addEventListener('click', () => { messengerTogglePopup.hidden = true; });
   if (messengerTogglePopup) messengerTogglePopup.addEventListener('click', e => { if (e.target === messengerTogglePopup) messengerTogglePopup.hidden = true; });
   const messengerAutoToggle = document.getElementById('wdsMessengerAutoToggle');
-  if (messengerAutoToggle) messengerAutoToggle.addEventListener('change', () => {
-    wdsSetMessengerAutoRedirectPref(messengerAutoToggle.checked);
+  if (messengerAutoToggle) messengerAutoToggle.addEventListener('change', async () => {
+    // Briefly disabled with a "Saving…" hint while the write is in flight —
+    // gives set_messenger_auto_redirect a moment to actually reach the
+    // server before the user can act on it again (e.g. immediately
+    // reloading), rather than firing-and-forgetting it in the background.
+    // See wdsMessengerPrefSyncedThisLoad's own comment for the failure mode
+    // this was covering for.
+    const hint = document.getElementById('wdsMessengerAutoHint');
+    const original = hint ? hint.textContent : '';
+    messengerAutoToggle.disabled = true;
+    if (hint) hint.textContent = 'Saving…';
+    await wdsSetMessengerAutoRedirectPref(messengerAutoToggle.checked);
+    messengerAutoToggle.disabled = false;
+    if (hint) hint.textContent = original;
   });
   const forceDesktopToggle = document.getElementById('wdsForceDesktopToggle');
-  if (forceDesktopToggle) forceDesktopToggle.addEventListener('change', () => {
+  if (forceDesktopToggle) forceDesktopToggle.addEventListener('change', async () => {
     wdsApplyForceDesktopViewport(forceDesktopToggle.checked);
     if (forceDesktopToggle.checked) {
       // Mutually exclusive with the Messenger auto-redirect toggle -- no
       // reason to hand off to Messenger when you've deliberately asked to
       // see everything, chat popup included, in the full desktop layout.
       if (messengerAutoToggle) messengerAutoToggle.checked = false;
-      wdsSetMessengerAutoRedirectPref(false);
+      await wdsSetMessengerAutoRedirectPref(false);
     }
   });
 
@@ -2219,10 +2241,14 @@ function renderWdsNutrition() {
   const calorieOverflowPct = Math.max(0, caloriePctRaw - 100);
   const isOverCalories = caloriePctRaw > 100;
   const ringEl = document.getElementById('wdsFuelCalorieRing');
+  // Sized for the ~250px-wide wellness sidebar column (not a full phone
+  // width like the mobile tab's own equivalent ring), so this stays well
+  // under 120px unlike the size renderRing defaults to elsewhere.
+  const fuelRingSize = 100;
   if (ringEl) renderRing(ringEl, caloriePct, {
-    size: 120, stroke: 10, gradient: true, overflowPct: calorieOverflowPct,
+    size: fuelRingSize, stroke: 8, gradient: true, overflowPct: calorieOverflowPct,
     centerHtml: isOverCalories
-      ? `<span style="font-size:${Math.round(120 * 0.22)}px;font-weight:800;font-family:var(--font-mono);color:var(--critical);">${Math.round(caloriePctRaw)}%</span>`
+      ? `<span style="font-size:${Math.round(fuelRingSize * 0.22)}px;font-weight:800;font-family:var(--font-mono);color:var(--critical);">${Math.round(caloriePctRaw)}%</span>`
       : undefined,
     centerText: Math.round(caloriePctRaw) + '%',
     label: 'Calories',
@@ -2281,8 +2307,10 @@ function renderWdsFuelAverages() {
   const calorieTarget = profile ? getEffectiveCalorieTarget(profile, today) : null;
   const calRing = ringCurrentVsTarget(avgCalories ?? 0, calorieTarget, '');
   const calRingEl = document.getElementById('wdsAvgCaloriesRing');
+  // 3-across in a narrow sidebar column — smaller than the mobile tab's own
+  // equivalent ring-row--3 to actually fit the ~250px column width.
   if (calRingEl) renderRing(calRingEl, avgCalories != null ? calRing.pct : 0, {
-    size: 96, stroke: 7, gradient: true,
+    size: 64, stroke: 6, gradient: true,
     centerHtml: avgCalories != null ? calRing.centerHtml : undefined,
     label: 'Calories', sub: '7-day avg',
   });
@@ -2293,14 +2321,14 @@ function renderWdsFuelAverages() {
   const protRing = ringCurrentVsTarget(todayEntry.protein ?? 0, proteinTarget, 'g');
   const protRingEl = document.getElementById('wdsAvgProteinRing');
   if (protRingEl) renderRing(protRingEl, protRing.pct, {
-    size: 96, stroke: 7, gradient: true, centerHtml: protRing.centerHtml, label: 'Protein', sub: 'Today',
+    size: 64, stroke: 6, gradient: true, centerHtml: protRing.centerHtml, label: 'Protein', sub: 'Today',
   });
 
   const waterTarget = effectiveWaterTargetML(today);
   const waterRing = ringCurrentVsTarget(todayEntry.water ?? 0, waterTarget, '');
   const waterRingEl = document.getElementById('wdsAvgWaterRing');
   if (waterRingEl) renderRing(waterRingEl, waterRing.pct, {
-    size: 96, stroke: 7, gradient: true, centerHtml: waterRing.centerHtml, label: 'Water', sub: 'Today',
+    size: 64, stroke: 6, gradient: true, centerHtml: waterRing.centerHtml, label: 'Water', sub: 'Today',
   });
 }
 
@@ -2325,8 +2353,10 @@ function renderWdsBio() {
   });
   const habitPct = habitTotal > 0 ? Math.round((habitDone / habitTotal) * 100) : 0;
   const habitRingEl = document.getElementById('wdsRingHabitCard');
+  // 2-across in the ~250px sidebar column — smaller than the mobile tab's
+  // own full-width equivalent so the pair actually fits side by side.
   if (habitRingEl) renderRing(habitRingEl, habitPct, {
-    size: 140, stroke: 9, modTag: 'MOD_HABIT_01', centerText: habitPct + '%', label: 'Habit completion', sub: `${habitDone}/${habitTotal} today`,
+    size: 90, stroke: 7, modTag: 'MOD_HABIT_01', centerText: habitPct + '%', label: 'Habit completion', sub: `${habitDone}/${habitTotal} today`,
   });
 
   const waterGoal = (profile && profile.waterGoal) || 3000;
@@ -2344,14 +2374,14 @@ function renderWdsBio() {
   const fuelMetCount = [waterPct, caloriePct, proteinPct].filter(p => p >= 100).length;
   const hydrationRingEl = document.getElementById('wdsRingHydrationCard');
   if (hydrationRingEl) renderRing(hydrationRingEl, lifeFuelPct, {
-    size: 140, stroke: 9, magenta: true, modTag: 'MOD_FUEL_02', centerText: lifeFuelPct + '%', label: 'Life Fuel', sub: `${fuelMetCount}/3 today`,
+    size: 90, stroke: 7, magenta: true, modTag: 'MOD_FUEL_02', centerText: lifeFuelPct + '%', label: 'Life Fuel', sub: `${fuelMetCount}/3 today`,
   });
 
   const bodyFatEntry = findLastBodyFatEntry(today);
   const bodyFatPct = bodyFatEntry ? computeBodyFatJP7(bodyFatEntry.skinfolds, profile ? profile.age : null, profile ? profile.gender : null) : null;
   const bodyFatRingEl = document.getElementById('wdsBodyFatRing');
   if (bodyFatRingEl) renderRing(bodyFatRingEl, bodyFatPct != null ? Math.min(100, bodyFatPct * 2) : 0, {
-    size: 108, stroke: 8, centerText: bodyFatPct != null ? bodyFatPct.toFixed(1) + '%' : '–',
+    size: 82, stroke: 6, centerText: bodyFatPct != null ? bodyFatPct.toFixed(1) + '%' : '–',
     label: 'Body Fat %', sub: bodyFatEntry ? `Average · last logged ${fmtDate(parseISO(bodyFatEntry.date))}` : 'Not logged yet',
   });
 
@@ -2365,7 +2395,7 @@ function renderWdsEdemaRing() {
   const kg = profile ? currentWeightKg(profile) : null;
   const tbwLiters = kg ? computeWatsonTBW(profile, kg) : null;
   if (!tbwLiters) {
-    renderRing(container, 0, { size: 108, stroke: 8, magenta: true, centerText: '–', label: 'Edema extrapolation', sub: 'Complete Bio profile to estimate' });
+    renderRing(container, 0, { size: 82, stroke: 6, magenta: true, centerText: '–', label: 'Edema extrapolation', sub: 'Complete Bio profile to estimate' });
     return;
   }
   const date = todayISO();
@@ -2382,7 +2412,7 @@ function renderWdsEdemaRing() {
     : 0;
   const totalG = glycogenWaterG + stateWaterG + periodBonusG;
   const gaugePct = Math.min(100, (totalG / 3500) * 100);
-  renderRing(container, gaugePct, { size: 108, stroke: 8, magenta: true, centerText: round0(totalG) + 'g', label: 'Edema extrapolation', sub: `Estimate for ${fmtDate(parseISO(date))}` });
+  renderRing(container, gaugePct, { size: 82, stroke: 6, magenta: true, centerText: round0(totalG) + 'g', label: 'Edema extrapolation', sub: `Estimate for ${fmtDate(parseISO(date))}` });
 }
 
 async function renderWdsNexus() {
@@ -3590,6 +3620,10 @@ function wdsOpenPushPopup() {
 // there. localStorage here only drives this browser's own immediate
 // chat-icon-click behavior and the toggle's own on/off display.
 const WDS_MESSENGER_AUTO_KEY = 'wft_web_messenger_auto_redirect';
+// Guards enterDashboard's own server->local sync for this key (see its
+// definition) so a background poll of an already-active session can't
+// revert a just-made toggle change before its own save has landed.
+let wdsMessengerPrefSyncedThisLoad = false;
 async function wdsSetMessengerAutoRedirectPref(enabled) {
   localStorage.setItem(WDS_MESSENGER_AUTO_KEY, enabled ? '1' : '0');
   if (wdsRemoteData && wdsRemoteData.shareKey) {
@@ -5388,9 +5422,6 @@ function renderWdsProfileHeader() {
   if (wallPermissionLabel) wallPermissionLabel.hidden = !isOwn;
   const manageBtn = document.getElementById('btnWdsProfileManage');
   if (manageBtn) manageBtn.hidden = !isOwn;
-  const bioMarkersCard = document.getElementById('wdsProfileBodyFatText');
-  const bioMarkersCardEl = bioMarkersCard ? bioMarkersCard.closest('.wds-card') : null;
-  if (bioMarkersCardEl) bioMarkersCardEl.hidden = !isOwn;
 
   if (isOwn) {
     const mode = getFitnessMode();
@@ -5403,17 +5434,6 @@ function renderWdsProfileHeader() {
       <li><span>Fitness Mode</span><strong>${escapeHtml(MODE_LABEL[mode] || mode)}</strong></li>
       <li><span>Member Since</span><strong>${escapeHtml(memberSince)}</strong></li>
     `;
-
-    // Same calc as the dashboard's own Bio-Markers card (renderWdsBio).
-    const today = todayISO();
-    const bodyFatEntry = findLastBodyFatEntry(today);
-    const bodyFatPct = bodyFatEntry ? computeBodyFatJP7(bodyFatEntry.skinfolds, profile.age, profile.gender) : null;
-    document.getElementById('wdsProfileBodyFatText').textContent = bodyFatPct != null ? bodyFatPct.toFixed(1) + '%' : '–';
-    document.getElementById('wdsProfileBodyFatBar').style.width = bodyFatPct != null ? Math.min(100, bodyFatPct * 2) + '%' : '0%';
-
-    const stats = computeLeaderboardStats();
-    document.getElementById('wdsProfileWeightText').textContent = stats.progress != null ? `${stats.progress > 0 ? '+' : ''}${stats.progress}${stats.weightUnit}` : '–';
-    document.getElementById('wdsProfileWeightBar').style.width = stats.progressPct != null ? Math.min(100, Math.abs(stats.progressPct) * 5) + '%' : '0%';
 
     const wallSelect = document.getElementById('wdsWallPermissionSelect');
     if (wallSelect) wallSelect.value = wdsOwnWallPermission || 'friends';
@@ -5483,22 +5503,6 @@ function initWdsShoutComposer() {
   };
   postBtn.addEventListener('click', () => submit(input.value));
   if (clearBtn) clearBtn.addEventListener('click', () => submit(''));
-}
-
-// Same gauge/chart visuals as the dashboard's own Status tab — reuses
-// getModeProgress()/computeTrendSeries() unchanged, just writes into the
-// Profile Page's own wdsProfile*-prefixed element ids so it doesn't
-// collide with the dashboard's copies. Own data only, so this is skipped
-// entirely (cards hidden) when viewing another operator's profile.
-function renderWdsProfileVisuals() {
-  const chartCard = document.getElementById('wdsProfileWeightTrendCard');
-  if (!chartCard) return;
-  const isOwn = !wdsViewedProfile;
-  chartCard.hidden = !isOwn;
-  if (!isOwn) return;
-
-  const series = computeTrendSeries(sortedLogsArray()).slice(-90);
-  wdsSetChartPaths('wdsProfileWeightChartArea', 'wdsProfileWeightChartLine', 'wdsProfileWeightChartDot', 'wdsProfileWeightChartEmpty', series.map(s => s.trendKg));
 }
 
 async function refreshWdsProfilePosts() {
@@ -5792,7 +5796,6 @@ async function wdsShowProfilePage(targetShareKey) {
   await refreshWdsFriendsList(isOwn ? null : targetShareKey);
   if (isOwn) await refreshWdsPendingFriendRequestsList();
   else await wdsRefreshViewedProfileFriendButton(targetShareKey);
-  renderWdsProfileVisuals();
   wdsSaveLastView({ type: 'profile', shareKey: isOwn ? 'own' : targetShareKey });
 }
 // Sets the "+ Add Friend" button's actual state (none/pending/already

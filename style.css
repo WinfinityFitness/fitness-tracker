@@ -5463,6 +5463,16 @@ html.wf-desktop-shell body { overflow-x: auto; }
 .wds-gauge--mini .wds-gauge-value { font-size: 1.05rem; }
 .wds-gauge--mini .wds-gauge-value small { font-size: 0.62rem; }
 .wds-linechart--mini { height: 60px; }
+/* Total Lift Volume chart — a bare <svg viewBox="0 0 280 90"> with no
+   width/height attributes defaults to the browser's replaced-element
+   intrinsic size (300x150), which both overflows the ~250px sidebar
+   column and stretches out of its 280:90 aspect ratio. */
+#wdsVolumeTrendChart { width: 100%; height: 90px; display: block; }
+/* The imported FT widgets in the desktop-shell's narrow left column were
+   designed for a full phone width — a 2-across perf-grid squeezes each
+   tile's label/value/sparkline below a readable size here, so stack them
+   in this column specifically instead of shrinking the text further. */
+.wds-uni-left .perf-grid { grid-template-columns: 1fr; }
 
 .wds-mini-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .wds-mini-stat { display: flex; flex-direction: column; gap: 2px; }
@@ -6303,6 +6313,12 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
 @media (max-width: 720px) {
   .wds-profile-body { grid-template-columns: 1fr; }
   .wds-profile-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+  /* The 440px cover height is tuned for the wide desktop/web viewport — at
+     phone widths the same fixed height reads as an over-zoomed near-square
+     crop instead of a letterboxed full-width band like the web view shows.
+     Shrinking it here keeps background-size:cover but at a shorter,
+     proportionally web-like band. */
+  .wds-profile-cover { height: 200px; }
 }
 
 /* Nexus */

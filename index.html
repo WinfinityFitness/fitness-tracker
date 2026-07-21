@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.21">
+<link rel="stylesheet" href="style.css?v=1.7.22">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -4011,19 +4011,6 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
           <ul class="wds-profile-detail-list" id="wdsProfileDetailList"></ul>
         </div>
         <div class="wds-card">
-          <h3 class="wds-card-title">Bio-Markers</h3>
-          <div class="wds-marker-row">
-            <div class="wds-macro">
-              <div class="wds-macro-head"><span>Body Fat %</span><span id="wdsProfileBodyFatText">–</span></div>
-              <div class="wds-progress"><div class="wds-progress-fill" id="wdsProfileBodyFatBar" style="width:0%;background:var(--cyan)"></div></div>
-            </div>
-            <div class="wds-macro">
-              <div class="wds-macro-head"><span>Weight Progress</span><span id="wdsProfileWeightText">–</span></div>
-              <div class="wds-progress"><div class="wds-progress-fill" id="wdsProfileWeightBar" style="width:0%;"></div></div>
-            </div>
-          </div>
-        </div>
-        <div class="wds-card">
           <div class="wds-card-head">
             <h3 class="wds-card-title" style="margin:0;">Friends</h3>
             <button type="button" class="wds-mini-btn" id="btnWdsProfileAddFriend">+ Add Friend</button>
@@ -4041,28 +4028,6 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
                otherwise have no way to ever be found. Own profile only. -->
           <div id="wdsPendingFriendRequestsList"></div>
           <div id="wdsProfileFriendsList"><p class="empty-note">No friends yet.</p></div>
-        </div>
-
-        <!-- Same chart visual as the dashboard's Status tab (own data only
-             — hidden when viewing another operator's profile, same as the
-             Bio-Markers card above). -->
-        <div class="wds-card wds-card--chart" id="wdsProfileWeightTrendCard">
-          <div class="wds-card-head">
-            <h3 class="wds-card-title">Weight Trend</h3>
-            <span class="wds-card-sub">90d</span>
-          </div>
-          <svg class="wds-linechart wds-linechart--mini" viewBox="0 0 560 160" preserveAspectRatio="none" id="wdsProfileWeightChartSvg">
-            <defs>
-              <linearGradient id="wdsAreaFillProfile" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="var(--cyan)" stop-opacity="0.35"/>
-                <stop offset="100%" stop-color="var(--cyan)" stop-opacity="0"/>
-              </linearGradient>
-            </defs>
-            <path id="wdsProfileWeightChartArea" d="" fill="url(#wdsAreaFillProfile)"/>
-            <path id="wdsProfileWeightChartLine" d="" fill="none" stroke="var(--cyan)" stroke-width="2.5" stroke-linecap="round"/>
-            <circle id="wdsProfileWeightChartDot" cx="0" cy="0" r="4.5" fill="var(--cyan)" visibility="hidden"/>
-          </svg>
-          <p class="hint hint--sm" id="wdsProfileWeightChartEmpty" hidden>No weight entries logged yet.</p>
         </div>
       </div>
       <div class="wds-profile-main">
@@ -4410,10 +4375,10 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
-<script src="config.js?v=1.7.21"></script>
+<script src="config.js?v=1.7.22"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.7.21"></script>
+<script src="app.js?v=1.7.22"></script>
 </body>
 </html>
