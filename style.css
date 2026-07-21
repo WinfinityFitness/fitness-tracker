@@ -4694,184 +4694,161 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .sheet-section--compact .section-title-row { margin: 4px 0 -2px; }
 
 /* ================================================================== */
-/* SKIN: Default Core — "Municipal Harmony." Full replacement of the      */
-/* earlier "Corporate Modern with a Neon Edge" brief — no residue of that */
-/* palette/gradient left anywhere below. "The Helpful Local": clean,      */
-/* calm, trustworthy municipal-directory look. Plain cool-white surfaces  */
-/* (#f6faff bg, pure white cards), deep slate teal (#2D6A6A) as the       */
-/* single accent for headers/active-states/primary buttons — no gradient */
-/* anywhere, buttons are flat solid fills per the brief's own "Primary    */
-/* buttons... Primary Teal background" rule. THE APP DEFAULT — see       */
-/* initSkinSelector's fallback in app.js. Plus Jakarta Sans reuses the    */
-/* local fonts/plus-jakarta-sans.woff2 file Asanoha Digital already      */
-/* self-hosts (no new font asset); the brief's separate "Work Sans" for  */
-/* labels has no local file, so labels fall back to the same Jakarta     */
-/* face rather than fetching a new one. Dark companion derived from the  */
-/* brief's own Material 3 inverse-* tokens, same technique as every      */
-/* other skin's dark mode here — not invented from scratch. */
+/* SKIN: Default Core — "Minimalist." Third rebuild, now deliberately the
+   OPPOSITE of the previous two attempts: no bespoke palette, no forced
+   pill/16px-everything shape overrides, no custom webfont. This is
+   wellness's own clean, undecorated look (.wds-card/.wds-icon-btn/
+   .wds-topnav etc. are the SAME classes mobile FT uses, styled entirely
+   off these same CSS custom properties with no skin-specific shape
+   rules today) — so "copying wellness's look" IS this app's plain base
+   :root / :root[data-theme="light"] palette, verbatim, just given its
+   own selectable, nameable skin slot instead of living only in the
+   unnamed "Winfinity Default" option. No component overrides below on
+   purpose: the app's own un-skinned card/button/input CSS is already
+   the minimal look being asked for.
+
+   THE APP DEFAULT — see initSkinSelector's fallback in app.js.
+
+   Pairs with a new Digital/Minimalist mode toggle (Settings > Theme):
+   selecting Minimalist applies this skin; a second "Color" picker then
+   lets you layer just the ACCENT color variables (--cyan/--violet/
+   --magenta/--good/--warning/--serious/--critical/--gradient-bar/
+   --series-1/2/--cyan-glow/--gradient-glow) from any of the other six
+   "Digital" skins on top, via [data-core-color="<skin>"] below —
+   everything else (surfaces, borders, text, shape) stays this skin's
+   own plain values regardless of which color set is layered in. */
 /* ================================================================== */
-@font-face {
-  font-family: 'Default Core Jakarta';
-  font-style: normal;
-  font-weight: 400 800;
-  font-display: swap;
-  src: url('fonts/plus-jakarta-sans.woff2') format('woff2');
-}
-
-/* Dark — derived from inverse-surface/inverse-on-surface/inverse-primary. */
 :root[data-skin="default-core"] {
-  --bg: #001e2e;
-  --bg-elevated: #00344c;
-  --surface-1: #00344c;
-  --surface-2: #123f52;
-  --surface-1-rgb: 0,52,76;
-  --surface-2-rgb: 18,63,82;
-  --border: rgba(149,209,209,0.3);
-  --border-soft: rgba(255,255,255,0.08);
-  --text-primary: #e5f2ff;
-  --text-secondary: #9ecfd1;
-  --text-muted: #7fa8a8;
-  --gridline: rgba(255,255,255,0.08);
-  --baseline: rgba(255,255,255,0.16);
+  --bg: #0a0e12;
+  --bg-elevated: #12181c;
+  --surface-1: #12181c;
+  --surface-2: #171f24;
+  --surface-1-rgb: 18,24,28;
+  --surface-2-rgb: 23,31,36;
+  --border: rgba(51, 200, 204, 0.12);
+  --border-soft: rgba(255,255,255,0.06);
+  --text-primary: #dde3e5;
+  --text-secondary: #7e8e95;
+  --text-muted: #5a686e;
+  --gridline: rgba(255,255,255,0.06);
+  --baseline: rgba(255,255,255,0.14);
 
-  --cyan: #95d1d1;
-  --cyan-dim: #6bb0b0;
-  --cyan-glow: rgba(149,209,209,0.32);
-  --violet: #9ecfd1;
-  --magenta: #c0c9be;
+  --cyan: #33c8cc;
+  --cyan-dim: #23888c;
+  --cyan-glow: rgba(51, 200, 204, 0.42);
+  --violet: #8069d6;
+  --magenta: #cf5cb8;
 
-  --series-1: #95d1d1;
-  --series-2: #9ecfd1;
-  --gradient-bar: linear-gradient(135deg, #95d1d1 0%, #0c5252 100%);
-  --gradient-glow: rgba(149,209,209,0.3);
+  --series-1: #33c8cc;
+  --series-2: #8069d6;
+  --gradient-bar: linear-gradient(90deg, var(--violet) 0%, #3f8ff0 55%, var(--cyan) 100%);
+  --gradient-glow: rgba(63,143,240,0.36);
 
-  --good: #6bcfc0;
-  --warning: #e0c04a;
-  --serious: #e0973c;
-  --critical: #ffb4ab;
+  --good: #34bd7c;
+  --warning: #dba52c;
+  --serious: #e6824b;
+  --critical: #e6516a;
 
-  --surface-translucent: rgba(0,30,46,0.92);
-  --nav-translucent: rgba(0,52,76,0.95);
+  --surface-translucent: rgba(10,14,18,0.88);
+  --nav-translucent: rgba(14,20,24,0.88);
 
-  --card-radius: 1rem;
-  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  --font-display: 'Default Core Jakarta', system-ui, sans-serif;
+  --card-radius: 8px;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Roboto Mono", monospace;
+  --font-display: system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-headline: var(--font-display);
 }
-
-/* Light — the brief's actual palette, verbatim (this is the intended/
-   primary mode; dark above is the derived companion). Plain flat
-   surfaces only — no rgba-translucent card fills anywhere, so nothing
-   from another skin can bleed through as visual "residue". */
 :root[data-skin="default-core"][data-theme="light"] {
-  --bg: #f6faff;
-  --bg-elevated: #ffffff;
-  --surface-1: #ffffff;
-  --surface-2: #eaf5ff;
-  --surface-1-rgb: 255,255,255;
-  --surface-2-rgb: 234,245,255;
-  --border: rgba(12,82,82,0.25);
-  --border-soft: #d3ebff;
-  --text-primary: #001e2e;
-  --text-secondary: #457b9d;
-  --text-muted: #707978;
-  --gridline: rgba(0,30,46,0.06);
-  --baseline: rgba(0,30,46,0.14);
+  --bg: #f0f3f5;
+  --bg-elevated: #fbfcfd;
+  --surface-1: #fbfcfd;
+  --surface-2: #eceff1;
+  --surface-1-rgb: 251,252,253;
+  --surface-2-rgb: 236,239,241;
+  --border: rgba(10, 163, 189, 0.2);
+  --border-soft: #e2e8f0;
+  --text-primary: #262a2c;
+  --text-secondary: #475356;
+  --text-muted: #707c80;
+  --gridline: rgba(25, 28, 30, 0.08);
+  --baseline: #bcc9cd;
 
-  --cyan: #2d6a6a;
-  --cyan-dim: #0c5252;
-  --cyan-glow: rgba(45,106,106,0.22);
-  --violet: #356668;
-  --magenta: #93000a;
+  --cyan: #0aa3bd;
+  --cyan-dim: #0c6d7e;
+  --cyan-glow: rgba(10, 163, 189, 0.24);
+  --violet: #6a41c2;
+  --magenta: #ab1a41;
 
-  --series-1: #2d6a6a;
-  --series-2: #356668;
-  --gradient-bar: linear-gradient(135deg, #2d6a6a 0%, #0c5252 100%);
-  --gradient-glow: rgba(45,106,106,0.2);
+  --series-1: #0aa3bd;
+  --series-2: #6a41c2;
+  --gradient-bar: linear-gradient(90deg, var(--violet) 0%, #3f8ff0 55%, var(--cyan) 100%);
+  --gradient-glow: rgba(63, 143, 240, 0.22);
 
-  --good: #2a9d8f;
-  --warning: #8a6d00;
-  --serious: #a15c00;
-  --critical: #ba1a1a;
+  --good: #16805c;
+  --warning: #a35714;
+  --serious: #b04a1c;
+  --critical: #a82929;
 
-  --surface-translucent: rgba(246,250,255,0.94);
-  --nav-translucent: rgba(255,255,255,0.96);
+  --surface-translucent: rgba(240,243,245,0.88);
+  --nav-translucent: rgba(251,252,253,0.88);
 }
+/* No decorative body pattern/radial glow — plain flat background only,
+   this skin specifically (every other skin keeps its own body look). */
+[data-skin="default-core"] body { background-image: none !important; }
 
-/* Shapes: 8px standard elements (inputs/list items/small buttons — the
-   sitewide default already), 16px large containers (cards/panels), full
-   pill for tags/chips AND primary buttons specifically (the brief calls
-   out pill-shaped primary buttons by name, not just tags). */
-[data-skin="default-core"] .wds-card,
-[data-skin="default-core"] .chart-card,
-[data-skin="default-core"] .stat-tile,
-[data-skin="default-core"] .hero-card,
-[data-skin="default-core"] .ring-card,
-[data-skin="default-core"] .computed-card {
-  border-radius: 1rem !important;
-  border: 1px solid var(--border-soft);
-  /* Level 1: blur 12px, y 4px, 4% Primary Teal — ambient, not a harsh
-     black shadow, so cards read as "floating gently" per the brief. */
-  box-shadow: 0 4px 12px rgba(45,106,106,0.04);
+/* ---------------------------------------------------------------------
+   Color-only overlays — [data-core-color] is set independently of
+   [data-skin], only meaningful/applied while data-skin="default-core"
+   (see the Minimalist mode's Color picker in app.js). Each block below
+   is exactly that skin's own accent-token values, copied verbatim — no
+   surface/border/text/shape properties, so the minimal layout underneath
+   never changes, only the accent hue does. */
+[data-skin="default-core"][data-core-color="shinobi-core"] {
+  --cyan: #d9720a; --cyan-dim: #a85400; --cyan-glow: rgba(217,114,10,0.28);
+  --violet: #46485a; --magenta: #b3261e;
+  --series-1: #d9720a; --series-2: #46485a;
+  --gradient-bar: linear-gradient(90deg, #46485a 0%, #d9720a 100%);
+  --gradient-glow: rgba(217,114,10,0.24);
+  --good: #3f6b21; --warning: #8a5a00; --serious: #a13d0f; --critical: #ba1a1a;
 }
-[data-skin="default-core"] .chip,
-[data-skin="default-core"] .pill {
-  border-radius: 9999px !important;
+[data-skin="default-core"][data-core-color="grand-core"] {
+  --cyan: #00aeef; --cyan-dim: #00658d; --cyan-glow: rgba(0,174,239,0.35);
+  --violet: #2ae500; --magenta: #ba1a1a;
+  --series-1: #00aeef; --series-2: #2ae500;
+  --gradient-bar: linear-gradient(90deg, #2ae500 0%, #00aeef 100%);
+  --gradient-glow: rgba(0,174,239,0.3);
+  --good: #106e00; --warning: #bfa100; --serious: #b5650a; --critical: #ba1a1a;
 }
-[data-skin="default-core"] .hero-title,
-[data-skin="default-core"] .chart-card-title,
-[data-skin="default-core"] .section-title,
-[data-skin="default-core"] .app-header h1,
-[data-skin="default-core"] .sheet-head h2,
-[data-skin="default-core"] .field-group-heading {
-  font-family: var(--font-headline);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+[data-skin="default-core"][data-core-color="sovereign-core"] {
+  --cyan: #00838f; --cyan-dim: #005f66; --cyan-glow: rgba(0,131,143,0.22);
+  --violet: #0058cc; --magenta: #5b00cc;
+  --series-1: #00838f; --series-2: #0058cc;
+  --gradient-bar: linear-gradient(90deg, #0058cc 0%, #00838f 100%);
+  --gradient-glow: rgba(0,131,143,0.18);
+  --good: #00838f; --warning: #5b00cc; --serious: #a8324a; --critical: #ba1a1a;
 }
-/* Primary buttons: flat solid Primary Teal, no gradient, no shadow —
-   pill-shaped per the brief. Secondary: Secondary Mint fill, Primary
-   Teal text. */
-[data-skin="default-core"] .btn {
-  background: var(--surface-2);
-  color: var(--cyan-dim);
-  border: none;
-  box-shadow: none;
-  border-radius: 0.5rem !important;
+[data-skin="default-core"][data-core-color="hashira-core"] {
+  --cyan: #92002f; --cyan-dim: #680015; --cyan-glow: rgba(146,0,47,0.22);
+  --violet: #cc4400; --magenta: #8a6d00;
+  --series-1: #92002f; --series-2: #cc4400;
+  --gradient-bar: linear-gradient(90deg, #cc4400 0%, #92002f 100%);
+  --gradient-glow: rgba(146,0,47,0.18);
+  --good: #cc4400; --warning: #8a6d00; --serious: #b23a00; --critical: #ba1a1a;
 }
-[data-skin="default-core"] .btn--primary {
-  background: var(--cyan);
-  color: #ffffff;
-  border: none;
-  box-shadow: none;
-  border-radius: 9999px !important;
+[data-skin="default-core"][data-core-color="asanoha-digital"] {
+  --cyan: #970046; --cyan-dim: #7a0038; --cyan-glow: rgba(151,0,70,0.28);
+  --violet: #416e00; --magenta: #c9184a;
+  --series-1: #970046; --series-2: #416e00;
+  --gradient-bar: linear-gradient(90deg, #416e00 0%, #970046 100%);
+  --gradient-glow: rgba(151,0,70,0.22);
+  --good: #416e00; --warning: #c9184a; --serious: #a3123f; --critical: #ba1a1a;
 }
-[data-skin="default-core"] input,
-[data-skin="default-core"] select,
-[data-skin="default-core"] textarea {
-  background: var(--surface-2) !important;
-  color: var(--text-primary) !important;
-  border: 1px solid var(--border-soft) !important;
-  border-radius: 0.5rem !important;
-}
-[data-skin="default-core"] input:focus,
-[data-skin="default-core"] select:focus,
-[data-skin="default-core"] textarea:focus {
-  background: var(--surface-1) !important;
-  border-color: var(--cyan) !important;
-  outline: none;
-}
-[data-skin="default-core"] .tab-bar,
-[data-skin="default-core"] .app-header {
-  background: var(--surface-1);
-  border-bottom: 1px solid var(--border-soft);
-  box-shadow: none;
-}
-/* Level 2: dropdowns/overlays get a more pronounced (8% Primary Teal)
-   shadow than cards, per the brief's own elevation scale. */
-[data-skin="default-core"] .wds-story-modal,
-[data-skin="default-core"] .chat-user-menu,
-[data-skin="default-core"] .sheet {
-  box-shadow: 0 8px 24px rgba(45,106,106,0.08);
+[data-skin="default-core"][data-core-color="steampunk-core"] {
+  --cyan: #8e4e00; --cyan-dim: #6c3a00; --cyan-glow: rgba(142,78,0,0.24);
+  --violet: #8a6b00; --magenta: #93000a;
+  --series-1: #8e4e00; --series-2: #8a6b00;
+  --gradient-bar: linear-gradient(90deg, #8e4e00 0%, #cd7f32 55%, #af8d11 100%);
+  --gradient-glow: rgba(142,78,0,0.2);
+  --good: #3f6b21; --warning: #7a5c00; --serious: #a13d0f; --critical: #93000a;
 }
 
 /* ---------------- Custom background upload (Settings) ---------------- */

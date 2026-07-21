@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.4';
+const APP_VERSION = 'WF_SYS_V.1.7.5';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -14940,8 +14940,7 @@ function effectiveLeaderboardName() {
 
 function updateCodeNameHint() {
   const hint = document.getElementById('lbCodeNameHint');
-  const optedIn = localStorage.getItem('wft_lb_optin') === '1';
-  hint.textContent = optedIn ? `Sharing as "${effectiveLeaderboardName()}"` : 'Not sharing. Turn on to join the Nexus.';
+  hint.textContent = `Sharing as "${effectiveLeaderboardName()}"`;
 }
 
 // Current consecutive-day streak of fully-complete daily logs — the same
@@ -15081,13 +15080,6 @@ async function pullLeaderboard() {
   if (error) throw error;
   const cutoff = Date.now() - LEADERBOARD_INACTIVE_MS;
   return (data || []).filter(r => r.updated_at && new Date(r.updated_at).getTime() >= cutoff);
-}
-
-async function removeFromLeaderboard() {
-  const shareKey = localStorage.getItem('wft_lb_share_key');
-  if (!shareKey || !sbConfigured()) return;
-  try { await sb.rpc('delete_leaderboard_entry', { p_share_key: shareKey }); }
-  catch (e) { /* best effort */ }
 }
 
 function timeAgo(iso) {
@@ -15593,6 +15585,9 @@ function refreshDigitalIdOverrideVisibility() {
   // are gated here. Quick Log icons (data-quicklog-key) are unrelated to
   // login state — see loadQuickLogDialConfig/applyQuickLogDialConfig.
   document.querySelectorAll('.admin-drawer-pill-item[data-admin-only]').forEach(el => { el.hidden = !loggedIn; });
+  // Inverse of the above — the Admin Log In icon only makes sense while
+  // logged out (see its own comment in index.html, next to the Log Out icon).
+  document.querySelectorAll('.admin-drawer-pill-item[data-hide-when-admin]').forEach(el => { el.hidden = loggedIn; });
   if (!loggedIn) closeAdminDrawerAll();
 }
 
@@ -18323,17 +18318,13 @@ function refreshAnnouncementMenuState() {
 }
 
 function initAnnouncementWidget() {
-  const menuBtn = document.getElementById('btnAnnouncementMenu');
-  const menu = document.getElementById('announcementMenu');
   refreshAnnouncementMenuState();
 
-  menuBtn.addEventListener('click', () => { menu.hidden = !menu.hidden; });
-  document.addEventListener('click', e => {
-    if (!menu.hidden && !e.target.closest('.announcement-menu-wrap')) menu.hidden = true;
-  });
-
+  // Admin Log In lives as a hidden proxy button now, reached via its own
+  // always-visible-when-logged-out drawer pill icon (data-action="btnAdminLogin",
+  // same click-forwarding the Log Out icon already used) — no more
+  // standalone announcement-card menu to toggle open/closed first.
   document.getElementById('btnAdminLogin').addEventListener('click', () => {
-    menu.hidden = true;
     document.getElementById('adminLoginNote').textContent = '';
     document.getElementById('adminLoginId').value = '';
     document.getElementById('adminLoginPassword').value = '';
@@ -18343,19 +18334,16 @@ function initAnnouncementWidget() {
     if (!confirm('Log out of admin?')) return;
     adminSession = { digitalId: null, password: null };
     localStorage.removeItem('wft_admin_session');
-    menu.hidden = true;
     refreshAnnouncementMenuState();
     refreshChatRooms();
     showRestToast('Logged out of admin.');
   });
   document.getElementById('btnAdminPost').addEventListener('click', () => {
-    menu.hidden = true;
     document.getElementById('adminPostText').value = currentAnnouncementText;
     document.getElementById('adminPostNote').textContent = '';
     document.getElementById('adminPostOverlay').hidden = false;
   });
   document.getElementById('btnAdminAssignTargets').addEventListener('click', () => {
-    menu.hidden = true;
     ['adminAssignTargetId', 'adminAssignCalorie', 'adminAssignSteps', 'adminAssignWorkouts', 'adminAssignRefeedCalories', 'adminAssignRefeedStart', 'adminAssignRefeedEnd', 'adminAssignSocialLinks'].forEach(id => {
       document.getElementById(id).value = '';
     });
@@ -18469,30 +18457,27 @@ function initAnnouncementWidget() {
   loadAnnouncement();
 }
 
+// Sharing progress to the Nexus is always on now — no opt-in toggle, no
+// manual "Sync to Nexus" button. wft_lb_optin is forced to '1' here (once,
+// every boot) purely so the many other places already gated on it
+// (autoSyncLeaderboardIfOptedIn, the habit-completion checklist, etc.)
+// keep working unchanged rather than rewriting every call site.
 function initLeaderboard() {
-  const optInEl = document.getElementById('lbOptIn');
-  optInEl.checked = localStorage.getItem('wft_lb_optin') === '1';
+  localStorage.setItem('wft_lb_optin', '1');
+  getOrCreateShareKey();
   updateCodeNameHint();
 
   document.querySelectorAll('.rank-share-btn').forEach(btn => {
     btn.addEventListener('click', () => shareLeaderboardCard(btn.dataset.target, btn.dataset.title));
   });
 
-  optInEl.addEventListener('change', () => {
-    if (optInEl.checked) {
-      getOrCreateShareKey();
-      localStorage.setItem('wft_lb_optin', '1');
-    } else {
-      localStorage.setItem('wft_lb_optin', '0');
-      removeFromLeaderboard();
-    }
-    updateCodeNameHint();
-  });
-
-  document.getElementById('btnLbUpdate').addEventListener('click', () => {
+  // Syncs once right away, then again every 3 hours for as long as the app
+  // stays open — same push+pull+chat-refresh updateLeaderboard() always
+  // did on a manual tap, just automatic now.
+  if (sbConfigured()) {
     updateLeaderboard();
-    if (localStorage.getItem('wft_drive_connected') && driveConfigured()) saveToDrive(false);
-  });
+    setInterval(() => { if (sbConfigured()) updateLeaderboard(); }, 3 * 60 * 60 * 1000);
+  }
 
   document.getElementById('btnLbChatSend').addEventListener('click', async () => {
     const input = document.getElementById('lbChatInput');
@@ -18562,8 +18547,6 @@ function initLeaderboard() {
 
   if (!sbConfigured()) {
     document.getElementById('lbSaveNote').textContent = 'Nexus not set up yet.';
-    optInEl.disabled = true;
-    document.getElementById('btnLbUpdate').disabled = true;
     document.getElementById('btnLbChatSend').disabled = true;
   }
 

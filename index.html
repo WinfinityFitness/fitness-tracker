@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.4">
+<link rel="stylesheet" href="style.css?v=1.7.5">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -110,6 +110,13 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <button type="button" class="admin-drawer-pill-item" data-admin-only hidden data-action="btnAdminLogout" aria-label="Log Out" title="Log Out">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
   </button>
+  <!-- Inverse of the Log Out icon above — visible only while logged OUT
+       (see the data-hide-when-admin toggle in refreshDigitalIdOverrideVisibility,
+       app.js). Forwards to the hidden #btnAdminLogin proxy below, same
+       click-forwarding pattern data-action already uses for Log Out. -->
+  <button type="button" class="admin-drawer-pill-item" data-hide-when-admin data-action="btnAdminLogin" aria-label="Admin Log In" title="Admin Log In">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+  </button>
   <!-- Theme changer shortcut — always visible (unlike the Quick Log icons
        below, not gated behind Drawer Settings' per-icon admin toggle),
        forwards to the real Open Settings button; Appearance (theme
@@ -151,6 +158,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
          Log Out icon, which forwards a .click() here. -->
     <div class="admin-drawer-hidden-proxies" aria-hidden="true">
       <button type="button" id="btnAdminLogout" hidden>Log Out</button>
+      <button type="button" id="btnAdminLogin" hidden>Admin Log In</button>
     </div>
 
     <div class="chart-card admin-drawer-section" id="adminBroadcastToolsSection">
@@ -1102,45 +1110,16 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
     <div class="hero-card">
       <p class="hero-eyebrow">System status: active</p>
       <h2 class="hero-title">Global Nexus</h2>
-      <label class="field field--checkbox" style="margin-top:12px;">
-        <input type="checkbox" id="lbOptIn">
-        <span>Share my progress</span>
-      </label>
-      <p class="hint" id="lbCodeNameHint">Not sharing.</p>
-      <p class="hint">Uses the name from your Bio tab, visible to everyone on the Nexus. Set a name in Bio before sharing.</p>
     </div>
 
-    <button type="button" class="btn btn--primary" id="btnLbUpdate">Sync to Nexus</button>
     <p class="save-note" id="lbSaveNote"></p>
     <div class="nexus-presence" id="nexusPresence">
       <span><strong id="nexusTotalUsers">–</strong> operators synced</span>
       <span><span class="status-dot status-good"></span><strong id="nexusOnlineUsers">–</strong> online now</span>
       <span><strong id="nexusAppOpens">–</strong> total app opens</span>
     </div>
-    <p class="empty-note" id="lbEmptyNote" hidden>No Nexus data yet. Tap Sync to share and see others.</p>
+    <p class="empty-note" id="lbEmptyNote" hidden>No Nexus data yet — syncing automatically.</p>
 
-
-
-
-    <div class="chart-card announcement-card" id="announcementCard">
-      <div class="chart-card-head">
-        <p class="mod-tag" style="margin:0;">Nexus Announcement</p>
-        <div class="announcement-menu-wrap">
-          <button type="button" class="icon-btn glass-emboss" id="btnAnnouncementMenu" aria-label="Announcement menu">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="var(--cyan)" stroke="none"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
-          </button>
-          <div class="announcement-menu" id="announcementMenu" hidden>
-            <button type="button" class="announcement-menu-item" id="btnAdminLogin">Admin Log In</button>
-          </div>
-        </div>
-      </div>
-      <div class="announcement-marquee-wrap">
-        <div class="announcement-marquee" id="announcementMarquee">
-          <span class="announcement-marquee-text">No announcements yet.</span>
-          <span class="announcement-marquee-text" aria-hidden="true">No announcements yet.</span>
-        </div>
-      </div>
-    </div>
 
     <div id="quickCommunityAnchor" hidden></div>
     <div id="quickCommunityBlock">
@@ -1328,6 +1307,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       </div>
       <p class="hint hint--sm">Today's Habit Completion + Life Fuel %, averaged — rewards showing up and logging fully, not just being active.</p>
       <div class="rank-list" id="lbConscientiousRanking"></div>
+    </div>
+
+    <div class="sheet-section sheet-section--compact">
+      <p class="hint" id="lbCodeNameHint">Sharing as "Operator"</p>
+      <p class="hint">Uses the name from your Bio tab, visible to everyone on the Nexus. Syncs automatically on startup and every 3 hours while the app is open.</p>
     </div>
 
     <footer class="app-footer">
@@ -1836,6 +1820,13 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         </label>
       </div>
       <label class="field" style="margin-top:10px;">
+        <span>Mode</span>
+        <div class="unit-switch" id="themeModeSwitch" style="width:100%;">
+          <button type="button" class="unit-switch-btn is-active" data-theme-mode="digital" style="flex:1;">Digital</button>
+          <button type="button" class="unit-switch-btn" data-theme-mode="minimalist" style="flex:1;">Minimalist</button>
+        </div>
+      </label>
+      <label class="field" style="margin-top:10px;" id="skinSelectField">
         <span>Theme</span>
         <select id="skinSelect">
           <option value="default">Winfinity Default</option>
@@ -1848,7 +1839,19 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
           <option value="steampunk-core">Steampunk Core</option>
         </select>
       </label>
-      <p class="hint">Themes work with the light/dark switch above — pick a theme, then toggle light or dark within it. Grand Core is designed for light mode.</p>
+      <label class="field" style="margin-top:10px;" id="coreColorField" hidden>
+        <span>Minimalist Color</span>
+        <select id="coreColorSelect">
+          <option value="">Neutral (default)</option>
+          <option value="shinobi-core">Shinobi Core colors</option>
+          <option value="grand-core">Grand Core colors</option>
+          <option value="sovereign-core">Sovereign Core colors</option>
+          <option value="hashira-core">Hashira Core colors</option>
+          <option value="asanoha-digital">Nezuko Digital colors</option>
+          <option value="steampunk-core">Steampunk Core colors</option>
+        </select>
+      </label>
+      <p class="hint">Themes work with the light/dark switch above — pick a theme, then toggle light or dark within it. Grand Core is designed for light mode. Minimalist mode keeps Default Core's plain layout and lets you layer just the accent color from any Digital theme.</p>
       <label class="field" style="margin-top:10px;">
         <span>Text Size</span>
         <input type="range" id="textSizeSlider" min="90" max="115" step="5" value="100">
@@ -2155,7 +2158,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
 
       <h3>4. Optional Cloud Features</h3>
       <ul>
-        <li><strong>Leaderboard ("Sync to Nexus"):</strong> if you enable this, your display name, weight, weight progress, steps, and lifting volume are stored on our server and are publicly visible to other users of the app.</li>
+        <li><strong>Global Nexus:</strong> your display name, weight, weight progress, steps, and lifting volume are stored on our server and publicly visible to other users of the app. This syncs automatically — there's no separate opt-in toggle.</li>
         <li><strong>Group chat &amp; direct messages:</strong> messages you send are stored on our server. Group chat is readable by any user of the app; there is no moderation team reviewing messages.</li>
         <li><strong>Push notifications:</strong> if enabled, we store a push subscription token tied to your device (not your real identity) solely to deliver reminders and message alerts.</li>
         <li><strong>AI food estimate:</strong> if you use the "Estimate with AI" feature (text or photo), the description or photo you submit is sent to our server and forwarded to Google's Gemini API to generate a nutrition estimate. We do not retain the photo or text beyond generating that estimate.</li>
@@ -3538,16 +3541,35 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
               </label>
             </div>
             <label class="field" style="margin-top:8px;">
+              <span>Mode</span>
+              <div class="unit-switch" id="wdsThemeModeSwitch" style="width:100%;">
+                <button type="button" class="unit-switch-btn is-active" data-theme-mode="digital" style="flex:1;">Digital</button>
+                <button type="button" class="unit-switch-btn" data-theme-mode="minimalist" style="flex:1;">Minimalist</button>
+              </div>
+            </label>
+            <label class="field" style="margin-top:8px;" id="wdsSkinSelectField">
               <span>Theme</span>
               <select id="wdsSkinSelect">
                 <option value="default">Winfinity Default</option>
-          <option value="default-core">Default Core</option>
+                <option value="default-core">Default Core</option>
                 <option value="shinobi-core">Shinobi Core</option>
                 <option value="grand-core">Grand Core</option>
                 <option value="sovereign-core">Sovereign Core</option>
                 <option value="hashira-core">Hashira Core</option>
                 <option value="asanoha-digital">Nezuko Digital</option>
                 <option value="steampunk-core">Steampunk Core</option>
+              </select>
+            </label>
+            <label class="field" style="margin-top:8px;" id="wdsCoreColorField" hidden>
+              <span>Minimalist Color</span>
+              <select id="wdsCoreColorSelect">
+                <option value="">Neutral (default)</option>
+                <option value="shinobi-core">Shinobi Core colors</option>
+                <option value="grand-core">Grand Core colors</option>
+                <option value="sovereign-core">Sovereign Core colors</option>
+                <option value="hashira-core">Hashira Core colors</option>
+                <option value="asanoha-digital">Nezuko Digital colors</option>
+                <option value="steampunk-core">Steampunk Core colors</option>
               </select>
             </label>
             <p class="hint hint--sm">Web-only — separate from the app's own theme, doesn't affect your phone.</p>
@@ -4256,10 +4278,10 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
-<script src="config.js?v=1.7.4"></script>
+<script src="config.js?v=1.7.5"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.7.4"></script>
+<script src="app.js?v=1.7.5"></script>
 </body>
 </html>
