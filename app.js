@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.10';
+const APP_VERSION = 'WF_SYS_V.1.7.11';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -5264,14 +5264,20 @@ async function wdsShowProfilePage(targetShareKey) {
   if (!page) return;
   const isOwn = !targetShareKey || targetShareKey === wdsRemoteData.shareKey;
   try {
-    const { data, error } = await sb.rpc('get_public_profile_by_share_key', { p_share_key: isOwn ? wdsRemoteData.shareKey : targetShareKey });
+    const { data, error } = await sb.rpc('get_public_profile_by_share_key', {
+      p_share_key: isOwn ? wdsRemoteData.shareKey : targetShareKey,
+      p_viewer_share_key: wdsRemoteData.shareKey,
+    });
     if (error) throw error;
     const row = (data && data[0]) || null;
     if (isOwn) {
       wdsViewedProfile = null;
       wdsOwnWallPermission = (row && row.wall_post_permission) || 'friends';
     } else {
-      if (!row) return; // no such operator (or they've never synced) — nothing to show
+      // Also covers a blocked pair — get_public_profile_by_share_key now
+      // returns zero rows rather than an error, so this same fallback
+      // (already here for "no such operator") handles it for free.
+      if (!row) return;
       wdsViewedProfile = { shareKey: targetShareKey, publicId: row.public_id, codeName: row.code_name, avatarDataUrl: row.avatar_data_url };
     }
   } catch (e) {
@@ -15167,9 +15173,11 @@ async function syncAccountLogFromGoogle(accessToken) {
 const LEADERBOARD_INACTIVE_MS = 7 * 24 * 60 * 60 * 1000;
 
 async function pullLeaderboard() {
-  const { data, error } = await sb.from('leaderboard')
-    .select('code_name, public_id, weight, weight_unit, weight_progress, weight_progress_pct, steps, volume_lifted, volume_unit, furthest_run_km, fastest_run_pace_sec, conscientious_score, fitness_mode, updated_at')
-    .order('updated_at', { ascending: false });
+  // get_visible_leaderboard (supabase_admin_block_visibility_migration.sql)
+  // replaces a raw table select so an admin-blocked pair actually
+  // disappears from each other's leaderboard instead of just being a
+  // stored-but-unenforced row in blocked_pairs.
+  const { data, error } = await sb.rpc('get_visible_leaderboard', { p_viewer_share_key: getOrCreateShareKey() });
   if (error) throw error;
   const cutoff = Date.now() - LEADERBOARD_INACTIVE_MS;
   return (data || []).filter(r => r.updated_at && new Date(r.updated_at).getTime() >= cutoff);
@@ -15319,12 +15327,17 @@ async function postChatMessage(text, imageDataUrl, shareKeyOverride, codeNameOve
   let imageUrl = null;
   if (imageDataUrl) imageUrl = await uploadChatImage(imageDataUrl, shareKeyOverride);
 
-  const { error } = await sb.from('chat_messages').insert({
-    code_name: codeNameOverride || effectiveLeaderboardName(),
-    message: trimmed,
-    image_url: imageUrl,
-    room_id: roomIdOverride !== undefined ? roomIdOverride : (currentChatRoomId || null),
-    sender_share_key: shareKeyOverride || getOrCreateShareKey(),
+  // send_chat_message (supabase_admin_block_visibility_migration.sql)
+  // replaces a raw insert -- the old RLS insert policy only checked
+  // string lengths, with no way to see "who's the other member of this
+  // DM room" the way a SECURITY DEFINER function can, so a block
+  // couldn't be enforced at all on the old path.
+  const { error } = await sb.rpc('send_chat_message', {
+    p_room_id: roomIdOverride !== undefined ? roomIdOverride : (currentChatRoomId || null),
+    p_sender_key: shareKeyOverride || getOrCreateShareKey(),
+    p_code_name: codeNameOverride || effectiveLeaderboardName(),
+    p_message: trimmed,
+    p_image_url: imageUrl,
   });
   if (error) throw error;
 }
@@ -15647,6 +15660,17 @@ function refreshDigitalIdOverrideVisibility() {
   if (section) section.hidden = !loggedIn;
   const adFreeSection = document.getElementById('adFreeOverrideSection');
   if (adFreeSection) adFreeSection.hidden = !loggedIn;
+  // Both were missing from this function, which left them permanently
+  // hidden (the pill's is-not-focused focus toggle only ever controls
+  // display for sections that ALSO have hidden=false to begin with) --
+  // fixed alongside adding entityDesignationOverrideSection/
+  // blockVisibilitySection so all three actually reach the UI.
+  const fitnessModeSection = document.getElementById('fitnessModeOverrideSection');
+  if (fitnessModeSection) fitnessModeSection.hidden = !loggedIn;
+  const entityDesignationSection = document.getElementById('entityDesignationOverrideSection');
+  if (entityDesignationSection) entityDesignationSection.hidden = !loggedIn;
+  const blockVisibilitySection = document.getElementById('blockVisibilitySection');
+  if (blockVisibilitySection) blockVisibilitySection.hidden = !loggedIn;
   const adManagerSection = document.getElementById('adManagerSection');
   if (adManagerSection) {
     adManagerSection.hidden = !loggedIn;
@@ -16293,6 +16317,90 @@ function initFitnessModeOverride() {
     }
     setBtn.disabled = false;
   });
+}
+
+// Admin-only: renames a user's Entity Designation (leaderboard display
+// name) by Digital ID. Unlike Fitness Mode, code_name is a live
+// server-side column with nothing device-local to reconcile, so this
+// writes it directly instead of going through a pending-flag/pickup
+// dance -- see admin_set_entity_designation in
+// supabase_admin_entity_designation_override_migration.sql. Caveat
+// (surfaced in the card's own hint text too): if the target still has
+// their own Bio Name set locally, effectiveLeaderboardName() prefers
+// that over code_name, so their own next leaderboard sync silently
+// overwrites this again.
+function initEntityDesignationOverride() {
+  const idInput = document.getElementById('entityDesignationOverrideIdInput');
+  const nameInput = document.getElementById('entityDesignationOverrideNameInput');
+  const note = document.getElementById('entityDesignationOverrideNote');
+  const setBtn = document.getElementById('btnAssignEntityDesignation');
+  if (!idInput || !nameInput || !setBtn) return;
+
+  setBtn.addEventListener('click', async () => {
+    if (!isAdminLoggedIn()) { note.textContent = 'Admin login required.'; return; }
+    const targetId = idInput.value.trim().toUpperCase();
+    const newName = nameInput.value.trim();
+    if (!DIGITAL_ID_PATTERN.test(targetId)) { note.textContent = 'Must match the format WF-XXXXXX.'; return; }
+    if (!newName) { note.textContent = 'Enter a new Entity Designation.'; return; }
+    if (!sbConfigured()) { note.textContent = 'Not available offline.'; return; }
+    setBtn.disabled = true;
+    note.textContent = 'Assigning…';
+    try {
+      const { error } = await sb.rpc('admin_set_entity_designation', {
+        p_digital_id: adminSession.digitalId, p_password: adminSession.password,
+        p_target_public_id: targetId, p_new_name: newName,
+      });
+      if (error) throw error;
+      note.textContent = `${targetId} is now designated "${newName}".`;
+      nameInput.value = '';
+    } catch (e) {
+      note.textContent = 'Failed: ' + (e.message || 'no user found with that Digital ID, or you\'re offline.');
+    }
+    setBtn.disabled = false;
+  });
+}
+
+// Admin-only: hides one user from another's view everywhere the app reads
+// visibility-gated data -- Leaderboard, profile view/wall, Nexus feed, and
+// Chat/DM lookups all now go through visibility-checking RPCs/filters that
+// consult the blocked_pairs table (see
+// supabase_admin_block_visibility_migration.sql). One-directional by
+// design -- p_hide_public_id is hidden FROM p_from_public_id specifically,
+// not the reverse, so blocking both ways takes two calls.
+function initBlockVisibilityOverride() {
+  const hideInput = document.getElementById('blockVisibilityHideInput');
+  const fromInput = document.getElementById('blockVisibilityFromInput');
+  const note = document.getElementById('blockVisibilityNote');
+  const blockBtn = document.getElementById('btnBlockVisibility');
+  const unblockBtn = document.getElementById('btnUnblockVisibility');
+  if (!hideInput || !fromInput || !blockBtn || !unblockBtn) return;
+
+  async function run(rpcName, actionLabel) {
+    if (!isAdminLoggedIn()) { note.textContent = 'Admin login required.'; return; }
+    const hideId = hideInput.value.trim().toUpperCase();
+    const fromId = fromInput.value.trim().toUpperCase();
+    if (!DIGITAL_ID_PATTERN.test(hideId) || !DIGITAL_ID_PATTERN.test(fromId)) {
+      note.textContent = 'Both Digital IDs must match the format WF-XXXXXX.'; return;
+    }
+    if (hideId === fromId) { note.textContent = "Can't block a user from themselves."; return; }
+    if (!sbConfigured()) { note.textContent = 'Not available offline.'; return; }
+    blockBtn.disabled = true; unblockBtn.disabled = true;
+    note.textContent = actionLabel + '…';
+    try {
+      const { error } = await sb.rpc(rpcName, {
+        p_digital_id: adminSession.digitalId, p_password: adminSession.password,
+        p_hide_public_id: hideId, p_from_public_id: fromId,
+      });
+      if (error) throw error;
+      note.textContent = `${hideId} is ${rpcName === 'admin_block_visibility' ? 'now hidden from' : 'no longer hidden from'} ${fromId}.`;
+    } catch (e) {
+      note.textContent = 'Failed: ' + (e.message || 'one of those Digital IDs wasn\'t found, or you\'re offline.');
+    }
+    blockBtn.disabled = false; unblockBtn.disabled = false;
+  }
+
+  blockBtn.addEventListener('click', () => run('admin_block_visibility', 'Blocking'));
+  unblockBtn.addEventListener('click', () => run('admin_unblock_visibility', 'Unblocking'));
 }
 
 // Runs on every periodic leaderboard sync (pushLeaderboardEntry) — checks
@@ -19975,6 +20083,8 @@ safeInit(initDigitalId, 'initDigitalId');
 safeInit(initDigitalIdOverride, 'initDigitalIdOverride');
 safeInit(initAdFreeOverride, 'initAdFreeOverride');
 safeInit(initFitnessModeOverride, 'initFitnessModeOverride');
+safeInit(initEntityDesignationOverride, 'initEntityDesignationOverride');
+safeInit(initBlockVisibilityOverride, 'initBlockVisibilityOverride');
 safeInit(initAdManager, 'initAdManager');
 safeInit(initSplashLogoManager, 'initSplashLogoManager');
 safeInit(initSyncLogsShare, 'initSyncLogsShare');

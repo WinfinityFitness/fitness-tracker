@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.10">
+<link rel="stylesheet" href="style.css?v=1.7.11">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -89,7 +89,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
 <div class="admin-drawer-backdrop" id="adminDrawerBackdrop" hidden></div>
 
 <div class="admin-drawer-pill" id="adminDrawerPill" hidden>
-  <button type="button" class="admin-drawer-pill-item" data-admin-only hidden data-target="digitalIdOverrideSection,adFreeOverrideSection,fitnessModeOverrideSection,updatesEnabledSection" aria-label="Account Admin (Digital ID, Ad-Free, Fitness Mode, Force Updates)" title="Account Admin">
+  <button type="button" class="admin-drawer-pill-item" data-admin-only hidden data-target="digitalIdOverrideSection,adFreeOverrideSection,fitnessModeOverrideSection,entityDesignationOverrideSection,blockVisibilitySection,updatesEnabledSection" aria-label="Account Admin (Digital ID, Ad-Free, Fitness Mode, Entity Designation, Block Visibility, Force Updates)" title="Account Admin">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M5 17c0-2 2-3 4-3s4 1 4 3"/><line x1="14" y1="9" x2="19" y2="9"/><line x1="14" y1="13" x2="19" y2="13"/></svg>
   </button>
   <button type="button" class="admin-drawer-pill-item" data-admin-only hidden data-target="adManagerSection" aria-label="Startup Ad Splash" title="Startup Ad Splash">
@@ -244,6 +244,39 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       </label>
       <button type="button" class="btn btn--primary" id="btnSetFitnessModeOverride">Set Fitness Mode</button>
       <p class="save-note" id="fitnessModeOverrideNote"></p>
+    </div>
+
+    <div class="sheet-section admin-drawer-section" id="entityDesignationOverrideSection" hidden>
+      <p class="field-group-heading">Admin: Entity Designation Override</p>
+      <p class="hint">Renames their leaderboard display name directly. If they still have their own Bio Name set on their device, it'll overwrite this again on their next sync.</p>
+      <label class="field">
+        <span>Digital ID</span>
+        <input type="text" id="entityDesignationOverrideIdInput" placeholder="e.g. WF-B932GB" maxlength="9" style="text-transform:uppercase;">
+      </label>
+      <label class="field">
+        <span>New Entity Designation</span>
+        <input type="text" id="entityDesignationOverrideNameInput" placeholder="e.g. Swift Falcon" maxlength="40">
+      </label>
+      <button type="button" class="btn btn--primary" id="btnAssignEntityDesignation">Assign New Entity Designation</button>
+      <p class="save-note" id="entityDesignationOverrideNote"></p>
+    </div>
+
+    <div class="sheet-section admin-drawer-section" id="blockVisibilitySection" hidden>
+      <p class="field-group-heading">Admin: Block Visibility</p>
+      <p class="hint">Hides the first Digital ID from the second, everywhere they'd normally see each other — Leaderboard, profile view, Nexus feed, and Chat/DMs. One-directional: the second user isn't hidden from the first unless you block that direction too.</p>
+      <label class="field">
+        <span>Digital ID to hide</span>
+        <input type="text" id="blockVisibilityHideInput" placeholder="e.g. WF-4JVFB4" maxlength="9" style="text-transform:uppercase;">
+      </label>
+      <label class="field">
+        <span>Hide from this Digital ID</span>
+        <input type="text" id="blockVisibilityFromInput" placeholder="e.g. WF-B932GB" maxlength="9" style="text-transform:uppercase;">
+      </label>
+      <div class="btn-row">
+        <button type="button" class="btn btn--primary" id="btnBlockVisibility">Block visibility</button>
+        <button type="button" class="btn" id="btnUnblockVisibility">Unblock</button>
+      </div>
+      <p class="save-note" id="blockVisibilityNote"></p>
     </div>
 
     <div class="chart-card admin-drawer-section" id="adManagerSection" hidden>
@@ -4281,10 +4314,10 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
-<script src="config.js?v=1.7.10"></script>
+<script src="config.js?v=1.7.11"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.7.10"></script>
+<script src="app.js?v=1.7.11"></script>
 </body>
 </html>
