@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.20';
+const APP_VERSION = 'WF_SYS_V.1.7.21';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -3841,9 +3841,36 @@ function wdsIsRoomUnread(roomId, meta) {
   return !lastRead || new Date(meta.lastMessageAt) > new Date(lastRead);
 }
 
+// Merges this account's server-persisted read state (chat_read_receipts,
+// via mark_chat_read in wdsOpenChatPopup) into wdsChatLastRead once per
+// session, before it's used to decide which threads show an unread dot.
+// Without this, a fresh browser/device (or any cache clear) starts with
+// an empty wdsChatLastRead and shows every thread with message history
+// as unread, even if it was already read elsewhere -- wdsIsRoomUnread's
+// own "no record at all = unread" fallback exists for a genuinely never-
+// opened thread, not for "never opened on THIS device."
+let wdsChatLastReadServerSynced = false;
+async function wdsSyncChatLastReadFromServer(myShareKey) {
+  if (wdsChatLastReadServerSynced || !myShareKey || !sbConfigured()) return;
+  wdsChatLastReadServerSynced = true;
+  try {
+    const { data } = await sb.from('chat_read_receipts').select('room_key, last_read_at').eq('share_key', myShareKey);
+    let changed = false;
+    (data || []).forEach(row => {
+      const existing = wdsChatLastRead[row.room_key];
+      if (!existing || new Date(row.last_read_at) > new Date(existing)) {
+        wdsChatLastRead[row.room_key] = row.last_read_at;
+        changed = true;
+      }
+    });
+    if (changed) wdsSaveChatLastRead();
+  } catch (e) { /* best effort -- falls back to whatever's already in localStorage */ }
+}
+
 async function refreshWdsChatRooms() {
   if (!wdsRemoteData) return;
   const myShareKey = wdsRemoteData.shareKey;
+  await wdsSyncChatLastReadFromServer(myShareKey);
   // Independent of the room-membership fetch below (and run even for a
   // user with zero joined rooms) so the pinned Nexus Com entry always has
   // a real preview — chat_messages with room_id IS NULL is the public
@@ -4224,6 +4251,16 @@ async function wdsOpenChatPopup(roomId) {
   }
   wdsChatLastRead[roomId] = new Date().toISOString();
   wdsSaveChatLastRead();
+  // Also persisted server-side (chat_read_receipts/mark_chat_read --
+  // orphaned since the Nexus Com merge dropped its original "Seen by"
+  // client code, repurposed here) so a fresh browser/device/cache-clear
+  // doesn't show every thread as unread just because THIS localStorage
+  // has no record of it ever being opened before — see
+  // wdsSyncChatLastReadFromServer, called on every refreshWdsChatRooms.
+  if (wdsRemoteData && wdsRemoteData.shareKey && sbConfigured()) {
+    const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
+    sb.rpc('mark_chat_read', { p_room_key: String(roomId), p_share_key: wdsRemoteData.shareKey, p_code_name: codeName }).catch(() => {});
+  }
   await wdsRefreshChatPopup(roomId);
   renderWdsChatListPanel();
   renderWdsChatContactRail();
