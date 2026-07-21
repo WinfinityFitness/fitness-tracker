@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.11';
+const APP_VERSION = 'WF_SYS_V.1.7.13';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -257,16 +257,16 @@ function initDesktopShell() {
         p_public_id: cleanId, p_pin: cleanPin, p_days: 90,
       });
       if (error) throw error;
-      // Default Core's intended look is light -- only relevant the first
+      // First-run default (Steampunk + light) -- only relevant the first
       // time an account is ever seen here (data.theme/data.skin null means
       // this account has never pushed a choice up), same reasoning as
       // initThemeToggle's own themeDefault.
-      const wdsResolvedSkin = data.skin || 'default-core';
+      const wdsResolvedSkin = data.skin || 'steampunk-core';
       wdsRemoteData = {
         publicId: cleanId,
         shareKey: data.shareKey || null,
         profile: data.profile || null,
-        theme: data.theme || (wdsResolvedSkin === 'default-core' ? 'light' : 'dark'),
+        theme: data.theme || (wdsResolvedSkin === 'steampunk-core' ? 'light' : 'dark'),
         skin: wdsResolvedSkin,
         logsObj: wdsArrayToDateMap(data.logs),
         reviewsObj: wdsArrayToDateMap(data.reviews),
@@ -378,10 +378,12 @@ function initDesktopShell() {
     localStorage.setItem(WDS_GUEST_MODE_KEY, '1');
     wdsRemoteData = {
       publicId: 'GUEST', shareKey: WDS_GUEST_SHARE_KEY, profile: { name: WDS_GUEST_NAME },
-      theme: 'light', skin: 'default-core', logsObj: {}, reviewsObj: {}, dailyReviewsObj: {},
+      theme: 'light', skin: 'steampunk-core', logsObj: {}, reviewsObj: {}, dailyReviewsObj: {},
     };
     document.documentElement.setAttribute('data-theme', wdsRemoteData.theme);
     document.documentElement.setAttribute('data-skin', wdsRemoteData.skin);
+    // wdsApplyThemeOverride() also sets data-theme-mode (default 'minimalist'
+    // when no web-only override exists) -- see its own definition.
     wdsApplyThemeOverride();
     operatorNameEl.textContent = WDS_GUEST_NAME;
     modeIconImgEl.src = MODE_ICON.beginner;
@@ -2836,7 +2838,9 @@ function wdsApplyThemeOverride() {
   const modeOverride = localStorage.getItem(WDS_MODE_OVERRIDE_KEY);
   if (themeOverride) document.documentElement.setAttribute('data-theme', themeOverride);
   if (skinOverride) document.documentElement.setAttribute('data-skin', skinOverride);
-  document.documentElement.setAttribute('data-theme-mode', modeOverride || 'digital');
+  // First-run default is Minimalist (matches FT's own initSkinSelector
+  // default) -- a returning visitor's own web-only override always wins.
+  document.documentElement.setAttribute('data-theme-mode', modeOverride || 'minimalist');
 }
 
 // Digital/Minimalist — independent of data-skin (see the FT-side
@@ -3565,17 +3569,18 @@ function renderWdsMessengerInbox() {
 
 const WDM_SHARE_KEY_STORAGE = 'wft_msg_share_key';
 function wdmSetIdentity(payload) {
-  const wdmResolvedSkin = payload.skin || 'default-core';
+  const wdmResolvedSkin = payload.skin || 'steampunk-core';
   wdsRemoteData = {
     publicId: payload.publicId || null,
     shareKey: payload.shareKey || null,
     profile: payload.profile || null,
-    theme: payload.theme || (wdmResolvedSkin === 'default-core' ? 'light' : 'dark'),
+    theme: payload.theme || (wdmResolvedSkin === 'steampunk-core' ? 'light' : 'dark'),
     skin: wdmResolvedSkin,
     logsObj: {}, reviewsObj: {}, dailyReviewsObj: {},
   };
   document.documentElement.setAttribute('data-theme', wdsRemoteData.theme);
   document.documentElement.setAttribute('data-skin', wdsRemoteData.skin);
+  document.documentElement.setAttribute('data-theme-mode', localStorage.getItem(WDS_MODE_OVERRIDE_KEY) || 'minimalist');
   if (wdsRemoteData.shareKey) localStorage.setItem(WDM_SHARE_KEY_STORAGE, wdsRemoteData.shareKey);
 }
 async function initMessengerShell() {
@@ -15504,8 +15509,8 @@ async function pushWebSyncSnapshot() {
     await sb.rpc('web_sync_push_snapshot', {
       p_share_key: shareKey,
       p_profile: profile,
-      p_theme: localStorage.getItem('wft_theme') || ((localStorage.getItem('wft_skin') || 'default-core') === 'default-core' ? 'light' : 'dark'),
-      p_skin: localStorage.getItem('wft_skin') || 'default-core',
+      p_theme: localStorage.getItem('wft_theme') || ((localStorage.getItem('wft_skin') || 'steampunk-core') === 'steampunk-core' ? 'light' : 'dark'),
+      p_skin: localStorage.getItem('wft_skin') || 'steampunk-core',
     });
   } catch (e) { /* best effort — profile/theme just won't update until next successful sync */ }
   try {
@@ -19626,11 +19631,11 @@ function applyTheme(theme) {
 }
 
 function initThemeToggle() {
-  // Default Core's intended/primary look is light (its dark companion is
-  // a derived fallback, see its style.css comment) -- so light is the
-  // right default specifically when no explicit theme choice has been
-  // made yet AND the skin is (or will default to) Default Core. Every
-  // other skin's un-set-theme default stays 'dark', unchanged.
+  // Fresh install (nothing saved yet) defaults to light -- matches the
+  // overall first-run default of Steampunk Core + Minimalist mode (see
+  // initSkinSelector below). A returning user who somehow has a saved
+  // skin but no saved theme keeps the old per-skin fallback (Default
+  // Core's own intended look is light; every other skin defaults dark).
   const savedSkin = localStorage.getItem('wft_skin');
   const themeDefault = (!savedSkin || savedSkin === 'default-core') ? 'light' : 'dark';
   applyTheme(localStorage.getItem('wft_theme') || themeDefault);
@@ -19678,8 +19683,11 @@ function applyThemeMode(mode) {
 }
 
 function initSkinSelector() {
-  applySkin(localStorage.getItem('wft_skin') || 'default-core');
-  applyThemeMode(localStorage.getItem('wft_theme_mode') || 'digital');
+  // First-run default: Steampunk Core, Minimalist mode (light comes from
+  // initThemeToggle's own fresh-install default above). Anyone who's
+  // already picked something keeps their own saved choice regardless.
+  applySkin(localStorage.getItem('wft_skin') || 'steampunk-core');
+  applyThemeMode(localStorage.getItem('wft_theme_mode') || 'minimalist');
 
   const skinSelect = document.getElementById('skinSelect');
   const modeSwitch = document.getElementById('themeModeSwitch');
@@ -20177,6 +20185,7 @@ function initSysVersionUpdatePopup() {
   bindOverlayBackdropClose(overlay, close);
 }
 safeInit(renderDashboard, 'renderDashboard');
+safeInit(incrementAppOpens, 'incrementAppOpens');
 safeInit(updateTabDots, 'updateTabDots');
 safeInit(initBetaLock, 'initBetaLock');
 safeInit(() => {
