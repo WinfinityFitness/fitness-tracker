@@ -160,31 +160,20 @@ $$;
 grant execute on function get_public_profile_by_share_key(uuid, uuid) to anon;
 
 -- ---------------------------------------------------------------------
--- 5. Feed/wall -- both existing get_visible_feed_posts overloads
---    (3-arg from supabase_friends_and_visibility_migration.sql, 4-arg
---    from supabase_profile_view_and_wall_migration.sql) gain a block
---    check; arg lists are unchanged so these are genuine in-place
---    replacements, not new overloads. can_post_on_wall also gains a
---    block check, ahead of its existing permission logic.
+-- 5. Feed/wall -- get_visible_feed_posts gains a block check.
+--    supabase_fix_feed_rpc_overload_migration.sql already dropped the
+--    original 3-argument overload (created before p_author_share_key was
+--    added, in supabase_friends_and_visibility_migration.sql) because
+--    Postgres treats a different argument COUNT as a distinct function,
+--    not a replacement -- having both left every normal 3-arg feed load
+--    ambiguous between them. Only the 4-arg version (from
+--    supabase_profile_view_and_wall_migration.sql, whose extra param
+--    already defaults to null) should exist; the DROP below is
+--    defensive in case this file runs on a database where the 3-arg
+--    version got reintroduced. can_post_on_wall also gains a block
+--    check, ahead of its existing permission logic.
 -- ---------------------------------------------------------------------
-create or replace function get_visible_feed_posts(p_viewer_share_key uuid, p_cutoff timestamptz, p_limit int default 30)
-returns setof feed_posts
-language sql
-security definer
-as $$
-  select fp.* from feed_posts fp
-  where fp.deleted = false
-    and fp.created_at >= p_cutoff
-    and (
-      fp.visibility = 'public'
-      or fp.share_key = p_viewer_share_key
-      or (fp.visibility = 'friends' and are_friends(fp.share_key, p_viewer_share_key))
-    )
-    and not is_blocked(p_viewer_share_key, fp.share_key)
-  order by fp.created_at desc
-  limit p_limit;
-$$;
-grant execute on function get_visible_feed_posts(uuid, timestamptz, int) to anon;
+drop function if exists get_visible_feed_posts(uuid, timestamptz, int);
 
 create or replace function get_visible_feed_posts(p_viewer_share_key uuid, p_cutoff timestamptz, p_limit int default 30, p_author_share_key uuid default null)
 returns setof feed_posts
