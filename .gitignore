@@ -1,10 +1,12 @@
 # Local-only Android TWA build projects (Gradle caches, signing keystores,
 # compiled APKs/AABs) — not part of the deployed web app, stays local.
 # android-twa/ wraps FT (GitHub Pages), android-twa-wellness/ wraps
-# wellness.winfinityfitness.com — separate Play Store apps/keystores, same
+# wellness.winfinityfitness.com, android-twa-messenger/ wraps
+# messenger.winfinityfitness.com — separate Play Store apps/keystores, same
 # reasoning for staying out of the repo.
 android-twa/
 android-twa-wellness/
+android-twa-messenger/
 
 # Local-only Capacitor native Android shell (loads the live site remotely,
 # adds real background GPS tracking via a native plugin the bare TWA above

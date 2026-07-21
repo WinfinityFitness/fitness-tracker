@@ -1,6 +1,6 @@
 {
   "appId": "io.github.winfinityfitness.twa",
-  "appName": "Winfinity Fitness Tracker",
+  "appName": "Winfinity Fitness",
   "webDir": "www",
   "server": {
     "url": "https://winfinityfitness.github.io/fitness-tracker/",
