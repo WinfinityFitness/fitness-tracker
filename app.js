@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.16';
+const APP_VERSION = 'WF_SYS_V.1.7.17';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -272,6 +272,11 @@ function initDesktopShell() {
         reviewsObj: wdsArrayToDateMap(data.reviews),
         dailyReviewsObj: wdsArrayToDateMap(data.dailyReviews),
       };
+      // Source of truth is server-side (see set_messenger_auto_redirect) —
+      // this just keeps the toggle's own localStorage-backed display in
+      // sync with whatever was actually last set, possibly from another
+      // device, rather than trusting this browser's own possibly-stale copy.
+      localStorage.setItem(WDS_MESSENGER_AUTO_KEY, data.messengerAutoRedirect ? '1' : '0');
     } catch (e) {
       errorEl.textContent = (e && e.message) || 'Sign-in failed — check your Digital ID and PIN.';
       errorEl.hidden = false;
@@ -3196,32 +3201,24 @@ function wdsOpenPushPopup() {
 // Whether the chat icon / a chat push notification should go straight to
 // the Messenger app instead of the in-page dropdown. Independent of (and
 // an override for) wdsIsMessengerAppInstalled()'s own auto-detection —
-// see chatListBtn's click handler. Mirrored into IndexedDB, not just
-// localStorage, because sw.js's notificationclick handler (a Service
-// Worker, no localStorage access) needs to read it too when deciding
-// where a tapped chat notification should go.
+// see chatListBtn's click handler below for the immediate-click case.
+// For the notification-tap case, the source of truth is server-side —
+// web_sync_accounts.messenger_auto_redirect, set via
+// set_messenger_auto_redirect and read by notify_dm_push at send time
+// (see supabase_messenger_auto_redirect_serverside_migration.sql) — NOT
+// this localStorage flag, since a chat push can land on any of an
+// account's subscribed devices/origins (most commonly the FT mobile app
+// itself), and per-device storage on wellness alone can't be read from
+// there. localStorage here only drives this browser's own immediate
+// chat-icon-click behavior and the toggle's own on/off display.
 const WDS_MESSENGER_AUTO_KEY = 'wft_web_messenger_auto_redirect';
-const WDS_PREFS_DB_NAME = 'wft-web-prefs';
-const WDS_PREFS_STORE_NAME = 'kv';
-function wdsOpenPrefsDb() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(WDS_PREFS_DB_NAME, 1);
-    req.onupgradeneeded = () => { req.result.createObjectStore(WDS_PREFS_STORE_NAME); };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
 async function wdsSetMessengerAutoRedirectPref(enabled) {
   localStorage.setItem(WDS_MESSENGER_AUTO_KEY, enabled ? '1' : '0');
-  try {
-    const db = await wdsOpenPrefsDb();
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction(WDS_PREFS_STORE_NAME, 'readwrite');
-      tx.objectStore(WDS_PREFS_STORE_NAME).put(enabled, 'messengerAutoRedirect');
-      tx.oncomplete = resolve;
-      tx.onerror = () => reject(tx.error);
-    });
-  } catch (e) { /* best effort — sw.js just won't redirect notification taps if this never wrote */ }
+  if (wdsRemoteData && wdsRemoteData.shareKey) {
+    try {
+      await sb.rpc('set_messenger_auto_redirect', { p_share_key: wdsRemoteData.shareKey, p_enabled: enabled });
+    } catch (e) { /* best effort — toggle still reflects locally even if the write failed */ }
+  }
 }
 function wdsOpenMessengerTogglePopup() {
   const popup = document.getElementById('wdsMessengerTogglePopup');

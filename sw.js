@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fittracker-v418';
+const CACHE_NAME = 'fittracker-v419';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -69,11 +69,14 @@ self.addEventListener('message', event => {
 self.addEventListener('push', event => {
   // url lets a specific reminder (e.g. the Start/End Day Log pushes from
   // check-reminders) deep-link straight to the relevant sheet instead of
-  // just opening the app to whatever tab it was last on. type distinguishes
-  // a chat push (notify_dm_push sets type: 'chat') from a reminder one —
-  // see notificationclick below, which only ever redirects to Messenger
-  // for a 'chat' notification.
-  let data = { title: 'Winfinity Tracker', body: 'You have a new notification.', url: './', type: null };
+  // just opening the app to whatever tab it was last on — same idea for a
+  // chat message when the recipient's account has Messenger auto-redirect
+  // on (decided server-side, at send time, by notify_dm_push — see
+  // set_messenger_auto_redirect/web_sync_accounts.messenger_auto_redirect
+  // — deliberately NOT a client-side/per-device preference, since a chat
+  // push can land on any of an account's subscribed devices/origins and
+  // e.g. IndexedDB can't be read across them).
+  let data = { title: 'Winfinity Tracker', body: 'You have a new notification.', url: './' };
   try { if (event.data) data = Object.assign(data, event.data.json()); } catch (e) { /* ignore malformed payload */ }
   event.waitUntil(
     self.registration.showNotification(data.title, {
@@ -83,56 +86,30 @@ self.addEventListener('push', event => {
       // No explicit vibrate pattern — like most well-behaved apps, this lets
       // Android's own per-app notification vibration setting decide instead
       // of forcing a fixed buzz regardless of what the phone is set to.
-      data: { url: data.url || './', type: data.type || null },
+      data: { url: data.url || './' },
     })
   );
 });
 
-// Mirrors wdsOpenPrefsDb/wdsSetMessengerAutoRedirectPref in app.js — a
-// Service Worker has no localStorage access, so the wdsMessengerAutoToggle
-// setting (Settings icon above the wellness Nexus composer) is mirrored
-// into this same IndexedDB store for notificationclick below to read.
-// Origin-scoped like any IndexedDB, so this is only ever populated on
-// wellness.winfinityfitness.com — reads on FT/Messenger's own origins
-// just come back undefined, which is the correct "off" behavior there.
-function wftGetMessengerAutoRedirectPref() {
-  return new Promise(resolve => {
-    const req = indexedDB.open('wft-web-prefs', 1);
-    req.onupgradeneeded = () => { req.result.createObjectStore('kv'); };
-    req.onsuccess = () => {
-      try {
-        const tx = req.result.transaction('kv', 'readonly');
-        const getReq = tx.objectStore('kv').get('messengerAutoRedirect');
-        getReq.onsuccess = () => resolve(!!getReq.result);
-        getReq.onerror = () => resolve(false);
-      } catch (e) { resolve(false); }
-    };
-    req.onerror = () => resolve(false);
-  });
-}
-
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  const notifData = event.notification.data || {};
-  event.waitUntil((async () => {
-    if (notifData.type === 'chat' && await wftGetMessengerAutoRedirectPref()) {
-      // Different origin from wherever this notification fired (always
-      // wellness.winfinityfitness.com, since that's the only origin that
-      // ever writes this pref) — always a real navigation, postMessage-ing
-      // an existing wellness tab to "deep link" cross-origin wouldn't work.
-      return self.clients.openWindow('https://messenger.winfinityfitness.com/');
-    }
-    const targetUrl = notifData.url || './';
-    const clientsArr = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    const existing = clientsArr.find(c => c.url.includes(self.registration.scope));
-    if (existing) {
-      // Already open — a fresh navigation would reload and lose state, so
-      // just tell the running page which sheet to open instead.
-      existing.postMessage({ type: 'DEEP_LINK', url: targetUrl });
-      return existing.focus();
-    }
-    return self.clients.openWindow(targetUrl);
-  })());
+  const targetUrl = (event.notification.data && event.notification.data.url) || './';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientsArr => {
+      // A cross-origin target (the Messenger redirect url, set server-side
+      // — see the push handler above) can't be handed to an existing
+      // same-origin tab via postMessage; always a real navigation for that.
+      const sameOrigin = targetUrl.startsWith(self.registration.scope) || targetUrl.startsWith('./') || targetUrl.startsWith('/');
+      const existing = sameOrigin ? clientsArr.find(c => c.url.includes(self.registration.scope)) : null;
+      if (existing) {
+        // Already open — a fresh navigation would reload and lose state, so
+        // just tell the running page which sheet to open instead.
+        existing.postMessage({ type: 'DEEP_LINK', url: targetUrl });
+        return existing.focus();
+      }
+      return self.clients.openWindow(targetUrl);
+    })
+  );
 });
 
 // ---------------------------------------------------------------------

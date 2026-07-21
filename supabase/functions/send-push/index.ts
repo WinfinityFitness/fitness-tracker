@@ -119,14 +119,14 @@ async function sendFcm(sa: ServiceAccount, token: string, title: string, body: s
 }
 
 Deno.serve(async (req: Request) => {
-  let payload: { share_key?: string; title?: string; body?: string; type?: string };
+  let payload: { share_key?: string; title?: string; body?: string; type?: string; url?: string };
   try {
     payload = await req.json();
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400 });
   }
 
-  const { share_key, title, body, type } = payload;
+  const { share_key, title, body, type, url } = payload;
   if (!share_key || !title) {
     return new Response(JSON.stringify({ error: 'share_key and title are required' }), { status: 400 });
   }
@@ -141,7 +141,11 @@ Deno.serve(async (req: Request) => {
       .eq('share_key', share_key);
     if (subs && subs.length) {
       webTotal = subs.length;
-      const notifPayload = JSON.stringify({ title, body: body ?? '', type: type ?? undefined });
+      // url was never forwarded here before this fix -- check-reminders'
+      // own pushes set their own url directly in its own payload (not
+      // through this function), so this only ever mattered for DM pushes,
+      // which previously always fell through to sw.js's './' default.
+      const notifPayload = JSON.stringify({ title, body: body ?? '', type: type ?? undefined, url: url ?? undefined });
       const results = await Promise.allSettled(
         subs.map((s) => webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, notifPayload)),
       );
