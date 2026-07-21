@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.6">
+<link rel="stylesheet" href="style.css?v=1.7.7">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -89,7 +89,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
 <div class="admin-drawer-backdrop" id="adminDrawerBackdrop" hidden></div>
 
 <div class="admin-drawer-pill" id="adminDrawerPill" hidden>
-  <button type="button" class="admin-drawer-pill-item" data-admin-only hidden data-target="digitalIdOverrideSection,adFreeOverrideSection,updatesEnabledSection" aria-label="Account Admin (Digital ID, Ad-Free, Force Updates)" title="Account Admin">
+  <button type="button" class="admin-drawer-pill-item" data-admin-only hidden data-target="digitalIdOverrideSection,adFreeOverrideSection,fitnessModeOverrideSection,updatesEnabledSection" aria-label="Account Admin (Digital ID, Ad-Free, Fitness Mode, Force Updates)" title="Account Admin">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M5 17c0-2 2-3 4-3s4 1 4 3"/><line x1="14" y1="9" x2="19" y2="9"/><line x1="14" y1="13" x2="19" y2="13"/></svg>
   </button>
   <button type="button" class="admin-drawer-pill-item" data-admin-only hidden data-target="adManagerSection" aria-label="Startup Ad Splash" title="Startup Ad Splash">
@@ -224,6 +224,26 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         <button type="button" class="btn" id="btnRevokeAdFree">Revoke ad-free</button>
       </div>
       <p class="save-note" id="adFreeNote"></p>
+    </div>
+
+    <div class="sheet-section admin-drawer-section" id="fitnessModeOverrideSection" hidden>
+      <p class="field-group-heading">Admin: Fitness Mode Override</p>
+      <p class="hint">Force-sets their tier immediately. Normal rules still apply afterward — they can still be promoted or demoted again on their own next daily check, this just resets where they're starting from.</p>
+      <label class="field">
+        <span>Digital ID</span>
+        <input type="text" id="fitnessModeOverrideIdInput" placeholder="e.g. WF-B932GB" maxlength="9" style="text-transform:uppercase;">
+      </label>
+      <label class="field">
+        <span>Fitness Mode</span>
+        <select id="fitnessModeOverrideSelect">
+          <option value="beginner">Novice Mode</option>
+          <option value="warrior">Warrior Mode</option>
+          <option value="spartan">Spartan Mode</option>
+          <option value="demigod">Demi-God Mode</option>
+        </select>
+      </label>
+      <button type="button" class="btn btn--primary" id="btnSetFitnessModeOverride">Set Fitness Mode</button>
+      <p class="save-note" id="fitnessModeOverrideNote"></p>
     </div>
 
     <div class="chart-card admin-drawer-section" id="adManagerSection" hidden>
@@ -4297,10 +4317,10 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
-<script src="config.js?v=1.7.6"></script>
+<script src="config.js?v=1.7.7"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.7.6"></script>
+<script src="app.js?v=1.7.7"></script>
 </body>
 </html>

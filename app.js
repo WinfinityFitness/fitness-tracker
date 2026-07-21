@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.6';
+const APP_VERSION = 'WF_SYS_V.1.7.7';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -15161,6 +15161,7 @@ async function pushLeaderboardEntry() {
       p_code_name: effectiveLeaderboardName(), p_public_id: getOrCreatePublicId(),
     });
   } catch (e) { /* best effort — avatar just stays an initial circle until this succeeds */ }
+  if (shareKey) await checkPendingAdminModeOverride(shareKey);
 }
 
 async function autoSyncLeaderboardIfOptedIn() {
@@ -16307,6 +16308,68 @@ function initAdFreeOverride() {
     }
     revokeBtn.disabled = false;
   });
+}
+
+// Admin-only: force-sets a user's Fitness Mode by Digital ID. Fitness
+// mode lives purely in each device's own local profile (offline-first),
+// so there's nothing server-side to write directly — this just sets a
+// pending flag on their public leaderboard row; the target device picks
+// it up and applies it locally on its own next sync (see
+// checkPendingAdminModeOverride, called from pushLeaderboardEntry).
+function initFitnessModeOverride() {
+  const idInput = document.getElementById('fitnessModeOverrideIdInput');
+  const modeSelect = document.getElementById('fitnessModeOverrideSelect');
+  const note = document.getElementById('fitnessModeOverrideNote');
+  const setBtn = document.getElementById('btnSetFitnessModeOverride');
+  if (!idInput || !modeSelect || !setBtn) return;
+
+  setBtn.addEventListener('click', async () => {
+    if (!isAdminLoggedIn()) { note.textContent = 'Admin login required.'; return; }
+    const targetId = idInput.value.trim().toUpperCase();
+    if (!DIGITAL_ID_PATTERN.test(targetId)) { note.textContent = 'Must match the format WF-XXXXXX.'; return; }
+    if (!sbConfigured()) { note.textContent = 'Not available offline.'; return; }
+    setBtn.disabled = true;
+    note.textContent = 'Setting…';
+    try {
+      const { error } = await sb.rpc('admin_set_fitness_mode', {
+        p_digital_id: adminSession.digitalId, p_password: adminSession.password,
+        p_target_public_id: targetId, p_mode: modeSelect.value,
+      });
+      if (error) throw error;
+      note.textContent = `${targetId} will be set to ${MODE_LABEL[modeSelect.value]} next time their app syncs.`;
+    } catch (e) {
+      note.textContent = 'Failed: ' + (e.message || 'no user found with that Digital ID, or you\'re offline.');
+    }
+    setBtn.disabled = false;
+  });
+}
+
+// Runs on every periodic leaderboard sync (pushLeaderboardEntry) — checks
+// this device's OWN row for a pending admin_set_fitness_mode override and,
+// if present, applies it exactly like a normal promotion/demotion
+// (freshModeProgress reset too, so normal daily rules resume cleanly from
+// here — this is a one-time forced-set, not a lock), then clears the flag
+// so it never re-applies on a later sync.
+async function checkPendingAdminModeOverride(shareKey) {
+  if (!sbConfigured()) return;
+  try {
+    const { data } = await sb.from('leaderboard').select('admin_mode_override').eq('share_key', shareKey).maybeSingle();
+    const override = data && data.admin_mode_override;
+    if (!override || !MODE_ORDER.includes(override)) return;
+    const p = getProfile();
+    if (!p) return;
+    p.fitnessMode = override;
+    p.modeProgress = freshModeProgress();
+    saveProfile(p);
+    applyModeGating();
+    await sb.rpc('clear_leaderboard_mode_override', { p_share_key: shareKey });
+    showModeTransitionPopup({
+      icon: '🛠️',
+      title: 'MODE UPDATED',
+      message: `An admin set your tier to ${MODE_LABEL[override].toUpperCase()}. Normal promotion/demotion rules apply from here.`,
+      features: MODE_UNLOCK_FEATURES[override] || [],
+    });
+  } catch (e) { /* best effort — just tries again on the next sync */ }
 }
 
 // Per-user ad-free check — only meaningful for accounts that have a
@@ -19955,6 +20018,7 @@ safeInit(incrementAppOpens, 'incrementAppOpens');
 safeInit(initDigitalId, 'initDigitalId');
 safeInit(initDigitalIdOverride, 'initDigitalIdOverride');
 safeInit(initAdFreeOverride, 'initAdFreeOverride');
+safeInit(initFitnessModeOverride, 'initFitnessModeOverride');
 safeInit(initAdManager, 'initAdManager');
 safeInit(initSplashLogoManager, 'initSplashLogoManager');
 safeInit(initSyncLogsShare, 'initSyncLogsShare');
