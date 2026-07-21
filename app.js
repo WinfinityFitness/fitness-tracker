@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.18';
+const APP_VERSION = 'WF_SYS_V.1.7.19';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -170,6 +170,11 @@ function wdsArrayToDateMap(arr) {
 function initDesktopShell() {
   const shell = document.getElementById('wdsShell');
   if (!shell) return;
+
+  // Re-applies the forced-desktop-layout viewport on every load/reload —
+  // see wdsApplyForceDesktopViewport's own definition for why this is a
+  // viewport-width trick rather than a CSS class.
+  if (localStorage.getItem(WDS_FORCE_DESKTOP_KEY) === '1') wdsApplyForceDesktopViewport(true);
 
   const gate = document.getElementById('wdsGate');
   const dashboard = document.getElementById('wdsDashboard');
@@ -1250,6 +1255,17 @@ function initDesktopShell() {
   const messengerAutoToggle = document.getElementById('wdsMessengerAutoToggle');
   if (messengerAutoToggle) messengerAutoToggle.addEventListener('change', () => {
     wdsSetMessengerAutoRedirectPref(messengerAutoToggle.checked);
+  });
+  const forceDesktopToggle = document.getElementById('wdsForceDesktopToggle');
+  if (forceDesktopToggle) forceDesktopToggle.addEventListener('change', () => {
+    wdsApplyForceDesktopViewport(forceDesktopToggle.checked);
+    if (forceDesktopToggle.checked) {
+      // Mutually exclusive with the Messenger auto-redirect toggle -- no
+      // reason to hand off to Messenger when you've deliberately asked to
+      // see everything, chat popup included, in the full desktop layout.
+      if (messengerAutoToggle) messengerAutoToggle.checked = false;
+      wdsSetMessengerAutoRedirectPref(false);
+    }
   });
 
   // Notification bell — simple open/close popover, closes on outside click.
@@ -3220,11 +3236,28 @@ async function wdsSetMessengerAutoRedirectPref(enabled) {
     } catch (e) { /* best effort — toggle still reflects locally even if the write failed */ }
   }
 }
+// Forces the full desktop Nexus layout onto a phone-width screen by
+// widening the LAYOUT viewport itself (same trick as a browser's own
+// "Desktop site" toggle) -- every @media (max-width: 860px) rule in
+// style.css evaluates against this virtual width, so it's a straight
+// CSS re-layout, no reload needed. The existing viewport tag has no
+// user-scalable=no/maximum-scale, so pinch-zoom/drag already work once
+// the layout itself is wide enough to need them.
+const WDS_FORCE_DESKTOP_KEY = 'wft_web_force_desktop_viewport';
+const WDS_DEFAULT_VIEWPORT_CONTENT = 'width=device-width, initial-scale=1, viewport-fit=cover';
+const WDS_DESKTOP_VIEWPORT_CONTENT = 'width=1280, viewport-fit=cover';
+function wdsApplyForceDesktopViewport(enabled) {
+  localStorage.setItem(WDS_FORCE_DESKTOP_KEY, enabled ? '1' : '0');
+  const viewportMeta = document.querySelector('meta[name="viewport"]');
+  if (viewportMeta) viewportMeta.setAttribute('content', enabled ? WDS_DESKTOP_VIEWPORT_CONTENT : WDS_DEFAULT_VIEWPORT_CONTENT);
+}
 function wdsOpenMessengerTogglePopup() {
   const popup = document.getElementById('wdsMessengerTogglePopup');
   if (!popup) return;
   const toggle = document.getElementById('wdsMessengerAutoToggle');
   if (toggle) toggle.checked = localStorage.getItem(WDS_MESSENGER_AUTO_KEY) === '1';
+  const desktopToggle = document.getElementById('wdsForceDesktopToggle');
+  if (desktopToggle) desktopToggle.checked = localStorage.getItem(WDS_FORCE_DESKTOP_KEY) === '1';
   popup.hidden = false;
 }
 // Reuses FT's own subscribeToPush/unsubscribeFromPush (they now pick
