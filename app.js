@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.8';
+const APP_VERSION = 'WF_SYS_V.1.7.9';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -1095,9 +1095,11 @@ function initDesktopShell() {
   });
   const skinSelectEl = document.getElementById('wdsSkinSelect');
   const modeSwitchEl = document.getElementById('wdsThemeModeSwitch');
+  // Digital/Minimalist is a fully independent attribute now (see
+  // wdsApplyThemeMode) -- reads the live attribute rather than deriving
+  // from which skin is selected, so any skin can be viewed in either mode.
   const syncWdsModeUI = () => {
-    if (!skinSelectEl) return;
-    const isMinimalist = skinSelectEl.value === 'default-core';
+    const isMinimalist = document.documentElement.getAttribute('data-theme-mode') === 'minimalist';
     if (modeSwitchEl) modeSwitchEl.querySelectorAll('[data-theme-mode]').forEach(btn => {
       btn.classList.toggle('is-active', (btn.dataset.themeMode === 'minimalist') === isMinimalist);
     });
@@ -1105,21 +1107,13 @@ function initDesktopShell() {
   if (skinSelectEl) skinSelectEl.addEventListener('change', () => {
     document.documentElement.setAttribute('data-skin', skinSelectEl.value);
     localStorage.setItem(WDS_SKIN_OVERRIDE_KEY, skinSelectEl.value);
-    syncWdsModeUI();
   });
   if (modeSwitchEl) modeSwitchEl.addEventListener('click', e => {
     const btn = e.target.closest('[data-theme-mode]');
-    if (!btn || !skinSelectEl) return;
-    if (btn.dataset.themeMode === 'minimalist') {
-      skinSelectEl.value = 'default-core';
-      document.documentElement.setAttribute('data-skin', 'default-core');
-      localStorage.setItem(WDS_SKIN_OVERRIDE_KEY, 'default-core');
-    } else if (skinSelectEl.value === 'default-core') {
-      skinSelectEl.value = 'default';
-      document.documentElement.setAttribute('data-skin', 'default');
-      localStorage.setItem(WDS_SKIN_OVERRIDE_KEY, 'default');
-    }
+    if (!btn) return;
+    wdsApplyThemeMode(btn.dataset.themeMode);
     syncWdsModeUI();
+    syncWdsModeUIMobile();
   });
   syncWdsModeUI();
 
@@ -1132,8 +1126,7 @@ function initDesktopShell() {
   const skinSelectMobileEl = document.getElementById('wdsSkinSelectMobile');
   const modeSwitchMobileEl = document.getElementById('wdsThemeModeSwitchMobile');
   const syncWdsModeUIMobile = () => {
-    if (!skinSelectMobileEl) return;
-    const isMinimalist = skinSelectMobileEl.value === 'default-core';
+    const isMinimalist = document.documentElement.getAttribute('data-theme-mode') === 'minimalist';
     if (modeSwitchMobileEl) modeSwitchMobileEl.querySelectorAll('[data-theme-mode]').forEach(btn => {
       btn.classList.toggle('is-active', (btn.dataset.themeMode === 'minimalist') === isMinimalist);
     });
@@ -1147,23 +1140,13 @@ function initDesktopShell() {
   if (skinSelectMobileEl) skinSelectMobileEl.addEventListener('change', () => {
     document.documentElement.setAttribute('data-skin', skinSelectMobileEl.value);
     localStorage.setItem(WDS_SKIN_OVERRIDE_KEY, skinSelectMobileEl.value);
-    if (skinSelectEl) { skinSelectEl.value = skinSelectMobileEl.value; syncWdsModeUI(); }
-    syncWdsModeUIMobile();
+    if (skinSelectEl) skinSelectEl.value = skinSelectMobileEl.value;
   });
   if (modeSwitchMobileEl) modeSwitchMobileEl.addEventListener('click', e => {
     const btn = e.target.closest('[data-theme-mode]');
-    if (!btn || !skinSelectMobileEl) return;
-    if (btn.dataset.themeMode === 'minimalist') {
-      skinSelectMobileEl.value = 'default-core';
-      document.documentElement.setAttribute('data-skin', 'default-core');
-      localStorage.setItem(WDS_SKIN_OVERRIDE_KEY, 'default-core');
-      if (skinSelectEl) { skinSelectEl.value = 'default-core'; syncWdsModeUI(); }
-    } else if (skinSelectMobileEl.value === 'default-core') {
-      skinSelectMobileEl.value = 'default';
-      document.documentElement.setAttribute('data-skin', 'default');
-      localStorage.setItem(WDS_SKIN_OVERRIDE_KEY, 'default');
-      if (skinSelectEl) { skinSelectEl.value = 'default'; syncWdsModeUI(); }
-    }
+    if (!btn) return;
+    wdsApplyThemeMode(btn.dataset.themeMode);
+    syncWdsModeUI();
     syncWdsModeUIMobile();
   });
   syncWdsModeUIMobile();
@@ -1873,11 +1856,11 @@ function renderWdsMenu() {
   const themeToggle = document.getElementById('wdsThemeToggle');
   if (themeToggle) themeToggle.checked = document.documentElement.getAttribute('data-theme') === 'light';
   const skinSelect = document.getElementById('wdsSkinSelect');
-  if (skinSelect) {
-    skinSelect.value = document.documentElement.getAttribute('data-skin') || 'default';
-    const modeSwitch = document.getElementById('wdsThemeModeSwitch');
-    const isMinimalist = skinSelect.value === 'default-core';
-    if (modeSwitch) modeSwitch.querySelectorAll('[data-theme-mode]').forEach(btn => {
+  if (skinSelect) skinSelect.value = document.documentElement.getAttribute('data-skin') || 'default';
+  const modeSwitch = document.getElementById('wdsThemeModeSwitch');
+  if (modeSwitch) {
+    const isMinimalist = document.documentElement.getAttribute('data-theme-mode') === 'minimalist';
+    modeSwitch.querySelectorAll('[data-theme-mode]').forEach(btn => {
       btn.classList.toggle('is-active', (btn.dataset.themeMode === 'minimalist') === isMinimalist);
     });
   }
@@ -2840,6 +2823,7 @@ function wdsCloseStoryComposer() {
 const WDS_DIAL_POS_KEY = 'wft_web_dial_pos';
 const WDS_THEME_OVERRIDE_KEY = 'wft_web_theme_override';
 const WDS_SKIN_OVERRIDE_KEY = 'wft_web_skin_override';
+const WDS_MODE_OVERRIDE_KEY = 'wft_web_mode_override';
 const WDS_DIAL_ITEM_RADIUS = 78;
 let wdsDialOpen = false;
 
@@ -2849,8 +2833,17 @@ let wdsDialOpen = false;
 function wdsApplyThemeOverride() {
   const themeOverride = localStorage.getItem(WDS_THEME_OVERRIDE_KEY);
   const skinOverride = localStorage.getItem(WDS_SKIN_OVERRIDE_KEY);
+  const modeOverride = localStorage.getItem(WDS_MODE_OVERRIDE_KEY);
   if (themeOverride) document.documentElement.setAttribute('data-theme', themeOverride);
   if (skinOverride) document.documentElement.setAttribute('data-skin', skinOverride);
+  document.documentElement.setAttribute('data-theme-mode', modeOverride || 'digital');
+}
+
+// Digital/Minimalist — independent of data-skin (see the FT-side
+// applyThemeMode, same idea): any skin can be viewed in either mode.
+function wdsApplyThemeMode(mode) {
+  document.documentElement.setAttribute('data-theme-mode', mode);
+  localStorage.setItem(WDS_MODE_OVERRIDE_KEY, mode);
 }
 
 function wdsApplyDialPosition() {
@@ -3116,11 +3109,11 @@ function wdsOpenThemePopup() {
   const toggle = document.getElementById('wdsThemeToggleMobile');
   const select = document.getElementById('wdsSkinSelectMobile');
   if (toggle) toggle.checked = document.documentElement.getAttribute('data-theme') === 'light';
-  if (select) {
-    select.value = document.documentElement.getAttribute('data-skin') || 'default';
-    const modeSwitch = document.getElementById('wdsThemeModeSwitchMobile');
-    const isMinimalist = select.value === 'default-core';
-    if (modeSwitch) modeSwitch.querySelectorAll('[data-theme-mode]').forEach(btn => {
+  if (select) select.value = document.documentElement.getAttribute('data-skin') || 'default';
+  const modeSwitch = document.getElementById('wdsThemeModeSwitchMobile');
+  if (modeSwitch) {
+    const isMinimalist = document.documentElement.getAttribute('data-theme-mode') === 'minimalist';
+    modeSwitch.querySelectorAll('[data-theme-mode]').forEach(btn => {
       btn.classList.toggle('is-active', (btn.dataset.themeMode === 'minimalist') === isMinimalist);
     });
   }
@@ -19542,7 +19535,9 @@ initThemeToggle();
 /* ---------------------------------------------------------------- */
 /* Skin (theme pack) selector — layered on top of the dark/light toggle */
 /* above via a separate [data-skin] attribute, so any skin can still be */
-/* viewed in either light or dark mode.                                 */
+/* viewed in either light or dark mode. Digital/Minimalist (below) is a */
+/* THIRD, fully independent attribute -- any skin can be viewed in       */
+/* either mode, same relationship dark/light already has to skin.       */
 /* ---------------------------------------------------------------- */
 function applySkin(skin) {
   document.documentElement.setAttribute('data-skin', skin);
@@ -19550,35 +19545,41 @@ function applySkin(skin) {
   localStorage.setItem('wft_skin', skin);
 }
 
+// Minimalist strips every skin's glow/gradient/shape signature down to
+// just its color palette on the app's plain default component shapes
+// (see the :root[data-theme-mode="minimalist"] block in style.css) and
+// hides the Custom Background section entirely -- re-running
+// applyCustomBg() here lets it re-evaluate whether to actually paint a
+// saved background (it checks this same attribute), without ever
+// touching the stored image/settings, so switching back to Digital
+// brings a saved background right back.
+function applyThemeMode(mode) {
+  document.documentElement.setAttribute('data-theme-mode', mode);
+  localStorage.setItem('wft_theme_mode', mode);
+  const customBgSection = document.getElementById('customBgSection');
+  if (customBgSection) customBgSection.hidden = mode === 'minimalist';
+  if (typeof applyCustomBg === 'function') applyCustomBg();
+}
+
 function initSkinSelector() {
   applySkin(localStorage.getItem('wft_skin') || 'default-core');
+  applyThemeMode(localStorage.getItem('wft_theme_mode') || 'digital');
 
   const skinSelect = document.getElementById('skinSelect');
   const modeSwitch = document.getElementById('themeModeSwitch');
 
   const syncModeUI = () => {
-    const isMinimalist = skinSelect.value === 'default-core';
+    const isMinimalist = document.documentElement.getAttribute('data-theme-mode') === 'minimalist';
     if (modeSwitch) modeSwitch.querySelectorAll('[data-theme-mode]').forEach(btn => {
       btn.classList.toggle('is-active', (btn.dataset.themeMode === 'minimalist') === isMinimalist);
     });
   };
 
-  skinSelect.addEventListener('change', e => {
-    applySkin(e.target.value);
-    syncModeUI();
-  });
+  skinSelect.addEventListener('change', e => { applySkin(e.target.value); });
   if (modeSwitch) modeSwitch.addEventListener('click', e => {
     const btn = e.target.closest('[data-theme-mode]');
     if (!btn) return;
-    if (btn.dataset.themeMode === 'minimalist') {
-      applySkin('default-core');
-      skinSelect.value = 'default-core';
-    } else if (skinSelect.value === 'default-core') {
-      // Leaving Minimalist -- fall back to the plain base look rather
-      // than leaving Default Core active under the Digital label.
-      applySkin('default');
-      skinSelect.value = 'default';
-    }
+    applyThemeMode(btn.dataset.themeMode);
     syncModeUI();
   });
   syncModeUI();
@@ -19678,6 +19679,12 @@ function applyCustomBg() {
   const layer = document.getElementById('customBgLayer');
   const imageEl = document.getElementById('customBgImage');
   const overlayEl = document.getElementById('customBgOverlay');
+  // Minimalist mode drops the whole Custom Background feature (photo AND
+  // widget transparency) -- checked fresh on every call rather than
+  // cached, so switching modes just re-runs this function and it sorts
+  // itself out. Nothing stored gets touched, so a saved background/slider
+  // setup comes right back the moment Digital mode is reselected.
+  const isMinimalist = document.documentElement.getAttribute('data-theme-mode') === 'minimalist';
 
   // Widget Box Fill Transparency applies regardless of whether a background
   // photo is set — it's a general "let widgets go see-through" control, not
@@ -19691,12 +19698,12 @@ function applyCustomBg() {
   // eye is far more sensitive to alpha loss near full opacity than a
   // straight percentage suggests.
   const bgSettingsForWidgets = getBgSettings();
-  const fillFrac = bgSettingsForWidgets.widgetFill / 100;
-  const opacityFrac = bgSettingsForWidgets.widgetOpacity / 100;
+  const fillFrac = isMinimalist ? 0 : bgSettingsForWidgets.widgetFill / 100;
+  const opacityFrac = isMinimalist ? 0 : bgSettingsForWidgets.widgetOpacity / 100;
   document.documentElement.style.setProperty('--widget-fill-alpha', (1 - fillFrac * fillFrac).toFixed(2));
   document.documentElement.style.setProperty('--widget-opacity', (1 - opacityFrac * opacityFrac).toFixed(2));
 
-  if (!imgData || !imgData.dataUrl) {
+  if (isMinimalist || !imgData || !imgData.dataUrl) {
     layer.hidden = true;
     document.body.classList.remove('has-custom-bg');
     return;

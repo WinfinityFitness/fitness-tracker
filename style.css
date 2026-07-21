@@ -4699,17 +4699,16 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .sheet-section--compact .section-title-row { margin: 4px 0 -2px; }
 
 /* ================================================================== */
-/* SKIN: Default Core — "Minimalist." Fourth rebuild: strips every
-   transparency and glow effect the app's shared component CSS drives off
-   --surface-translucent/--nav-translucent/--cyan-glow/--gradient-glow, so
-   this skin renders those effects as fully opaque/inert everywhere they're
-   used (box-shadow, text-shadow, filter: drop-shadow, backdrop-filter)
-   without needing per-component overrides — cards stay on the shared
-   .wds-card/.chart-card rules, which already fill flat with var(--surface-1)
-   and pick up nothing extra from this skin. Dark mode is a cool, neutral
+/* SKIN: Default Core — a distinct cool-teal/violet color palette, same
+   status as the other six skins. Digital/Minimalist (see the global
+   :root[data-theme-mode="minimalist"] block further down) is now a fully
+   independent toggle that applies to EVERY skin including this one —
+   Default Core no longer force-flattens its own glow/gradient/blur, so it
+   renders normally (glow, gradient text/fills, translucent blur nav) in
+   Digital mode and only goes plain when Minimalist is separately picked,
+   exactly like Shinobi/Grand/Sovereign/etc. Dark mode is a cool, neutral
    dark; light mode is pure clean white. Plain system sans-serif only, no
-   custom display font. Pairs with the Digital/Minimalist mode toggle
-   (Settings > Theme) — selecting Minimalist just applies this skin.
+   custom display font — that part of its identity stays regardless of mode.
 
    THE APP DEFAULT — see initSkinSelector's fallback in app.js. */
 /* ================================================================== */
@@ -4730,22 +4729,22 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 
   --cyan: #3fb8c4;
   --cyan-dim: #2a7d86;
-  --cyan-glow: rgba(0,0,0,0);
+  --cyan-glow: rgba(63,184,196,0.4);
   --violet: #7c74c9;
   --magenta: #b95fa8;
 
   --series-1: #3fb8c4;
   --series-2: #7c74c9;
   --gradient-bar: linear-gradient(90deg, var(--violet) 0%, #4a8fce 55%, var(--cyan) 100%);
-  --gradient-glow: rgba(0,0,0,0);
+  --gradient-glow: rgba(74,143,206,0.36);
 
   --good: #34bd7c;
   --warning: #dba52c;
   --serious: #e6824b;
   --critical: #e6516a;
 
-  --surface-translucent: #0a0d10;
-  --nav-translucent: #12161a;
+  --surface-translucent: rgba(10,13,16,0.88);
+  --nav-translucent: rgba(18,22,26,0.88);
 
   --card-radius: 8px;
   --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Roboto Mono", monospace;
@@ -4769,29 +4768,148 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 
   --cyan: #0b8fa3;
   --cyan-dim: #0c6d7e;
-  --cyan-glow: rgba(0,0,0,0);
+  --cyan-glow: rgba(11,143,163,0.26);
   --violet: #5d47ab;
   --magenta: #9c1c47;
 
   --series-1: #0b8fa3;
   --series-2: #5d47ab;
   --gradient-bar: linear-gradient(90deg, var(--violet) 0%, #4a8fce 55%, var(--cyan) 100%);
-  --gradient-glow: rgba(0,0,0,0);
+  --gradient-glow: rgba(74,143,206,0.22);
 
   --good: #16805c;
   --warning: #a35714;
   --serious: #b04a1c;
   --critical: #a82929;
 
-  --surface-translucent: #ffffff;
-  --nav-translucent: #ffffff;
+  --surface-translucent: rgba(255,255,255,0.88);
+  --nav-translucent: rgba(255,255,255,0.92);
 }
-/* No decorative body pattern/radial glow — plain flat background only,
-   this skin specifically (every other skin keeps its own body look). */
-[data-skin="default-core"] body { background-image: none !important; }
-/* No glass/blur surfaces anywhere in this skin — every popup, sheet, and
-   translucent nav bar renders fully opaque instead. */
-[data-skin="default-core"] * { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+
+/* ================================================================== */
+/* UI MODE: Minimalist — orthogonal to [data-skin] (see applyThemeMode/
+   wdsApplyThemeMode in app.js). Strips every skin's glow, translucency,
+   custom typography, and decorative gradient/texture flourishes down to
+   a plain flat look while KEEPING that skin's own accent colors and
+   border-radius/clip-path corner identity — Shinobi Core in Minimalist
+   still looks like Shinobi Core (sharp corners, orange/ink palette),
+   just without the glow/uppercase/thick-border/hard-shadow treatment.
+   Digital mode (no data-theme-mode attribute, or value="digital") is
+   entirely unaffected — every skin's full bespoke look lives only in
+   the [data-skin="..."] blocks above, untouched by anything below.
+   Placed after every skin definition so equal-specificity ties resolve
+   in this block's favor by source order; !important throughout guards
+   against the handful of skin rules that are themselves !important. */
+/* ================================================================== */
+:root[data-theme-mode="minimalist"] {
+  --cyan-glow: transparent;
+  --gradient-glow: transparent;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Roboto Mono", monospace;
+  --font-display: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  --font-headline: Arial, "Helvetica Neue", Helvetica, sans-serif;
+}
+[data-theme-mode="minimalist"] * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+[data-theme-mode="minimalist"] body { background-image: none !important; }
+
+[data-theme-mode="minimalist"] .hero-title,
+[data-theme-mode="minimalist"] .chart-card-title,
+[data-theme-mode="minimalist"] .section-title,
+[data-theme-mode="minimalist"] .app-header h1,
+[data-theme-mode="minimalist"] .sheet-head h2,
+[data-theme-mode="minimalist"] .field-group-heading {
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  text-shadow: none !important;
+}
+[data-theme-mode="minimalist"] .hero-card,
+[data-theme-mode="minimalist"] .chart-card,
+[data-theme-mode="minimalist"] .stat-tile,
+[data-theme-mode="minimalist"] .ring-card,
+[data-theme-mode="minimalist"] .computed-card {
+  border-width: 1px !important;
+  border-image: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  filter: none !important;
+  background-image: none !important;
+}
+[data-theme-mode="minimalist"] .btn {
+  border-width: 1px !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  filter: none !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+}
+[data-theme-mode="minimalist"] .btn:active,
+[data-theme-mode="minimalist"] .btn--primary:active {
+  box-shadow: none !important;
+}
+[data-theme-mode="minimalist"] input,
+[data-theme-mode="minimalist"] select,
+[data-theme-mode="minimalist"] textarea {
+  border-width: 1px !important;
+  box-shadow: none !important;
+}
+[data-theme-mode="minimalist"] .chip,
+[data-theme-mode="minimalist"] .pill {
+  border-width: 1px !important;
+  letter-spacing: normal !important;
+  background-image: none !important;
+}
+[data-theme-mode="minimalist"] .switch-track {
+  box-shadow: none !important;
+}
+[data-theme-mode="minimalist"] .tab-bar,
+[data-theme-mode="minimalist"] .app-header {
+  border-width: 1px !important;
+  box-shadow: none !important;
+  background-image: none !important;
+}
+
+/* Steampunk Core's rivets, gear-icon flourish, and gradient button/chip/
+   switch fills, plus Hashira Core's gradient "blade edge" card border, are
+   the only genuinely non-flat (gradient/textured) renders among the six
+   skins — nothing generic above catches a background-image or gradient
+   used as decoration, so they're flattened to solid theme-color fills
+   here instead. Corner shape (clip-path katana-cuts/chamfers, border-
+   radius) is untouched everywhere, same as every other skin. */
+[data-theme-mode="minimalist"][data-skin="steampunk-core"] .hero-card,
+[data-theme-mode="minimalist"][data-skin="steampunk-core"] .chart-card,
+[data-theme-mode="minimalist"][data-skin="steampunk-core"] .stat-tile,
+[data-theme-mode="minimalist"][data-skin="steampunk-core"] .ring-card,
+[data-theme-mode="minimalist"][data-skin="steampunk-core"] .computed-card {
+  background-image: none !important;
+}
+[data-theme-mode="minimalist"][data-skin="steampunk-core"] .chart-card-title::before,
+[data-theme-mode="minimalist"][data-skin="steampunk-core"] .hero-title::before {
+  content: none !important;
+}
+[data-theme-mode="minimalist"][data-skin="steampunk-core"] .btn--primary {
+  background: var(--cyan) !important;
+  color: var(--bg) !important;
+}
+[data-theme-mode="minimalist"][data-skin="steampunk-core"] .btn:not(.btn--primary) {
+  background: var(--surface-2) !important;
+}
+[data-theme-mode="minimalist"][data-skin="steampunk-core"] .chip,
+[data-theme-mode="minimalist"][data-skin="steampunk-core"] .pill {
+  background: var(--surface-2) !important;
+}
+[data-theme-mode="minimalist"][data-skin="steampunk-core"] .switch input:checked + .switch-track {
+  background: var(--cyan) !important;
+}
+[data-theme-mode="minimalist"][data-skin="hashira-core"] .hero-card,
+[data-theme-mode="minimalist"][data-skin="hashira-core"] .chart-card,
+[data-theme-mode="minimalist"][data-skin="hashira-core"] .stat-tile,
+[data-theme-mode="minimalist"][data-skin="hashira-core"] .ring-card,
+[data-theme-mode="minimalist"][data-skin="hashira-core"] .computed-card {
+  border-image: none !important;
+  border-top: 1px solid var(--border) !important;
+}
 
 /* ---------------- Custom background upload (Settings) ---------------- */
 .opacity-preview-row { display: flex; align-items: center; gap: 12px; margin: 10px 0 4px; }
@@ -6211,6 +6329,92 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
 .wds-menu-links { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .wds-menu-links a { color: var(--cyan); text-decoration: none; font-size: 0.84rem; }
 .wds-menu-links a:hover { text-decoration: underline; }
+
+/* ================================================================== */
+/* MODE: Minimalist — independent of which skin (data-skin) is active;   */
+/* see applyThemeMode/wdsApplyThemeMode in app.js. Strips every skin down */
+/* to just its own color palette on the app's plain default shapes/text, */
+/* same idea as the light/dark toggle already being independent of skin. */
+/* Placed last in the file deliberately: several skins use !important on */
+/* border-radius/shadows (e.g. Shinobi/Grand's `[data-skin=X] * { border- */
+/* radius: ... !important }`), and among equal-specificity !important     */
+/* declarations the LAST one in source order wins — every selector below */
+/* is also prefixed with :root (skins' component overrides use a bare    */
+/* [data-skin="..."] selector), which alone is already higher specificity */
+/* than a bare attribute selector, so this wins on both counts.          */
+/* ================================================================== */
+:root[data-theme-mode="minimalist"] {
+  /* Flattens every shared glow AND every gradient-fill/gradient-clip-text
+     element (avatars, .hero-title .accent, .wds-profile-identity h2, bar
+     charts, sliders, dial buttons, ...) to a plain, flat, skin-colored
+     fill — no per-element overrides needed since every skin already
+     defines --cyan, and every such element already reads --gradient-bar/
+     --cyan-glow/--gradient-glow rather than a hardcoded color. */
+  --cyan-glow: rgba(0,0,0,0);
+  --gradient-glow: rgba(0,0,0,0);
+  --gradient-bar: var(--cyan);
+  /* No glass/blur surfaces — every popup, sheet, and translucent nav bar
+     renders fully opaque instead (this is what Default Core's own skin
+     block used to force on itself alone; now it's every skin's Minimalist
+     look, same as Default Core's Digital look is now just like the rest). */
+  --surface-translucent: var(--surface-1);
+  --nav-translucent: var(--surface-1);
+}
+/* No decorative body pattern/radial glow in Minimalist, regardless of skin. */
+:root[data-theme-mode="minimalist"] body { background-image: none !important; }
+:root[data-theme-mode="minimalist"] * { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+/* Shape/font signature reset — undoes each skin's own border-radius,
+   heading font/transform, card & button shadow, and input border
+   overrides (Shinobi's block at [data-skin="shinobi-core"], ~line 3499,
+   is the fullest concrete example of what's being undone here; Grand/
+   Sovereign/Hashira/Asanoha/Steampunk follow the same shape). Values below
+   match this app's own plain unscoped defaults (.btn/.hero-card/.chart-card
+   etc.), not any one skin's numbers, so Minimalist reads as genuinely
+   plain rather than "borrowing" another skin's shape. */
+:root[data-theme-mode="minimalist"] * { border-radius: 5px !important; }
+:root[data-theme-mode="minimalist"] .hero-title,
+:root[data-theme-mode="minimalist"] .chart-card-title,
+:root[data-theme-mode="minimalist"] .section-title,
+:root[data-theme-mode="minimalist"] .app-header h1,
+:root[data-theme-mode="minimalist"] .sheet-head h2,
+:root[data-theme-mode="minimalist"] .field-group-heading {
+  font-family: var(--font-display) !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  text-shadow: none !important;
+}
+:root[data-theme-mode="minimalist"] .hero-card,
+:root[data-theme-mode="minimalist"] .chart-card,
+:root[data-theme-mode="minimalist"] .stat-tile,
+:root[data-theme-mode="minimalist"] .ring-card,
+:root[data-theme-mode="minimalist"] .computed-card {
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-color: var(--border) !important;
+  box-shadow: none !important;
+}
+:root[data-theme-mode="minimalist"] .btn {
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-color: var(--border-soft) !important;
+  font-weight: 700 !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  transform: none !important;
+}
+:root[data-theme-mode="minimalist"] .btn--primary {
+  background: var(--surface-2) !important;
+  color: var(--text-primary) !important;
+}
+:root[data-theme-mode="minimalist"] input,
+:root[data-theme-mode="minimalist"] select,
+:root[data-theme-mode="minimalist"] textarea {
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-color: var(--border-soft) !important;
+}
 
 /* ---------- Responsive ---------- */
 @media (max-width: 1080px) {

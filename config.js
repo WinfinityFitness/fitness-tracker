@@ -3,9 +3,13 @@
 // Leave as-is to keep the app fully functional without Google Drive backup.
 const GOOGLE_CLIENT_ID = '61766354133-38gfl9pkak9955639ubh5svaq0fginc3.apps.googleusercontent.com';
 
-// Supabase project powering the anonymous opt-in Leaderboard tab.
+// Supabase project powering the anonymous opt-in Leaderboard tab. Uses the
+// new publishable-key format (replaces the old JWT-format anon key after
+// the legacy HS256 signing secret was revoked) -- safe to expose client-
+// side same as the old anon key was, access is still governed entirely by
+// RLS policies, not by keeping this value secret.
 const SUPABASE_URL = 'https://mzkjboplfalauivwcnni.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im16a2pib3BsZmFsYXVpdndjbm5pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxNTM4MTMsImV4cCI6MjA5ODcyOTgxM30.62tmKUxeKSLHhPuDZ6akBJq4e8QV4LqfklZEqa4OGUM';
+const SUPABASE_ANON_KEY = 'sb_publishable_YwHBnvbBjd8Oj8hgPXb_JA_buurC92v';
 
 // Web Push VAPID public key — safe to expose client-side (that's how VAPID
 // works, only the matching private key must stay secret). The private key
