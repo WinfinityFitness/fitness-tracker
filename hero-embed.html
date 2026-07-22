@@ -3,16 +3,17 @@
      section should go. Fragment, not a full page, same convention as
      footer-embed.html -- inherits the page's own width.
 
-     CTA button ("Launch Nexus") links to the same admin-editable Wellness
-     URL the Digital Arsenal's Wellness card uses (ad_settings.
-     download_url_wellness, set via Edit Download Links in the FT admin
-     drawer) so both stay in sync -- falls back to wellness.winfinityfitness.com
-     directly if that hasn't been set yet. -->
+     CTA button ("Launch Nexus") is a fixed, static link straight to the
+     live Wellness dashboard -- deliberately NOT synced to the Digital
+     Arsenal's Wellness download-icon link (ad_settings.download_url_
+     wellness), which points at the installer file instead. Two different
+     destinations by design: this button launches the live app, Arsenal's
+     downloads the installer. No Supabase fetch needed here at all. -->
 <section class="wf-hero-embed" id="wfHeroEmbed">
   <img class="wf-hero-logo" src="https://winfinityfitness.github.io/fitness-tracker/icons/icon-192.png" alt="Winfinity">
   <h1 class="wf-hero-title">The Future Of<br><em>Performance</em></h1>
   <p class="wf-hero-subtitle">Unlock your latent potential through the Global Neural Grid. Real-time bio-syncing for the modern shinobi.</p>
-  <a class="wf-hero-cta" id="wfHeroCta" href="https://wellness.winfinityfitness.com" target="_blank" rel="noopener">Launch Nexus</a>
+  <a class="wf-hero-cta" href="https://wellness.winfinityfitness.com" target="_blank" rel="noopener">Launch Nexus</a>
 </section>
 
 <style>
@@ -55,27 +56,3 @@
   }
   .wf-hero-cta:hover { background: #ffb668; }
 </style>
-
-<script>
-(function () {
-  var SUPABASE_URL = 'https://mzkjboplfalauivwcnni.supabase.co';
-  var SUPABASE_ANON_KEY = 'sb_publishable_YwHBnvbBjd8Oj8hgPXb_JA_buurC92v';
-  if (!window.supabase) {
-    var script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-    script.onload = applyCtaLink;
-    document.head.appendChild(script);
-  } else {
-    applyCtaLink();
-  }
-  function applyCtaLink() {
-    var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    sb.from('ad_settings').select('download_url_wellness').eq('id', 1).maybeSingle()
-      .then(function (result) {
-        var url = result.data && result.data.download_url_wellness;
-        if (url) document.getElementById('wfHeroCta').href = url;
-      })
-      .catch(function () { /* keep the default wellness URL already in the href */ });
-  }
-})();
-</script>
