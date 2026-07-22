@@ -452,7 +452,7 @@ function openStatCard(row) {
   }
   if (row.weight_lost_kg != null) rows.push(['Total Weight Loss', row.weight_lost_kg + ' kg', true]);
   if (row.steps != null) rows.push(['Daily Steps', Math.round(row.steps).toLocaleString(), null]);
-  if (row.avg_calories != null) rows.push(['Caloric Burn', row.avg_calories.toLocaleString() + ' kcal', null]);
+  if (row.avg_calories != null) rows.push(['Calories Consumed', row.avg_calories.toLocaleString() + ' kcal', null]);
   if (row.avg_protein_g != null) rows.push(['Protein Intake', row.avg_protein_g + ' g', null]);
   if (row.volume_lifted != null) rows.push(['Volume Lifted', Math.round(row.volume_lifted).toLocaleString() + ' ' + (row.volume_unit || 'kg'), null]);
   if (row.furthest_run_km != null) rows.push(['Furthest Run', Number(row.furthest_run_km).toFixed(1) + ' km', null]);
