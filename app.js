@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.34';
+const APP_VERSION = 'WF_SYS_V.1.7.35';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -4409,7 +4409,16 @@ async function wdsOpenChatPopup(roomId) {
   // wdsSyncChatLastReadFromServer, called on every refreshWdsChatRooms.
   if (wdsRemoteData && wdsRemoteData.shareKey && sbConfigured()) {
     const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
-    sb.rpc('mark_chat_read', { p_room_key: String(roomId), p_share_key: wdsRemoteData.shareKey, p_code_name: codeName }).catch(() => {});
+    // .then(ok, fail) instead of .catch(fail) -- sb.rpc(...) returns a
+    // "thenable" query builder that only implements .then(), not a real
+    // native Promise, so chaining .catch() straight onto it threw
+    // "sb.rpc(...).catch is not a function" synchronously, right here,
+    // which aborted the REST of wdsOpenChatPopup before it ever reached
+    // wdsRefreshChatPopup below -- the actual reason chat history never
+    // loaded until sending a message (a different call) ran this same
+    // function again afterward. .then() is the one method every thenable
+    // is guaranteed to have.
+    sb.rpc('mark_chat_read', { p_room_key: String(roomId), p_share_key: wdsRemoteData.shareKey, p_code_name: codeName }).then(() => {}, () => {});
   }
   await wdsRefreshChatPopup(roomId);
   renderWdsChatListPanel();
