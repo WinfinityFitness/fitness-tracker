@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.37';
+const APP_VERSION = 'WF_SYS_V.1.7.38';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -17300,7 +17300,7 @@ let cachedAdSettingsPromise = null;
 function fetchAdSettings() {
   if (!sbConfigured()) return Promise.resolve(null);
   if (!cachedAdSettingsPromise) {
-    cachedAdSettingsPromise = sb.from('ad_settings').select('ads_enabled, updates_enabled, footer_tagline, footer_webpage_url, footer_facebook_url, footer_instagram_url, footer_affiliate_url').eq('id', 1).maybeSingle()
+    cachedAdSettingsPromise = sb.from('ad_settings').select('ads_enabled, updates_enabled, footer_tagline, footer_webpage_url, footer_facebook_url, footer_instagram_url, footer_affiliate_url, download_url_ft, download_url_wellness, download_url_messenger').eq('id', 1).maybeSingle()
       .then(({ data }) => data)
       .catch(() => null);
   }
@@ -19461,6 +19461,15 @@ function initAnnouncementWidget() {
     document.getElementById('adminFooterAffiliateUrl').value = (settings && settings.footer_affiliate_url) || '';
     document.getElementById('adminFooterOverlay').hidden = false;
   });
+  document.getElementById('btnDrawerOpenDownloadLinks').addEventListener('click', async () => {
+    const noteEl = document.getElementById('adminDownloadLinksNote');
+    noteEl.textContent = '';
+    const settings = await fetchAdSettings();
+    document.getElementById('adminDownloadUrlFt').value = (settings && settings.download_url_ft) || '';
+    document.getElementById('adminDownloadUrlWellness').value = (settings && settings.download_url_wellness) || '';
+    document.getElementById('adminDownloadUrlMessenger').value = (settings && settings.download_url_messenger) || '';
+    document.getElementById('adminDownloadLinksOverlay').hidden = false;
+  });
   document.getElementById('btnAdminAssignTargets').addEventListener('click', () => {
     ['adminAssignTargetId', 'adminAssignCalorie', 'adminAssignSteps', 'adminAssignWorkouts', 'adminAssignRefeedCalories', 'adminAssignRefeedStart', 'adminAssignRefeedEnd', 'adminAssignSocialLinks'].forEach(id => {
       document.getElementById(id).value = '';
@@ -19547,6 +19556,31 @@ function initAnnouncementWidget() {
       showRestToast('Footer updated. Reload FT/wellness/Messenger to see it live.');
     } catch (e) {
       handleAdminRpcError('admin_set_footer_settings', e, noteEl);
+    }
+  });
+
+  const downloadLinksOverlay = document.getElementById('adminDownloadLinksOverlay');
+  document.getElementById('btnCloseAdminDownloadLinks').addEventListener('click', () => { downloadLinksOverlay.hidden = true; });
+  downloadLinksOverlay.addEventListener('click', e => { if (e.target === downloadLinksOverlay) downloadLinksOverlay.hidden = true; });
+
+  document.getElementById('btnAdminDownloadLinksSubmit').addEventListener('click', async () => {
+    const noteEl = document.getElementById('adminDownloadLinksNote');
+    if (!isAdminLoggedIn()) { noteEl.textContent = 'Not logged in.'; return; }
+    noteEl.textContent = 'Saving…';
+    try {
+      const { error } = await sb.rpc('admin_set_download_links', {
+        p_digital_id: adminSession.digitalId,
+        p_password: adminSession.password,
+        p_ft_url: document.getElementById('adminDownloadUrlFt').value,
+        p_wellness_url: document.getElementById('adminDownloadUrlWellness').value,
+        p_messenger_url: document.getElementById('adminDownloadUrlMessenger').value,
+      });
+      if (error) throw error;
+      cachedAdSettingsPromise = null;
+      downloadLinksOverlay.hidden = true;
+      showRestToast('Download links updated.');
+    } catch (e) {
+      handleAdminRpcError('admin_set_download_links', e, noteEl);
     }
   });
 

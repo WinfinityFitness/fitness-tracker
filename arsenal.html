@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Winfinity Digital Arsenal</title>
+<style>
+  :root {
+    --bg: #1a0f08;
+    --panel: #241609;
+    --border: #3a2412;
+    --text-primary: #f2e9de;
+    --text-muted: #b8a48f;
+    --accent: #ff7a1a;
+    --accent-dim: #b9762f;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow-x: hidden;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 40px 24px 56px; }
+  h1 {
+    font-size: clamp(1.5rem, 3.5vw, 2.1rem); letter-spacing: 0.04em; margin: 0 0 10px;
+    text-transform: uppercase; font-weight: 800;
+  }
+  .title-rule { width: 64px; height: 4px; background: var(--accent); border-radius: 2px; margin-bottom: 34px; }
+
+  .grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 22px;
+  }
+  .app-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    padding: 22px; display: flex; flex-direction: column;
+  }
+  .app-icon-badge {
+    width: 46px; height: 46px; border-radius: 12px; background: rgba(255,122,26,0.12);
+    border: 1px solid var(--accent-dim); display: flex; align-items: center; justify-content: center;
+    margin-bottom: 16px;
+  }
+  .app-icon-badge img { width: 28px; height: 28px; object-fit: contain; }
+  .app-title {
+    font-size: 1rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; margin: 0 0 6px;
+  }
+  .app-tagline {
+    color: var(--accent); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em;
+    text-transform: uppercase; margin: 0 0 12px; line-height: 1.4;
+  }
+  .app-desc { color: var(--text-muted); font-size: 0.85rem; line-height: 1.55; margin: 0 0 20px; flex: 1; }
+  .app-btn {
+    display: block; text-align: center; text-decoration: none; box-sizing: border-box;
+    border: 1px solid var(--accent); color: var(--accent); background: transparent;
+    font-weight: 700; font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase;
+    border-radius: 8px; padding: 11px; transition: background 0.15s, color 0.15s;
+  }
+  .app-btn:hover { background: var(--accent); color: #1a0f08; }
+  .app-btn.is-disabled {
+    border-color: var(--border); color: var(--text-muted); pointer-events: none; cursor: default;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Digital Arsenal</h1>
+  <div class="title-rule"></div>
+
+  <div class="grid" id="appGrid">
+    <div class="app-card">
+      <span class="app-icon-badge"><img src="icons/icon-192.png" alt="Winfinity Fitness Tracker"></span>
+      <h2 class="app-title">Winfinity Fitness Tracker</h2>
+      <p class="app-tagline">Every rep, every meal, every day — tracked.</p>
+      <p class="app-desc">Log training, nutrition, weight, and hydration in one place, with macros that auto-calculate your calories and reminders that actually adapt to your schedule. Track body measurements and progress photos over time, climb the Nexus Leaderboard, and back everything up automatically.</p>
+      <a class="app-btn is-disabled" id="btnDownloadFt" href="#">Download Installer</a>
+    </div>
+
+    <div class="app-card">
+      <span class="app-icon-badge"><img src="icons/icon-nexus-192.png" alt="Winfinity Wellness"></span>
+      <h2 class="app-title">Winfinity Wellness (Nexus)</h2>
+      <p class="app-tagline">Your full Nexus history, wherever you check it.</p>
+      <p class="app-desc">Sign in with your Digital ID and see everything FT tracks — training trends, nutrition breakdowns, weight progress — in one dashboard that works on desktop or mobile. Chat with your community, check the Nexus Leaderboard, and follow friends' progress from whichever screen you're on.</p>
+      <a class="app-btn is-disabled" id="btnDownloadWellness" href="#">Launch Nexus</a>
+    </div>
+
+    <div class="app-card">
+      <span class="app-icon-badge"><img src="icons/icon-messenger-192.png" alt="Winfinity Messenger"></span>
+      <h2 class="app-title">Winfinity Messenger</h2>
+      <p class="app-tagline">The Nexus community, one tap away.</p>
+      <p class="app-desc">A dedicated chat app for your Winfinity circle — direct messages, Nexus Com group chat, image sharing, and reactions. Built for quick check-ins with training partners and coaches, without opening the full tracker.</p>
+      <a class="app-btn is-disabled" id="btnDownloadMessenger" href="#">Get Messenger</a>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+'use strict';
+async function loadDownloadLinks() {
+  try {
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { data, error } = await sb.from('ad_settings')
+      .select('download_url_ft, download_url_wellness, download_url_messenger')
+      .eq('id', 1).maybeSingle();
+    if (error) throw error;
+    applyLink('btnDownloadFt', data && data.download_url_ft);
+    applyLink('btnDownloadWellness', data && data.download_url_wellness);
+    applyLink('btnDownloadMessenger', data && data.download_url_messenger);
+  } catch (e) { /* buttons stay disabled if this fails -- no broken links shown */ }
+}
+function applyLink(id, url) {
+  const el = document.getElementById(id);
+  if (!url) return;
+  el.href = url;
+  el.target = '_blank';
+  el.rel = 'noopener';
+  el.classList.remove('is-disabled');
+}
+loadDownloadLinks();
+</script>
+</body>
+</html>

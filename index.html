@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.37">
+<link rel="stylesheet" href="style.css?v=1.7.38">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -169,6 +169,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         <button type="button" class="announcement-menu-item" id="btnAdminAssignTargets" hidden>Assign Targets</button>
         <button type="button" class="announcement-menu-item" id="btnDrawerOpenMediaSync">Media Sync Calibration</button>
         <button type="button" class="announcement-menu-item" id="btnDrawerOpenFooterSettings">Edit Footer</button>
+        <button type="button" class="announcement-menu-item" id="btnDrawerOpenDownloadLinks">Edit Download Links</button>
       </div>
       <p class="field-group-heading" style="font-size:0.8rem;margin-top:14px;">Quick Log buttons in everyone's dial</p>
       <p class="hint hint--sm">Shown to every user, not just admin, in their own drawer dial — pick which Quick Log shortcuts appear.</p>
@@ -2858,6 +2859,31 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
+<div class="sheet-overlay" id="adminDownloadLinksOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Edit Download Links</h2>
+      <button class="sheet-close" id="btnCloseAdminDownloadLinks">✕</button>
+    </div>
+    <p class="hint hint--sm">Powers the Download buttons on winfinityfitness.com's Digital Arsenal section (arsenal.html). Blank a field to leave that button without a link.</p>
+    <label class="field">
+      <span>FT (Fitness Tracker) download URL</span>
+      <input type="url" id="adminDownloadUrlFt" placeholder="https://..." autocomplete="off">
+    </label>
+    <label class="field">
+      <span>Wellness (Nexus) launch URL</span>
+      <input type="url" id="adminDownloadUrlWellness" placeholder="https://..." autocomplete="off">
+    </label>
+    <label class="field">
+      <span>Messenger download URL</span>
+      <input type="url" id="adminDownloadUrlMessenger" placeholder="https://..." autocomplete="off">
+    </label>
+    <button type="button" class="btn btn--primary" id="btnAdminDownloadLinksSubmit" style="width:100%;margin-top:10px;">Save</button>
+    <p class="save-note" id="adminDownloadLinksNote"></p>
+  </div>
+</div>
+
 <div class="sheet-overlay" id="adminAssignTargetsOverlay" hidden>
   <div class="sheet">
     <div class="sheet-handle"></div>
@@ -4423,11 +4449,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
-<script src="config.js?v=1.7.37"></script>
+<script src="config.js?v=1.7.38"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.37"></script>
+<script src="app.js?v=1.7.38"></script>
 </body>
 </html>
