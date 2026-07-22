@@ -26,6 +26,7 @@
   <div class="wf-footer-top">
     <div class="wf-footer-brand">
       <img class="wf-footer-logo" src="https://winfinityfitness.github.io/fitness-tracker/icons/icon-192.png" alt="Winfinity">
+      <span class="wf-footer-name">WINFINITYFITNESS</span>
     </div>
     <div class="wf-footer-actions">
       <button type="button" class="wf-footer-pill" id="wfFooterDonate">
@@ -39,7 +40,6 @@
     </div>
   </div>
 
-  <h2 class="wf-footer-name">WINFINITYFITNESS</h2>
   <p class="wf-footer-tagline" id="wfFooterTagline">"The only bad workout is the one that didn't happen."</p>
 
   <div class="wf-footer-columns">
@@ -93,7 +93,18 @@
     border-top: 1px solid #232d3a;
   }
   .wf-footer-top { display: flex; align-items: center; justify-content: space-between; max-width: 720px; margin: 0 auto 18px; flex-wrap: wrap; gap: 10px; }
+  .wf-footer-brand { display: flex; align-items: center; gap: 10px; }
   .wf-footer-logo { width: 30px; height: 30px; object-fit: contain; display: block; }
+  /* !important + a scoped selector here specifically because WordPress
+     themes commonly re-style bare h1-h6 tags globally (color/weight/
+     letter-spacing) with higher specificity than a single class -- this
+     is a <span>, not a heading element, precisely to sidestep that, but
+     the !important stays as a second line of defense against the theme's
+     own .wf-footer-embed-unaware selectors if it ever targets spans too. */
+  .wf-footer-embed .wf-footer-name {
+    color: #ff9f43 !important; font-size: 1rem !important; font-weight: 700 !important;
+    letter-spacing: 0.08em; text-transform: uppercase; line-height: 1;
+  }
   .wf-footer-actions { display: flex; gap: 10px; }
   .wf-footer-pill {
     display: inline-flex; align-items: center; gap: 6px; background: transparent;
@@ -101,7 +112,6 @@
     padding: 7px 14px; border-radius: 999px; cursor: pointer;
   }
   .wf-footer-pill:hover { background: #ff9f43; color: #0a0d12; }
-  .wf-footer-name { font-size: 1rem; letter-spacing: 0.08em; margin: 0 0 10px; text-transform: uppercase; }
   .wf-footer-tagline {
     font-style: italic; color: #8a97a8; font-size: 0.88rem; max-width: 560px;
     margin: 0 auto 30px; line-height: 1.5;
