@@ -1774,6 +1774,17 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 #setupPhotoLockHint { margin: 0; max-width: 220px; }
 #setupPhotoNote { margin: 0; }
 
+.avatar-picker-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 8px;
+  max-height: 60vh; overflow-y: auto; padding: 4px 2px 12px;
+}
+.avatar-picker-cell {
+  width: 100%; aspect-ratio: 1; border-radius: 10px; border: 2px solid transparent;
+  background: var(--border); cursor: pointer; padding: 0; overflow: hidden;
+}
+.avatar-picker-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar-picker-cell.is-selected { border-color: var(--cyan); }
+
 /* ---------------- Rank list (Nexus) ---------------- */
 .rank-list { display: flex; flex-direction: column; gap: 6px; }
 .rank-expand-btn {

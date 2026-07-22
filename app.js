@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.39';
+const APP_VERSION = 'WF_SYS_V.1.7.40';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -382,12 +382,13 @@ function initDesktopShell() {
     const displayName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || cleanId;
     operatorNameEl.textContent = displayName;
     const mode = getFitnessMode();
-    const myPhoto = wdsRemoteData.profile && wdsRemoteData.profile.photoDataUrl;
+    const myPhotoRaw = wdsRemoteData.profile && wdsRemoteData.profile.photoDataUrl;
+    const myPhoto = myPhotoRaw; // mode icon deliberately shows the fitness-mode icon (not a default avatar) when no real photo is set
     modeIconImgEl.src = myPhoto || MODE_ICON[mode] || MODE_ICON.beginner;
     modeIconEl.classList.toggle('wds-user-mode-icon--photo', !!myPhoto);
     modeIconEl.title = myPhoto ? 'View profile' : (MODE_LABEL[mode] || mode);
     const composerAvatarEl = document.getElementById('wdsComposerAvatar');
-    wdsSetAvatarVisual(composerAvatarEl, wdsRemoteData.profile && wdsRemoteData.profile.photoDataUrl, displayName.trim().charAt(0).toUpperCase());
+    wdsSetAvatarVisual(composerAvatarEl, wdsResolveOwnAvatarUrl(myPhotoRaw, wdsRemoteData.shareKey), displayName.trim().charAt(0).toUpperCase());
     const composerInputEl = document.getElementById('wdsComposerInput');
     if (composerInputEl) composerInputEl.placeholder = `What's on your mind, ${displayName.split(' ')[0]}?`;
     renderWdsDashboard();
@@ -3111,7 +3112,7 @@ function renderWdsMyday() {
   if (!el) return;
   const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
   const myName = (wdsRemoteData && wdsRemoteData.profile && wdsRemoteData.profile.name) || (wdsRemoteData && wdsRemoteData.publicId) || '?';
-  const myPhoto = wdsRemoteData && wdsRemoteData.profile && wdsRemoteData.profile.photoDataUrl;
+  const myPhoto = wdsResolveOwnAvatarUrl(wdsRemoteData && wdsRemoteData.profile && wdsRemoteData.profile.photoDataUrl, myShareKey);
   const mineGroup = wdsStoryGroups.find(g => g.shareKey === myShareKey);
   const otherGroups = wdsStoryGroups.filter(g => g.shareKey !== myShareKey);
 
@@ -5520,7 +5521,7 @@ function renderWdsProfileHeader() {
   const profile = isOwn ? (wdsRemoteData.profile || {}) : {};
   const displayName = isOwn ? (profile.name || wdsRemoteData.publicId) : (wdsViewedProfile.codeName || wdsViewedProfile.publicId);
   const publicId = isOwn ? wdsRemoteData.publicId : wdsViewedProfile.publicId;
-  const photoDataUrl = isOwn ? profile.photoDataUrl : wdsViewedProfile.avatarDataUrl;
+  const photoDataUrl = isOwn ? wdsResolveOwnAvatarUrl(profile.photoDataUrl, wdsRemoteData.shareKey) : wdsViewedProfile.avatarDataUrl;
   document.getElementById('wdsProfilePageName').textContent = displayName;
   wdsSetAvatarVisual(document.getElementById('wdsProfilePageAvatar'), photoDataUrl, displayName.trim().charAt(0).toUpperCase());
   const coverEl = document.getElementById('wdsProfileCover');
@@ -5532,7 +5533,7 @@ function renderWdsProfileHeader() {
   // the one who'd be posting — whether that's on their own wall or (when
   // wdsViewedProfile is set) someone else's.
   const myName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
-  wdsSetAvatarVisual(document.getElementById('wdsProfileComposerAvatar'), wdsRemoteData.profile && wdsRemoteData.profile.photoDataUrl, myName.trim().charAt(0).toUpperCase());
+  wdsSetAvatarVisual(document.getElementById('wdsProfileComposerAvatar'), wdsResolveOwnAvatarUrl(wdsRemoteData.profile && wdsRemoteData.profile.photoDataUrl, wdsRemoteData.shareKey), myName.trim().charAt(0).toUpperCase());
   const composerInputEl = document.getElementById('wdsProfileComposerInput');
   if (composerInputEl) composerInputEl.placeholder = isOwn ? "What's on your mind?" : `Write something on ${displayName.split(' ')[0]}'s timeline…`;
 
@@ -8942,6 +8943,44 @@ function resizeCoverImageFull(file) {
   });
 }
 
+// Shinobi Pulse default-avatar pool: 4 sheets x 100 cells each, sliced into
+// icons/avatars/s{1-4}-{001-100}.png. djb2-style hash of a seed (share_key)
+// mod 400 -> one fixed pool image, so a user with no uploaded/picked photo
+// always gets the SAME default avatar rather than a new random one every
+// reload. Mirrors default_avatar_url() in supabase_default_avatar_migration.sql
+// so a user's own local preview (before their first sync) matches what
+// leaderboard.avatar_data_url will resolve to for everyone else viewing them
+// -- that DB-side value stays the real source of truth for other viewers,
+// this is just for the couple of screens (wellness dashboard's own-profile
+// header/composer) that read the separately-synced web_sync_accounts photo
+// instead of leaderboard.avatar_data_url.
+const AVATAR_POOL_BASE = 'https://winfinityfitness.github.io/fitness-tracker/icons/avatars';
+const AVATAR_POOL_SHEETS = 4;
+const AVATAR_POOL_PER_SHEET = 100;
+const AVATAR_POOL_TOTAL = AVATAR_POOL_SHEETS * AVATAR_POOL_PER_SHEET;
+
+function avatarPoolUrlForIndex(idx) {
+  const sheet = Math.floor(idx / AVATAR_POOL_PER_SHEET) + 1;
+  const cell = (idx % AVATAR_POOL_PER_SHEET) + 1;
+  return `${AVATAR_POOL_BASE}/s${sheet}-${String(cell).padStart(3, '0')}.png`;
+}
+
+function defaultAvatarUrlForSeed(seed) {
+  let h = 5381;
+  const s = String(seed || '');
+  for (let i = 0; i < s.length; i++) {
+    h = (h * 33 + s.charCodeAt(i)) % 4294967296;
+  }
+  return avatarPoolUrlForIndex(h % AVATAR_POOL_TOTAL);
+}
+
+// Own-avatar screens only -- other users' avatars already come back
+// pre-resolved from leaderboard.avatar_data_url (server-side default via
+// set_leaderboard_avatar), so they never need this fallback applied again.
+function wdsResolveOwnAvatarUrl(photoDataUrl, seed) {
+  return photoDataUrl || (seed ? defaultAvatarUrlForSeed(seed) : null);
+}
+
 function wdsSetAvatarVisual(el, photoDataUrl, initial) {
   if (!el) return;
   if (photoDataUrl) {
@@ -8961,11 +9000,52 @@ function refreshEntityPhotoUI() {
   if (!preview) return;
   const p = getProfile();
   const initial = ((p && p.name) || '').trim().charAt(0).toUpperCase() || '–';
-  wdsSetAvatarVisual(preview, p && p.photoDataUrl, initial);
+  wdsSetAvatarVisual(preview, wdsResolveOwnAvatarUrl(p && p.photoDataUrl, getOrCreateShareKey()), initial);
   removeBtn.hidden = !(p && p.photoDataUrl);
   const locked = isDemoDataActive();
   uploadBtn.disabled = locked;
   lockHint.hidden = !locked;
+}
+
+// Two SEPARATE syncs, deliberately gated differently:
+//  - pushWebSyncSnapshot() carries the full private profile/logs/history
+//    blob into web_sync_accounts, correctly gated behind the user having
+//    explicitly turned on (PIN-protected) Web Dashboard Sync.
+//  - The photo itself is public-safe (same threat model as the public
+//    leaderboard entry's code_name) and is what feed posts/comments/
+//    Friends cards/chat avatars everywhere on wellness read from
+//    (leaderboard.avatar_data_url) -- this used to ALSO be gated behind
+//    Web Sync, which meant anyone who'd simply set a profile photo
+//    without ever opting into that separate, PIN-gated feature stayed
+//    permanently stuck showing an initial-letter circle everywhere,
+//    even to their own friends. Split out so it always best-effort
+//    pushes on every photo change, independent of Web Sync's state.
+// Shared by the real-photo upload/remove flow AND the pool picker below --
+// a pool pick is just photoDataUrl set to a plain https:// pool URL rather
+// than a data: URL, so the "already uploaded" check further down skips the
+// storage upload and syncs the pool URL straight through.
+async function syncOwnAvatarIfEnabled() {
+  if (localStorage.getItem('wft_web_sync_enabled') === '1') {
+    try { await pushWebSyncSnapshot(); } catch (e) { /* best effort — Sync Now still works as a fallback */ }
+  }
+  if (sbConfigured()) {
+    try {
+      const localPhoto = (getProfile() || {}).photoDataUrl || null;
+      let avatarUrl = localPhoto;
+      if (localPhoto && localPhoto.startsWith('data:')) {
+        // Usually a cache hit here — pushWebSyncSnapshot() above already
+        // uploaded+cached this same photo under the same 'avatar' key.
+        try { avatarUrl = await uploadImageWithCache(localPhoto, 'avatar', 'avatars'); }
+        catch (e) { avatarUrl = localPhoto; /* fall back to base64 rather than drop the avatar */ }
+      }
+      await sb.rpc('set_leaderboard_avatar', {
+        p_share_key: getOrCreateShareKey(),
+        p_avatar_data_url: avatarUrl,
+        p_code_name: effectiveLeaderboardName(),
+        p_public_id: getOrCreatePublicId(),
+      });
+    } catch (e) { /* best effort */ }
+  }
 }
 
 function initEntityPhotoUpload() {
@@ -8974,42 +9054,6 @@ function initEntityPhotoUpload() {
   const input = document.getElementById('setupPhotoInput');
   const noteEl = document.getElementById('setupPhotoNote');
   uploadBtn.addEventListener('click', () => { if (!uploadBtn.disabled) input.click(); });
-  // Two SEPARATE syncs, deliberately gated differently:
-  //  - pushWebSyncSnapshot() carries the full private profile/logs/history
-  //    blob into web_sync_accounts, correctly gated behind the user having
-  //    explicitly turned on (PIN-protected) Web Dashboard Sync.
-  //  - The photo itself is public-safe (same threat model as the public
-  //    leaderboard entry's code_name) and is what feed posts/comments/
-  //    Friends cards/chat avatars everywhere on wellness read from
-  //    (leaderboard.avatar_data_url) -- this used to ALSO be gated behind
-  //    Web Sync, which meant anyone who'd simply set a profile photo
-  //    without ever opting into that separate, PIN-gated feature stayed
-  //    permanently stuck showing an initial-letter circle everywhere,
-  //    even to their own friends. Split out so it always best-effort
-  //    pushes on every photo change, independent of Web Sync's state.
-  const autoSyncIfEnabled = async () => {
-    if (localStorage.getItem('wft_web_sync_enabled') === '1') {
-      try { await pushWebSyncSnapshot(); } catch (e) { /* best effort — Sync Now still works as a fallback */ }
-    }
-    if (sbConfigured()) {
-      try {
-        const localPhoto = (getProfile() || {}).photoDataUrl || null;
-        let avatarUrl = localPhoto;
-        if (localPhoto && localPhoto.startsWith('data:')) {
-          // Usually a cache hit here — pushWebSyncSnapshot() above already
-          // uploaded+cached this same photo under the same 'avatar' key.
-          try { avatarUrl = await uploadImageWithCache(localPhoto, 'avatar', 'avatars'); }
-          catch (e) { avatarUrl = localPhoto; /* fall back to base64 rather than drop the avatar */ }
-        }
-        await sb.rpc('set_leaderboard_avatar', {
-          p_share_key: getOrCreateShareKey(),
-          p_avatar_data_url: avatarUrl,
-          p_code_name: effectiveLeaderboardName(),
-          p_public_id: getOrCreatePublicId(),
-        });
-      } catch (e) { /* best effort */ }
-    }
-  };
   input.addEventListener('change', async () => {
     const file = input.files[0];
     input.value = '';
@@ -9022,7 +9066,7 @@ function initEntityPhotoUpload() {
       refreshEntityPhotoUI();
       noteEl.textContent = 'Saved.';
       setTimeout(() => { noteEl.textContent = ''; }, 2000);
-      await autoSyncIfEnabled();
+      await syncOwnAvatarIfEnabled();
     } catch (e) {
       noteEl.textContent = (e && e.message) || 'Could not save that photo.';
     }
@@ -9032,8 +9076,49 @@ function initEntityPhotoUpload() {
     delete p.photoDataUrl;
     saveProfile(p);
     refreshEntityPhotoUI();
-    await autoSyncIfEnabled();
+    await syncOwnAvatarIfEnabled();
   });
+}
+
+// Picker for the Shinobi Pulse default-avatar pool (see defaultAvatarUrlForSeed) --
+// an explicit alternative to uploading a real photo, not a preview of the
+// auto-assigned default (that already shows for free the moment the sheet
+// opens, via refreshEntityPhotoUI's own fallback).
+function initAvatarPicker() {
+  const overlay = document.getElementById('avatarPickerOverlay');
+  const grid = document.getElementById('avatarPickerGrid');
+  const chooseBtn = document.getElementById('btnSetupPhotoChoose');
+  if (!overlay || !grid || !chooseBtn) return;
+  if (!grid.children.length) {
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < AVATAR_POOL_TOTAL; i++) {
+      const url = avatarPoolUrlForIndex(i);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'avatar-picker-cell';
+      btn.dataset.url = url;
+      btn.innerHTML = `<img src="${url}" loading="lazy" alt="Avatar option">`;
+      btn.addEventListener('click', async () => {
+        const p = getProfile() || {};
+        p.photoDataUrl = url;
+        saveProfile(p);
+        refreshEntityPhotoUI();
+        overlay.hidden = true;
+        await syncOwnAvatarIfEnabled();
+      });
+      frag.appendChild(btn);
+    }
+    grid.appendChild(frag);
+  }
+  chooseBtn.addEventListener('click', () => {
+    const current = (getProfile() || {}).photoDataUrl || null;
+    grid.querySelectorAll('.avatar-picker-cell').forEach(cell => {
+      cell.classList.toggle('is-selected', current === cell.dataset.url);
+    });
+    overlay.hidden = false;
+  });
+  document.getElementById('btnCloseAvatarPicker').addEventListener('click', () => { overlay.hidden = true; });
+  bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
 }
 
 /* ---------------------------------------------------------------- */
@@ -21029,6 +21114,7 @@ safeInit(initPRBoardOverlay, 'initPRBoardOverlay');
 safeInit(initMeasureEntryOverlay, 'initMeasureEntryOverlay');
 safeInit(initEntityIdentityOverlay, 'initEntityIdentityOverlay');
 safeInit(initEntityPhotoUpload, 'initEntityPhotoUpload');
+safeInit(initAvatarPicker, 'initAvatarPicker');
 safeInit(initDateTimeWidget, 'initDateTimeWidget');
 safeInit(initTimezonePicker, 'initTimezonePicker');
 safeInit(initWeatherWidget, 'initWeatherWidget');

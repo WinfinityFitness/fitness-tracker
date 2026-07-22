@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.39">
+<link rel="stylesheet" href="style.css?v=1.7.40">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -1657,6 +1657,18 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
 </nav>
 
 <!-- ============ ENTITY IDENTITY SHEET ============ -->
+<div class="sheet-overlay" id="avatarPickerOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Choose Avatar</h2>
+      <button class="sheet-close" id="btnCloseAvatarPicker">✕</button>
+    </div>
+    <p class="hint hint--sm">Pick a default from the Shinobi Pulse pool. You can switch back to your own photo anytime.</p>
+    <div class="avatar-picker-grid" id="avatarPickerGrid"></div>
+  </div>
+</div>
+
 <div class="sheet-overlay" id="entityIdentityOverlay" hidden>
   <div class="sheet">
     <div class="sheet-handle"></div>
@@ -1671,6 +1683,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         <div class="entity-photo-avatar" id="setupPhotoPreview">–</div>
         <div class="entity-photo-actions">
           <button type="button" class="btn btn--sm" id="btnSetupPhotoUpload">Upload Photo</button>
+          <button type="button" class="btn btn--sm btn--ghost" id="btnSetupPhotoChoose">Choose Avatar</button>
           <button type="button" class="btn btn--sm btn--ghost" id="btnSetupPhotoRemove" hidden>Remove</button>
           <input type="file" id="setupPhotoInput" accept="image/*" hidden>
           <p class="hint hint--sm" id="setupPhotoLockHint" hidden>Available once you clear the sample data (Settings &rarr; Clear all data) or log something real.</p>
@@ -4451,11 +4464,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
-<script src="config.js?v=1.7.39"></script>
+<script src="config.js?v=1.7.40"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.39"></script>
+<script src="app.js?v=1.7.40"></script>
 </body>
 </html>
