@@ -22,7 +22,14 @@
   }
   .wf-hero-logo {
     width: 64px; height: 64px; object-fit: contain; margin: 0 auto 28px; display: block;
-    filter: drop-shadow(0 0 18px rgba(255,159,67,0.55));
+    animation: wf-hero-glow-pulse 2.4s ease-in-out infinite alternate;
+  }
+  @keyframes wf-hero-glow-pulse {
+    from { filter: drop-shadow(0 0 10px rgba(255,159,67,0.4)); }
+    to   { filter: drop-shadow(0 0 26px rgba(255,159,67,0.85)); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .wf-hero-logo { animation: none; filter: drop-shadow(0 0 18px rgba(255,159,67,0.55)); }
   }
   /* !important + explicit font-family throughout, same defensive pattern
      as .wf-footer-name -- WordPress themes commonly re-style bare h1-h6
