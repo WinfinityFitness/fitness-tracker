@@ -24,12 +24,18 @@
     width: 64px; height: 64px; object-fit: contain; margin: 0 auto 28px; display: block;
     filter: drop-shadow(0 0 18px rgba(255,159,67,0.55));
   }
-  .wf-hero-title {
-    color: #e8ecf1; font-size: clamp(1.8rem, 5vw, 2.6rem); font-weight: 800;
-    text-transform: uppercase; line-height: 1.2; margin: 0 0 18px; letter-spacing: 0.04em;
+  /* !important + explicit font-family throughout, same defensive pattern
+     as .wf-footer-name -- WordPress themes commonly re-style bare h1-h6
+     (and em inside them) with their own font-family/font-style/color at
+     higher specificity than a single class can beat on its own. */
+  .wf-hero-embed .wf-hero-title {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    color: #e8ecf1 !important; font-size: clamp(1.8rem, 5vw, 2.6rem) !important; font-weight: 800 !important;
+    font-style: normal !important; text-transform: uppercase; line-height: 1.2; margin: 0 0 18px; letter-spacing: 0.04em;
   }
-  .wf-hero-title em {
-    display: block; color: #ff9f43; font-style: normal; font-weight: 800;
+  .wf-hero-embed .wf-hero-title em {
+    font-family: inherit !important; display: block; color: #ff9f43 !important;
+    font-style: normal !important; font-weight: 800 !important;
   }
   .wf-hero-subtitle {
     color: #8a97a8; font-size: 0.92rem; line-height: 1.6; max-width: 480px;
