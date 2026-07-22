@@ -1,0 +1,120 @@
+<!-- Winfinity footer embed for winfinityfitness.com (WordPress) — paste this
+     whole block into a Custom HTML widget/block in your site's footer area.
+     Not a full page (no <html>/<head>/<body>) — it's a fragment meant to be
+     dropped directly into an existing page, so it inherits the page's own
+     width instead of sitting in a boxed iframe like the Showcase/Arsenal
+     embeds. Pulls the SAME tagline + link settings the FT/Wellness footers
+     already read from (ad_settings, admin-editable via Edit Footer in the
+     FT admin drawer) — editing it there updates this too, no separate
+     admin panel. Messenger doesn't have a footer yet ("soon" per the
+     request this was built for) — this embed only ever depends on
+     ad_settings, so it'll pick up Messenger's footer automatically
+     whenever that ships, no changes needed here. -->
+<footer class="wf-footer-embed" id="wfFooterEmbed">
+  <p class="wf-footer-tagline" id="wfFooterTagline">"The only bad workout is the one that didn't happen."</p>
+  <div class="wf-footer-links" id="wfFooterLinks">
+    <a href="https://winfinityfitness.com" id="wfFooterWebpage">Website</a>
+    <a href="#" id="wfFooterFacebook" hidden>Facebook</a>
+    <a href="#" id="wfFooterInstagram" hidden>Instagram</a>
+    <a href="#" id="wfFooterAffiliate" hidden>Affiliate</a>
+  </div>
+  <p class="wf-footer-copyright">&copy; <span id="wfFooterYear"></span> Winfinity Fitness. All rights reserved.</p>
+</footer>
+
+<style>
+  .wf-footer-embed {
+    background: #0a0d12; color: #e8ecf1; text-align: center;
+    padding: 28px 20px 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    border-top: 1px solid #232d3a;
+  }
+  .wf-footer-tagline {
+    font-style: italic; color: #8a97a8; font-size: 0.88rem; max-width: 560px;
+    margin: 0 auto 16px; line-height: 1.5;
+  }
+  .wf-footer-links {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 18px; margin-bottom: 14px;
+  }
+  .wf-footer-links a {
+    color: #ff9f43; text-decoration: none; font-size: 0.82rem; font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .wf-footer-links a:hover { text-decoration: underline; }
+  .wf-footer-copyright { color: #5c6675; font-size: 0.74rem; margin: 0; }
+</style>
+
+<script>
+(function () {
+  var SUPABASE_URL = 'https://mzkjboplfalauivwcnni.supabase.co';
+  var SUPABASE_ANON_KEY = 'sb_publishable_YwHBnvbBjd8Oj8hgPXb_JA_buurC92v';
+  var TAGLINES = [
+    "The only bad workout is the one that didn't happen.",
+    "Don't stop when you're tired. Stop when you're done.",
+    "Your body can stand almost anything. It's your mind that you have to convince.",
+    "Fitness is not about being better than someone else. It's about being better than you were yesterday.",
+    "Motivation is what gets you started. Habit is what keeps you going.",
+    "Success starts with self-discipline.",
+    "Push yourself because no one else is going to do it for you.",
+    "It does not matter how slowly you go as long as you do not stop.",
+    "Transformation is not five minutes from now; it's a present activity. In this moment, you can make a different choice, and it will lead to a different result.",
+    "Believe in yourself and all that you are. Know that there is something inside you that is greater than any obstacle.",
+  ];
+
+  document.getElementById('wfFooterYear').textContent = new Date().getFullYear();
+
+  function startRotation() {
+    var el = document.getElementById('wfFooterTagline');
+    var lastIdx = -1;
+    setInterval(function () {
+      var idx;
+      do { idx = Math.floor(Math.random() * TAGLINES.length); } while (idx === lastIdx && TAGLINES.length > 1);
+      lastIdx = idx;
+      el.textContent = '"' + TAGLINES[idx] + '"';
+    }, 15000);
+  }
+
+  function applyLink(id, url) {
+    var el = document.getElementById(id);
+    if (!url) return;
+    el.href = url;
+    el.hidden = false;
+    el.target = '_blank';
+    el.rel = 'noopener';
+  }
+
+  function loadFooterSettings(sb) {
+    sb.from('ad_settings')
+      .select('footer_tagline, footer_webpage_url, footer_facebook_url, footer_instagram_url, footer_affiliate_url')
+      .eq('id', 1).maybeSingle()
+      .then(function (result) {
+        var data = result.data;
+        if (data && data.footer_tagline) {
+          document.getElementById('wfFooterTagline').textContent = '"' + data.footer_tagline + '"';
+        } else {
+          startRotation();
+        }
+        if (data) {
+          applyLink('wfFooterWebpage', data.footer_webpage_url);
+          applyLink('wfFooterFacebook', data.footer_facebook_url);
+          applyLink('wfFooterInstagram', data.footer_instagram_url);
+          applyLink('wfFooterAffiliate', data.footer_affiliate_url);
+        }
+      })
+      .catch(function () { startRotation(); });
+  }
+
+  // Reuses the global supabase-js CDN script if some other embed on the
+  // same page (Showcase/Arsenal, if ever inlined instead of iframed) has
+  // already loaded it -- otherwise loads it once for this footer alone.
+  if (window.supabase) {
+    loadFooterSettings(window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY));
+  } else {
+    var script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+    script.onload = function () {
+      loadFooterSettings(window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY));
+    };
+    script.onerror = startRotation;
+    document.head.appendChild(script);
+  }
+})();
+</script>
