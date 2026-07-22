@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.30';
+const APP_VERSION = 'WF_SYS_V.1.7.31';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -15662,7 +15662,21 @@ function sbConfigured() {
   const hasCreds = typeof SUPABASE_URL === 'string' && SUPABASE_URL && !SUPABASE_URL.startsWith('YOUR_') &&
     typeof SUPABASE_ANON_KEY === 'string' && SUPABASE_ANON_KEY && !SUPABASE_ANON_KEY.startsWith('YOUR_');
   if (!hasCreds) return false;
-  if (!sb && window.supabase) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // persistSession/autoRefreshToken/detectSessionInUrl all default to true,
+  // spinning up GoTrueClient's full session machinery -- including a
+  // cross-tab Web Locks mutex every single sb.from()/sb.rpc() call has to
+  // acquire first -- for zero benefit, since this app never calls
+  // sb.auth.* at all (identity is share_key/RLS-based, not Supabase Auth).
+  // That lock is a known supabase-js deadlock class: if it ever gets stuck
+  // (e.g. a tab backgrounded mid-acquisition), every future call on this
+  // origin queues forever until something outside this client clears it --
+  // exactly the "chat popup stuck on Loading… until you send a message"
+  // symptom, since a stray unrelated event was what finally released it.
+  // Disabling the auth subsystem entirely removes the lock, not just the
+  // symptom of it wedging.
+  if (!sb && window.supabase) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
   return !!sb;
 }
 
