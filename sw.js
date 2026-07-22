@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fittracker-v433';
+const CACHE_NAME = 'fittracker-v434';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -81,9 +81,12 @@ self.addEventListener('push', event => {
   // Same sw.js file runs independently under each proxied origin (FT,
   // wellness, messenger), so self.location.hostname reliably tells us
   // which one this instance actually is -- mirrors wordpress-proxy's own
-  // per-host branding switch.
+  // per-host branding switch. Each surface uses its own app icon in the
+  // OS notification panel rather than all three sharing FT's.
   const notifIcon = self.location.hostname === 'wellness.winfinityfitness.com'
     ? './icons/icon-nexus-192.png'
+    : self.location.hostname === 'messenger.winfinityfitness.com'
+    ? './icons/icon-messenger-192.png'
     : './icons/icon-192.png';
   event.waitUntil(
     self.registration.showNotification(data.title, {

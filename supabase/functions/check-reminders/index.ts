@@ -170,10 +170,18 @@ function isSundayDateStr(dateStr: string): boolean {
 }
 
 async function sendPushToShareKey(shareKey: string, title: string, body: string, url: string) {
+  // These are all FT's own reminder types (hydration, Start/End Day Log,
+  // Progress Photo, Take Measurements) -- restricted to FT-tagged
+  // subscriptions (see push_subscriptions.app / supabase_notification_
+  // routing_migration.sql) so Wellness/Messenger never get a duplicate OS
+  // notification for them; Wellness surfaces its own equivalent in its
+  // in-app notification bell instead. Rows from before that column existed
+  // are null and still count as FT.
   const { data: subs } = await supabase
     .from('push_subscriptions')
     .select('endpoint, p256dh, auth')
-    .eq('share_key', shareKey);
+    .eq('share_key', shareKey)
+    .or('app.eq.ft,app.is.null');
   if (!subs || subs.length === 0) return;
   const payload = JSON.stringify({ title, body, url });
   const results = await Promise.allSettled(

@@ -119,14 +119,14 @@ async function sendFcm(sa: ServiceAccount, token: string, title: string, body: s
 }
 
 Deno.serve(async (req: Request) => {
-  let payload: { share_key?: string; title?: string; body?: string; type?: string; url?: string };
+  let payload: { share_key?: string; title?: string; body?: string; type?: string; url?: string; app_filter?: string[] };
   try {
     payload = await req.json();
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400 });
   }
 
-  const { share_key, title, body, type, url } = payload;
+  const { share_key, title, body, type, url, app_filter } = payload;
   if (!share_key || !title) {
     return new Response(JSON.stringify({ error: 'share_key and title are required' }), { status: 400 });
   }
@@ -135,10 +135,18 @@ Deno.serve(async (req: Request) => {
 
   // --- Web Push (browser / installed PWA) ---
   if (VAPID_PRIVATE_KEY) {
-    const { data: subs } = await supabase
-      .from('push_subscriptions')
-      .select('endpoint, p256dh, auth')
-      .eq('share_key', share_key);
+    // app_filter restricts delivery to specific surfaces (FT/wellness/
+    // messenger — see push_subscriptions.app, set at subscribe time). Rows
+    // predating that column are null and count as 'ft' wherever 'ft' is in
+    // the filter, same convention check-reminders uses for its own FT-only
+    // reminder pushes.
+    let subsQuery = supabase.from('push_subscriptions').select('endpoint, p256dh, auth').eq('share_key', share_key);
+    if (app_filter && app_filter.length) {
+      subsQuery = app_filter.includes('ft')
+        ? subsQuery.or(`app.in.(${app_filter.join(',')}),app.is.null`)
+        : subsQuery.in('app', app_filter);
+    }
+    const { data: subs } = await subsQuery;
     if (subs && subs.length) {
       webTotal = subs.length;
       // url was never forwarded here before this fix -- check-reminders'
@@ -162,7 +170,12 @@ Deno.serve(async (req: Request) => {
   }
 
   // --- FCM (native Android app) ---
-  if (FCM_SERVICE_ACCOUNT_JSON) {
+  // fcm_tokens has no app column -- it's only ever the Capacitor-wrapped FT
+  // native app (Wellness/Messenger ship as TWAs, which use Web Push like
+  // any other browser install, not FCM) -- so an app_filter that excludes
+  // 'ft' means skip this branch entirely rather than double-notify FT here
+  // too after Web Push above already routed elsewhere.
+  if (FCM_SERVICE_ACCOUNT_JSON && (!app_filter || app_filter.includes('ft'))) {
     let sa: ServiceAccount;
     try {
       sa = JSON.parse(FCM_SERVICE_ACCOUNT_JSON);

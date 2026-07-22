@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.31';
+const APP_VERSION = 'WF_SYS_V.1.7.32';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -52,6 +52,17 @@ const isDesktopShellSite = location.hostname === DESKTOP_SHELL_HOST || new URLSe
 // as isDesktopShellSite — each is pinned to its own exact hostname.
 const MESSENGER_SHELL_HOST = 'messenger.winfinityfitness.com';
 const isMessengerShellSite = location.hostname === MESSENGER_SHELL_HOST || new URLSearchParams(location.search).has('wdsMsgPreview');
+
+// Tags this device's push subscription with which surface it was created
+// on (see push_subscriptions.app / supabase_notification_routing_migration.sql)
+// so the server can route chat pushes to Messenger-if-installed-else-
+// Wellness, and keep FT's own reminder pushes FT-only, instead of every
+// subscribed surface getting a duplicate of everything.
+function wfCurrentAppTag() {
+  if (isMessengerShellSite) return 'messenger';
+  if (isDesktopShellSite) return 'wellness';
+  return 'ft';
+}
 
 // Best-effort "is the Messenger PWA installed on this device" check for the
 // mobile chat icon (see chatListBtn's click handler in initDesktopShell) —
@@ -11459,6 +11470,7 @@ async function subscribeToPush() {
       p_endpoint: json.endpoint,
       p_p256dh: json.keys.p256dh,
       p_auth: json.keys.auth,
+      p_app: wfCurrentAppTag(),
     });
     if (error) throw error;
     localStorage.setItem('wft_push_enabled', '1');
