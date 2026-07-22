@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.35';
+const APP_VERSION = 'WF_SYS_V.1.7.36';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -7132,6 +7132,37 @@ function initSettingsOverlay() {
 
   initHydrationReminderSettings();
   initWebSyncSettings();
+  initShowcaseOptinSettings();
+}
+
+// Separate, explicit opt-in from the in-app Nexus Leaderboard sharing
+// (which is forced on unconditionally now, see initLeaderboard() below) --
+// "visible to other signed-in app users" and "visible publicly with no
+// login at all, on winfinityfitness.com" are different consent levels, so
+// this gets its own toggle and its own server-side flag (showcase_optins,
+// see supabase_public_showcase_migration.sql) rather than reusing
+// wft_lb_optin. Local flag mirrors server state as a fast-path UI cache,
+// same best-effort convention as the Web Dashboard Sync toggle above.
+function initShowcaseOptinSettings() {
+  const toggle = document.getElementById('showcaseOptinEnabled');
+  const note = document.getElementById('showcaseOptinNote');
+  if (!toggle) return;
+  toggle.checked = localStorage.getItem('wft_showcase_optin') === '1';
+  toggle.addEventListener('change', async () => {
+    if (!sbConfigured()) { toggle.checked = !toggle.checked; note.textContent = 'Not available offline.'; return; }
+    const enabled = toggle.checked;
+    const shareKey = getOrCreateShareKey();
+    getOrCreatePublicId(); // ensures a public_id exists -- get_public_showcase_data() requires one
+    try {
+      const { error } = await sb.rpc('set_showcase_optin', { p_share_key: shareKey, p_optin: enabled });
+      if (error) throw error;
+      localStorage.setItem('wft_showcase_optin', enabled ? '1' : '0');
+      note.textContent = enabled ? "You're now visible on the public showcase." : 'Removed from the public showcase.';
+    } catch (e) {
+      toggle.checked = !enabled;
+      note.textContent = 'Could not update — try again.';
+    }
+  });
 }
 
 function initContact() {

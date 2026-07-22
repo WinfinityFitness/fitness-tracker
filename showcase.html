@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Winfinity Progress Showcase</title>
+<style>
+  :root {
+    --bg: #0a0d12;
+    --panel: #121820;
+    --panel-2: #171f2a;
+    --border: #232d3a;
+    --text-primary: #e8ecf1;
+    --text-muted: #8a97a8;
+    --accent: #ff9f43;
+    --accent-dim: #b9762f;
+    --tier-elite: #ff9f43;
+    --tier-ontrack: #4fd1c5;
+    --tier-building: #7c8ba1;
+    --tier-behind: #e0555a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow-x: hidden;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 20px 40px; }
+  header.hero { text-align: center; margin-bottom: 22px; }
+  header.hero h1 {
+    font-size: clamp(1.4rem, 3vw, 2rem); margin: 0 0 8px;
+    letter-spacing: 0.02em;
+  }
+  header.hero h1 .accent { color: var(--accent); }
+  header.hero p { color: var(--text-muted); margin: 0; font-size: 0.92rem; }
+
+  .tabs {
+    display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+    margin-bottom: 18px;
+  }
+  .tab-btn {
+    background: var(--panel); color: var(--text-muted); border: 1px solid var(--border);
+    border-radius: 999px; padding: 8px 16px; font-size: 0.85rem; cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .tab-btn:hover { color: var(--text-primary); }
+  .tab-btn.is-active { color: #0a0d12; background: var(--accent); border-color: var(--accent); font-weight: 600; }
+
+  .filter-row {
+    display: flex; align-items: center; gap: 14px; justify-content: center;
+    color: var(--text-muted); font-size: 0.82rem; margin-bottom: 18px; flex-wrap: wrap;
+  }
+  .filter-range { position: relative; width: 260px; height: 28px; }
+  .filter-range input[type="range"] {
+    position: absolute; left: 0; top: 9px; width: 100%; margin: 0;
+    -webkit-appearance: none; appearance: none; background: transparent; pointer-events: none;
+  }
+  .filter-range input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; pointer-events: auto; width: 15px; height: 15px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg); cursor: pointer; margin-top: -6px;
+  }
+  .filter-range input[type="range"]::-webkit-slider-runnable-track { height: 3px; background: var(--border); border-radius: 2px; }
+  .filter-range input[type="range"]::-moz-range-thumb {
+    pointer-events: auto; width: 15px; height: 15px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg); cursor: pointer;
+  }
+  .filter-range input[type="range"]::-moz-range-track { height: 3px; background: var(--border); border-radius: 2px; }
+  .filter-values { font-variant-numeric: tabular-nums; color: var(--text-primary); }
+
+  .chart-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px 20px 8px;
+  }
+  .chart-card-head {
+    display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 18px;
+  }
+  .chart-card-head h2 { font-size: 1rem; margin: 0; }
+  .chart-card-head span { color: var(--text-muted); font-size: 0.8rem; }
+
+  .legend { display: flex; gap: 16px; margin-bottom: 14px; font-size: 0.76rem; color: var(--text-muted); flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+  .bars-scroll {
+    display: flex; align-items: flex-end; gap: 5px; height: 220px;
+    overflow-x: auto; padding: 0 4px 14px; scrollbar-width: thin;
+  }
+  .bars-scroll::-webkit-scrollbar { height: 6px; }
+  .bars-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .showcase-bar {
+    flex: 0 0 auto; width: 10px; min-height: 4px; border-radius: 3px 3px 0 0;
+    border: none; cursor: pointer; position: relative;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .showcase-bar:hover, .showcase-bar:focus-visible { transform: scaleX(1.6); outline: none; }
+  .showcase-bar.is-filtered-out { opacity: 0.12; pointer-events: none; }
+  .showcase-bar[data-tier="elite"] { background: var(--tier-elite); }
+  .showcase-bar[data-tier="ontrack"] { background: var(--tier-ontrack); }
+  .showcase-bar[data-tier="building"] { background: var(--tier-building); }
+  .showcase-bar[data-tier="behind"] { background: var(--tier-behind); }
+
+  .empty-note { color: var(--text-muted); text-align: center; padding: 40px 0; }
+
+  footer {
+    text-align: center; color: var(--text-muted); font-size: 0.74rem;
+    margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border);
+  }
+
+  /* Stat card popup */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(4,6,9,0.72); display: flex;
+    align-items: center; justify-content: center; z-index: 50; padding: 20px;
+  }
+  .overlay[hidden] { display: none; }
+  .stat-card {
+    width: 320px; max-width: 100%; background: linear-gradient(180deg, #171f2a, #0f141b);
+    border: 1px solid var(--accent-dim); border-radius: 16px; padding: 22px 22px 18px;
+    box-shadow: 0 0 0 1px rgba(255,159,67,0.08), 0 20px 60px rgba(0,0,0,0.5);
+    position: relative;
+  }
+  .stat-card-close {
+    position: absolute; top: 12px; right: 14px; background: none; border: none;
+    color: var(--text-muted); font-size: 1.1rem; cursor: pointer; line-height: 1;
+  }
+  .stat-card-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .stat-card-avatar {
+    width: 44px; height: 44px; border-radius: 50%; background: var(--panel-2);
+    display: flex; align-items: center; justify-content: center; font-weight: 700;
+    color: var(--accent); border: 1px solid var(--accent-dim); flex-shrink: 0;
+    background-size: cover; background-position: center;
+  }
+  .stat-card-id { font-size: 0.72rem; letter-spacing: 0.06em; color: var(--text-muted); text-transform: uppercase; }
+  .stat-card-id strong { color: var(--text-primary); font-size: 0.85rem; letter-spacing: 0.03em; display: block; }
+  .stat-card-tier {
+    display: inline-block; margin-top: 4px; font-size: 0.68rem; font-weight: 700;
+    letter-spacing: 0.08em; padding: 2px 8px; border-radius: 999px; text-transform: uppercase;
+  }
+  .stat-card-tier[data-tier="elite"] { color: var(--tier-elite); background: rgba(255,159,67,0.12); }
+  .stat-card-tier[data-tier="ontrack"] { color: var(--tier-ontrack); background: rgba(79,209,197,0.12); }
+  .stat-card-tier[data-tier="building"] { color: var(--tier-building); background: rgba(124,139,161,0.14); }
+  .stat-card-tier[data-tier="behind"] { color: var(--tier-behind); background: rgba(224,85,90,0.12); }
+
+  .stat-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.82rem;
+  }
+  .stat-row span:first-child { color: var(--text-muted); letter-spacing: 0.02em; }
+  .stat-row span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .stat-row.is-positive span:last-child { color: var(--tier-ontrack); }
+  .stat-row.is-negative span:last-child { color: var(--tier-behind); }
+
+  .consistency-block { margin-top: 14px; }
+  .consistency-label { display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 6px; }
+  .consistency-label strong { font-variant-numeric: tabular-nums; }
+  .consistency-track { height: 6px; background: var(--panel-2); border-radius: 4px; overflow: hidden; }
+  .consistency-fill { height: 100%; background: linear-gradient(90deg, var(--tier-behind), var(--tier-elite)); border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <h1>Winfinity <span class="accent">Progress Showcase</span></h1>
+    <p>A live look at real member progress across the Nexus community.</p>
+  </header>
+
+  <nav class="tabs" id="metricTabs"></nav>
+
+  <div class="filter-row">
+    <span>Filter range:</span>
+    <div class="filter-range">
+      <input type="range" id="filterMin">
+      <input type="range" id="filterMax">
+    </div>
+    <span class="filter-values" id="filterValues"></span>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-card-head">
+      <h2 id="chartTitle">Daily Steps</h2>
+      <span id="chartCount"></span>
+    </div>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-dot" style="background:var(--tier-elite)"></span>Elite</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--tier-ontrack)"></span>On Track</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--tier-building)"></span>Building</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--tier-behind)"></span>Needs Attention</span>
+    </div>
+    <div class="bars-scroll" id="barsScroll"></div>
+  </div>
+
+  <footer>Showcase includes both real member results and illustrative sample data. Tap any bar to view a member's summary.</footer>
+</div>
+
+<div class="overlay" id="statOverlay" hidden>
+  <div class="stat-card" id="statCard"></div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+'use strict';
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+const METRICS = [
+  { key: 'steps', label: 'Daily Steps', domain: [0, 20000], higherIsBetter: true, format: v => Math.round(v).toLocaleString() },
+  { key: 'volume_lifted', label: 'Volume Lifted', domain: [0, 8000], higherIsBetter: true, format: v => Math.round(v).toLocaleString() + ' kg' },
+  { key: 'weight_progress_pct', label: 'Weight Progress', domain: [-10, 10], higherIsBetter: false, format: v => (v > 0 ? '+' : '') + v + '%' },
+  { key: 'furthest_run_km', label: 'Furthest Run', domain: [0, 20], higherIsBetter: true, format: v => Number(v).toFixed(1) + ' km' },
+  { key: 'fastest_run_pace_sec', label: 'Fastest Pace', domain: [180, 600], higherIsBetter: false, format: v => formatPace(v) },
+  { key: 'conscientious_score', label: 'Consistency Score', domain: [0, 100], higherIsBetter: true, format: v => Math.round(v) + '%' },
+];
+
+function formatPace(sec) {
+  const m = Math.floor(sec / 60), s = Math.round(sec % 60);
+  return m + ':' + String(s).padStart(2, '0') + '/km';
+}
+
+function tierFor(normalizedPct) {
+  if (normalizedPct >= 80) return 'elite';
+  if (normalizedPct >= 55) return 'ontrack';
+  if (normalizedPct >= 30) return 'building';
+  return 'behind';
+}
+const TIER_LABEL = { elite: 'Elite Performer', ontrack: 'On Track', building: 'Building Momentum', behind: 'Needs Attention' };
+
+let allRows = [];
+let activeMetricIndex = 0;
+let filterMinVal = null, filterMaxVal = null;
+
+async function loadData() {
+  const barsEl = document.getElementById('barsScroll');
+  try {
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { data, error } = await sb.rpc('get_public_showcase_data');
+    if (error) throw error;
+    allRows = data || [];
+  } catch (e) {
+    barsEl.innerHTML = '<p class="empty-note">Progress data is temporarily unavailable — check back soon.</p>';
+    return;
+  }
+  renderTabs();
+  renderMetric(0);
+}
+
+function renderTabs() {
+  const tabsEl = document.getElementById('metricTabs');
+  tabsEl.innerHTML = METRICS.map((m, i) =>
+    `<button type="button" class="tab-btn${i === 0 ? ' is-active' : ''}" data-metric-index="${i}">${escapeHtml(m.label)}</button>`
+  ).join('');
+  tabsEl.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabsEl.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('is-active', b === btn));
+      renderMetric(Number(btn.dataset.metricIndex));
+    });
+  });
+}
+
+function renderMetric(index) {
+  activeMetricIndex = index;
+  const metric = METRICS[index];
+  document.getElementById('chartTitle').textContent = metric.label;
+
+  const rows = allRows.filter(r => r[metric.key] != null);
+  document.getElementById('chartCount').textContent = rows.length + ' member' + (rows.length === 1 ? '' : 's');
+
+  rows.sort((a, b) => metric.higherIsBetter ? b[metric.key] - a[metric.key] : a[metric.key] - b[metric.key]);
+
+  const [domainMin, domainMax] = metric.domain;
+  filterMinVal = domainMin;
+  filterMaxVal = domainMax;
+  const filterMinEl = document.getElementById('filterMin');
+  const filterMaxEl = document.getElementById('filterMax');
+  filterMinEl.min = filterMaxEl.min = domainMin;
+  filterMinEl.max = filterMaxEl.max = domainMax;
+  filterMinEl.step = filterMaxEl.step = (domainMax - domainMin) / 100;
+  filterMinEl.value = domainMin;
+  filterMaxEl.value = domainMax;
+  updateFilterLabel(metric);
+
+  const barsEl = document.getElementById('barsScroll');
+  if (!rows.length) {
+    barsEl.innerHTML = '<p class="empty-note">No data yet for this metric.</p>';
+    return;
+  }
+  barsEl.innerHTML = rows.map(r => {
+    const raw = r[metric.key];
+    const rawClamped = Math.min(domainMax, Math.max(domainMin, raw));
+    const normalized = metric.higherIsBetter
+      ? (rawClamped - domainMin) / (domainMax - domainMin) * 100
+      : (domainMax - rawClamped) / (domainMax - domainMin) * 100;
+    const tier = tierFor(normalized);
+    const heightPct = Math.max(4, normalized);
+    return `<button type="button" class="showcase-bar" data-tier="${tier}" data-value="${raw}"
+      style="height:${heightPct}%" data-public-id="${escapeHtml(r.public_id)}"
+      aria-label="${escapeHtml(r.code_name)}: ${escapeHtml(metric.format(raw))}"></button>`;
+  }).join('');
+
+  barsEl.querySelectorAll('.showcase-bar').forEach((barEl, i) => {
+    barEl.addEventListener('click', () => openStatCard(rows[i]));
+  });
+
+  applyFilter();
+}
+
+function updateFilterLabel(metric) {
+  document.getElementById('filterValues').textContent =
+    `${metric.format(filterMinVal)} – ${metric.format(filterMaxVal)}`;
+}
+
+function applyFilter() {
+  const metric = METRICS[activeMetricIndex];
+  document.querySelectorAll('.showcase-bar').forEach(el => {
+    const v = Number(el.dataset.value);
+    el.classList.toggle('is-filtered-out', v < filterMinVal || v > filterMaxVal);
+  });
+  updateFilterLabel(metric);
+}
+
+document.getElementById('filterMin').addEventListener('input', e => {
+  filterMinVal = Math.min(Number(e.target.value), filterMaxVal);
+  applyFilter();
+});
+document.getElementById('filterMax').addEventListener('input', e => {
+  filterMaxVal = Math.max(Number(e.target.value), filterMinVal);
+  applyFilter();
+});
+
+function openStatCard(row) {
+  const consistency = row.conscientious_score != null ? row.conscientious_score : (row.logging_consistency_pct || 0);
+  const tier = tierFor(consistency);
+  const rows = [];
+  if (row.weight_progress_pct != null) {
+    rows.push(['Weightloss Trend', (row.weight_progress_pct > 0 ? '+' : '') + row.weight_progress_pct + '%', row.weight_progress_pct <= 0]);
+  }
+  if (row.weight_lost_kg != null) rows.push(['Total Weight Loss', row.weight_lost_kg + ' kg', true]);
+  if (row.steps != null) rows.push(['Daily Steps', Math.round(row.steps).toLocaleString(), null]);
+  if (row.avg_calories != null) rows.push(['Caloric Burn', row.avg_calories.toLocaleString() + ' kcal', null]);
+  if (row.avg_protein_g != null) rows.push(['Protein Intake', row.avg_protein_g + ' g', null]);
+  if (row.volume_lifted != null) rows.push(['Volume Lifted', Math.round(row.volume_lifted).toLocaleString() + ' ' + (row.volume_unit || 'kg'), null]);
+  if (row.furthest_run_km != null) rows.push(['Furthest Run', Number(row.furthest_run_km).toFixed(1) + ' km', null]);
+  if (row.fastest_run_pace_sec != null) rows.push(['Fastest Pace', formatPace(row.fastest_run_pace_sec), null]);
+  if (row.logging_consistency_pct != null) rows.push(['Habitual Logging', row.logging_consistency_pct + '%', null]);
+
+  const initial = (row.code_name || '?').trim().charAt(0).toUpperCase();
+  const avatarStyle = row.avatar_data_url ? ` style="background-image:url('${escapeHtml(row.avatar_data_url)}')"` : '';
+
+  document.getElementById('statCard').innerHTML = `
+    <button type="button" class="stat-card-close" aria-label="Close">&times;</button>
+    <div class="stat-card-head">
+      <span class="stat-card-avatar"${avatarStyle}>${row.avatar_data_url ? '' : escapeHtml(initial)}</span>
+      <div class="stat-card-id">
+        Neural ID
+        <strong>${escapeHtml(row.public_id)}</strong>
+        <span class="stat-card-tier" data-tier="${tier}">${TIER_LABEL[tier]}</span>
+      </div>
+    </div>
+    ${rows.map(([label, value, positive]) =>
+      `<div class="stat-row${positive === true ? ' is-positive' : positive === false ? ' is-negative' : ''}"><span>${escapeHtml(label)}</span><span>${escapeHtml(value)}</span></div>`
+    ).join('')}
+    <div class="consistency-block">
+      <div class="consistency-label"><span>Consistency Score</span><strong>${Math.round(consistency)}</strong></div>
+      <div class="consistency-track"><div class="consistency-fill" style="width:${Math.min(100, Math.max(0, consistency))}%"></div></div>
+    </div>
+  `;
+  document.getElementById('statCard').querySelector('.stat-card-close').addEventListener('click', closeStatCard);
+  document.getElementById('statOverlay').hidden = false;
+}
+function closeStatCard() { document.getElementById('statOverlay').hidden = true; }
+document.getElementById('statOverlay').addEventListener('click', e => {
+  if (e.target.id === 'statOverlay') closeStatCard();
+});
+
+loadData();
+</script>
+</body>
+</html>

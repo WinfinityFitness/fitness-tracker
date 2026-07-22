@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.35">
+<link rel="stylesheet" href="style.css?v=1.7.36">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -2082,6 +2082,19 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         <button type="button" class="btn btn--sm btn--danger" id="btnWebSyncDisable">Disable web sync</button>
         <p class="hint hint--sm">Disabling locks the web dashboard sign-in without deleting your already-synced history — set a new PIN any time to pick it back up.</p>
       </div>
+    </div>
+
+    <div class="sheet-section">
+      <p class="field-group-heading">Public Progress Showcase</p>
+      <p class="hint">Show your progress publicly on winfinityfitness.com — visible to anyone, no login required. This is separate from Nexus sharing inside the app; turning this on also shows your Digital ID to public site visitors.</p>
+      <div class="theme-toggle-row">
+        <span>Show my progress on the public site</span>
+        <label class="switch">
+          <input type="checkbox" id="showcaseOptinEnabled">
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+        </label>
+      </div>
+      <p class="hint hint--sm" id="showcaseOptinNote"></p>
     </div>
 
   </div>
@@ -4410,10 +4423,10 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
-<script src="config.js?v=1.7.35"></script>
+<script src="config.js?v=1.7.36"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.7.35"></script>
+<script src="app.js?v=1.7.36"></script>
 </body>
 </html>
