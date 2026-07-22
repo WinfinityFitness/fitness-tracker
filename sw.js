@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fittracker-v428';
+const CACHE_NAME = 'fittracker-v429';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -78,11 +78,18 @@ self.addEventListener('push', event => {
   // e.g. IndexedDB can't be read across them).
   let data = { title: 'Winfinity Tracker', body: 'You have a new notification.', url: './' };
   try { if (event.data) data = Object.assign(data, event.data.json()); } catch (e) { /* ignore malformed payload */ }
+  // Same sw.js file runs independently under each proxied origin (FT,
+  // wellness, messenger), so self.location.hostname reliably tells us
+  // which one this instance actually is -- mirrors wordpress-proxy's own
+  // per-host branding switch.
+  const notifIcon = self.location.hostname === 'wellness.winfinityfitness.com'
+    ? './icons/icon-nexus-192.png'
+    : './icons/icon-192.png';
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: './icons/icon-192.png',
-      badge: './icons/icon-192.png',
+      icon: notifIcon,
+      badge: notifIcon,
       // No explicit vibrate pattern — like most well-behaved apps, this lets
       // Android's own per-app notification vibration setting decide instead
       // of forcing a fixed buzz regardless of what the phone is set to.
