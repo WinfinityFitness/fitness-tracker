@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.33';
+const APP_VERSION = 'WF_SYS_V.1.7.34';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -4283,8 +4283,12 @@ async function wdsFetchRoomMessages(roomId) {
   return (data || []).slice().reverse();
 }
 
-function wdsRenderChatPopupMessages(roomId, messages) {
-  const popup = document.querySelector(`.wds-chat-popup[data-room-id="${roomId}"]`);
+function wdsRenderChatPopupMessages(roomId, messages, popupEl) {
+  // popupEl (when passed) is the exact element the caller already found --
+  // avoids a second, independent DOM query that could in principle miss
+  // (e.g. right after the element was replaced) and silently no-op,
+  // leaving the original "Loading…" text on screen forever with no error.
+  const popup = popupEl || document.querySelector(`.wds-chat-popup[data-room-id="${roomId}"]`);
   if (!popup) return;
   const listEl = popup.querySelector('.wds-chat-popup-list');
   const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
@@ -4311,6 +4315,18 @@ function wdsRenderChatPopupMessages(roomId, messages) {
 async function wdsRefreshChatPopup(roomId) {
   const popup = document.querySelector(`.wds-chat-popup[data-room-id="${roomId}"]`);
   if (!popup) return;
+  const listEl = popup.querySelector('.wds-chat-popup-list');
+  // Visible elapsed-time tick on the "Loading…" text itself -- previously
+  // this text never changed at all while waiting, so a genuinely stuck
+  // load and a merely-slow one looked identical on screen. If this still
+  // gets stuck, the next screenshot will show how far the counter got
+  // (still 0-1s = the fetch never really started; climbing normally then
+  // stopping = it hung mid-flight) instead of just "Loading…" either way.
+  let elapsedSec = 0;
+  const tick = setInterval(() => {
+    elapsedSec++;
+    if (listEl.querySelector('.empty-note')) listEl.innerHTML = `<p class="empty-note">Loading… (${elapsedSec}s)</p>`;
+  }, 1000);
   try {
     // Race against a timeout so a stuck fetch (e.g. supabase-js's own
     // internal auth-refresh lock occasionally wedging after a tab goes
@@ -4323,10 +4339,11 @@ async function wdsRefreshChatPopup(roomId) {
       wdsFetchRoomMessages(roomId),
       new Promise((_, reject) => setTimeout(() => reject(new Error('Timed out loading messages')), 10000)),
     ]);
-    wdsRenderChatPopupMessages(roomId, messages);
+    clearInterval(tick);
+    wdsRenderChatPopupMessages(roomId, messages, popup);
   } catch (e) {
+    clearInterval(tick);
     console.error('wdsRefreshChatPopup failed for room', roomId, e);
-    const listEl = popup.querySelector('.wds-chat-popup-list');
     listEl.innerHTML = '<p class="empty-note">Could not load messages. <a href="#" data-retry-load>Retry</a></p>';
     const retryLink = listEl.querySelector('[data-retry-load]');
     if (retryLink) retryLink.addEventListener('click', ev => { ev.preventDefault(); wdsRefreshChatPopup(roomId); });
