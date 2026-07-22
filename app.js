@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.27';
+const APP_VERSION = 'WF_SYS_V.1.7.28';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -93,8 +93,14 @@ try {
 } catch (e) { /* ignore malformed/missing saved session */ }
 function wdsIsAdminLoggedIn() { return !!wdsAdminSession.password; }
 function wdsUpdateAdminBadge() {
+  const loggedIn = wdsIsAdminLoggedIn();
   const badge = document.getElementById('wdsAdminBadge');
-  if (badge) badge.hidden = !wdsIsAdminLoggedIn();
+  if (badge) badge.hidden = !loggedIn;
+  // Compact glow-ring replacement for the text badge on mobile (see its
+  // own @media rule in style.css) -- toggled alongside the badge itself
+  // rather than duplicating the login-state check at every call site.
+  const modeIcon = document.getElementById('wdsUserModeIcon');
+  if (modeIcon) modeIcon.classList.toggle('wds-user-mode-icon--admin', loggedIn);
 }
 
 // ---------------------------------------------------------------------
@@ -167,9 +173,56 @@ function wdsArrayToDateMap(arr) {
   return map;
 }
 
+// Every wds- dropdown/menu (notifications, chats list, announcement menu,
+// chat room/user/reaction menus, theme popup, post menu, ...) is
+// positioned relative to its own trigger button with a fixed width/anchor
+// that only fits when that particular button happens to have enough room
+// on every side -- on a narrow mobile screen (or a trigger sitting near
+// an edge) that silently overflows off-screen instead of erroring, so it
+// was never caught until someone actually looked. Rather than hand-tuning
+// each popup's own left/right/width per breakpoint, this watches every
+// popup's `hidden` attribute (same MutationObserver technique
+// initBackButtonNav already uses for .sheet-overlay) and nudges it back
+// on-screen via a transform the instant it opens -- works regardless of
+// which edge the popup was originally anchored to, and needs zero changes
+// at any individual open call site.
+const WDS_VIEWPORT_CLAMP_SELECTOR = '.wds-notif-pop, .announcement-menu, .chat-room-menu, .chat-user-menu, .chat-reaction-menu, .chat-invites-popover, .wds-theme-popup, .wds-profile-avatar-add-menu';
+function wdsClampPopupToViewport(el) {
+  const margin = 8;
+  el.style.transform = '';
+  requestAnimationFrame(() => {
+    if (el.hidden) return;
+    const rect = el.getBoundingClientRect();
+    let dx = 0, dy = 0;
+    if (rect.right > window.innerWidth - margin) dx = (window.innerWidth - margin) - rect.right;
+    if (rect.left + dx < margin) dx = margin - rect.left;
+    if (rect.bottom > window.innerHeight - margin) dy = (window.innerHeight - margin) - rect.bottom;
+    if (rect.top + dy < margin) dy = margin - rect.top;
+    if (dx || dy) el.style.transform = `translate(${dx}px, ${dy}px)`;
+  });
+}
+function initWdsPopupViewportClamp() {
+  const observer = new MutationObserver(mutations => {
+    mutations.forEach(m => {
+      const el = m.target;
+      if (el instanceof Element && el.matches(WDS_VIEWPORT_CLAMP_SELECTOR) && !el.hidden) wdsClampPopupToViewport(el);
+    });
+  });
+  document.querySelectorAll(WDS_VIEWPORT_CLAMP_SELECTOR).forEach(el => {
+    observer.observe(el, { attributes: true, attributeFilter: ['hidden'] });
+  });
+  // Re-clamp on resize/orientation change too -- a popup opened in
+  // landscape (or before a keyboard pushed the layout around) can end up
+  // overflowing once the viewport changes shape under it.
+  window.addEventListener('resize', () => {
+    document.querySelectorAll(WDS_VIEWPORT_CLAMP_SELECTOR).forEach(el => { if (!el.hidden) wdsClampPopupToViewport(el); });
+  });
+}
+
 function initDesktopShell() {
   const shell = document.getElementById('wdsShell');
   if (!shell) return;
+  initWdsPopupViewportClamp();
 
   // Re-applies the forced-desktop-layout viewport on every load/reload —
   // see wdsApplyForceDesktopViewport's own definition for why this is a
@@ -4225,10 +4278,24 @@ async function wdsRefreshChatPopup(roomId) {
   const popup = document.querySelector(`.wds-chat-popup[data-room-id="${roomId}"]`);
   if (!popup) return;
   try {
-    const messages = await wdsFetchRoomMessages(roomId);
+    // Race against a timeout so a stuck fetch (e.g. supabase-js's own
+    // internal auth-refresh lock occasionally wedging after a tab goes
+    // background/foreground -- a known class of supabase-js issue) can
+    // never leave the popup stuck on "Loading…" forever with no way out.
+    // Sending a message afterward "fixing" it was the tell: that succeeds
+    // via a completely different call, then explicitly re-runs this same
+    // function, so whatever it was stuck on had already cleared by then.
+    const messages = await Promise.race([
+      wdsFetchRoomMessages(roomId),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timed out loading messages')), 10000)),
+    ]);
     wdsRenderChatPopupMessages(roomId, messages);
   } catch (e) {
-    popup.querySelector('.wds-chat-popup-list').innerHTML = '<p class="empty-note">Could not load messages.</p>';
+    console.error('wdsRefreshChatPopup failed for room', roomId, e);
+    const listEl = popup.querySelector('.wds-chat-popup-list');
+    listEl.innerHTML = '<p class="empty-note">Could not load messages. <a href="#" data-retry-load>Retry</a></p>';
+    const retryLink = listEl.querySelector('[data-retry-load]');
+    if (retryLink) retryLink.addEventListener('click', ev => { ev.preventDefault(); wdsRefreshChatPopup(roomId); });
   }
 }
 
