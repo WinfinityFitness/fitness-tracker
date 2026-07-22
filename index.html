@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.29">
+<link rel="stylesheet" href="style.css?v=1.7.30">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -168,6 +168,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         <button type="button" class="announcement-menu-item" id="btnAdminPost" hidden>Post Announcement</button>
         <button type="button" class="announcement-menu-item" id="btnAdminAssignTargets" hidden>Assign Targets</button>
         <button type="button" class="announcement-menu-item" id="btnDrawerOpenMediaSync">Media Sync Calibration</button>
+        <button type="button" class="announcement-menu-item" id="btnDrawerOpenFooterSettings">Edit Footer</button>
       </div>
       <p class="field-group-heading" style="font-size:0.8rem;margin-top:14px;">Quick Log buttons in everyone's dial</p>
       <p class="hint hint--sm">Shown to every user, not just admin, in their own drawer dial — pick which Quick Log shortcuts appear.</p>
@@ -1395,7 +1396,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         <div class="footer-col">
           <h4>About</h4>
           <span class="footer-link-static">Team</span>
-          <a class="footer-link" href="http://www.facebook.com/aldruz3dsign" target="_blank" rel="noopener noreferrer">Affiliate</a>
+          <a class="footer-link" href="http://www.facebook.com/aldruz3dsign" target="_blank" rel="noopener noreferrer" id="footerAffiliateLink">Affiliate</a>
           <span class="footer-link-static">Careers</span>
         </div>
         <div class="footer-col">
@@ -1406,7 +1407,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         </div>
         <div class="footer-col">
           <h4>Social</h4>
-          <a class="footer-link" href="http://wellness.winfinityfitness.com" target="_blank" rel="noopener noreferrer">Webpage</a>
+          <a class="footer-link" href="http://wellness.winfinityfitness.com" target="_blank" rel="noopener noreferrer" id="footerWebpageLink">Webpage</a>
           <a class="footer-link" href="https://www.facebook.com/winfinityfit/" target="_blank" rel="noopener noreferrer" id="footerFacebookLink">Facebook</a>
           <a class="footer-link" href="https://www.instagram.com/windalchamp/" target="_blank" rel="noopener noreferrer" id="footerInstagramLink">Instagram</a>
         </div>
@@ -2811,6 +2812,39 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
+<div class="sheet-overlay" id="adminFooterOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Edit Footer</h2>
+      <button class="sheet-close" id="btnCloseAdminFooter">✕</button>
+    </div>
+    <p class="hint hint--sm">Blank a field and Save to reset it back to this app's default. Synced across FT, wellness, and Messenger.</p>
+    <label class="field">
+      <span>Tagline</span>
+      <input type="text" id="adminFooterTagline" placeholder="Leave blank for the default rotating taglines" autocomplete="off">
+    </label>
+    <label class="field">
+      <span>Webpage URL</span>
+      <input type="url" id="adminFooterWebpageUrl" placeholder="https://..." autocomplete="off">
+    </label>
+    <label class="field">
+      <span>Facebook URL</span>
+      <input type="url" id="adminFooterFacebookUrl" placeholder="https://..." autocomplete="off">
+    </label>
+    <label class="field">
+      <span>Instagram URL</span>
+      <input type="url" id="adminFooterInstagramUrl" placeholder="https://..." autocomplete="off">
+    </label>
+    <label class="field">
+      <span>Affiliate URL</span>
+      <input type="url" id="adminFooterAffiliateUrl" placeholder="https://..." autocomplete="off">
+    </label>
+    <button type="button" class="btn btn--primary" id="btnAdminFooterSubmit" style="width:100%;margin-top:10px;">Save</button>
+    <p class="save-note" id="adminFooterNote"></p>
+  </div>
+</div>
+
 <div class="sheet-overlay" id="adminAssignTargetsOverlay" hidden>
   <div class="sheet">
     <div class="sheet-handle"></div>
@@ -3865,7 +3899,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
             <div class="footer-col">
               <h4>About</h4>
               <span class="footer-link-static">Team</span>
-              <a class="footer-link" href="http://www.facebook.com/aldruz3dsign" target="_blank" rel="noopener noreferrer">Affiliate</a>
+              <a class="footer-link" href="http://www.facebook.com/aldruz3dsign" target="_blank" rel="noopener noreferrer" id="wdsFooterAffiliateLink">Affiliate</a>
               <span class="footer-link-static">Careers</span>
             </div>
             <div class="footer-col">
@@ -3876,7 +3910,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
             </div>
             <div class="footer-col">
               <h4>Social</h4>
-              <a class="footer-link" href="http://wellness.winfinityfitness.com" target="_blank" rel="noopener noreferrer">Webpage</a>
+              <a class="footer-link" href="http://wellness.winfinityfitness.com" target="_blank" rel="noopener noreferrer" id="wdsFooterWebpageLink">Webpage</a>
               <a class="footer-link" href="https://www.facebook.com/winfinityfit/" target="_blank" rel="noopener noreferrer" id="wdsFooterFacebookLink">Facebook</a>
               <a class="footer-link" href="https://www.instagram.com/windalchamp/" target="_blank" rel="noopener noreferrer" id="wdsFooterInstagramLink">Instagram</a>
             </div>
@@ -4376,10 +4410,10 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
-<script src="config.js?v=1.7.29"></script>
+<script src="config.js?v=1.7.30"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.7.29"></script>
+<script src="app.js?v=1.7.30"></script>
 </body>
 </html>

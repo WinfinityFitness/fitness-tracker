@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.29';
+const APP_VERSION = 'WF_SYS_V.1.7.30';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -7321,8 +7321,22 @@ const FOOTER_TAGLINES = [
   "Believe in yourself and all that you are. Know that there is something inside you that is greater than any obstacle.",
 ];
 
-function initFooterTagline() {
-  const el = document.getElementById('footerTagline');
+// Both footers' markup physically exist in the DOM regardless of which
+// shell (FT/wellness) is actually active on a given page load -- the
+// inactive one just sits CSS-hidden, so both initFooterTagline() and
+// initWdsFooter() can genuinely run on the same load. Rotation-starting
+// (and the admin-fixed-tagline override) is centralized here, called
+// exactly once, specifically so two independent setInterval loops never
+// end up fighting over the same element -- initFooterTagline/initWdsFooter
+// only wire their OTHER footer buttons now, not the tagline.
+let footerTaglineInitStarted = false;
+function initFooterTaglineDisplay() {
+  if (footerTaglineInitStarted) return;
+  footerTaglineInitStarted = true;
+  applyAdminFooterSettings();
+}
+function startFooterTaglineRotation(elId) {
+  const el = document.getElementById(elId);
   if (!el) return;
   let lastIdx = -1;
   setInterval(() => {
@@ -7331,6 +7345,44 @@ function initFooterTagline() {
     lastIdx = idx;
     el.textContent = `"${FOOTER_TAGLINES[idx]}"`;
   }, 15000);
+}
+function initFooterTagline() { initFooterTaglineDisplay(); }
+
+// Admin-editable footer content (Settings > Drawer Settings > Edit Footer)
+// -- one global ad_settings row (see supabase_footer_settings_migration.sql),
+// synced across FT and wellness (Messenger has no footer yet). Every field
+// is optional: null/blank means "keep this app's own hardcoded default,"
+// so setting just the tagline doesn't force every link to be re-entered.
+// Runs once at boot, after which the fixed tagline (if any) simply stays
+// put -- there's no live-push channel for this, a fresh app load is what
+// picks up a change an admin just made.
+async function applyAdminFooterSettings() {
+  const settings = await fetchAdSettings();
+  if (settings && settings.footer_tagline) {
+    const text = `"${settings.footer_tagline}"`;
+    ['footerTagline', 'wdsFooterTagline'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text;
+    });
+  } else {
+    startFooterTaglineRotation('footerTagline');
+    startFooterTaglineRotation('wdsFooterTagline');
+  }
+  if (!settings) return;
+  const linkFields = [
+    ['footer_webpage_url', 'footerWebpageLink', 'wdsFooterWebpageLink'],
+    ['footer_facebook_url', 'footerFacebookLink', 'wdsFooterFacebookLink'],
+    ['footer_instagram_url', 'footerInstagramLink', 'wdsFooterInstagramLink'],
+    ['footer_affiliate_url', 'footerAffiliateLink', 'wdsFooterAffiliateLink'],
+  ];
+  linkFields.forEach(([settingKey, ftId, wdsId]) => {
+    const url = settings[settingKey];
+    if (!url) return;
+    [ftId, wdsId].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.href = url;
+    });
+  });
 }
 
 // Wellness's own copy of the footer (Nexus Leaderboard column) — reuses
@@ -7356,16 +7408,7 @@ function initWdsFooter() {
   const contactBtn = document.getElementById('btnWdsFooterContact');
   if (contactBtn) contactBtn.addEventListener('click', () => { document.getElementById('contactOverlay').hidden = false; });
 
-  const tagEl = document.getElementById('wdsFooterTagline');
-  if (tagEl) {
-    let lastIdx = -1;
-    setInterval(() => {
-      let idx;
-      do { idx = Math.floor(Math.random() * FOOTER_TAGLINES.length); } while (idx === lastIdx && FOOTER_TAGLINES.length > 1);
-      lastIdx = idx;
-      tagEl.textContent = `"${FOOTER_TAGLINES[idx]}"`;
-    }, 15000);
-  }
+  initFooterTaglineDisplay();
 }
 
 // Facebook/Instagram footer links are visible by default for everyone, same
@@ -17131,7 +17174,7 @@ let cachedAdSettingsPromise = null;
 function fetchAdSettings() {
   if (!sbConfigured()) return Promise.resolve(null);
   if (!cachedAdSettingsPromise) {
-    cachedAdSettingsPromise = sb.from('ad_settings').select('ads_enabled, updates_enabled').eq('id', 1).maybeSingle()
+    cachedAdSettingsPromise = sb.from('ad_settings').select('ads_enabled, updates_enabled, footer_tagline, footer_webpage_url, footer_facebook_url, footer_instagram_url, footer_affiliate_url').eq('id', 1).maybeSingle()
       .then(({ data }) => data)
       .catch(() => null);
   }
@@ -19281,6 +19324,17 @@ function initAnnouncementWidget() {
     document.getElementById('adminPostNote').textContent = '';
     document.getElementById('adminPostOverlay').hidden = false;
   });
+  document.getElementById('btnDrawerOpenFooterSettings').addEventListener('click', async () => {
+    const noteEl = document.getElementById('adminFooterNote');
+    noteEl.textContent = '';
+    const settings = await fetchAdSettings();
+    document.getElementById('adminFooterTagline').value = (settings && settings.footer_tagline) || '';
+    document.getElementById('adminFooterWebpageUrl').value = (settings && settings.footer_webpage_url) || '';
+    document.getElementById('adminFooterFacebookUrl').value = (settings && settings.footer_facebook_url) || '';
+    document.getElementById('adminFooterInstagramUrl').value = (settings && settings.footer_instagram_url) || '';
+    document.getElementById('adminFooterAffiliateUrl').value = (settings && settings.footer_affiliate_url) || '';
+    document.getElementById('adminFooterOverlay').hidden = false;
+  });
   document.getElementById('btnAdminAssignTargets').addEventListener('click', () => {
     ['adminAssignTargetId', 'adminAssignCalorie', 'adminAssignSteps', 'adminAssignWorkouts', 'adminAssignRefeedCalories', 'adminAssignRefeedStart', 'adminAssignRefeedEnd', 'adminAssignSocialLinks'].forEach(id => {
       document.getElementById(id).value = '';
@@ -19340,6 +19394,33 @@ function initAnnouncementWidget() {
       showRestToast('Announcement posted.');
     } catch (e) {
       handleAdminRpcError('set_announcement', e, noteEl);
+    }
+  });
+
+  const footerOverlay = document.getElementById('adminFooterOverlay');
+  document.getElementById('btnCloseAdminFooter').addEventListener('click', () => { footerOverlay.hidden = true; });
+  footerOverlay.addEventListener('click', e => { if (e.target === footerOverlay) footerOverlay.hidden = true; });
+
+  document.getElementById('btnAdminFooterSubmit').addEventListener('click', async () => {
+    const noteEl = document.getElementById('adminFooterNote');
+    if (!isAdminLoggedIn()) { noteEl.textContent = 'Not logged in.'; return; }
+    noteEl.textContent = 'Saving…';
+    try {
+      const { error } = await sb.rpc('admin_set_footer_settings', {
+        p_digital_id: adminSession.digitalId,
+        p_password: adminSession.password,
+        p_tagline: document.getElementById('adminFooterTagline').value,
+        p_webpage_url: document.getElementById('adminFooterWebpageUrl').value,
+        p_facebook_url: document.getElementById('adminFooterFacebookUrl').value,
+        p_instagram_url: document.getElementById('adminFooterInstagramUrl').value,
+        p_affiliate_url: document.getElementById('adminFooterAffiliateUrl').value,
+      });
+      if (error) throw error;
+      cachedAdSettingsPromise = null;
+      footerOverlay.hidden = true;
+      showRestToast('Footer updated. Reload FT/wellness/Messenger to see it live.');
+    } catch (e) {
+      handleAdminRpcError('admin_set_footer_settings', e, noteEl);
     }
   });
 
