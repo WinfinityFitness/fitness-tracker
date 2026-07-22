@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.38';
+const APP_VERSION = 'WF_SYS_V.1.7.39';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -7402,6 +7402,11 @@ function initFooterTaglineDisplay() {
   if (footerTaglineInitStarted) return;
   footerTaglineInitStarted = true;
   applyAdminFooterSettings();
+  const year = String(new Date().getFullYear());
+  ['footerCopyright', 'wdsFooterCopyright'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = `&copy; ${year} Winfinity Fitness. All rights reserved.`;
+  });
 }
 function startFooterTaglineRotation(elId) {
   const el = document.getElementById(elId);

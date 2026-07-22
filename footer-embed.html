@@ -2,44 +2,140 @@
      whole block into a Custom HTML widget/block in your site's footer area.
      Not a full page (no <html>/<head>/<body>) — it's a fragment meant to be
      dropped directly into an existing page, so it inherits the page's own
-     width instead of sitting in a boxed iframe like the Showcase/Arsenal
-     embeds. Pulls the SAME tagline + link settings the FT/Wellness footers
-     already read from (ad_settings, admin-editable via Edit Footer in the
-     FT admin drawer) — editing it there updates this too, no separate
-     admin panel. Messenger doesn't have a footer yet ("soon" per the
-     request this was built for) — this embed only ever depends on
-     ad_settings, so it'll pick up Messenger's footer automatically
-     whenever that ships, no changes needed here. -->
+     width instead of sitting boxed in an iframe like the Showcase/Arsenal
+     embeds.
+
+     Full replica of the in-app footer (FT/Wellness):
+       - Tagline + Webpage/Facebook/Instagram/Affiliate links pull from
+         ad_settings (footer_*), same as the app -- editing "Edit Footer" in
+         the FT admin drawer updates this too, no separate admin panel.
+       - Team/Careers stay non-clickable, matching the app's own footer
+         exactly (they're static placeholders there too, not real links).
+       - Privacy Policy / Terms and Services link to privacy.html/terms.html
+         (verbatim copies of the app's own legal text, hosted standalone so
+         they have real shareable URLs a WordPress page can link to).
+       - Contact Us opens a small popup with the same Viber/WhatsApp/
+         Telegram/Email info the app's own Contact Us overlay shows.
+       - Donate opens a popup with the same GCash QR the app uses
+         (icons/gcash-donate-qr.png, fetched from the live GitHub Pages
+         site). Share uses the visitor's own share sheet if available.
+       - Messenger has no footer yet ("soon") -- this only ever depends on
+         ad_settings, so it'll pick up Messenger's footer automatically
+         once that ships, no changes needed here. -->
 <footer class="wf-footer-embed" id="wfFooterEmbed">
-  <p class="wf-footer-tagline" id="wfFooterTagline">"The only bad workout is the one that didn't happen."</p>
-  <div class="wf-footer-links" id="wfFooterLinks">
-    <a href="https://winfinityfitness.com" id="wfFooterWebpage">Website</a>
-    <a href="#" id="wfFooterFacebook" hidden>Facebook</a>
-    <a href="#" id="wfFooterInstagram" hidden>Instagram</a>
-    <a href="#" id="wfFooterAffiliate" hidden>Affiliate</a>
+  <div class="wf-footer-top">
+    <div class="wf-footer-brand">
+      <img class="wf-footer-logo" src="https://winfinityfitness.github.io/fitness-tracker/icons/icon-192.png" alt="Winfinity">
+    </div>
+    <div class="wf-footer-actions">
+      <button type="button" class="wf-footer-pill" id="wfFooterDonate">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
+        Donate
+      </button>
+      <button type="button" class="wf-footer-pill" id="wfFooterShare">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
+        Share
+      </button>
+    </div>
   </div>
+
+  <h2 class="wf-footer-name">WINFINITYFITNESS</h2>
+  <p class="wf-footer-tagline" id="wfFooterTagline">"The only bad workout is the one that didn't happen."</p>
+
+  <div class="wf-footer-columns">
+    <div class="wf-footer-col">
+      <h3>About</h3>
+      <span class="wf-footer-static">Team</span>
+      <a href="#" id="wfFooterAffiliate" class="wf-footer-static-link">Affiliate</a>
+      <span class="wf-footer-static">Careers</span>
+    </div>
+    <div class="wf-footer-col">
+      <h3>Privacy</h3>
+      <a href="https://winfinityfitness.github.io/fitness-tracker/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
+      <a href="https://winfinityfitness.github.io/fitness-tracker/terms.html" target="_blank" rel="noopener">Terms and Services</a>
+      <button type="button" class="wf-footer-linkbtn" id="wfFooterContact">Contact Us</button>
+    </div>
+    <div class="wf-footer-col">
+      <h3>Social</h3>
+      <a href="#" id="wfFooterWebpage" hidden>Webpage</a>
+      <a href="#" id="wfFooterFacebook" hidden>Facebook</a>
+      <a href="#" id="wfFooterInstagram" hidden>Instagram</a>
+    </div>
+  </div>
+
   <p class="wf-footer-copyright">&copy; <span id="wfFooterYear"></span> Winfinity Fitness. All rights reserved.</p>
 </footer>
+
+<div class="wf-footer-overlay" id="wfDonateOverlay" hidden>
+  <div class="wf-footer-popup">
+    <button type="button" class="wf-footer-popup-close" data-wf-close>&times;</button>
+    <h3>Support Winfinity</h3>
+    <p>Donate to the dev to keep the app working and developing to be better. Thank you!</p>
+    <img class="wf-footer-qr" src="https://winfinityfitness.github.io/fitness-tracker/icons/gcash-donate-qr.png" alt="GCash QR code for donation">
+  </div>
+</div>
+
+<div class="wf-footer-overlay" id="wfContactOverlay" hidden>
+  <div class="wf-footer-popup">
+    <button type="button" class="wf-footer-popup-close" data-wf-close>&times;</button>
+    <h3>Contact Us</h3>
+    <div class="wf-footer-contact-row"><span>Viber</span><span>0915 370 3821</span></div>
+    <div class="wf-footer-contact-row"><span>WhatsApp</span><span>0915 370 3821</span></div>
+    <div class="wf-footer-contact-row"><span>Telegram</span><span>0915 370 3821</span></div>
+    <div class="wf-footer-contact-row"><span>Email</span><span>winfinityfitness@gmail.com</span></div>
+  </div>
+</div>
 
 <style>
   .wf-footer-embed {
     background: #0a0d12; color: #e8ecf1; text-align: center;
-    padding: 28px 20px 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    padding: 26px 24px 22px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     border-top: 1px solid #232d3a;
   }
+  .wf-footer-top { display: flex; align-items: center; justify-content: space-between; max-width: 720px; margin: 0 auto 18px; flex-wrap: wrap; gap: 10px; }
+  .wf-footer-logo { width: 30px; height: 30px; object-fit: contain; display: block; }
+  .wf-footer-actions { display: flex; gap: 10px; }
+  .wf-footer-pill {
+    display: inline-flex; align-items: center; gap: 6px; background: transparent;
+    border: 1px solid #ff9f43; color: #ff9f43; font-size: 0.76rem; font-weight: 600;
+    padding: 7px 14px; border-radius: 999px; cursor: pointer;
+  }
+  .wf-footer-pill:hover { background: #ff9f43; color: #0a0d12; }
+  .wf-footer-name { font-size: 1rem; letter-spacing: 0.08em; margin: 0 0 10px; text-transform: uppercase; }
   .wf-footer-tagline {
     font-style: italic; color: #8a97a8; font-size: 0.88rem; max-width: 560px;
-    margin: 0 auto 16px; line-height: 1.5;
+    margin: 0 auto 30px; line-height: 1.5;
   }
-  .wf-footer-links {
-    display: flex; flex-wrap: wrap; justify-content: center; gap: 18px; margin-bottom: 14px;
+  .wf-footer-columns {
+    display: grid; grid-template-columns: repeat(3, minmax(120px, 160px)); gap: 20px;
+    justify-content: center; text-align: left; max-width: 640px; margin: 0 auto 26px;
   }
-  .wf-footer-links a {
-    color: #ff9f43; text-decoration: none; font-size: 0.82rem; font-weight: 600;
-    letter-spacing: 0.02em;
+  .wf-footer-col h3 { color: #e8ecf1; font-size: 0.86rem; margin: 0 0 10px; }
+  .wf-footer-col a, .wf-footer-col .wf-footer-static, .wf-footer-col .wf-footer-linkbtn, .wf-footer-col .wf-footer-static-link {
+    display: block; color: #8a97a8; text-decoration: none; font-size: 0.82rem;
+    margin-bottom: 8px; background: none; border: none; padding: 0; text-align: left; cursor: default; font-family: inherit;
   }
-  .wf-footer-links a:hover { text-decoration: underline; }
+  .wf-footer-col a[href]:not([hidden]), .wf-footer-col .wf-footer-linkbtn, .wf-footer-col .wf-footer-static-link[href]:not([href="#"]) {
+    cursor: pointer;
+  }
+  .wf-footer-col a[href]:not([href="#"]):hover, .wf-footer-col .wf-footer-linkbtn:hover { color: #ff9f43; }
   .wf-footer-copyright { color: #5c6675; font-size: 0.74rem; margin: 0; }
+
+  .wf-footer-overlay {
+    position: fixed; inset: 0; background: rgba(4,6,9,0.72); z-index: 999;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .wf-footer-overlay[hidden] { display: none; }
+  .wf-footer-popup {
+    background: #121820; border: 1px solid #232d3a; border-radius: 14px;
+    padding: 22px; width: 300px; max-width: 100%; position: relative; text-align: left;
+  }
+  .wf-footer-popup h3 { margin: 0 0 12px; color: #e8ecf1; font-size: 0.95rem; }
+  .wf-footer-popup p { color: #8a97a8; font-size: 0.82rem; line-height: 1.5; margin: 0 0 14px; }
+  .wf-footer-popup-close { position: absolute; top: 10px; right: 12px; background: none; border: none; color: #8a97a8; font-size: 1.1rem; cursor: pointer; }
+  .wf-footer-qr { width: 100%; border-radius: 8px; }
+  .wf-footer-contact-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.82rem; color: #e8ecf1; }
+  .wf-footer-contact-row span:first-child { color: #8a97a8; }
 </style>
 
 <script>
@@ -116,5 +212,30 @@
     script.onerror = startRotation;
     document.head.appendChild(script);
   }
+
+  // Donate / Contact popups
+  function openOverlay(id) { document.getElementById(id).hidden = false; }
+  function closeOverlay(el) { el.hidden = true; }
+  document.getElementById('wfFooterDonate').addEventListener('click', function () { openOverlay('wfDonateOverlay'); });
+  document.getElementById('wfFooterContact').addEventListener('click', function () { openOverlay('wfContactOverlay'); });
+  document.querySelectorAll('.wf-footer-overlay').forEach(function (overlay) {
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOverlay(overlay); });
+    overlay.querySelector('[data-wf-close]').addEventListener('click', function () { closeOverlay(overlay); });
+  });
+
+  // Share -- native share sheet if available, otherwise copy the link
+  document.getElementById('wfFooterShare').addEventListener('click', function () {
+    var shareBtn = this;
+    var shareData = { title: 'Winfinity Fitness', text: 'Check out Winfinity Fitness!', url: 'https://winfinityfitness.com' };
+    if (navigator.share) {
+      navigator.share(shareData).catch(function () { /* user cancelled -- ignore */ });
+    } else if (navigator.clipboard) {
+      navigator.clipboard.writeText(shareData.url).then(function () {
+        var original = shareBtn.innerHTML;
+        shareBtn.textContent = 'Link copied!';
+        setTimeout(function () { shareBtn.innerHTML = original; }, 1800);
+      });
+    }
+  });
 })();
 </script>
