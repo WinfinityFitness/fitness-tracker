@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.36';
+const APP_VERSION = 'WF_SYS_V.1.7.37';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -8452,6 +8452,7 @@ function handleDeepLinkUrl(url) {
     else if (sheet === 'dailyFuel') openDailyFuelStatus();
     else if (sheet === 'measureEntry') openMeasureEntry();
     else if (sheet === 'progressPhoto') openProgressPhotoCamera();
+    else if (sheet === 'requestAssessment') openAssessmentOverlay();
   } catch (e) { /* ignore malformed url */ }
 }
 
@@ -14917,9 +14918,44 @@ async function buildAssessmentBlobs() {
   return Promise.all(jobs);
 }
 
-function openAssessmentOverlay() {
-  document.getElementById('assessmentShareNote').textContent = '';
+// Set by openAssessmentOverlay's pending-request check, read by the submit
+// handler below -- avoids a second RPC round trip right before submitting.
+let assessmentPendingAdminRequest = false;
+
+async function openAssessmentOverlay() {
+  const note = document.getElementById('assessmentShareNote');
+  note.textContent = '';
   document.getElementById('assessmentShareOverlay').hidden = false;
+  assessmentPendingAdminRequest = false;
+  // Best-effort -- an admin "Assess for New Assignment" request (see
+  // supabase_assessment_request_migration.sql) is entirely optional; this
+  // overlay works the same with or without one pending.
+  if (sbConfigured()) {
+    try {
+      const { data } = await sb.rpc('get_my_assessment_request', { p_share_key: getOrCreateShareKey() });
+      if (Array.isArray(data) && data[0] && data[0].status === 'pending') {
+        assessmentPendingAdminRequest = true;
+        note.textContent = 'Your coach requested an updated assessment — this will also be sent to them.';
+      }
+    } catch (e) { /* ignore -- overlay already works without this */ }
+  }
+}
+
+// Zips the same PNG blobs the local share below uses and uploads them to
+// the assessment-zips bucket, then marks the pending request ready --
+// only ever called when assessmentPendingAdminRequest is true, so a normal
+// personal share (no admin request) never uploads anything.
+async function uploadAssessmentZipForAdmin(blobs) {
+  const zip = new JSZip();
+  blobs.forEach(({ name, blob }) => zip.file(name, blob));
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+  const shareKey = getOrCreateShareKey();
+  const path = `${shareKey}/${Date.now()}.zip`;
+  const { error } = await sb.storage.from('assessment-zips').upload(path, zipBlob, { contentType: 'application/zip' });
+  if (error) throw error;
+  const zipUrl = sb.storage.from('assessment-zips').getPublicUrl(path).data.publicUrl;
+  await sb.rpc('submit_assessment_zip', { p_share_key: shareKey, p_zip_url: zipUrl });
+  assessmentPendingAdminRequest = false;
 }
 
 function initRequestAssessment() {
@@ -14939,6 +14975,13 @@ function initRequestAssessment() {
         note.textContent = 'Check at least one item to share.';
         btn.disabled = false;
         return;
+      }
+      // Your own share sheet below is unchanged either way -- this only
+      // adds a silent upload alongside it when a coach actually asked.
+      if (assessmentPendingAdminRequest) {
+        note.textContent = 'Sending to your coach…';
+        try { await uploadAssessmentZipForAdmin(blobs); }
+        catch (e) { /* best effort -- local share still proceeds below */ }
       }
       const result = await shareMultipleViaWebShare({
         title: 'Winfinity Tracker — Assessment',

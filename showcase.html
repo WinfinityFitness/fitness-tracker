@@ -100,6 +100,7 @@
   }
   .showcase-bar:hover, .showcase-bar:focus-visible { transform: scaleX(1.6); outline: none; }
   .showcase-bar.is-filtered-out { opacity: 0.12; pointer-events: none; }
+  .showcase-bar.is-hidden { display: none; }
   .showcase-bar[data-tier="elite"] { background: var(--tier-elite); }
   .showcase-bar[data-tier="ontrack"] { background: var(--tier-ontrack); }
   .showcase-bar[data-tier="building"] { background: var(--tier-building); }
@@ -162,6 +163,29 @@
   .consistency-label strong { font-variant-numeric: tabular-nums; }
   .consistency-track { height: 6px; background: var(--panel-2); border-radius: 4px; overflow: hidden; }
   .consistency-fill { height: 100%; background: linear-gradient(90deg, var(--tier-behind), var(--tier-elite)); border-radius: 4px; }
+
+  /* Deliberately unobtrusive -- this is a small escape hatch for admin use,
+     not a feature regular visitors are meant to notice. */
+  .admin-corner-btn {
+    position: fixed; bottom: 10px; right: 10px; z-index: 40;
+    background: none; border: 1px solid var(--border); color: var(--text-muted);
+    font-size: 0.68rem; padding: 4px 10px; border-radius: 999px; cursor: pointer; opacity: 0.5;
+  }
+  .admin-corner-btn:hover { opacity: 1; }
+  .admin-login-card { width: 280px; }
+  .admin-field { display: block; margin-bottom: 10px; font-size: 0.78rem; color: var(--text-muted); }
+  .admin-field input {
+    display: block; width: 100%; margin-top: 4px; background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; color: var(--text-primary); font-size: 0.85rem; box-sizing: border-box;
+  }
+  .assign-section { margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.05); }
+  .btn-assign {
+    display: block; width: 100%; text-align: center; text-decoration: none; box-sizing: border-box;
+    background: var(--accent); color: #0a0d12; font-weight: 600; font-size: 0.82rem;
+    border: none; border-radius: 8px; padding: 9px; cursor: pointer;
+  }
+  .btn-assign:disabled { background: var(--panel-2); color: var(--text-muted); cursor: default; }
+  .btn-assign.is-download { background: var(--tier-ontrack); }
 </style>
 </head>
 <body>
@@ -177,6 +201,10 @@
     <label class="sort-toggle">
       <input type="checkbox" id="sortByHeight">
       <span>Sort by progress</span>
+    </label>
+    <label class="sort-toggle">
+      <input type="checkbox" id="hideFiltered">
+      <span>Hide filtered-out users</span>
     </label>
     <select class="location-select" id="locationFilter">
       <option value="">All locations</option>
@@ -206,8 +234,21 @@
   <footer>Showcase includes both real member results and illustrative sample data. Tap any bar to view a member's summary.</footer>
 </div>
 
+<button type="button" class="admin-corner-btn" id="btnAdminCorner">Admin</button>
+
 <div class="overlay" id="statOverlay" hidden>
   <div class="stat-card" id="statCard"></div>
+</div>
+
+<div class="overlay" id="adminLoginOverlay" hidden>
+  <div class="stat-card admin-login-card">
+    <button type="button" class="stat-card-close" id="btnCloseAdminLogin" aria-label="Close">&times;</button>
+    <h3 style="margin:0 0 14px;font-size:0.95rem;">Admin Login</h3>
+    <label class="admin-field"><span>Digital ID</span><input type="text" id="adminLoginId" autocapitalize="characters"></label>
+    <label class="admin-field"><span>Password</span><input type="password" id="adminLoginPassword"></label>
+    <button type="button" class="tab-btn is-active" id="btnAdminLoginSubmit" style="width:100%;margin-top:6px;">Log In</button>
+    <p class="empty-note" id="adminLoginNote" style="padding:8px 0 0;"></p>
+  </div>
 </div>
 
 <script src="config.js"></script>
@@ -218,6 +259,8 @@
 function escapeHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const METRICS = [
   { key: 'steps', label: 'Daily Steps', domain: [0, 20000], higherIsBetter: true, format: v => Math.round(v).toLocaleString() },
@@ -259,7 +302,6 @@ let locationFilterVal = '';
 async function loadData() {
   const barsEl = document.getElementById('barsScroll');
   try {
-    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const { data, error } = await sb.rpc('get_public_showcase_data');
     if (error) throw error;
     allRows = data || [];
@@ -356,13 +398,20 @@ function updateFilterLabel(metric) {
     `${metric.format(filterMinVal)} – ${metric.format(filterMaxVal)}`;
 }
 
+let hideFilteredOut = false;
+
 function applyFilter() {
   const metric = METRICS[activeMetricIndex];
   document.querySelectorAll('.showcase-bar').forEach(el => {
     const v = Number(el.dataset.value);
     const outOfRange = v < filterMinVal || v > filterMaxVal;
     const wrongLocation = locationFilterVal && el.dataset.location !== locationFilterVal;
-    el.classList.toggle('is-filtered-out', outOfRange || wrongLocation);
+    const filteredOut = outOfRange || wrongLocation;
+    // Dimmed-in-place (default) keeps every bar's horizontal position
+    // stable; "Hide filtered-out users" instead removes them from flow
+    // entirely so the remaining bars sit compactly side by side.
+    el.classList.toggle('is-filtered-out', filteredOut && !hideFilteredOut);
+    el.classList.toggle('is-hidden', filteredOut && hideFilteredOut);
   });
   updateFilterLabel(metric);
 }
@@ -378,6 +427,10 @@ document.getElementById('filterMax').addEventListener('input', e => {
 document.getElementById('sortByHeight').addEventListener('change', e => {
   sortByHeight = e.target.checked;
   renderMetric(activeMetricIndex);
+});
+document.getElementById('hideFiltered').addEventListener('change', e => {
+  hideFilteredOut = e.target.checked;
+  applyFilter();
 });
 
 function openStatCard(row) {
@@ -420,14 +473,100 @@ function openStatCard(row) {
       <div class="consistency-label"><span>Consistency Score</span><strong>${Math.round(consistency)}</strong></div>
       <div class="consistency-track"><div class="consistency-fill" style="width:${Math.min(100, Math.max(0, consistency))}%"></div></div>
     </div>
+    ${adminSession && !row.is_demo ? '<div class="assign-section" id="assignSection"><button type="button" class="btn-assign" id="btnAssign" disabled>Checking status…</button></div>' : ''}
   `;
   document.getElementById('statCard').querySelector('.stat-card-close').addEventListener('click', closeStatCard);
   document.getElementById('statOverlay').hidden = false;
+  if (adminSession && !row.is_demo) refreshAssignSection(row.public_id);
 }
 function closeStatCard() { document.getElementById('statOverlay').hidden = true; }
 document.getElementById('statOverlay').addEventListener('click', e => {
   if (e.target.id === 'statOverlay') closeStatCard();
 });
+
+// ---------------------------------------------------------------------
+// Admin: "Assess for New Assignment" -- only ever shown for real (non-demo)
+// users, only once an admin has logged in on this page. Every RPC call
+// re-verifies the admin password server-side (no server-side session
+// exists anywhere in this app), same pattern the main app's own admin
+// tools already use.
+// ---------------------------------------------------------------------
+let adminSession = null;
+try {
+  const saved = localStorage.getItem('wft_showcase_admin_session');
+  if (saved) adminSession = JSON.parse(saved);
+} catch (e) { /* ignore corrupt value */ }
+
+document.getElementById('btnAdminCorner').addEventListener('click', () => {
+  document.getElementById('adminLoginNote').textContent = '';
+  document.getElementById('adminLoginId').value = '';
+  document.getElementById('adminLoginPassword').value = '';
+  document.getElementById('adminLoginOverlay').hidden = false;
+});
+document.getElementById('btnCloseAdminLogin').addEventListener('click', () => {
+  document.getElementById('adminLoginOverlay').hidden = true;
+});
+document.getElementById('adminLoginOverlay').addEventListener('click', e => {
+  if (e.target.id === 'adminLoginOverlay') document.getElementById('adminLoginOverlay').hidden = true;
+});
+document.getElementById('btnAdminLoginSubmit').addEventListener('click', async () => {
+  const id = document.getElementById('adminLoginId').value.trim();
+  const password = document.getElementById('adminLoginPassword').value;
+  const note = document.getElementById('adminLoginNote');
+  if (!id || !password) { note.textContent = 'Enter both Digital ID and password.'; return; }
+  note.textContent = 'Checking…';
+  try {
+    const { error } = await sb.rpc('verify_admin_login', { p_digital_id: id, p_password: password });
+    if (error) throw error;
+    adminSession = { digitalId: id, password };
+    localStorage.setItem('wft_showcase_admin_session', JSON.stringify(adminSession));
+    document.getElementById('adminLoginOverlay').hidden = true;
+  } catch (e) {
+    note.textContent = 'Incorrect Digital ID or password.';
+  }
+});
+
+async function refreshAssignSection(publicId) {
+  const btn = document.getElementById('btnAssign');
+  if (!btn) return;
+  try {
+    const { data, error } = await sb.rpc('get_assessment_request_status', {
+      p_admin_digital_id: adminSession.digitalId, p_admin_password: adminSession.password, p_target_public_id: publicId,
+    });
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : null;
+    if (row && row.status === 'ready' && row.zip_url) {
+      btn.outerHTML = `<a class="btn-assign is-download" href="${escapeHtml(row.zip_url)}" target="_blank" rel="noopener">Download Assessment Zip</a>`;
+    } else if (row && row.status === 'pending') {
+      btn.textContent = 'Requested — waiting for sync…';
+      btn.disabled = true;
+    } else {
+      btn.textContent = 'Assess for New Assignment';
+      btn.disabled = false;
+      btn.addEventListener('click', () => requestAssessment(publicId));
+    }
+  } catch (e) {
+    btn.textContent = 'Assess for New Assignment';
+    btn.disabled = false;
+    btn.addEventListener('click', () => requestAssessment(publicId));
+  }
+}
+
+async function requestAssessment(publicId) {
+  const btn = document.getElementById('btnAssign');
+  btn.disabled = true;
+  btn.textContent = 'Sending request…';
+  try {
+    const { error } = await sb.rpc('request_assessment', {
+      p_admin_digital_id: adminSession.digitalId, p_admin_password: adminSession.password, p_target_public_id: publicId,
+    });
+    if (error) throw error;
+    btn.textContent = 'Requested — waiting for sync…';
+  } catch (e) {
+    btn.textContent = 'Could not send request — try again';
+    btn.disabled = false;
+  }
+}
 
 loadData();
 </script>
