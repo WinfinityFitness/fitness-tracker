@@ -55,6 +55,14 @@
     background: var(--panel); color: var(--text-primary); border: 1px solid var(--border);
     border-radius: 8px; padding: 5px 10px; font-size: 0.8rem; cursor: pointer;
   }
+  .filter-range-group { display: flex; align-items: center; gap: 14px; }
+  /* Dragging two overlapping range-slider thumbs is fiddly on a touchscreen
+     and eats a lot of vertical space on narrow phones -- hidden below this
+     width; the Sort/Hide toggles and location dropdown still work fine
+     without it. */
+  @media (max-width: 640px) {
+    .filter-range-group { display: none; }
+  }
   .filter-range { position: relative; width: 260px; height: 28px; }
   .filter-range input[type="range"] {
     position: absolute; left: 0; top: 9px; width: 100%; margin: 0;
@@ -209,12 +217,14 @@
     <select class="location-select" id="locationFilter">
       <option value="">All locations</option>
     </select>
-    <span>Filter range:</span>
-    <div class="filter-range">
-      <input type="range" id="filterMin">
-      <input type="range" id="filterMax">
+    <div class="filter-range-group" id="filterRangeGroup">
+      <span>Filter range:</span>
+      <div class="filter-range">
+        <input type="range" id="filterMin">
+        <input type="range" id="filterMax">
+      </div>
+      <span class="filter-values" id="filterValues"></span>
     </div>
-    <span class="filter-values" id="filterValues"></span>
   </div>
 
   <div class="chart-card">
