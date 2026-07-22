@@ -50,6 +50,11 @@
     display: flex; align-items: center; gap: 14px; justify-content: center;
     color: var(--text-muted); font-size: 0.82rem; margin-bottom: 18px; flex-wrap: wrap;
   }
+  .sort-toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+  .location-select {
+    background: var(--panel); color: var(--text-primary); border: 1px solid var(--border);
+    border-radius: 8px; padding: 5px 10px; font-size: 0.8rem; cursor: pointer;
+  }
   .filter-range { position: relative; width: 260px; height: 28px; }
   .filter-range input[type="range"] {
     position: absolute; left: 0; top: 9px; width: 100%; margin: 0;
@@ -140,6 +145,8 @@
   .stat-card-tier[data-tier="ontrack"] { color: var(--tier-ontrack); background: rgba(79,209,197,0.12); }
   .stat-card-tier[data-tier="building"] { color: var(--tier-building); background: rgba(124,139,161,0.14); }
   .stat-card-tier[data-tier="behind"] { color: var(--tier-behind); background: rgba(224,85,90,0.12); }
+  .stat-card-mode-icon { width: 16px; height: 16px; vertical-align: -3px; }
+  .stat-card-location { display: block; margin-top: 4px; font-size: 0.74rem; color: var(--text-muted); }
 
   .stat-row {
     display: flex; justify-content: space-between; align-items: baseline;
@@ -167,6 +174,13 @@
   <nav class="tabs" id="metricTabs"></nav>
 
   <div class="filter-row">
+    <label class="sort-toggle">
+      <input type="checkbox" id="sortByHeight">
+      <span>Sort by progress</span>
+    </label>
+    <select class="location-select" id="locationFilter">
+      <option value="">All locations</option>
+    </select>
     <span>Filter range:</span>
     <div class="filter-range">
       <input type="range" id="filterMin">
@@ -227,9 +241,20 @@ function tierFor(normalizedPct) {
 }
 const TIER_LABEL = { elite: 'Elite Performer', ontrack: 'On Track', building: 'Building Momentum', behind: 'Needs Attention' };
 
+const FLAG_EMOJI = {
+  'Philippines': '🇵🇭', 'United States': '🇺🇸', 'Japan': '🇯🇵', 'Brazil': '🇧🇷',
+  'Germany': '🇩🇪', 'India': '🇮🇳', 'Australia': '🇦🇺', 'Canada': '🇨🇦',
+  'South Korea': '🇰🇷', 'United Kingdom': '🇬🇧', 'Mexico': '🇲🇽', 'Nigeria': '🇳🇬',
+  'Sweden': '🇸🇪', 'Italy': '🇮🇹', 'South Africa': '🇿🇦', 'Indonesia': '🇮🇩',
+  'France': '🇫🇷', 'Vietnam': '🇻🇳', 'Spain': '🇪🇸', 'Kenya': '🇰🇪',
+};
+const MODE_ICON = { beginner: 'mode-beginner.png', warrior: 'mode-warrior.png', spartan: 'mode-spartan.png', demigod: 'mode-demigod.png' };
+
 let allRows = [];
 let activeMetricIndex = 0;
 let filterMinVal = null, filterMaxVal = null;
+let sortByHeight = false;
+let locationFilterVal = '';
 
 async function loadData() {
   const barsEl = document.getElementById('barsScroll');
@@ -242,8 +267,20 @@ async function loadData() {
     barsEl.innerHTML = '<p class="empty-note">Progress data is temporarily unavailable — check back soon.</p>';
     return;
   }
+  populateLocationFilter();
   renderTabs();
   renderMetric(0);
+}
+
+function populateLocationFilter() {
+  const select = document.getElementById('locationFilter');
+  const locations = [...new Set(allRows.map(r => r.location).filter(Boolean))].sort();
+  select.innerHTML = '<option value="">All locations</option>' +
+    locations.map(loc => `<option value="${escapeHtml(loc)}">${escapeHtml(FLAG_EMOJI[loc] || '')} ${escapeHtml(loc)}</option>`).join('');
+  select.addEventListener('change', () => {
+    locationFilterVal = select.value;
+    applyFilter();
+  });
 }
 
 function renderTabs() {
@@ -267,7 +304,15 @@ function renderMetric(index) {
   const rows = allRows.filter(r => r[metric.key] != null);
   document.getElementById('chartCount').textContent = rows.length + ' member' + (rows.length === 1 ? '' : 's');
 
-  rows.sort((a, b) => metric.higherIsBetter ? b[metric.key] - a[metric.key] : a[metric.key] - b[metric.key]);
+  // Default order is alphabetical by code name -- bar heights (driven by
+  // each user's actual value) then land in a naturally scattered pattern
+  // instead of a predictable best-to-worst staircase. "Sort by progress"
+  // switches to the ranked order on demand.
+  if (sortByHeight) {
+    rows.sort((a, b) => metric.higherIsBetter ? b[metric.key] - a[metric.key] : a[metric.key] - b[metric.key]);
+  } else {
+    rows.sort((a, b) => a.code_name.localeCompare(b.code_name));
+  }
 
   const [domainMin, domainMax] = metric.domain;
   filterMinVal = domainMin;
@@ -294,7 +339,7 @@ function renderMetric(index) {
       : (domainMax - rawClamped) / (domainMax - domainMin) * 100;
     const tier = tierFor(normalized);
     const heightPct = Math.max(4, normalized);
-    return `<button type="button" class="showcase-bar" data-tier="${tier}" data-value="${raw}"
+    return `<button type="button" class="showcase-bar" data-tier="${tier}" data-value="${raw}" data-location="${escapeHtml(r.location || '')}"
       style="height:${heightPct}%" data-public-id="${escapeHtml(r.public_id)}"
       aria-label="${escapeHtml(r.code_name)}: ${escapeHtml(metric.format(raw))}"></button>`;
   }).join('');
@@ -315,7 +360,9 @@ function applyFilter() {
   const metric = METRICS[activeMetricIndex];
   document.querySelectorAll('.showcase-bar').forEach(el => {
     const v = Number(el.dataset.value);
-    el.classList.toggle('is-filtered-out', v < filterMinVal || v > filterMaxVal);
+    const outOfRange = v < filterMinVal || v > filterMaxVal;
+    const wrongLocation = locationFilterVal && el.dataset.location !== locationFilterVal;
+    el.classList.toggle('is-filtered-out', outOfRange || wrongLocation);
   });
   updateFilterLabel(metric);
 }
@@ -327,6 +374,10 @@ document.getElementById('filterMin').addEventListener('input', e => {
 document.getElementById('filterMax').addEventListener('input', e => {
   filterMaxVal = Math.max(Number(e.target.value), filterMinVal);
   applyFilter();
+});
+document.getElementById('sortByHeight').addEventListener('change', e => {
+  sortByHeight = e.target.checked;
+  renderMetric(activeMetricIndex);
 });
 
 function openStatCard(row) {
@@ -347,6 +398,9 @@ function openStatCard(row) {
 
   const initial = (row.code_name || '?').trim().charAt(0).toUpperCase();
   const avatarStyle = row.avatar_data_url ? ` style="background-image:url('${escapeHtml(row.avatar_data_url)}')"` : '';
+  const modeIcon = MODE_ICON[row.fitness_mode];
+  const modeIconHtml = modeIcon ? `<img class="stat-card-mode-icon" src="icons/${modeIcon}" alt="${escapeHtml(row.fitness_mode)}" title="${escapeHtml(row.fitness_mode)}">` : '';
+  const locationHtml = row.location ? `<span class="stat-card-location">${escapeHtml(FLAG_EMOJI[row.location] || '')} ${escapeHtml(row.location)}</span>` : '';
 
   document.getElementById('statCard').innerHTML = `
     <button type="button" class="stat-card-close" aria-label="Close">&times;</button>
@@ -354,8 +408,9 @@ function openStatCard(row) {
       <span class="stat-card-avatar"${avatarStyle}>${row.avatar_data_url ? '' : escapeHtml(initial)}</span>
       <div class="stat-card-id">
         Neural ID
-        <strong>${escapeHtml(row.public_id)}</strong>
+        <strong>${escapeHtml(row.public_id)} ${modeIconHtml}</strong>
         <span class="stat-card-tier" data-tier="${tier}">${TIER_LABEL[tier]}</span>
+        ${locationHtml}
       </div>
     </div>
     ${rows.map(([label, value, positive]) =>
