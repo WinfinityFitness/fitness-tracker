@@ -34,12 +34,21 @@
     background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
     padding: 22px; display: flex; flex-direction: column;
   }
+  .app-card-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
   .app-icon-badge {
     width: 46px; height: 46px; border-radius: 12px; background: rgba(255,159,67,0.12);
     border: 1px solid var(--accent-dim); display: flex; align-items: center; justify-content: center;
-    margin-bottom: 16px;
   }
   .app-icon-badge img { width: 28px; height: 28px; object-fit: contain; }
+  .app-download-icon {
+    width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--accent); color: var(--accent); text-decoration: none; flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+  }
+  .app-download-icon:hover { background: var(--accent); color: var(--bg); }
+  .app-download-icon.is-disabled {
+    border-color: var(--border); color: var(--text-muted); pointer-events: none; cursor: default;
+  }
   .app-title {
     font-size: 1rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; margin: 0 0 6px;
   }
@@ -47,17 +56,7 @@
     color: var(--accent); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em;
     text-transform: uppercase; margin: 0 0 12px; line-height: 1.4;
   }
-  .app-desc { color: var(--text-muted); font-size: 0.85rem; line-height: 1.55; margin: 0 0 20px; flex: 1; }
-  .app-btn {
-    display: block; text-align: center; text-decoration: none; box-sizing: border-box;
-    border: 1px solid var(--accent); color: var(--accent); background: transparent;
-    font-weight: 700; font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase;
-    border-radius: 8px; padding: 11px; transition: background 0.15s, color 0.15s;
-  }
-  .app-btn:hover { background: var(--accent); color: var(--bg); }
-  .app-btn.is-disabled {
-    border-color: var(--border); color: var(--text-muted); pointer-events: none; cursor: default;
-  }
+  .app-desc { color: var(--text-muted); font-size: 0.85rem; line-height: 1.55; margin: 0; }
 </style>
 </head>
 <body>
@@ -67,27 +66,39 @@
 
   <div class="grid" id="appGrid">
     <div class="app-card">
-      <span class="app-icon-badge"><img src="icons/icon-192.png" alt="Winfinity Fitness Tracker"></span>
+      <div class="app-card-head">
+        <span class="app-icon-badge"><img src="icons/icon-192.png" alt="Winfinity Fitness Tracker"></span>
+        <a class="app-download-icon is-disabled" id="btnDownloadFt" href="#" aria-label="Download Winfinity Fitness Tracker" title="Download">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+        </a>
+      </div>
       <h2 class="app-title">Winfinity Fitness Tracker</h2>
       <p class="app-tagline">Every rep, every meal, every day — tracked.</p>
       <p class="app-desc">Log training, nutrition, weight, and hydration in one place, with macros that auto-calculate your calories and reminders that actually adapt to your schedule. Track body measurements and progress photos over time, climb the Nexus Leaderboard, and back everything up automatically.</p>
-      <a class="app-btn is-disabled" id="btnDownloadFt" href="#">Download Installer</a>
     </div>
 
     <div class="app-card">
-      <span class="app-icon-badge"><img src="icons/icon-nexus-192.png" alt="Winfinity Wellness"></span>
+      <div class="app-card-head">
+        <span class="app-icon-badge"><img src="icons/icon-nexus-192.png" alt="Winfinity Wellness"></span>
+        <a class="app-download-icon is-disabled" id="btnDownloadWellness" href="#" aria-label="Launch Winfinity Wellness" title="Launch">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+        </a>
+      </div>
       <h2 class="app-title">Winfinity Wellness (Nexus)</h2>
       <p class="app-tagline">Your full Nexus history, wherever you check it.</p>
       <p class="app-desc">Sign in with your Digital ID and see everything FT tracks — training trends, nutrition breakdowns, weight progress — in one dashboard that works on desktop or mobile. Chat with your community, check the Nexus Leaderboard, and follow friends' progress from whichever screen you're on.</p>
-      <a class="app-btn is-disabled" id="btnDownloadWellness" href="#">Launch Nexus</a>
     </div>
 
     <div class="app-card">
-      <span class="app-icon-badge"><img src="icons/icon-messenger-192.png" alt="Winfinity Messenger"></span>
+      <div class="app-card-head">
+        <span class="app-icon-badge"><img src="icons/icon-messenger-192.png" alt="Winfinity Messenger"></span>
+        <a class="app-download-icon is-disabled" id="btnDownloadMessenger" href="#" aria-label="Download Winfinity Messenger" title="Download">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+        </a>
+      </div>
       <h2 class="app-title">Winfinity Messenger</h2>
       <p class="app-tagline">The Nexus community, one tap away.</p>
       <p class="app-desc">A dedicated chat app for your Winfinity circle — direct messages, Nexus Com group chat, image sharing, and reactions. Built for quick check-ins with training partners and coaches, without opening the full tracker.</p>
-      <a class="app-btn is-disabled" id="btnDownloadMessenger" href="#">Get Messenger</a>
     </div>
   </div>
 </div>

@@ -1,0 +1,68 @@
+<!-- Winfinity hero embed for winfinityfitness.com (WordPress) — paste this
+     whole block into a Custom HTML widget/block wherever the hero/top
+     section should go. Fragment, not a full page, same convention as
+     footer-embed.html -- inherits the page's own width.
+
+     CTA button ("Launch Nexus") links to the same admin-editable Wellness
+     URL the Digital Arsenal's Wellness card uses (ad_settings.
+     download_url_wellness, set via Edit Download Links in the FT admin
+     drawer) so both stay in sync -- falls back to wellness.winfinityfitness.com
+     directly if that hasn't been set yet. -->
+<section class="wf-hero-embed" id="wfHeroEmbed">
+  <img class="wf-hero-logo" src="https://winfinityfitness.github.io/fitness-tracker/icons/icon-192.png" alt="Winfinity">
+  <h1 class="wf-hero-title">The Future Of<br><em>Performance</em></h1>
+  <p class="wf-hero-subtitle">Unlock your latent potential through the Global Neural Grid. Real-time bio-syncing for the modern shinobi.</p>
+  <a class="wf-hero-cta" id="wfHeroCta" href="https://wellness.winfinityfitness.com" target="_blank" rel="noopener">Launch Nexus</a>
+</section>
+
+<style>
+  .wf-hero-embed {
+    background: #1a0f08; text-align: center; padding: 64px 24px 72px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  .wf-hero-logo {
+    width: 64px; height: 64px; object-fit: contain; margin: 0 auto 28px; display: block;
+    filter: drop-shadow(0 0 18px rgba(255,122,26,0.55));
+  }
+  .wf-hero-title {
+    color: #f2e9de; font-size: clamp(1.8rem, 5vw, 2.6rem); font-weight: 800;
+    text-transform: uppercase; line-height: 1.15; margin: 0 0 18px; letter-spacing: 0.01em;
+  }
+  .wf-hero-title em {
+    display: block; color: #ff7a1a; font-style: italic; font-weight: 800;
+  }
+  .wf-hero-subtitle {
+    color: #b8a48f; font-size: 0.92rem; line-height: 1.6; max-width: 480px;
+    margin: 0 auto 32px;
+  }
+  .wf-hero-cta {
+    display: inline-block; background: #ff7a1a; color: #1a0f08; text-decoration: none;
+    font-weight: 700; font-size: 0.85rem; letter-spacing: 0.03em; text-transform: uppercase;
+    padding: 14px 32px; clip-path: polygon(4% 0, 100% 0, 96% 100%, 0 100%);
+  }
+  .wf-hero-cta:hover { background: #ff9143; }
+</style>
+
+<script>
+(function () {
+  var SUPABASE_URL = 'https://mzkjboplfalauivwcnni.supabase.co';
+  var SUPABASE_ANON_KEY = 'sb_publishable_YwHBnvbBjd8Oj8hgPXb_JA_buurC92v';
+  if (!window.supabase) {
+    var script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+    script.onload = applyCtaLink;
+    document.head.appendChild(script);
+  } else {
+    applyCtaLink();
+  }
+  function applyCtaLink() {
+    var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sb.from('ad_settings').select('download_url_wellness').eq('id', 1).maybeSingle()
+      .then(function (result) {
+        var url = result.data && result.data.download_url_wellness;
+        if (url) document.getElementById('wfHeroCta').href = url;
+      })
+      .catch(function () { /* keep the default wellness URL already in the href */ });
+  }
+})();
+</script>
