@@ -96,6 +96,15 @@ html, body {
   color: var(--text-primary);
   font-family: var(--font-display);
   -webkit-tap-highlight-color: transparent;
+  /* Without this, a downward drag past the top of the page (a stray scroll,
+     not just an intentional "pull to refresh") triggers the browser's own
+     native pull-to-refresh -- a REAL full-page reload, not an in-app
+     refresh. That reload is what was closing an open Messenger chat
+     thread, resetting Wellness back to its default tab, and cancelling
+     whatever write (e.g. the Messenger auto-redirect toggle's save) was
+     still in flight. `contain` keeps normal internal scrolling working —
+     it only stops the overscroll from bubbling up into a page navigation. */
+  overscroll-behavior-y: contain;
 }
 
 body {
