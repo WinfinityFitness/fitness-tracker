@@ -5458,7 +5458,11 @@ html.wf-desktop-shell body { overflow-x: auto; }
 }
 .wds-nexus-icon-tab:hover { color: var(--text-primary); }
 .wds-nexus-icon-tab.is-active { color: var(--cyan); border-bottom-color: var(--cyan); }
-.wds-uni-left, .wds-uni-right { position: sticky; top: 84px; max-height: calc(100vh - 100px); overflow-y: auto; }
+/* overflow-x left unset here used to compute to auto too (the "only one
+   axis set" quirk), so any sub-pixel/rounding overflow from a child was
+   showing up as a horizontal drag bar under the column instead of just
+   being absorbed — pin it to hidden so the column always sits flush. */
+.wds-uni-left, .wds-uni-right { position: sticky; top: 84px; max-height: calc(100vh - 100px); overflow-y: auto; overflow-x: hidden; }
 .wds-uni-right { display: flex; flex-direction: column; }
 /* The Nexus Leaderboard is now the only card in the right column (the
    separate Notifications card was removed — the bell icon's own dropdown
