@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.28">
+<link rel="stylesheet" href="style.css?v=1.7.29">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3998,6 +3998,12 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <button type="button" class="wds-profile-tab is-active" data-profile-tab="all">All</button>
       <button type="button" class="wds-profile-tab" data-profile-tab="photos">Photos</button>
       <button type="button" class="wds-profile-tab" data-profile-tab="friends">Friends</button>
+      <!-- Mobile-only (see the @media rule in style.css) -- desktop already
+           shows this content permanently in the dashboard's own left/right
+           columns (.wds-uni-left/.wds-uni-right), which phones hide
+           entirely with nowhere else to reach them from. -->
+      <button type="button" class="wds-profile-tab wds-profile-tab--mobile-only" data-profile-tab="stats">Stats</button>
+      <button type="button" class="wds-profile-tab wds-profile-tab--mobile-only" data-profile-tab="leaderboard">Leaderboard</button>
     </div>
     <div class="wds-profile-body">
       <div class="wds-profile-side">
@@ -4370,10 +4376,10 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
-<script src="config.js?v=1.7.28"></script>
+<script src="config.js?v=1.7.29"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.7.28"></script>
+<script src="app.js?v=1.7.29"></script>
 </body>
 </html>

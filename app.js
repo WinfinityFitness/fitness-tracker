@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.28';
+const APP_VERSION = 'WF_SYS_V.1.7.29';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -226,7 +226,12 @@ function initDesktopShell() {
 
   // Re-applies the forced-desktop-layout viewport on every load/reload —
   // see wdsApplyForceDesktopViewport's own definition for why this is a
-  // viewport-width trick rather than a CSS class.
+  // viewport-width trick rather than a CSS class. A genuinely first-ever
+  // launch (nothing saved yet, e.g. right after installing the APK) gets
+  // this written explicitly rather than just relying on the `=== '1'`
+  // check's implicit false — same end state, but makes "off by default"
+  // an intentional, auditable write instead of an absence.
+  if (localStorage.getItem(WDS_FORCE_DESKTOP_KEY) === null) localStorage.setItem(WDS_FORCE_DESKTOP_KEY, '0');
   if (localStorage.getItem(WDS_FORCE_DESKTOP_KEY) === '1') wdsApplyForceDesktopViewport(true);
 
   const gate = document.getElementById('wdsGate');
@@ -3678,6 +3683,24 @@ let wdsMessengerPrefSyncedThisLoad = false;
 async function wdsSetMessengerAutoRedirectPref(enabled) {
   localStorage.setItem(WDS_MESSENGER_AUTO_KEY, enabled ? '1' : '0');
   if (wdsRemoteData && wdsRemoteData.shareKey) {
+    // Browsers cancel any in-flight fetch (which is what sb.rpc uses under
+    // the hood) the instant real navigation starts — a drag-to-refresh or
+    // reload right after flipping this toggle was losing that race, so the
+    // server never actually got the new value; the NEXT load's server->local
+    // sync (see enterDashboard's wdsMessengerPrefSyncedThisLoad guard) then
+    // correctly-but-confusingly pulled the still-stale server value back
+    // in, reading as "the toggle reverted on reload." sendBeacon is the
+    // browser API built specifically to survive that -- queued by the
+    // browser itself to complete even after the page starts unloading,
+    // unlike a normal fetch. Fired alongside (not instead of) the awaited
+    // RPC call below so the normal path still gets real error feedback
+    // when nothing's racing a navigation.
+    try {
+      if (navigator.sendBeacon && sbConfigured()) {
+        const beaconBody = new Blob([JSON.stringify({ p_share_key: wdsRemoteData.shareKey, p_enabled: enabled })], { type: 'application/json' });
+        navigator.sendBeacon(`${SUPABASE_URL}/rest/v1/rpc/set_messenger_auto_redirect?apikey=${SUPABASE_ANON_KEY}`, beaconBody);
+      }
+    } catch (e) { /* best effort — the awaited RPC below is still the primary path */ }
     try {
       await sb.rpc('set_messenger_auto_redirect', { p_share_key: wdsRemoteData.shareKey, p_enabled: enabled });
     } catch (e) { /* best effort — toggle still reflects locally even if the write failed */ }
@@ -5663,6 +5686,21 @@ function wdsSwitchProfileTab(tab) {
   if (friendsEl) friendsEl.hidden = tab !== 'friends';
   if (tab === 'photos') renderWdsProfilePhotosGrid();
   else if (tab === 'friends') renderWdsProfileFriendsGrid();
+  // Stats/Leaderboard (mobile only) have no panel of their own -- they
+  // reveal the dashboard's existing .wds-uni-left/.wds-uni-right columns
+  // in place, repositioned as an overlay by the matching body class (see
+  // style.css). Those columns are kept current by their own normal render
+  // pipeline regardless of visibility, so there's nothing to fetch here.
+  document.body.classList.toggle('wds-profile-show-stats', tab === 'stats');
+  document.body.classList.toggle('wds-profile-show-leaderboard', tab === 'leaderboard');
+  if ((tab === 'stats' || tab === 'leaderboard') && tabsEl) {
+    // Measured, not guessed -- --wds-profile-overlay-top has to clear the
+    // tab bar's REAL rendered height (varies with text-size settings) so
+    // the overlay starts right below it instead of covering it.
+    requestAnimationFrame(() => {
+      document.documentElement.style.setProperty('--wds-profile-overlay-top', tabsEl.getBoundingClientRect().bottom + 'px');
+    });
+  }
 }
 function initWdsProfileTabs() {
   const tabsEl = document.getElementById('wdsProfileTabs');
@@ -5896,6 +5934,9 @@ function wdsHideProfilePage() {
   if (page) page.hidden = true;
   wdsViewedProfile = null;
   wdsSaveLastView({ type: 'feed', scrollY: window.scrollY });
+  // Leaving mid-Stats/Leaderboard shouldn't leave the dashboard's own
+  // columns stuck in their profile-overlay positioning underneath.
+  document.body.classList.remove('wds-profile-show-stats', 'wds-profile-show-leaderboard');
 }
 
 // Pull-to-refresh (and any other full page reload) wipes all JS state by

@@ -6272,6 +6272,10 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
 }
 .wds-profile-tab:hover { color: var(--text-primary); }
 .wds-profile-tab.is-active { color: var(--cyan); border-bottom-color: var(--cyan); }
+/* Desktop already shows this content permanently in the dashboard's own
+   side columns -- shown again below at (max-width: 720px), the same
+   breakpoint .wds-profile-body itself stacks to a single column at. */
+.wds-profile-tab--mobile-only { display: none; }
 .wds-profile-tab-panel { display: flex; flex-direction: column; gap: 16px; }
 .wds-profile-photos-head { display: flex; align-items: center; justify-content: space-between; }
 .wds-profile-photos-grid {
@@ -6340,6 +6344,36 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
 }
 @media (max-width: 720px) {
   .wds-profile-body { grid-template-columns: 1fr; }
+  .wds-profile-tab--mobile-only { display: block; }
+  /* .wds-profile-side (Personal Details + Friends cards) sits before
+     .wds-profile-main in the markup, so once the two-column grid above
+     collapses to a single stacked column it renders above EVERY tab's
+     content, not just "All" -- Photos doesn't need it at all (its own
+     panel stands alone), and Friends already has its own bigger,
+     dedicated Friends grid below (see #wdsProfileTabFriends), so showing
+     the sidebar's small Friends card there just duplicates the heading.
+     Desktop is unaffected -- side-by-side there, not tab-gated. */
+  .wds-profile-body:has(#wdsProfileTabPhotos:not([hidden])) .wds-profile-side { display: none; }
+  .wds-profile-body:has(#wdsProfileTabFriends:not([hidden])) .wds-profile-side > .wds-card:first-child { display: none; }
+  /* Stats/Leaderboard tabs (mobile only, see .wds-profile-tab--mobile-only
+     below) don't have their own panel -- they reveal the dashboard's
+     existing .wds-uni-left/.wds-uni-right columns in place (still fed by
+     their own normal render pipeline regardless of visibility, so there's
+     nothing extra to populate) repositioned as a full-screen overlay over
+     the profile page, below the tab bar so it stays reachable to switch
+     back out. --wds-profile-overlay-top is set by wdsSwitchProfileTab so
+     this actually clears the tab bar's real height instead of a guess. */
+  body.wds-profile-show-stats .wds-uni-left,
+  body.wds-profile-show-leaderboard .wds-uni-right {
+    display: flex !important; flex-direction: column; gap: 16px;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 200;
+    top: var(--wds-profile-overlay-top, 160px);
+    background: var(--bg); overflow-y: auto; padding: 12px; box-sizing: border-box;
+  }
+  body.wds-profile-show-stats .wds-profile-body,
+  body.wds-profile-show-leaderboard .wds-profile-body {
+    display: none;
+  }
   .wds-profile-header { flex-direction: column; align-items: flex-start; gap: 8px; }
   /* The 440px cover height is tuned for the wide desktop/web viewport — at
      phone widths the same fixed height reads as an over-zoomed near-square
