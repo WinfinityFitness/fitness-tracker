@@ -127,6 +127,10 @@
     align-items: center; justify-content: center; z-index: 50; padding: 20px;
   }
   .overlay[hidden] { display: none; }
+  /* #statOverlay only -- in-flow under the chart, not a fixed/dimmed modal
+     like the admin login overlay above still is. */
+  .stat-panel { margin-top: 16px; display: flex; justify-content: center; }
+  .stat-panel[hidden] { display: none; }
   .stat-card {
     width: 320px; max-width: 100%; background: linear-gradient(180deg, #171f2a, #0f141b);
     border: 1px solid var(--accent-dim); border-radius: 16px; padding: 22px 22px 18px;
@@ -239,16 +243,21 @@
       <span class="legend-item"><span class="legend-dot" style="background:var(--tier-behind)"></span>Needs Attention</span>
     </div>
     <div class="bars-scroll" id="barsScroll"></div>
+
+    <!-- In-flow, not a fixed/dimmed modal like #adminLoginOverlay below --
+         opens on hover as the user drags across bars, so it must sit below
+         the chart instead of covering it (previously a centered full-screen
+         overlay, which blocked the very bars it was supposed to let you
+         keep browsing). -->
+    <div class="stat-panel" id="statOverlay" hidden>
+      <div class="stat-card" id="statCard"></div>
+    </div>
   </div>
 
   <footer>Showcase includes both real member results and illustrative sample data. Tap any bar to view a member's summary.</footer>
 </div>
 
 <button type="button" class="admin-corner-btn" id="btnAdminCorner">Admin</button>
-
-<div class="overlay" id="statOverlay" hidden>
-  <div class="stat-card" id="statCard"></div>
-</div>
 
 <div class="overlay" id="adminLoginOverlay" hidden>
   <div class="stat-card admin-login-card">
