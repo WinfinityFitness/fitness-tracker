@@ -73,6 +73,14 @@
     padding: 10px 14px; border-radius: 8px; transition: background 0.15s, color 0.15s;
   }
   .app-pwa-btn:hover { background: var(--accent); color: var(--bg); }
+
+  .app-tutorial-btn {
+    margin-top: 14px; align-self: flex-start; display: inline-flex; align-items: center; gap: 6px;
+    background: none; border: 1px solid var(--accent-dim); color: var(--accent);
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.02em;
+    padding: 8px 14px; border-radius: 999px; cursor: pointer; font-family: inherit;
+  }
+  .app-tutorial-btn:hover { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 </style>
 </head>
 <body>
@@ -91,6 +99,7 @@
       <h2 class="app-title">Winfinity Fitness Tracker</h2>
       <p class="app-tagline">Every rep, every meal, every day — tracked.</p>
       <p class="app-desc">Log training, nutrition, weight, and hydration in one place, with macros that auto-calculate your calories and reminders that actually adapt to your schedule. Track body measurements and progress photos over time, climb the Nexus Leaderboard, and back everything up automatically.</p>
+      <button type="button" class="app-tutorial-btn" id="btnFtTutorial">▶ How to use (Status tab)</button>
     </div>
 
     <div class="app-card">
@@ -162,6 +171,17 @@ function applyLink(id, url) {
   el.classList.remove('is-disabled');
 }
 loadDownloadLinks();
+
+// Opening a real modal here wouldn't look right: arsenal.html is itself
+// embedded in a short, auto-height iframe (see the height-reporting script
+// below) sized just tall enough for these cards, not the full page --
+// position:fixed inside THIS document is constrained to that modest
+// height, not the visitor's actual screen. Asking the top-level WordPress
+// page to open the overlay instead (see arsenal-embed.html's matching
+// listener) means it's a real position:fixed over the whole real viewport.
+document.getElementById('btnFtTutorial').addEventListener('click', function () {
+  window.parent.postMessage({ wfOpenTutorial: 'https://winfinityfitness.github.io/fitness-tracker/tutorial-status-tab.html' }, '*');
+});
 </script>
 
 <!-- Reports this page's real content height to whatever iframe wrapper

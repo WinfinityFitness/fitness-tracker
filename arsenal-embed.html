@@ -3,17 +3,22 @@
      the app list should appear, replacing whatever plain
      <iframe src="...arsenal.html"> tag is there now.
 
-     Same auto-resize approach as showcase-embed.html: the iframe grows to
-     match arsenal.html's real content height via postMessage, instead of
-     using a fixed height guess that crops content behind a scroll bar. -->
+     Auto-resizes the iframe to match arsenal.html's real content height
+     via postMessage, instead of using a fixed height guess that crops
+     content behind a scroll bar. Also listens for a request from the
+     "How to use" button on the Fitness Tracker card to open a real,
+     full-viewport tutorial overlay here in the top-level page (arsenal.html
+     itself is too short an iframe to host that overlay properly).
+
+     The actual logic lives in arsenal-embed.js (hosted on GitHub Pages)
+     rather than inline here -- WordPress's content pipeline can silently
+     rewrite plain quote characters wherever it finds them in pasted
+     content, which is harmless in prose but can corrupt a JS string
+     literal into a syntax error. A <script src> pointing at an externally
+     hosted file is immune to that: the browser fetches and runs those
+     bytes exactly as committed, never passing through WordPress's
+     post-content rendering. -->
 <iframe id="wfArsenalFrame" src="https://winfinityfitness.github.io/fitness-tracker/arsenal.html"
         style="width:100%;border:0;display:block;min-height:400px;" loading="lazy"
         title="Winfinity Digital Arsenal"></iframe>
-<script>
-window.addEventListener('message', function (e) {
-  if (e.data && e.data.wfEmbedId === 'arsenal' && typeof e.data.wfEmbedHeight === 'number') {
-    var frame = document.getElementById('wfArsenalFrame');
-    if (frame) frame.style.height = e.data.wfEmbedHeight + 'px';
-  }
-});
-</script>
+<script src="https://winfinityfitness.github.io/fitness-tracker/arsenal-embed.js"></script>
