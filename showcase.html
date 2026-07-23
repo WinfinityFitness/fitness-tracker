@@ -601,7 +601,24 @@ try {
   if (saved) adminSession = JSON.parse(saved);
 } catch (e) { /* ignore corrupt value */ }
 
+// No visible sign either way of whether this browser was already logged
+// in as admin -- the button always just said "Admin" and silently opened
+// the login form regardless, so there was nothing to confirm a previous
+// login had actually taken (or stuck around). Now it reflects the real
+// adminSession state, and doubles as a one-click log out once logged in.
+function updateAdminCornerBtn() {
+  const btn = document.getElementById('btnAdminCorner');
+  btn.textContent = adminSession ? 'Admin ✓ — Log Out' : 'Admin';
+}
+updateAdminCornerBtn();
+
 document.getElementById('btnAdminCorner').addEventListener('click', () => {
+  if (adminSession) {
+    adminSession = null;
+    localStorage.removeItem('wft_showcase_admin_session');
+    updateAdminCornerBtn();
+    return;
+  }
   document.getElementById('adminLoginNote').textContent = '';
   document.getElementById('adminLoginId').value = '';
   document.getElementById('adminLoginPassword').value = '';
@@ -625,6 +642,7 @@ document.getElementById('btnAdminLoginSubmit').addEventListener('click', async (
     adminSession = { digitalId: id, password };
     localStorage.setItem('wft_showcase_admin_session', JSON.stringify(adminSession));
     document.getElementById('adminLoginOverlay').hidden = true;
+    updateAdminCornerBtn();
   } catch (e) {
     note.textContent = 'Incorrect Digital ID or password.';
   }
