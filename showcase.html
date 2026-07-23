@@ -95,7 +95,7 @@
   .legend-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 
   .bars-scroll {
-    display: flex; align-items: flex-end; gap: 5px; height: 220px;
+    display: flex; align-items: flex-end; gap: 3px; height: 220px;
     overflow-x: auto; padding: 0 4px 14px; scrollbar-width: thin;
   }
   .bars-scroll::-webkit-scrollbar { height: 6px; }
@@ -116,7 +116,7 @@
   }
 
   .showcase-bar {
-    flex: 0 0 auto; width: 5px; min-height: 4px; border-radius: 3px 3px 0 0;
+    flex: 0 0 auto; width: 2.5px; min-height: 4px; border-radius: 3px 3px 0 0;
     border: none; cursor: pointer; position: relative;
     transition: opacity 0.15s, transform 0.1s;
   }
@@ -141,23 +141,25 @@
     align-items: center; justify-content: center; z-index: 50; padding: 20px;
   }
   .overlay[hidden] { display: none; }
-  /* #statOverlay only -- floats just under the chart (anchored to
-     .chart-card, which is position:relative) instead of pushing the page
-     taller. Free to overlap the Digital Arsenal section below it -- it's
-     only ever open while a bar (or the card itself) is actively
-     hovered/dragged, and disappears the instant that stops, so it never
-     sits there permanently hiding anything. */
-  .stat-panel {
-    position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
-    margin-top: 8px; z-index: 10; display: flex; justify-content: center;
-  }
+  /* #statOverlay sits to the RIGHT of the bars now, both in normal
+     document flow inside .chart-body (a plain flex row) -- not
+     position:absolute like before. That absolute approach let the card
+     overflow past the chart's own layout box without reliably growing
+     document.body.scrollHeight, which is what the iframe embed's auto-
+     resize script (see showcase-embed.html) measures -- the card was
+     rendering fine but the iframe's own box stayed too short to show it,
+     right back to the original cropped/scrollbar problem. Being a normal
+     in-flow flex item avoids that class of bug entirely: the row's own
+     height already accounts for it, nothing to desync. */
+  .chart-body { display: flex; align-items: flex-start; gap: 14px; }
+  .bars-col { flex: 1 1 auto; min-width: 0; }
+  .stat-panel { flex: 0 0 auto; width: 260px; max-width: 42vw; }
   .stat-panel[hidden] { display: none; }
   .stat-card {
-    width: 320px; max-width: 100%; background: linear-gradient(180deg, #171f2a, #0f141b);
-    border: 1px solid var(--accent-dim); border-radius: 16px; padding: 22px 22px 18px;
+    width: 100%; background: linear-gradient(180deg, #171f2a, #0f141b);
+    border: 1px solid var(--accent-dim); border-radius: 16px; padding: 18px 16px 14px;
     box-shadow: 0 0 0 1px rgba(255,159,67,0.08), 0 20px 60px rgba(0,0,0,0.5);
     position: relative;
-    transform: scale(0.85);
   }
   .stat-card-close {
     position: absolute; top: 12px; right: 14px; background: none; border: none;
@@ -264,15 +266,17 @@
       <span class="legend-item"><span class="legend-dot" style="background:var(--tier-building)"></span>Building</span>
       <span class="legend-item"><span class="legend-dot" style="background:var(--tier-behind)"></span>Needs Attention</span>
     </div>
-    <div class="bars-scroll" id="barsScroll"></div>
-    <div class="showcase-center-pointer" aria-hidden="true"></div>
-
-    <!-- Floats just under the chart (see .stat-panel) rather than a
-         fixed/dimmed modal like #adminLoginOverlay below still is -- opens
-         on hover/drag and is free to overlap Digital Arsenal underneath it,
-         since it only stays open while actively pointed at. -->
-    <div class="stat-panel" id="statOverlay" hidden>
-      <div class="stat-card" id="statCard"></div>
+    <!-- Side by side, not stacked -- see .chart-body/.stat-panel. The bars
+         column shrinks to make room for the card instead of the card
+         floating over/under the chart. -->
+    <div class="chart-body">
+      <div class="bars-col">
+        <div class="bars-scroll" id="barsScroll"></div>
+        <div class="showcase-center-pointer" aria-hidden="true"></div>
+      </div>
+      <div class="stat-panel" id="statOverlay" hidden>
+        <div class="stat-card" id="statCard"></div>
+      </div>
     </div>
   </div>
 
