@@ -400,6 +400,14 @@ function renderMetric(index) {
     // mouseenter opens it for anyone with a real cursor -- click stays too,
     // since touch devices have no hover state and fire click instead.
     barEl.addEventListener('mouseenter', () => openStatCard(rows[i]));
+    // Closes first when dragging off a bar, rather than just silently
+    // swapping content underneath -- skipped if the cursor is heading
+    // straight into the card itself (e.g. to click Assess/close), which
+    // gets its own mouseleave below instead.
+    barEl.addEventListener('mouseleave', e => {
+      if (e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('#statOverlay')) return;
+      closeStatCard();
+    });
     barEl.addEventListener('click', () => openStatCard(rows[i]));
   });
 
@@ -495,6 +503,13 @@ function openStatCard(row) {
 function closeStatCard() { document.getElementById('statOverlay').hidden = true; }
 document.getElementById('statOverlay').addEventListener('click', e => {
   if (e.target.id === 'statOverlay') closeStatCard();
+});
+// Mirrors the bars' own mouseleave: dragging off the card itself (not back
+// onto a bar, which just reopens it anyway) closes it instead of leaving a
+// stale card open with nothing hovered.
+document.getElementById('statOverlay').addEventListener('mouseleave', e => {
+  if (e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('.showcase-bar')) return;
+  closeStatCard();
 });
 
 // ---------------------------------------------------------------------
