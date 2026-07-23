@@ -137,6 +137,15 @@
     display: grid; grid-template-columns: repeat(3, minmax(120px, 160px)); gap: 20px;
     justify-content: center; text-align: left; max-width: 640px; margin: 0 auto 26px;
   }
+  /* The 120px-per-column minimum needs ~400px+ just for the grid itself --
+     wider than most phone screens, so it was overflowing past both edges
+     (About cropped on the left, Social cropped on the right) since
+     justify-content:center centers the oversized grid rather than
+     shrinking it. Columns instead share the actual available width equally
+     below this breakpoint. */
+  @media (max-width: 480px) {
+    .wf-footer-columns { grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 100%; }
+  }
   .wf-footer-col h3 { color: #e8ecf1; font-size: 0.86rem; margin: 0 0 10px; }
   .wf-footer-col a, .wf-footer-col .wf-footer-static, .wf-footer-col .wf-footer-linkbtn, .wf-footer-col .wf-footer-static-link {
     display: block; color: #8a97a8; text-decoration: none; font-size: 0.82rem;
