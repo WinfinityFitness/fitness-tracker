@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.40';
+const APP_VERSION = 'WF_SYS_V.1.7.41';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -4162,6 +4162,167 @@ function renderWdsMessengerInbox() {
       <span class="wds-chat-thread-time">${t.lastMessageAt ? wdsRelativeTime(t.lastMessageAt) : ''}</span>
     </div>`;
   }).join('');
+  wdmUpdateChatsBadge(threads);
+}
+
+function wdmUpdateChatsBadge(threads) {
+  const badge = document.getElementById('wdmChatsBadge');
+  if (!badge) return;
+  const count = threads.filter(t => wdsIsRoomUnread(t.id, t)).length;
+  badge.textContent = count;
+  badge.hidden = count === 0;
+}
+
+// Toast for the still-visual-only rows (Compose, Menu placeholders, My Day
+// tiles) -- lives inside #wdsMessengerShell itself (see .wdm-toast) rather
+// than reusing FT's own #restToast, which would render invisibly underneath
+// this shell's own z-index:999999 stack.
+let wdmToastTimer = null;
+function wdmShowToast(message) {
+  const toast = document.getElementById('wdmToast');
+  if (!toast) return;
+  toast.textContent = message;
+  toast.hidden = false;
+  clearTimeout(wdmToastTimer);
+  wdmToastTimer = setTimeout(() => { toast.hidden = true; }, 2600);
+}
+
+// Mirrors renderWdsMyday's markup/logic (app.js ~3110) against a fresh
+// #wdmMydayRow id instead of reusing #wdsMydayRow directly -- that element
+// lives inside #wdsShell, which stays display:none outside the wellness
+// desktop shell, so it's not reachable/visible here. Reuses the real,
+// already-fetched wdsStoryGroups (populated by refreshWdsMyday, called from
+// initMessengerShell below) rather than fabricating placeholder people.
+// Read-only for now: tapping a tile just points to Wellness, since the full
+// composer/viewer (canvas text/photo editor, history-aware close, etc.) is
+// wired only into initDesktopShell -- bringing that over is a separate
+// follow-up, not a quick reskin.
+function renderWdmMyday() {
+  const el = document.getElementById('wdmMydayRow');
+  if (!el) return;
+  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+  const myName = (wdsRemoteData && wdsRemoteData.profile && wdsRemoteData.profile.name) || (wdsRemoteData && wdsRemoteData.publicId) || '?';
+  const myPhoto = wdsResolveOwnAvatarUrl(wdsRemoteData && wdsRemoteData.profile && wdsRemoteData.profile.photoDataUrl, myShareKey);
+  const mineGroup = wdsStoryGroups.find(g => g.shareKey === myShareKey);
+  const otherGroups = wdsStoryGroups.filter(g => g.shareKey !== myShareKey);
+  const initial = (name) => escapeHtml((name || '?').trim().charAt(0).toUpperCase() || '?');
+  const thumbHtml = (s) => s.image_url
+    ? `<img class="wds-myday-thumb-img" src="${escapeHtml(s.image_url)}" alt="">`
+    : `<div class="wds-myday-thumb-text">${escapeHtml((s.message || '').slice(0, 60))}</div>`;
+  const myAvatarBadge = myPhoto
+    ? `<span class="wds-myday-avatar-badge" style="background-image:url(${escapeHtml(myPhoto)});background-size:cover;background-position:center;"></span>`
+    : `<span class="wds-myday-avatar-badge">${initial(myName)}</span>`;
+  const myCreateAvatar = myPhoto
+    ? `<div class="wds-myday-create-avatar" style="background-image:url(${escapeHtml(myPhoto)});background-size:cover;background-position:center;"></div>`
+    : `<div class="wds-myday-create-avatar">${initial(myName)}</div>`;
+  const mineNewest = mineGroup ? mineGroup.stories[mineGroup.stories.length - 1] : null;
+  const youItem = mineNewest
+    ? `<div class="wds-myday-item wds-myday-item--has-story">${thumbHtml(mineNewest)}${myAvatarBadge}<span class="wds-myday-add-badge">+</span><span class="wds-myday-name">Your Day</span></div>`
+    : `<div class="wds-myday-item wds-myday-item--create">${myCreateAvatar}<span class="wds-myday-add-badge">+</span><span class="wds-myday-name">Your Day</span></div>`;
+  const otherItems = otherGroups.map(g => {
+    const name = g.codeName || '?';
+    const newest = g.stories[g.stories.length - 1];
+    return `<div class="wds-myday-item wds-myday-item--has-story">${thumbHtml(newest)}<span class="wds-myday-avatar-badge">${initial(name)}</span><span class="wds-myday-name">${escapeHtml(name)}</span></div>`;
+  }).join('');
+  el.innerHTML = youItem + otherItems;
+}
+
+function wdmFriendRowHtml(f) {
+  return `<div class="wds-friend-item">
+    <span class="wds-friend-avatar"${f.avatar_data_url ? ` style="background-image:url(${escapeHtml(f.avatar_data_url)});"` : ''}>${f.avatar_data_url ? '' : escapeHtml((f.code_name || '?').charAt(0).toUpperCase())}</span>
+    <span class="wds-friend-name">${escapeHtml(f.code_name || 'Unknown')}</span>
+  </div>`;
+}
+function wdmRequestRowHtml(r) {
+  return `<div class="wds-friend-item">
+    <span class="wds-friend-avatar"${r.avatar_data_url ? ` style="background-image:url(${escapeHtml(r.avatar_data_url)});"` : ''}>${r.avatar_data_url ? '' : escapeHtml((r.code_name || '?').charAt(0).toUpperCase())}</span>
+    <span class="wds-friend-name">${escapeHtml(r.code_name || 'Unknown')}</span>
+    <div class="wds-friend-actions">
+      <button type="button" class="wds-mini-btn" data-accept-friend="${escapeHtml(r.requester_share_key)}">Accept</button>
+      <button type="button" class="wds-mini-btn" data-decline-friend="${escapeHtml(r.requester_share_key)}">Decline</button>
+    </div>
+  </div>`;
+}
+
+// People tab -- real data via the same RPCs the wellness Profile page's
+// Friends card and pending-requests list use (list_friends,
+// list_pending_friend_requests; see refreshWdsFriendsList/
+// refreshWdsPendingFriendRequestsList, app.js ~5657/~5766).
+let wdmPeopleTab = 'friends';
+async function renderWdmPeopleTab(mode) {
+  if (mode) wdmPeopleTab = mode;
+  document.querySelectorAll('#wdmScreenPeople .wdm-chip').forEach(c => c.classList.toggle('is-active', c.dataset.peopleTab === wdmPeopleTab));
+  const listEl = document.getElementById('wdmPeopleList');
+  if (!listEl || !wdsRemoteData) return;
+  listEl.innerHTML = '<p class="empty-note">Loading…</p>';
+  try {
+    if (wdmPeopleTab === 'friends') {
+      const { data, error } = await sb.rpc('list_friends', { p_share_key: wdsRemoteData.shareKey });
+      if (error) throw error;
+      listEl.innerHTML = (data && data.length) ? data.map(wdmFriendRowHtml).join('') : '<p class="empty-note">No friends yet.</p>';
+    } else {
+      const { data, error } = await sb.rpc('list_pending_friend_requests', { p_share_key: wdsRemoteData.shareKey });
+      if (error) throw error;
+      listEl.innerHTML = (data && data.length) ? data.map(wdmRequestRowHtml).join('') : '<p class="empty-note">No pending requests.</p>';
+    }
+  } catch (e) {
+    listEl.innerHTML = '<p class="empty-note">Could not load.</p>';
+  }
+  wdmRefreshRequestsBadge();
+}
+async function wdmRefreshRequestsBadge() {
+  if (!wdsRemoteData) return;
+  try {
+    const { data } = await sb.rpc('list_pending_friend_requests', { p_share_key: wdsRemoteData.shareKey });
+    const badge = document.getElementById('wdmRequestsBadge');
+    const count = (data || []).length;
+    if (badge) { badge.textContent = count; badge.hidden = count === 0; }
+  } catch (e) { /* best effort -- badge just stays at its last known count */ }
+}
+
+// Notifications tab -- reuses the same localStorage-persisted history the
+// bell dropdown reads (wdsLoadNotifHistory/renderWdsNotifications, app.js
+// ~4654/~4725), just laid out as a full list instead of a compact popover.
+// No birthday-style notifications exist anywhere in this app (checked) --
+// that concept from the reference screenshots is dropped, not faked.
+function renderWdmNotifsTab() {
+  const listEl = document.getElementById('wdmNotifList');
+  if (!listEl) return;
+  const history = wdsLoadNotifHistory();
+  if (!history.length) { listEl.innerHTML = '<p class="empty-note">No notifications yet.</p>'; return; }
+  const sorted = history.slice().sort((a, b) => {
+    if (a.read !== b.read) return a.read ? 1 : -1;
+    return new Date(b.createdAt) - new Date(a.createdAt);
+  });
+  listEl.innerHTML = sorted.map(n => `<div class="wds-notif-item${n.read ? ' is-read' : ''}"><p style="margin:0;"><strong>${escapeHtml(n.title)}</strong> — ${escapeHtml(n.body)}</p>${n.actionsHtml ? `<div class="wds-notif-item-actions">${n.actionsHtml}</div>` : ''}</div>`).join('');
+  wdsMarkAllNotificationsRead();
+  renderWdsNotifications();
+  wdmRefreshNotifsBadge();
+}
+function wdmRefreshNotifsBadge() {
+  const badge = document.getElementById('wdmNotifsBadge');
+  if (!badge) return;
+  const count = wdsLoadNotifHistory().filter(n => !n.read).length;
+  badge.textContent = count;
+  badge.hidden = count === 0;
+}
+
+// Menu tab -- profile row + Log Out are real; every other row is a plain
+// "Coming soon" placeholder for now (see wdmShowToast), same spirit as the
+// desktop Nexus icon tabs' own Reels/Marketplace placeholders.
+function renderWdmMenuTab() {
+  if (!wdsRemoteData) return;
+  const name = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId || '–';
+  const photo = wdsResolveOwnAvatarUrl(wdsRemoteData.profile && wdsRemoteData.profile.photoDataUrl, wdsRemoteData.shareKey);
+  const avatarEl = document.getElementById('wdmMenuAvatar');
+  if (avatarEl) {
+    if (photo) { avatarEl.style.backgroundImage = `url(${photo})`; avatarEl.textContent = ''; }
+    else { avatarEl.style.backgroundImage = ''; avatarEl.textContent = (name || '?').trim().charAt(0).toUpperCase(); }
+  }
+  const nameEl = document.getElementById('wdmMenuName');
+  if (nameEl) nameEl.textContent = name;
+  const idEl = document.getElementById('wdmMenuDigitalId');
+  if (idEl) idEl.textContent = wdsRemoteData.publicId || '–';
 }
 
 const WDM_SHARE_KEY_STORAGE = 'wft_msg_share_key';
@@ -4252,7 +4413,49 @@ async function initMessengerShell() {
     if (item) wdsOpenChatPopup(item.dataset.roomId);
   });
 
+  // Bottom tab bar -- Chats/People/Notifications/Menu, plain hidden-attribute
+  // screen toggling (same pattern used throughout the rest of the app).
+  document.querySelectorAll('.wdm-tabbar-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const name = btn.dataset.wdmScreen;
+      document.querySelectorAll('.wdm-screen').forEach(s => { s.hidden = s.id !== `wdmScreen${name.charAt(0).toUpperCase()}${name.slice(1)}`; });
+      document.querySelectorAll('.wdm-tabbar-btn').forEach(b => b.classList.toggle('is-active', b === btn));
+      if (name === 'people') renderWdmPeopleTab();
+      else if (name === 'notifs') renderWdmNotifsTab();
+      else if (name === 'menu') renderWdmMenuTab();
+    });
+  });
+
+  document.getElementById('btnWdmCompose').addEventListener('click', () => wdmShowToast('Starting new chats from here is coming soon.'));
+  document.getElementById('wdmMydayRow').addEventListener('click', () => wdmShowToast('Full Stories view is coming soon to Messenger — open Wellness for now.'));
+
+  document.querySelectorAll('#wdmScreenPeople .wdm-chip').forEach(chip => {
+    chip.addEventListener('click', () => renderWdmPeopleTab(chip.dataset.peopleTab));
+  });
+  document.getElementById('wdmPeopleList').addEventListener('click', e => {
+    const acceptBtn = e.target.closest('[data-accept-friend]');
+    if (acceptBtn) { wdsRespondFriendRequest(acceptBtn.dataset.acceptFriend, true).then(() => renderWdmPeopleTab()); return; }
+    const declineBtn = e.target.closest('[data-decline-friend]');
+    if (declineBtn) wdsRespondFriendRequest(declineBtn.dataset.declineFriend, false).then(() => renderWdmPeopleTab());
+  });
+
+  document.getElementById('btnWdmMenuFriendRequests').addEventListener('click', () => {
+    document.getElementById('wdmNavPeople').click();
+    renderWdmPeopleTab('requests');
+  });
+  document.getElementById('btnWdmLogOut').addEventListener('click', () => {
+    localStorage.removeItem(WDM_SHARE_KEY_STORAGE);
+    location.reload();
+  });
+  document.querySelectorAll('#wdmScreenMenu [data-wdm-placeholder]').forEach(btn => {
+    btn.addEventListener('click', () => wdmShowToast(`${btn.dataset.wdmPlaceholder} is coming soon.`));
+  });
+
   await refreshWdsChatRooms();
+  await refreshWdsMyday();
+  renderWdmMyday();
+  wdmRefreshRequestsBadge();
+  wdmRefreshNotifsBadge();
   startWdsChatPolling();
 }
 

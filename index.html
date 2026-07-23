@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.40">
+<link rel="stylesheet" href="style.css?v=1.7.41">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -4448,27 +4448,104 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
     <p id="wdmStatusText">Connecting…</p>
   </div>
   <div class="wdm-app" id="wdmApp" hidden>
-    <header class="wdm-header">
-      <strong>Chats</strong>
-    </header>
-    <div class="wdm-search-wrap">
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
-      <input type="text" id="wdmSearch" placeholder="Search Messenger…" class="wdm-search">
+    <div class="wdm-screens">
+
+      <!-- ===================== Chats ===================== -->
+      <div class="wdm-screen" id="wdmScreenChats">
+        <header class="wdm-header wdm-header--chats">
+          <strong class="wdm-wordmark">messenger</strong>
+          <button type="button" class="wdm-icon-btn" id="btnWdmCompose" aria-label="New message" title="New message">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>
+          </button>
+        </header>
+        <div class="wdm-search-wrap">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+          <input type="text" id="wdmSearch" placeholder="Search Messenger" class="wdm-search">
+        </div>
+        <div class="wds-myday-row" id="wdmMydayRow"></div>
+        <div class="wdm-tabs">
+          <button type="button" class="wdm-tab is-active" id="wdmTabAll" data-tab="all">All</button>
+          <button type="button" class="wdm-tab" id="wdmTabUnread" data-tab="unread">Unread</button>
+          <button type="button" class="wdm-tab" id="wdmTabGroups" data-tab="groups">Groups</button>
+        </div>
+        <div class="wdm-thread-list" id="wdmThreadList"><p class="empty-note">Loading…</p></div>
+      </div>
+
+      <!-- ===================== People ===================== -->
+      <div class="wdm-screen" id="wdmScreenPeople" hidden>
+        <header class="wdm-header"><strong>People</strong></header>
+        <div class="wdm-chip-row">
+          <button type="button" class="wdm-chip is-active" id="wdmPeopleChipFriends" data-people-tab="friends">Friends</button>
+          <button type="button" class="wdm-chip" id="wdmPeopleChipRequests" data-people-tab="requests">Requests<span class="wdm-chip-badge" id="wdmRequestsBadge" hidden>0</span></button>
+        </div>
+        <div class="wdm-people-list" id="wdmPeopleList"><p class="empty-note">Loading…</p></div>
+      </div>
+
+      <!-- ===================== Notifications ===================== -->
+      <div class="wdm-screen" id="wdmScreenNotifs" hidden>
+        <header class="wdm-header"><strong>Notifications</strong></header>
+        <div class="wdm-notif-list" id="wdmNotifList"><p class="empty-note">Loading…</p></div>
+      </div>
+
+      <!-- ===================== Menu ===================== -->
+      <div class="wdm-screen" id="wdmScreenMenu" hidden>
+        <header class="wdm-header"><strong>Menu</strong></header>
+        <div class="wdm-menu-profile" id="wdmMenuProfileRow">
+          <span class="wdm-menu-avatar" id="wdmMenuAvatar">–</span>
+          <div class="wdm-menu-profile-body">
+            <strong id="wdmMenuName">–</strong>
+            <span>Digital ID <span id="wdmMenuDigitalId">–</span></span>
+          </div>
+        </div>
+        <div class="wdm-menu-section">
+          <button type="button" class="wdm-menu-row" data-wdm-placeholder="Settings"><span class="wdm-menu-row-icon">⚙️</span>Settings</button>
+        </div>
+        <div class="wdm-menu-section">
+          <button type="button" class="wdm-menu-row" data-wdm-placeholder="Marketplace"><span class="wdm-menu-row-icon">🛍️</span>Marketplace</button>
+          <button type="button" class="wdm-menu-row" data-wdm-placeholder="Communities"><span class="wdm-menu-row-icon">👥</span>Communities</button>
+          <button type="button" class="wdm-menu-row" data-wdm-placeholder="Message Requests"><span class="wdm-menu-row-icon">💬</span>Message Requests</button>
+          <button type="button" class="wdm-menu-row" data-wdm-placeholder="Archive"><span class="wdm-menu-row-icon">🗄️</span>Archive</button>
+        </div>
+        <div class="wdm-menu-section">
+          <button type="button" class="wdm-menu-row" id="btnWdmMenuFriendRequests"><span class="wdm-menu-row-icon">🤝</span>Friend Requests</button>
+        </div>
+        <div class="wdm-menu-section">
+          <button type="button" class="wdm-menu-row wdm-menu-row--danger" id="btnWdmLogOut"><span class="wdm-menu-row-icon">🚪</span>Log Out</button>
+        </div>
+      </div>
+
     </div>
-    <div class="wdm-tabs">
-      <button type="button" class="wdm-tab is-active" id="wdmTabAll" data-tab="all">All</button>
-      <button type="button" class="wdm-tab" id="wdmTabUnread" data-tab="unread">Unread</button>
-      <button type="button" class="wdm-tab" id="wdmTabGroups" data-tab="groups">Groups</button>
-    </div>
-    <div class="wdm-thread-list" id="wdmThreadList"><p class="empty-note">Loading…</p></div>
+
+    <!-- ===================== Bottom tab bar ===================== -->
+    <nav class="wdm-tabbar">
+      <button type="button" class="wdm-tabbar-btn is-active" id="wdmNavChats" data-wdm-screen="chats">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        <span>Chats</span>
+        <span class="wdm-tabbar-badge" id="wdmChatsBadge" hidden>0</span>
+      </button>
+      <button type="button" class="wdm-tabbar-btn" id="wdmNavPeople" data-wdm-screen="people">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>People</span>
+      </button>
+      <button type="button" class="wdm-tabbar-btn" id="wdmNavNotifs" data-wdm-screen="notifs">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span>Notifications</span>
+        <span class="wdm-tabbar-badge" id="wdmNotifsBadge" hidden>0</span>
+      </button>
+      <button type="button" class="wdm-tabbar-btn" id="wdmNavMenu" data-wdm-screen="menu">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        <span>Menu</span>
+      </button>
+    </nav>
   </div>
+  <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.7.40"></script>
+<script src="config.js?v=1.7.41"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.40"></script>
+<script src="app.js?v=1.7.41"></script>
 </body>
 </html>

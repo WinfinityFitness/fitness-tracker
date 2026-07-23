@@ -5093,14 +5093,29 @@ html.wf-messenger-shell #wdsMessengerShell {
 }
 .wdm-status { flex: 1; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--text-secondary); }
 .wdm-app { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-.wdm-header { padding: 16px 16px 8px; }
+/* Four screens (Chats/People/Notifications/Menu) stacked in the same slot,
+   only the non-[hidden] one actually in flow -- same plain hidden-attribute
+   toggle used throughout the rest of the app, no absolute-positioning. */
+.wdm-screens { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.wdm-screen { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.wdm-header { padding: 16px 16px 8px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .wdm-header strong { font-size: 1.4rem; color: var(--text-primary); }
+.wdm-wordmark { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; color: var(--text-primary); }
+.wdm-icon-btn {
+  width: 34px; height: 34px; border-radius: 50%; background: none; border: none;
+  color: var(--text-primary); display: grid; place-items: center; cursor: pointer; flex-shrink: 0;
+}
+.wdm-icon-btn:hover { background: var(--surface-2); }
 .wdm-search-wrap { position: relative; margin: 4px 16px 8px; }
 .wdm-search-wrap svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
 .wdm-search {
   width: 100%; box-sizing: border-box; background: var(--surface-2); border: 1px solid var(--border-soft);
   border-radius: 20px; padding: 10px 14px 10px 34px; color: var(--text-primary); font-size: 0.9rem;
 }
+/* Reuses .wds-myday-row/.wds-myday-item as-is (defined further down) --
+   renderWdmMyday feeds its own #wdmMydayRow container with the same
+   classes rather than duplicating this styling. */
+#wdmMydayRow { margin: 0 16px 8px; }
 .wdm-tabs { display: flex; gap: 4px; padding: 0 16px 8px; border-bottom: 1px solid var(--border-soft); }
 .wdm-tab {
   background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-secondary);
@@ -5108,6 +5123,75 @@ html.wf-messenger-shell #wdsMessengerShell {
 }
 .wdm-tab.is-active { color: var(--cyan); border-bottom-color: var(--cyan); }
 .wdm-thread-list { flex: 1; overflow-y: auto; padding: 4px 8px 16px; }
+
+/* People tab -- filter chips + list, reuses .wds-friend-item/.wds-friend-avatar/
+   .wds-friend-name (already styled elsewhere) for the rows themselves. */
+.wdm-chip-row { display: flex; gap: 8px; padding: 4px 16px 12px; }
+.wdm-chip {
+  background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 16px;
+  padding: 7px 14px; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+}
+.wdm-chip.is-active { color: var(--cyan); border-color: var(--cyan); }
+.wdm-chip-badge {
+  background: var(--critical); color: #fff; border-radius: 10px; font-size: 0.66rem; font-weight: 700;
+  padding: 1px 6px; line-height: 1.3;
+}
+.wdm-people-list { flex: 1; overflow-y: auto; padding: 4px 16px 16px; display: flex; flex-direction: column; gap: 2px; }
+.wdm-people-list .wds-friend-item { padding: 8px 4px; }
+.wdm-people-list .wds-friend-actions { margin-left: auto; }
+
+/* Notifications tab -- reuses .wds-notif-item (already styled for the bell
+   dropdown) inside a taller, full-screen-scrollable list. */
+.wdm-notif-list { flex: 1; overflow-y: auto; padding: 4px 16px 16px; display: flex; flex-direction: column; gap: 2px; }
+.wdm-notif-list .wds-notif-item { border-radius: 10px; padding: 10px 8px; }
+
+/* Menu tab */
+.wdm-menu-profile { display: flex; align-items: center; gap: 12px; padding: 4px 16px 16px; }
+.wdm-menu-avatar {
+  width: 52px; height: 52px; border-radius: 50%; background: var(--gradient-bar); color: #060a0d;
+  font-weight: 800; font-size: 1.3rem; display: grid; place-items: center; flex-shrink: 0;
+  background-size: cover; background-position: center;
+}
+.wdm-menu-profile-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.wdm-menu-profile-body strong { font-size: 1.05rem; color: var(--text-primary); }
+.wdm-menu-profile-body span { font-size: 0.78rem; color: var(--text-secondary); }
+.wdm-menu-section { border-top: 1px solid var(--border-soft); padding: 6px 8px; }
+.wdm-menu-row {
+  width: 100%; box-sizing: border-box; display: flex; align-items: center; gap: 12px;
+  background: none; border: none; text-align: left; padding: 12px 8px; border-radius: 8px;
+  color: var(--text-primary); font-size: 0.9rem; font-weight: 600; cursor: pointer;
+}
+.wdm-menu-row:hover { background: var(--surface-2); }
+.wdm-menu-row-icon { font-size: 1.15rem; width: 22px; text-align: center; flex-shrink: 0; }
+.wdm-menu-row--danger { color: var(--critical); }
+
+/* Bottom tab bar -- Chats/People/Notifications/Menu. */
+.wdm-tabbar {
+  flex-shrink: 0; display: flex; border-top: 1px solid var(--border-soft); background: var(--bg);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.wdm-tabbar-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  background: none; border: none; color: var(--text-secondary); padding: 8px 4px 10px;
+  font-size: 0.66rem; font-weight: 600; cursor: pointer; position: relative;
+}
+.wdm-tabbar-btn.is-active { color: var(--cyan); }
+.wdm-tabbar-badge {
+  position: absolute; top: 2px; right: calc(50% - 20px); background: var(--critical); color: #fff;
+  border-radius: 10px; font-size: 0.62rem; font-weight: 700; padding: 1px 5px; line-height: 1.3;
+}
+
+/* "Coming soon" toast for the still-visual-only Menu rows and Compose --
+   lives inside #wdsMessengerShell itself so it sits above this shell's own
+   z-index:999999 stack (a toast elsewhere in the page, e.g. FT's own
+   #restToast, would render invisibly underneath this shell). */
+.wdm-toast {
+  position: absolute; left: 50%; bottom: 76px; transform: translateX(-50%);
+  background: rgba(10,14,18,0.92); color: #fff; padding: 10px 16px; border-radius: 20px;
+  font-size: 0.82rem; z-index: 5; pointer-events: none; white-space: nowrap;
+}
+.wdm-toast[hidden] { display: none; }
 
 /* Opening a thread still reuses the existing floating chat-popup component
    (see wdsOpenChatPopup) rather than a rebuilt conversation view — that
