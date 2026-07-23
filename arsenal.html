@@ -74,13 +74,26 @@
   }
   .app-pwa-btn:hover { background: var(--accent); color: var(--bg); }
 
-  .app-tutorial-btn {
-    margin-top: 14px; align-self: flex-start; display: inline-flex; align-items: center; gap: 6px;
-    background: none; border: 1px solid var(--accent-dim); color: var(--accent);
-    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.02em;
-    padding: 8px 14px; border-radius: 999px; cursor: pointer; font-family: inherit;
+  .tutorial-nav-label {
+    margin: 16px 0 6px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--text-muted);
   }
-  .app-tutorial-btn:hover { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  /* Deliberately mirrors the real app's own bottom tab bar (same icon
+     shapes, icon-over-label layout) so this reads as "the app's own
+     navigation, in miniature" rather than a separate help menu. */
+  .tutorial-nav {
+    display: flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+  }
+  .tutorial-nav-btn {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+    background: none; border: none; border-right: 1px solid var(--border);
+    color: var(--accent); padding: 10px 2px 8px; cursor: pointer; font-family: inherit;
+  }
+  .tutorial-nav-btn:last-child { border-right: none; }
+  .tutorial-nav-btn svg { width: 19px; height: 19px; fill: none; stroke: currentColor; }
+  .tutorial-nav-btn span { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.01em; }
+  .tutorial-nav-btn:hover:not(.is-disabled) { background: rgba(255,159,67,0.1); }
+  .tutorial-nav-btn.is-disabled { color: var(--text-muted); opacity: 0.4; cursor: default; }
 </style>
 </head>
 <body>
@@ -99,7 +112,41 @@
       <h2 class="app-title">Winfinity Fitness Tracker</h2>
       <p class="app-tagline">Every rep, every meal, every day — tracked.</p>
       <p class="app-desc">Log training, nutrition, weight, and hydration in one place, with macros that auto-calculate your calories and reminders that actually adapt to your schedule. Track body measurements and progress photos over time, climb the Nexus Leaderboard, and back everything up automatically.</p>
-      <button type="button" class="app-tutorial-btn" id="btnFtTutorial">▶ How to use (Status tab)</button>
+
+      <p class="tutorial-nav-label">Tap a tab for a walkthrough</p>
+      <!-- Same icon shapes as the app's own bottom tab bar (index.html's
+           <nav class="tab-bar">), on purpose -- recognizable as "this is
+           the app's own navigation" rather than a separate generic help
+           menu. Each button posts wfOpenTutorial to the parent page (see
+           arsenal-embed.js) with that tab's own walkthrough file; tabs
+           without one yet are disabled, not hidden, so the full set of six
+           is always visible as a preview of what's coming. -->
+      <div class="tutorial-nav" id="ftTutorialNav">
+        <button type="button" class="tutorial-nav-btn" data-tutorial="tutorial-status-tab.html" title="Status tab walkthrough">
+          <svg viewBox="0 0 24 24" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="10" rx="1.5"/><rect x="14" y="3" width="7" height="6" rx="1.5"/><rect x="14" y="13" width="7" height="8" rx="1.5"/><rect x="3" y="17" width="7" height="4" rx="1.5"/></svg>
+          <span>Status</span>
+        </button>
+        <button type="button" class="tutorial-nav-btn is-disabled" data-tutorial="" title="Coming soon">
+          <svg viewBox="0 0 24 24" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><g transform="rotate(45 12 12)"><line x1="6.5" y1="12" x2="17.5" y2="12"/><rect x="3.5" y="9" width="3" height="6" rx="1"/><rect x="17.5" y="9" width="3" height="6" rx="1"/><rect x="1.5" y="10.3" width="2" height="3.4" rx="0.6"/><rect x="20.5" y="10.3" width="2" height="3.4" rx="0.6"/></g></svg>
+          <span>Training</span>
+        </button>
+        <button type="button" class="tutorial-nav-btn is-disabled" data-tutorial="" title="Coming soon">
+          <svg viewBox="0 0 24 24" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2v6a1.5 1.5 0 0 0 3 0V2M8.5 8v13"/><path d="M16 2c-1.7 0-3 1.8-3 4.5S14.3 11 16 11v11"/></svg>
+          <span>Fuel</span>
+        </button>
+        <button type="button" class="tutorial-nav-btn is-disabled" data-tutorial="" title="Coming soon">
+          <svg viewBox="0 0 24 24" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3c0 5 10 5 10 10s-10 5-10 10"/><path d="M17 3c0 5-10 5-10 10s10 5 10 10"/><path d="M8 7h8M7.5 12h9M8 17h8"/></svg>
+          <span>BIO</span>
+        </button>
+        <button type="button" class="tutorial-nav-btn is-disabled" data-tutorial="" title="Coming soon">
+          <svg viewBox="0 0 24 24" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.3"/><circle cx="12" cy="4" r="1.8"/><circle cx="12" cy="20" r="1.8"/><circle cx="4" cy="12" r="1.8"/><circle cx="20" cy="12" r="1.8"/><path d="M12 6.3v3.4M12 14.3v3.4M9.7 12H6.3M14.3 12h3.4"/></svg>
+          <span>Nexus</span>
+        </button>
+        <button type="button" class="tutorial-nav-btn is-disabled" data-tutorial="" title="Coming soon">
+          <svg viewBox="0 0 24 24" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+          <span>Menu</span>
+        </button>
+      </div>
     </div>
 
     <div class="app-card">
@@ -179,8 +226,12 @@ loadDownloadLinks();
 // height, not the visitor's actual screen. Asking the top-level WordPress
 // page to open the overlay instead (see arsenal-embed.html's matching
 // listener) means it's a real position:fixed over the whole real viewport.
-document.getElementById('btnFtTutorial').addEventListener('click', function () {
-  window.parent.postMessage({ wfOpenTutorial: 'https://winfinityfitness.github.io/fitness-tracker/tutorial-status-tab.html' }, '*');
+document.querySelectorAll('#ftTutorialNav .tutorial-nav-btn').forEach(function (btn) {
+  var file = btn.dataset.tutorial;
+  if (!file) return; // no walkthrough built for this tab yet -- stays disabled
+  btn.addEventListener('click', function () {
+    window.parent.postMessage({ wfOpenTutorial: 'https://winfinityfitness.github.io/fitness-tracker/' + file }, '*');
+  });
 });
 </script>
 
