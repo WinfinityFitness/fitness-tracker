@@ -247,24 +247,44 @@
       .catch(function () { startRotation(); });
   }
 
-  // Deliberately NOT the old "check window.supabase, reuse it if present"
-  // approach -- on the real site, some other unrelated plugin already
-  // loads its own bundled Supabase library into window.supabase before
-  // this script runs. It looks present, so the old code reused it
-  // assuming it was the real SDK, then window.supabase.createClient(...)
-  // threw (that plugin's copy isn't shaped the same) -- an uncaught error
-  // right at the top of this script, silently killing everything below
-  // it in this same script block (Donate/Contact/Share too, not just the
-  // visit counter). A dynamic import() of the CDN's ESM build sidesteps
-  // this entirely: it never touches window.supabase at all, so it can't
-  // collide with anyone else's copy no matter what else is on the page.
-  import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm')
-    .then(function (mod) {
-      var sb = mod.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // Deliberately does NOT check "if (window.supabase) reuse it" -- some
+  // other unrelated plugin on the real site already loads its own bundled
+  // Supabase library into window.supabase before this script runs, so that
+  // check always saw something already there and reused it assuming it was
+  // the real SDK. window.supabase.createClient(...) then threw (that
+  // plugin's copy isn't shaped the same) -- an uncaught error right at the
+  // top of this script, silently killing everything below it in this same
+  // block (Donate/Contact/Share too, not just the visit counter).
+  //
+  // Always appends a fresh <script> instead, every time, regardless of
+  // whatever's already on window.supabase -- the CDN's UMD build
+  // unconditionally overwrites window.supabase with the real SDK once IT
+  // finishes loading, so by the time this onload fires it's guaranteed to
+  // be ours, not whatever was there before. (A dynamic import() of the
+  // ESM build was tried first as a cleaner fix, but still didn't work on
+  // the live site -- reverted to this plainer approach instead.)
+  var sbScript = document.createElement('script');
+  sbScript.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+  sbScript.onload = function () {
+    if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+      console.error('[wf-footer] supabase-js loaded but window.supabase is not the expected SDK shape:', window.supabase);
+      startRotation();
+      return;
+    }
+    try {
+      var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       loadFooterSettings(sb);
       initVisitCounter(sb);
-    })
-    .catch(function () { startRotation(); });
+    } catch (e) {
+      console.error('[wf-footer] error initializing after supabase-js load:', e);
+      startRotation();
+    }
+  };
+  sbScript.onerror = function () {
+    console.error('[wf-footer] supabase-js script failed to load from CDN (network/CSP blocked?)');
+    startRotation();
+  };
+  document.head.appendChild(sbScript);
 
   // ---------------------------------------------------------------------
   // Site visit counter -- runs for every visitor (record_site_visit()),
