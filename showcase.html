@@ -82,7 +82,7 @@
 
   .chart-card {
     background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
-    padding: 20px 20px 8px;
+    padding: 20px 20px 8px; position: relative;
   }
   .chart-card-head {
     display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 18px;
@@ -100,6 +100,20 @@
   }
   .bars-scroll::-webkit-scrollbar { height: 6px; }
   .bars-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  /* Touch devices have no cursor to hover a bar with -- this marks the
+     fixed center point of the chart so dragging the bars themselves left/
+     right (instead of moving a pointer over them) still has an obvious
+     "whichever bar lines up with this" target. Desktop already has hover,
+     so hidden there (hover: none = "no real pointing device"). */
+  .showcase-center-pointer { display: none; }
+  @media (hover: none) {
+    .showcase-center-pointer {
+      display: block; width: 0; height: 0; margin: 3px auto 0;
+      border-left: 6px solid transparent; border-right: 6px solid transparent;
+      border-top: 7px solid var(--accent);
+    }
+  }
 
   .showcase-bar {
     flex: 0 0 auto; width: 5px; min-height: 4px; border-radius: 3px 3px 0 0;
@@ -127,15 +141,23 @@
     align-items: center; justify-content: center; z-index: 50; padding: 20px;
   }
   .overlay[hidden] { display: none; }
-  /* #statOverlay only -- in-flow under the chart, not a fixed/dimmed modal
-     like the admin login overlay above still is. */
-  .stat-panel { margin-top: 16px; display: flex; justify-content: center; }
+  /* #statOverlay only -- floats just under the chart (anchored to
+     .chart-card, which is position:relative) instead of pushing the page
+     taller. Free to overlap the Digital Arsenal section below it -- it's
+     only ever open while a bar (or the card itself) is actively
+     hovered/dragged, and disappears the instant that stops, so it never
+     sits there permanently hiding anything. */
+  .stat-panel {
+    position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
+    margin-top: 8px; z-index: 10; display: flex; justify-content: center;
+  }
   .stat-panel[hidden] { display: none; }
   .stat-card {
     width: 320px; max-width: 100%; background: linear-gradient(180deg, #171f2a, #0f141b);
     border: 1px solid var(--accent-dim); border-radius: 16px; padding: 22px 22px 18px;
     box-shadow: 0 0 0 1px rgba(255,159,67,0.08), 0 20px 60px rgba(0,0,0,0.5);
     position: relative;
+    transform: scale(0.85);
   }
   .stat-card-close {
     position: absolute; top: 12px; right: 14px; background: none; border: none;
@@ -243,12 +265,12 @@
       <span class="legend-item"><span class="legend-dot" style="background:var(--tier-behind)"></span>Needs Attention</span>
     </div>
     <div class="bars-scroll" id="barsScroll"></div>
+    <div class="showcase-center-pointer" aria-hidden="true"></div>
 
-    <!-- In-flow, not a fixed/dimmed modal like #adminLoginOverlay below --
-         opens on hover as the user drags across bars, so it must sit below
-         the chart instead of covering it (previously a centered full-screen
-         overlay, which blocked the very bars it was supposed to let you
-         keep browsing). -->
+    <!-- Floats just under the chart (see .stat-panel) rather than a
+         fixed/dimmed modal like #adminLoginOverlay below still is -- opens
+         on hover/drag and is free to overlap Digital Arsenal underneath it,
+         since it only stays open while actively pointed at. -->
     <div class="stat-panel" id="statOverlay" hidden>
       <div class="stat-card" id="statCard"></div>
     </div>
@@ -520,6 +542,46 @@ document.getElementById('statOverlay').addEventListener('mouseleave', e => {
   if (e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('.showcase-bar')) return;
   closeStatCard();
 });
+// Tapping/clicking anywhere that isn't a bar or the card itself closes it --
+// the card can now overlap Digital Arsenal underneath it, so this is what
+// makes tapping elsewhere on the page (not just leaving a bar) dismiss it.
+document.addEventListener('click', e => {
+  if (document.getElementById('statOverlay').hidden) return;
+  if (e.target.closest('.showcase-bar') || e.target.closest('#statOverlay')) return;
+  closeStatCard();
+});
+
+// Touch devices drag the bars themselves under a fixed center point
+// (.showcase-center-pointer) instead of moving a cursor over them -- as
+// #barsScroll scrolls, whichever bar currently lines up with that center
+// point opens, same effect as hovering it on desktop. Looks the row up
+// fresh from allRows by public_id each time rather than closing over the
+// rows array from whatever renderMetric call last ran, so this never goes
+// stale across metric switches without needing to re-bind per render.
+let centerCardRaf = null;
+document.getElementById('barsScroll').addEventListener('scroll', () => {
+  if (centerCardRaf) return;
+  centerCardRaf = requestAnimationFrame(() => {
+    centerCardRaf = null;
+    updateCenterPointedCard();
+  });
+});
+function updateCenterPointedCard() {
+  const barsEl = document.getElementById('barsScroll');
+  const bars = barsEl.querySelectorAll('.showcase-bar:not(.is-filtered-out):not(.is-hidden)');
+  if (!bars.length) return;
+  const containerRect = barsEl.getBoundingClientRect();
+  const centerX = containerRect.left + containerRect.width / 2;
+  let closest = null, closestDist = Infinity;
+  bars.forEach(barEl => {
+    const r = barEl.getBoundingClientRect();
+    const dist = Math.abs((r.left + r.width / 2) - centerX);
+    if (dist < closestDist) { closestDist = dist; closest = barEl; }
+  });
+  if (!closest) return;
+  const row = allRows.find(r => r.public_id === closest.dataset.publicId);
+  if (row) openStatCard(row);
+}
 
 // ---------------------------------------------------------------------
 // Admin: "Assess for New Assignment" -- only ever shown for real (non-demo)
