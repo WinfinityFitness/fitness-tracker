@@ -63,8 +63,25 @@
     </div>
   </div>
 
-  <p class="wf-footer-copyright">&copy; <span id="wfFooterYear"></span> Winfinity Fitness. All rights reserved.</p>
+  <p class="wf-footer-copyright">&copy; <span id="wfFooterYear"></span> Winfinity Fitness. All rights reserved.<button type="button" class="wf-visit-admin-btn" id="wfVisitAdminBtn" title="Admin" aria-label="Admin">👁</button><span class="wf-visit-count" id="wfVisitCount" hidden></span></p>
 </footer>
+
+<div class="wf-footer-overlay" id="wfAdminUnlockOverlay" hidden>
+  <div class="wf-footer-popup">
+    <button type="button" class="wf-footer-popup-close" data-wf-close>&times;</button>
+    <h3>Admin</h3>
+    <label class="wf-admin-field">
+      <span>Digital ID</span>
+      <input type="text" id="wfAdminId" autocomplete="off">
+    </label>
+    <label class="wf-admin-field">
+      <span>Password</span>
+      <input type="password" id="wfAdminPassword" autocomplete="off">
+    </label>
+    <p class="wf-admin-note" id="wfAdminNote" hidden></p>
+    <button type="button" class="wf-footer-pill" id="wfAdminUnlockBtn" style="width:100%;justify-content:center;">Unlock</button>
+  </div>
+</div>
 
 <div class="wf-footer-overlay" id="wfDonateOverlay" hidden>
   <div class="wf-footer-popup">
@@ -130,6 +147,19 @@
   }
   .wf-footer-col a[href]:not([href="#"]):hover, .wf-footer-col .wf-footer-linkbtn:hover { color: #ff9f43; }
   .wf-footer-copyright { color: #5c6675; font-size: 0.74rem; margin: 0; }
+  .wf-visit-admin-btn {
+    background: none; border: none; color: #5c6675; font-size: 0.8rem; cursor: pointer;
+    padding: 0; margin-left: 8px; vertical-align: middle; opacity: 0.45; line-height: 1;
+  }
+  .wf-visit-admin-btn:hover { opacity: 1; }
+  .wf-visit-count { color: #ff9f43; font-size: 0.74rem; margin-left: 8px; font-weight: 600; }
+  .wf-admin-field { display: block; margin-bottom: 12px; }
+  .wf-admin-field span { display: block; color: #8a97a8; font-size: 0.76rem; margin-bottom: 4px; }
+  .wf-admin-field input {
+    width: 100%; box-sizing: border-box; background: #0a0d12; border: 1px solid #232d3a; border-radius: 6px;
+    padding: 8px 10px; color: #e8ecf1; font-size: 0.85rem;
+  }
+  .wf-admin-note { color: #ff6b6b; font-size: 0.78rem; margin: -4px 0 12px; }
 
   .wf-footer-overlay {
     position: fixed; inset: 0; background: rgba(4,6,9,0.72); z-index: 999;
@@ -212,15 +242,88 @@
   // same page (Showcase/Arsenal, if ever inlined instead of iframed) has
   // already loaded it -- otherwise loads it once for this footer alone.
   if (window.supabase) {
-    loadFooterSettings(window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY));
+    var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    loadFooterSettings(sb);
+    initVisitCounter(sb);
   } else {
     var script = document.createElement('script');
     script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
     script.onload = function () {
-      loadFooterSettings(window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY));
+      var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      loadFooterSettings(sb);
+      initVisitCounter(sb);
     };
     script.onerror = startRotation;
     document.head.appendChild(script);
+  }
+
+  // ---------------------------------------------------------------------
+  // Site visit counter -- runs for every visitor (record_site_visit()),
+  // but the count is only ever displayed once this browser has unlocked
+  // Admin via the same Digital ID + password check the app's own admin
+  // login uses (verify_admin_login) -- everyone else just sees the plain
+  // footer with a barely-visible eye icon, nothing that looks countable.
+  // ---------------------------------------------------------------------
+  var VISIT_ADMIN_VERIFIED_KEY = 'wf_site_admin_verified_at';
+  var VISIT_ADMIN_VALID_MS = 12 * 60 * 60 * 1000; // re-prompt after 12h
+  var VISIT_SESSION_KEY = 'wf_site_visit_recorded';
+  var latestVisitCount = null;
+
+  function isAdminVerified() {
+    var raw = localStorage.getItem(VISIT_ADMIN_VERIFIED_KEY);
+    if (!raw) return false;
+    var ts = parseInt(raw, 10);
+    return !isNaN(ts) && (Date.now() - ts) < VISIT_ADMIN_VALID_MS;
+  }
+
+  function showVisitCount(count) {
+    var el = document.getElementById('wfVisitCount');
+    latestVisitCount = count;
+    el.textContent = count + ' visits';
+    el.hidden = false;
+  }
+
+  function initVisitCounter(sb) {
+    // Guarded by sessionStorage, not localStorage -- counts once per
+    // browsing session (this tab/window until closed), not once ever, so
+    // it still climbs across repeat visits like a normal visit counter.
+    if (!sessionStorage.getItem(VISIT_SESSION_KEY)) {
+      sessionStorage.setItem(VISIT_SESSION_KEY, '1');
+      sb.rpc('record_site_visit').then(function (result) {
+        if (result.data != null && isAdminVerified()) showVisitCount(result.data);
+      }).catch(function () { /* best effort -- counter just won't move this visit */ });
+    } else if (isAdminVerified()) {
+      sb.rpc('get_site_visit_count').then(function (result) {
+        if (result.data != null) showVisitCount(result.data);
+      }).catch(function () { /* best effort */ });
+    }
+
+    var adminBtn = document.getElementById('wfVisitAdminBtn');
+    var overlay = document.getElementById('wfAdminUnlockOverlay');
+    var unlockBtn = document.getElementById('wfAdminUnlockBtn');
+    var noteEl = document.getElementById('wfAdminNote');
+    adminBtn.addEventListener('click', function () { overlay.hidden = false; });
+    unlockBtn.addEventListener('click', function () {
+      var id = document.getElementById('wfAdminId').value.trim();
+      var pw = document.getElementById('wfAdminPassword').value;
+      noteEl.hidden = true;
+      if (!id || !pw) { noteEl.textContent = 'Enter both Digital ID and password.'; noteEl.hidden = false; return; }
+      unlockBtn.disabled = true;
+      sb.rpc('verify_admin_login', { p_digital_id: id, p_password: pw }).then(function (result) {
+        unlockBtn.disabled = false;
+        if (result.error) { noteEl.textContent = 'Incorrect Digital ID or password.'; noteEl.hidden = false; return; }
+        localStorage.setItem(VISIT_ADMIN_VERIFIED_KEY, String(Date.now()));
+        overlay.hidden = true;
+        document.getElementById('wfAdminId').value = '';
+        document.getElementById('wfAdminPassword').value = '';
+        if (latestVisitCount != null) { showVisitCount(latestVisitCount); return; }
+        sb.rpc('get_site_visit_count').then(function (r) { if (r.data != null) showVisitCount(r.data); });
+      }).catch(function () {
+        unlockBtn.disabled = false;
+        noteEl.textContent = 'Could not verify — try again.';
+        noteEl.hidden = false;
+      });
+    });
   }
 
   // Donate / Contact popups
