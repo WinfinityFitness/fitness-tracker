@@ -1,0 +1,19 @@
+<!-- Winfinity Digital Arsenal embed for winfinityfitness.com (WordPress)
+     -- paste this whole block into the Custom HTML widget/block wherever
+     the app list should appear, replacing whatever plain
+     <iframe src="...arsenal.html"> tag is there now.
+
+     Same auto-resize approach as showcase-embed.html: the iframe grows to
+     match arsenal.html's real content height via postMessage, instead of
+     using a fixed height guess that crops content behind a scroll bar. -->
+<iframe id="wfArsenalFrame" src="https://winfinityfitness.github.io/fitness-tracker/arsenal.html"
+        style="width:100%;border:0;display:block;min-height:400px;" loading="lazy"
+        title="Winfinity Digital Arsenal"></iframe>
+<script>
+window.addEventListener('message', function (e) {
+  if (e.data && e.data.wfEmbedId === 'arsenal' && typeof e.data.wfEmbedHeight === 'number') {
+    var frame = document.getElementById('wfArsenalFrame');
+    if (frame) frame.style.height = e.data.wfEmbedHeight + 'px';
+  }
+});
+</script>

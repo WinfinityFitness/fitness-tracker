@@ -129,5 +129,23 @@ function applyLink(id, url) {
 }
 loadDownloadLinks();
 </script>
+
+<!-- Reports this page's real content height to whatever iframe wrapper
+     embeds it on winfinityfitness.com, so the wrapper can size the iframe
+     to match instead of using a fixed height guess. See arsenal-embed.html
+     for the matching parent-side listener; harmless no-op if the page is
+     opened directly (not in an iframe) or embedded by something that
+     doesn't listen for it. -->
+<script>
+(function () {
+  function reportHeight() {
+    var h = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+    window.parent.postMessage({ wfEmbedId: 'arsenal', wfEmbedHeight: h }, '*');
+  }
+  window.addEventListener('load', reportHeight);
+  if (window.ResizeObserver) new ResizeObserver(reportHeight).observe(document.body);
+  else setInterval(reportHeight, 600); // older-browser fallback
+})();
+</script>
 </body>
 </html>
