@@ -28,7 +28,14 @@
   .title-rule { width: 64px; height: 4px; background: var(--accent); border-radius: 2px; margin-bottom: 34px; }
 
   .grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 22px;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px;
+  }
+  /* Cards in the same row stretch to match the tallest one by default
+     (grid's own align-items:stretch) -- fitting all 4 in a single row on
+     desktop is what makes the shorter PWA Version card match the others'
+     height, rather than needing an explicit height rule. */
+  @media (max-width: 720px) {
+    .grid { grid-template-columns: repeat(2, 1fr); }
   }
   .app-card {
     background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
