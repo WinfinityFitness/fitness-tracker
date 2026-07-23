@@ -102,7 +102,7 @@
   .bars-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
   .showcase-bar {
-    flex: 0 0 auto; width: 10px; min-height: 4px; border-radius: 3px 3px 0 0;
+    flex: 0 0 auto; width: 5px; min-height: 4px; border-radius: 3px 3px 0 0;
     border: none; cursor: pointer; position: relative;
     transition: opacity 0.15s, transform 0.1s;
   }
@@ -397,6 +397,9 @@ function renderMetric(index) {
   }).join('');
 
   barsEl.querySelectorAll('.showcase-bar').forEach((barEl, i) => {
+    // mouseenter opens it for anyone with a real cursor -- click stays too,
+    // since touch devices have no hover state and fire click instead.
+    barEl.addEventListener('mouseenter', () => openStatCard(rows[i]));
     barEl.addEventListener('click', () => openStatCard(rows[i]));
   });
 
