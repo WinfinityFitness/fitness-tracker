@@ -238,24 +238,24 @@
       .catch(function () { startRotation(); });
   }
 
-  // Reuses the global supabase-js CDN script if some other embed on the
-  // same page (Showcase/Arsenal, if ever inlined instead of iframed) has
-  // already loaded it -- otherwise loads it once for this footer alone.
-  if (window.supabase) {
-    var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    loadFooterSettings(sb);
-    initVisitCounter(sb);
-  } else {
-    var script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-    script.onload = function () {
-      var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // Deliberately NOT the old "check window.supabase, reuse it if present"
+  // approach -- on the real site, some other unrelated plugin already
+  // loads its own bundled Supabase library into window.supabase before
+  // this script runs. It looks present, so the old code reused it
+  // assuming it was the real SDK, then window.supabase.createClient(...)
+  // threw (that plugin's copy isn't shaped the same) -- an uncaught error
+  // right at the top of this script, silently killing everything below
+  // it in this same script block (Donate/Contact/Share too, not just the
+  // visit counter). A dynamic import() of the CDN's ESM build sidesteps
+  // this entirely: it never touches window.supabase at all, so it can't
+  // collide with anyone else's copy no matter what else is on the page.
+  import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm')
+    .then(function (mod) {
+      var sb = mod.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       loadFooterSettings(sb);
       initVisitCounter(sb);
-    };
-    script.onerror = startRotation;
-    document.head.appendChild(script);
-  }
+    })
+    .catch(function () { startRotation(); });
 
   // ---------------------------------------------------------------------
   // Site visit counter -- runs for every visitor (record_site_visit()),
