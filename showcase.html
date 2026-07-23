@@ -163,7 +163,7 @@
   }
   .stat-card-close {
     position: absolute; top: 12px; right: 14px; background: none; border: none;
-    color: var(--text-muted); font-size: 1.1rem; cursor: pointer; line-height: 1;
+    color: var(--text-muted); font-size: 0.935rem; cursor: pointer; line-height: 1;
   }
   .stat-card-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
   .stat-card-avatar {
@@ -172,10 +172,11 @@
     color: var(--accent); border: 1px solid var(--accent-dim); flex-shrink: 0;
     background-size: cover; background-position: center;
   }
-  .stat-card-id { font-size: 0.72rem; letter-spacing: 0.06em; color: var(--text-muted); text-transform: uppercase; }
-  .stat-card-id strong { color: var(--text-primary); font-size: 0.85rem; letter-spacing: 0.03em; display: block; }
+  /* Text sizes throughout the card are ~85% of their original values. */
+  .stat-card-id { font-size: 0.612rem; letter-spacing: 0.06em; color: var(--text-muted); text-transform: uppercase; }
+  .stat-card-id strong { color: var(--text-primary); font-size: 0.7225rem; letter-spacing: 0.03em; display: block; }
   .stat-card-tier {
-    display: inline-block; margin-top: 4px; font-size: 0.68rem; font-weight: 700;
+    display: inline-block; margin-top: 4px; font-size: 0.578rem; font-weight: 700;
     letter-spacing: 0.08em; padding: 2px 8px; border-radius: 999px; text-transform: uppercase;
   }
   .stat-card-tier[data-tier="elite"] { color: var(--tier-elite); background: rgba(255,159,67,0.12); }
@@ -183,11 +184,11 @@
   .stat-card-tier[data-tier="building"] { color: var(--tier-building); background: rgba(124,139,161,0.14); }
   .stat-card-tier[data-tier="behind"] { color: var(--tier-behind); background: rgba(224,85,90,0.12); }
   .stat-card-mode-icon { width: 16px; height: 16px; vertical-align: -3px; }
-  .stat-card-location { display: block; margin-top: 4px; font-size: 0.74rem; color: var(--text-muted); }
+  .stat-card-location { display: block; margin-top: 4px; font-size: 0.629rem; color: var(--text-muted); }
 
   .stat-row {
     display: flex; justify-content: space-between; align-items: baseline;
-    padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.82rem;
+    padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.697rem;
   }
   .stat-row span:first-child { color: var(--text-muted); letter-spacing: 0.02em; }
   .stat-row span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; }
@@ -195,7 +196,7 @@
   .stat-row.is-negative span:last-child { color: var(--tier-behind); }
 
   .consistency-block { margin-top: 14px; }
-  .consistency-label { display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 6px; }
+  .consistency-label { display: flex; justify-content: space-between; font-size: 0.663rem; margin-bottom: 6px; }
   .consistency-label strong { font-variant-numeric: tabular-nums; }
   .consistency-track { height: 6px; background: var(--panel-2); border-radius: 4px; overflow: hidden; }
   .consistency-fill { height: 100%; background: linear-gradient(90deg, var(--tier-behind), var(--tier-elite)); border-radius: 4px; }
@@ -217,7 +218,7 @@
   .assign-section { margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.05); }
   .btn-assign {
     display: block; width: 100%; text-align: center; text-decoration: none; box-sizing: border-box;
-    background: var(--accent); color: #0a0d12; font-weight: 600; font-size: 0.82rem;
+    background: var(--accent); color: #0a0d12; font-weight: 600; font-size: 0.697rem;
     border: none; border-radius: 8px; padding: 9px; cursor: pointer;
   }
   .btn-assign:disabled { background: var(--panel-2); color: var(--text-muted); cursor: default; }
