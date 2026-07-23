@@ -57,6 +57,15 @@
     text-transform: uppercase; margin: 0 0 12px; line-height: 1.4;
   }
   .app-desc { color: var(--text-muted); font-size: 0.85rem; line-height: 1.55; margin: 0; }
+
+  .app-pwa-links { display: flex; flex-direction: column; gap: 8px; margin-top: 2px; }
+  .app-pwa-btn {
+    display: block; text-align: center; text-decoration: none;
+    border: 1px solid var(--accent); color: var(--accent); background: none;
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+    padding: 10px 14px; border-radius: 8px; transition: background 0.15s, color 0.15s;
+  }
+  .app-pwa-btn:hover { background: var(--accent); color: var(--bg); }
 </style>
 </head>
 <body>
@@ -99,6 +108,24 @@
       <h2 class="app-title">Winfinity Messenger</h2>
       <p class="app-tagline">The Nexus community, one tap away.</p>
       <p class="app-desc">A dedicated chat app for your Winfinity circle — direct messages, Nexus Com group chat, image sharing, and reactions. Built for quick check-ins with training partners and coaches, without opening the full tracker.</p>
+    </div>
+
+    <div class="app-card">
+      <div class="app-card-head">
+        <span class="app-icon-badge">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/>
+            <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+          </svg>
+        </span>
+      </div>
+      <h2 class="app-title">PWA Version</h2>
+      <p class="app-tagline">Open via Safari or any browser, send to homescreen.</p>
+      <div class="app-pwa-links">
+        <a class="app-pwa-btn" href="https://app.winfinityfitness.com" target="_blank" rel="noopener">Fitness Tracker</a>
+        <a class="app-pwa-btn" href="https://wellness.winfinityfitness.com" target="_blank" rel="noopener">Winfinity Nexus</a>
+        <a class="app-pwa-btn" href="https://messenger.winfinityfitness.com" target="_blank" rel="noopener">Winfinity Messenger</a>
+      </div>
     </div>
   </div>
 </div>
