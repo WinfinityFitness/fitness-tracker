@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.42">
+<link rel="stylesheet" href="style.css?v=1.7.43">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -1441,7 +1441,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
           <svg viewBox="0 0 24 24" width="16" height="16" class="caliper-entry-chevron" id="weeklyReviewChevron" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
       </div>
-      <button type="button" class="btn" id="btnOpenAiKeys" style="margin-top:10px;">AI API Keys</button>
+      <button type="button" class="btn" id="btnOpenAiKeys" style="margin-top:10px;" hidden>AI API Keys</button>
       <div class="caliper-entry-panel" id="dailyReviewPanel" hidden>
       <p class="mod-tag">Mod_review_daily_11</p>
       <p class="field-group-heading">Daily Review</p>
@@ -4561,11 +4561,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.7.42"></script>
+<script src="config.js?v=1.7.43"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.42"></script>
+<script src="app.js?v=1.7.43"></script>
 </body>
 </html>

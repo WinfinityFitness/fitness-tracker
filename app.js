@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.42';
+const APP_VERSION = 'WF_SYS_V.1.7.43';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -16828,6 +16828,8 @@ function refreshDigitalIdOverrideVisibility() {
     prepMealManagerSection.hidden = !loggedIn;
     if (loggedIn) renderPrepMealManager();
   }
+  const aiKeysBtn = document.getElementById('btnOpenAiKeys');
+  if (aiKeysBtn) aiKeysBtn.hidden = !loggedIn;
   renderMediaSyncWidget();
   refreshOpenFoodPrepsScreen();
   const updatesRow = document.getElementById('updatesEnabledRow');
