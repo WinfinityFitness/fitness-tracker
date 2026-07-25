@@ -59,6 +59,38 @@ async function fetchUrlAsSource(url) {
   return { text };
 }
 
+// Admin-managed keys (ai_key_settings, set via FT's Menu > AI API Keys ->
+// supabase_ai_key_rotation_migration.sql) take priority when present, since
+// they support silent multi-key rotation on quota errors below; the
+// GEMINI_API_KEY secret is the original single-key fallback, kept working
+// for any deploy that hasn't set up the admin keys table yet. Supabase
+// auto-injects SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY into every edge
+// function -- no new secret needed to read this table directly (bypassing
+// RLS, which intentionally has zero anon policies on it).
+async function getGeminiApiKeys() {
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (supabaseUrl && serviceKey) {
+      const res = await fetch(`${supabaseUrl}/rest/v1/ai_key_settings?id=eq.1&select=keys`, {
+        headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+      });
+      if (res.ok) {
+        const rows = await res.json();
+        const keys = (rows[0] && rows[0].keys) || [];
+        const values = keys.map((k) => k && k.key).filter((k) => typeof k === 'string' && k.trim());
+        if (values.length) return values;
+      }
+    }
+  } catch (e) { /* fall through to env fallback */ }
+  const envKey = Deno.env.get('GEMINI_API_KEY');
+  return envKey ? [envKey] : [];
+}
+
+function isQuotaErrorText(text) {
+  return /RESOURCE_EXHAUSTED|429|exceeded your current quota|quota/i.test(text || '');
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
@@ -94,9 +126,9 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'foodName, imageBase64, a barcode/label photo pair, or a meal menu text/URL is required' }, 400);
   }
 
-  const apiKey = Deno.env.get('GEMINI_API_KEY');
-  if (!apiKey) {
-    return jsonResponse({ error: 'AI estimation is not configured yet — ask the app owner to set GEMINI_API_KEY.' }, 500);
+  const apiKeys = await getGeminiApiKeys();
+  if (!apiKeys.length) {
+    return jsonResponse({ error: 'AI estimation is not configured yet — ask the app owner to set GEMINI_API_KEY or add keys via FT\'s Menu > AI API Keys.' }, 500);
   }
 
   // Photo-based estimate also asks Gemini to name the dish (so the client
@@ -171,42 +203,51 @@ All values are per 100g. calories in kcal, protein/carbs/fat/fiber in grams, sod
     });
   }
 
-  // Gemini's hosted models occasionally return 503 "currently experiencing
-  // high demand" during load spikes — a transient, not a code, problem. A
-  // couple of short-delay retries clear most of these; if the primary
-  // model is still overloaded, gemini-2.5-flash-lite (a separate capacity
-  // pool) is tried once as a last resort before actually giving up.
+  // Two independent retry dimensions, nested: KEYS (outer) rotate on a
+  // quota-exhausted error (429/RESOURCE_EXHAUSTED) -- one admin-added
+  // Gemini key ran out of free-tier quota, try the next one silently.
+  // MODELS (inner, unchanged from before) retry on a 503 "currently
+  // experiencing high demand" -- Gemini's hosted capacity, not our key,
+  // being the bottleneck. Any OTHER error (bad request, malformed key,
+  // etc.) fails immediately without wasting retries across keys/models
+  // that would just fail the exact same way.
   const MODELS_TO_TRY = ['gemini-3.5-flash', 'gemini-3.5-flash', 'gemini-2.5-flash-lite'];
   const RETRY_DELAYS_MS = [0, 800, 0];
 
   let geminiRes, lastErrText;
-  for (let i = 0; i < MODELS_TO_TRY.length; i++) {
-    if (RETRY_DELAYS_MS[i]) await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[i]));
-    try {
-      geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${MODELS_TO_TRY[i]}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts }],
-            generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
-          }),
-        }
-      );
-    } catch (e) {
-      lastErrText = String(e);
-      continue;
+  keyLoop:
+  for (const apiKey of apiKeys) {
+    for (let i = 0; i < MODELS_TO_TRY.length; i++) {
+      if (RETRY_DELAYS_MS[i]) await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[i]));
+      try {
+        geminiRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${MODELS_TO_TRY[i]}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts }],
+              generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
+            }),
+          }
+        );
+      } catch (e) {
+        lastErrText = String(e);
+        continue;
+      }
+      if (geminiRes.ok) break keyLoop;
+      lastErrText = await geminiRes.text();
+      if (isQuotaErrorText(lastErrText)) continue keyLoop; // this key's quota is exhausted -- move on to the next key entirely
+      if (!/503|UNAVAILABLE|high demand/i.test(lastErrText)) break keyLoop; // not a capacity error -- retrying won't help
+      // else: capacity error, keep trying the next model with this same key
     }
-    if (geminiRes.ok) break;
-    lastErrText = await geminiRes.text();
-    // Only worth retrying/falling back on capacity errors — anything else
-    // (bad request, invalid key, etc.) will just fail the same way again.
-    if (!/503|UNAVAILABLE|high demand/i.test(lastErrText)) break;
   }
 
   if (!geminiRes || !geminiRes.ok) {
-    return jsonResponse({ error: 'AI request failed', detail: lastErrText }, 502);
+    const detail = isQuotaErrorText(lastErrText) && apiKeys.length > 1
+      ? `All ${apiKeys.length} configured Gemini keys have used up their free quota for now.`
+      : lastErrText;
+    return jsonResponse({ error: 'AI request failed', detail }, 502);
   }
 
   const geminiData = await geminiRes.json();

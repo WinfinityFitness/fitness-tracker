@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.41">
+<link rel="stylesheet" href="style.css?v=1.7.42">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -1441,6 +1441,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
           <svg viewBox="0 0 24 24" width="16" height="16" class="caliper-entry-chevron" id="weeklyReviewChevron" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
       </div>
+      <button type="button" class="btn" id="btnOpenAiKeys" style="margin-top:10px;">AI API Keys</button>
       <div class="caliper-entry-panel" id="dailyReviewPanel" hidden>
       <p class="mod-tag">Mod_review_daily_11</p>
       <p class="field-group-heading">Daily Review</p>
@@ -2895,6 +2896,25 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
     </label>
     <button type="button" class="btn btn--primary" id="btnAdminDownloadLinksSubmit" style="width:100%;margin-top:10px;">Save</button>
     <p class="save-note" id="adminDownloadLinksNote"></p>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="aiKeysOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>AI API Keys</h2>
+      <button class="sheet-close" id="btnCloseAiKeys">✕</button>
+    </div>
+    <p class="hint hint--sm">Gemini keys used for AI food estimation and meal photo auto-fill. Add more than one (e.g. from different Google accounts) — the app silently switches to the next when one's free quota runs out. Never shown to regular users.</p>
+    <label class="field">
+      <span>Paste New Key</span>
+      <input type="text" id="aiKeyInput" placeholder="Paste your Gemini API key" autocomplete="off">
+    </label>
+    <button type="button" class="btn btn--outline btn--block" id="btnAiKeyAdd" style="margin-top:8px;">+ Add Key</button>
+    <div id="aiKeyList" style="margin-top:12px;display:flex;flex-direction:column;gap:8px;"></div>
+    <button type="button" class="btn btn--primary" id="btnAiKeysSave" style="width:100%;margin-top:12px;">Save</button>
+    <p class="save-note" id="aiKeysNote"></p>
   </div>
 </div>
 
@@ -4541,11 +4561,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.7.41"></script>
+<script src="config.js?v=1.7.42"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.41"></script>
+<script src="app.js?v=1.7.42"></script>
 </body>
 </html>

@@ -249,6 +249,11 @@ body.has-custom-bg { background-color: transparent; }
 
 .tab-panel { display: flex; flex-direction: column; gap: 14px; }
 .tab-panel[hidden] { display: none; }
+/* Menu specifically (not the other tabs) opts out of the decorative
+   body background-image pattern, matching Settings' own solid .sheet
+   background (var(--bg), same variable, just opaque here since this
+   panel sits directly on the page instead of inside an overlay). */
+#tab-menu { background: var(--bg); margin: 0 -16px; padding: 16px; }
 
 /* ---------------- Hero ---------------- */
 .hero-card {
@@ -3502,6 +3507,12 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-head h2 { font-family: var(--font-mono); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.06em; margin: 0; color: var(--cyan); }
 .sheet-close { background: none; border: none; color: var(--text-muted); font-size: 1.3rem; cursor: pointer; padding: 4px 8px; }
+
+.key-row {
+  display: flex; align-items: center; gap: 8px; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 0.82rem;
+}
+.key-row-masked { flex: 1; color: var(--text-muted); font-family: var(--font-mono); letter-spacing: 0.02em; }
 
 /* ================================================================== */
 /* SKIN: Shinobi Core — brutalist / manga-panel reskin.                */

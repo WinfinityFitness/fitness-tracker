@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.41';
+const APP_VERSION = 'WF_SYS_V.1.7.42';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -19763,6 +19763,75 @@ function initAnnouncementWidget() {
     document.getElementById('adminDownloadUrlMessenger').value = (settings && settings.download_url_messenger) || '';
     document.getElementById('adminDownloadLinksOverlay').hidden = false;
   });
+
+  // AI API Keys (Menu tab) -- admin-managed Gemini keys with silent quota
+  // rotation server-side, see supabase_ai_key_rotation_migration.sql. This
+  // button lives directly in the Menu tab (not the admin drawer) per an
+  // explicit request, but the action itself still requires an existing
+  // admin session -- log in via the drawer first, same credentials.
+  let pendingAiKeys = [];
+  function maskAiApiKey(key) {
+    return key && key.length > 12 ? `${key.slice(0, 8)}…${key.slice(-4)}` : (key || '');
+  }
+  function renderAiKeyList() {
+    const list = document.getElementById('aiKeyList');
+    list.innerHTML = pendingAiKeys.map((k, i) => `
+      <div class="key-row">
+        <span>${escapeHtml(k.label || `Key ${i + 1}`)}</span>
+        <span class="key-row-masked">${escapeHtml(maskAiApiKey(k.key))}</span>
+        <button type="button" class="link-btn" data-remove-ai-key="${i}">Remove</button>
+      </div>
+    `).join('') || '<p class="hint hint--sm">No keys saved yet.</p>';
+    list.querySelectorAll('[data-remove-ai-key]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        pendingAiKeys.splice(Number(btn.dataset.removeAiKey), 1);
+        renderAiKeyList();
+      });
+    });
+  }
+  document.getElementById('btnOpenAiKeys').addEventListener('click', async () => {
+    if (!isAdminLoggedIn()) { showRestToast('Admin login required — log in via the drawer first.'); return; }
+    const noteEl = document.getElementById('aiKeysNote');
+    noteEl.textContent = 'Loading…';
+    document.getElementById('aiKeysOverlay').hidden = false;
+    try {
+      const { data, error } = await sb.rpc('admin_get_ai_keys', {
+        p_digital_id: adminSession.digitalId, p_password: adminSession.password,
+      });
+      if (error) throw error;
+      pendingAiKeys = Array.isArray(data) ? data : [];
+      renderAiKeyList();
+      noteEl.textContent = '';
+    } catch (e) {
+      handleAdminRpcError('admin_get_ai_keys', e, noteEl);
+    }
+  });
+  document.getElementById('btnAiKeyAdd').addEventListener('click', () => {
+    const input = document.getElementById('aiKeyInput');
+    const key = input.value.trim();
+    if (!key) return;
+    pendingAiKeys.push({ label: `Key ${pendingAiKeys.length + 1}`, key });
+    input.value = '';
+    renderAiKeyList();
+  });
+  document.getElementById('btnAiKeysSave').addEventListener('click', async () => {
+    const noteEl = document.getElementById('aiKeysNote');
+    if (!isAdminLoggedIn()) { noteEl.textContent = 'Not logged in.'; return; }
+    noteEl.textContent = 'Saving…';
+    try {
+      const { error } = await sb.rpc('admin_set_ai_keys', {
+        p_digital_id: adminSession.digitalId, p_password: adminSession.password, p_keys: pendingAiKeys,
+      });
+      if (error) throw error;
+      document.getElementById('aiKeysOverlay').hidden = true;
+      showRestToast('AI keys saved.');
+    } catch (e) {
+      handleAdminRpcError('admin_set_ai_keys', e, noteEl);
+    }
+  });
+  const aiKeysOverlay = document.getElementById('aiKeysOverlay');
+  document.getElementById('btnCloseAiKeys').addEventListener('click', () => { aiKeysOverlay.hidden = true; });
+  bindOverlayBackdropClose(aiKeysOverlay, () => { aiKeysOverlay.hidden = true; });
   document.getElementById('btnAdminAssignTargets').addEventListener('click', () => {
     ['adminAssignTargetId', 'adminAssignCalorie', 'adminAssignSteps', 'adminAssignWorkouts', 'adminAssignRefeedCalories', 'adminAssignRefeedStart', 'adminAssignRefeedEnd', 'adminAssignSocialLinks'].forEach(id => {
       document.getElementById(id).value = '';
