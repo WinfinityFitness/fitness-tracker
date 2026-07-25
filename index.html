@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.43">
+<link rel="stylesheet" href="style.css?v=1.7.44">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -2111,6 +2111,19 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         </label>
       </div>
       <p class="hint hint--sm" id="showcaseOptinNote"></p>
+    </div>
+
+    <div class="sheet-section">
+      <p class="field-group-heading">My AI API Key (Optional)</p>
+      <p class="hint hint--sm">AI food estimation and meal photo scans already work for free using Winfinity's shared keys. Add your own free Gemini key here only if you want your AI requests to run on your own quota instead of the shared pool — used only for your own requests, stored only on this device, never seen by anyone else.</p>
+      <button type="button" class="btn btn--outline btn--block" id="btnGetPersonalGeminiKey" style="margin-top:8px;">Get a Free Gemini API Key ↗</button>
+      <label class="field" style="margin-top:8px;">
+        <span>Paste New Key</span>
+        <input type="text" id="personalGeminiKeyInput" placeholder="Paste your Gemini API key" autocomplete="off">
+      </label>
+      <button type="button" class="btn btn--outline btn--block" id="btnAddPersonalGeminiKey" style="margin-top:8px;">+ Add Key</button>
+      <div id="personalGeminiKeyList" style="margin-top:12px;display:flex;flex-direction:column;gap:8px;"></div>
+      <p class="hint hint--sm" id="personalGeminiKeyStatus" style="margin-top:8px;"></p>
     </div>
 
   </div>
@@ -4561,11 +4574,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.7.43"></script>
+<script src="config.js?v=1.7.44"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.43"></script>
+<script src="app.js?v=1.7.44"></script>
 </body>
 </html>

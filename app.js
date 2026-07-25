@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.43';
+const APP_VERSION = 'WF_SYS_V.1.7.44';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -7337,6 +7337,7 @@ function initSettingsOverlay() {
   initHydrationReminderSettings();
   initWebSyncSettings();
   initShowcaseOptinSettings();
+  initPersonalGeminiKeySettings();
 }
 
 // Separate, explicit opt-in from the in-app Nexus Leaderboard sharing
@@ -7366,6 +7367,75 @@ function initShowcaseOptinSettings() {
       toggle.checked = !enabled;
       note.textContent = 'Could not update — try again.';
     }
+  });
+}
+
+// Per-device, per-user BYOK Gemini key(s) -- same idea as QuizForge's
+// multi-key setup, but isolated to just this device/user's own requests
+// (never written to the shared admin pool in ai_key_settings, and never
+// readable by anyone else). No client-side quota-rotation logic needed --
+// unlike QuizForge, the edge function itself already retries across every
+// key it's given (see estimate-food-nutrition/index.js's keyLoop), so the
+// client just needs to send its full personal key list on every AI
+// request; the server tries those first, then falls through to the shared
+// admin/env keys automatically if all of them are exhausted or unset.
+function loadPersonalGeminiKeys() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('wft_personal_gemini_keys') || '[]');
+    if (Array.isArray(stored)) return stored;
+  } catch (e) { /* ignore malformed storage */ }
+  return [];
+}
+function savePersonalGeminiKeys(keys) {
+  localStorage.setItem('wft_personal_gemini_keys', JSON.stringify(keys));
+}
+function getPersonalGeminiKeys() {
+  return loadPersonalGeminiKeys().map(k => k.key).filter(k => typeof k === 'string' && k.trim());
+}
+function maskPersonalGeminiKey(key) {
+  return key && key.length > 12 ? `${key.slice(0, 8)}…${key.slice(-4)}` : (key || '');
+}
+function renderPersonalGeminiKeyList() {
+  const list = document.getElementById('personalGeminiKeyList');
+  if (!list) return;
+  const keys = loadPersonalGeminiKeys();
+  const status = document.getElementById('personalGeminiKeyStatus');
+  if (status) {
+    status.textContent = keys.length
+      ? `${keys.length} key${keys.length > 1 ? 's' : ''} saved on this device.`
+      : 'No personal key saved — AI requests use the shared free pool.';
+  }
+  list.innerHTML = keys.map((k, i) => `
+    <div class="key-row">
+      <span>${escapeHtml(k.label || `Key ${i + 1}`)}</span>
+      <span class="key-row-masked">${escapeHtml(maskPersonalGeminiKey(k.key))}</span>
+      <button type="button" class="link-btn" data-remove-personal-gemini-key="${i}">Remove</button>
+    </div>
+  `).join('');
+  list.querySelectorAll('[data-remove-personal-gemini-key]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const keys2 = loadPersonalGeminiKeys();
+      keys2.splice(Number(btn.dataset.removePersonalGeminiKey), 1);
+      savePersonalGeminiKeys(keys2);
+      renderPersonalGeminiKeyList();
+    });
+  });
+}
+function initPersonalGeminiKeySettings() {
+  const addBtn = document.getElementById('btnAddPersonalGeminiKey');
+  const getBtn = document.getElementById('btnGetPersonalGeminiKey');
+  if (!addBtn) return;
+  renderPersonalGeminiKeyList();
+  getBtn.addEventListener('click', () => window.open('https://aistudio.google.com/apikey', '_blank', 'noopener'));
+  addBtn.addEventListener('click', () => {
+    const input = document.getElementById('personalGeminiKeyInput');
+    const key = input.value.trim();
+    if (!key) return;
+    const keys = loadPersonalGeminiKeys();
+    keys.push({ label: `Key ${keys.length + 1}`, key });
+    savePersonalGeminiKeys(keys);
+    input.value = '';
+    renderPersonalGeminiKeyList();
   });
 }
 
@@ -12727,7 +12797,7 @@ async function estimateFoodNutritionWithAI(foodName) {
     res = await fetch(`${SUPABASE_URL}/functions/v1/smooth-service`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-      body: JSON.stringify({ foodName }),
+      body: JSON.stringify({ foodName, personalGeminiKeys: getPersonalGeminiKeys() }),
     });
   } catch (e) {
     throw new Error('AI estimate unavailable — check your connection.');
@@ -12748,7 +12818,7 @@ async function estimateFoodNutritionFromPhoto(imageBase64, mimeType) {
     res = await fetch(`${SUPABASE_URL}/functions/v1/smooth-service`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-      body: JSON.stringify({ imageBase64, imageMimeType: mimeType }),
+      body: JSON.stringify({ imageBase64, imageMimeType: mimeType, personalGeminiKeys: getPersonalGeminiKeys() }),
     });
   } catch (e) {
     throw new Error('AI photo estimate unavailable — check your connection.');
@@ -12769,7 +12839,7 @@ async function estimateFoodFromBarcodePhotos(barcodeImageBase64, barcodeImageMim
     res = await fetch(`${SUPABASE_URL}/functions/v1/smooth-service`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-      body: JSON.stringify({ barcodeImageBase64, barcodeImageMimeType, labelImageBase64, labelImageMimeType }),
+      body: JSON.stringify({ barcodeImageBase64, barcodeImageMimeType, labelImageBase64, labelImageMimeType, personalGeminiKeys: getPersonalGeminiKeys() }),
     });
   } catch (e) {
     throw new Error('AI barcode reading unavailable — check your connection.');

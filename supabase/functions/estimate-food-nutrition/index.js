@@ -94,7 +94,7 @@ function isQuotaErrorText(text) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
-  let foodName, servingDescription, imageBase64, imageMimeType, barcodeImageBase64, barcodeImageMimeType, labelImageBase64, labelImageMimeType, mealMenuText, mealMenuUrl, mealMenuImageBase64, mealMenuImageMimeType;
+  let foodName, servingDescription, imageBase64, imageMimeType, barcodeImageBase64, barcodeImageMimeType, labelImageBase64, labelImageMimeType, mealMenuText, mealMenuUrl, mealMenuImageBase64, mealMenuImageMimeType, personalGeminiKeys;
   try {
     const body = await req.json();
     foodName = body.foodName;
@@ -109,6 +109,13 @@ Deno.serve(async (req) => {
     mealMenuUrl = body.mealMenuUrl;
     mealMenuImageBase64 = body.mealMenuImageBase64;
     mealMenuImageMimeType = body.mealMenuImageMimeType;
+    // Optional per-user BYOK keys (Settings > My AI API Key) -- isolated to
+    // this one request, never persisted server-side. Tried before the
+    // shared admin/env keys below, so a user who added their own key runs
+    // on their own quota instead of the shared pool.
+    personalGeminiKeys = Array.isArray(body.personalGeminiKeys)
+      ? body.personalGeminiKeys.filter((k) => typeof k === 'string' && k.trim())
+      : [];
   } catch {
     return jsonResponse({ error: 'Invalid request body' }, 400);
   }
@@ -126,7 +133,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'foodName, imageBase64, a barcode/label photo pair, or a meal menu text/URL is required' }, 400);
   }
 
-  const apiKeys = await getGeminiApiKeys();
+  const apiKeys = [...personalGeminiKeys, ...(await getGeminiApiKeys())];
   if (!apiKeys.length) {
     return jsonResponse({ error: 'AI estimation is not configured yet — ask the app owner to set GEMINI_API_KEY or add keys via FT\'s Menu > AI API Keys.' }, 500);
   }
