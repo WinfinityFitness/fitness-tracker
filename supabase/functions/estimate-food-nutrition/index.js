@@ -91,6 +91,21 @@ function isQuotaErrorText(text) {
   return /RESOURCE_EXHAUSTED|429|exceeded your current quota|quota/i.test(text || '');
 }
 
+// Anything wrong with THIS SPECIFIC KEY (exhausted quota, invalid/revoked,
+// no permission) -- move on to the next key rather than giving up outright.
+// Found via real testing: a deliberately-bogus key correctly got rejected
+// by Gemini, but since "API key not valid" isn't quota-shaped, the old
+// logic treated it as a non-retryable failure and stopped immediately
+// instead of falling through to the working shared/env key -- meaning one
+// broken personal key would have silently broken food estimation entirely
+// for that user, exactly the fragility this feature was supposed to avoid.
+// Distinct from a REQUEST-shaped error (bad JSON, content policy, etc.),
+// which would fail identically on every key and genuinely isn't worth
+// retrying.
+function isKeySpecificErrorText(text) {
+  return /RESOURCE_EXHAUSTED|429|exceeded your current quota|quota|API_KEY_INVALID|API key not valid|PERMISSION_DENIED|UNAUTHENTICATED|invalid api key/i.test(text || '');
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
@@ -244,15 +259,15 @@ All values are per 100g. calories in kcal, protein/carbs/fat/fiber in grams, sod
       }
       if (geminiRes.ok) break keyLoop;
       lastErrText = await geminiRes.text();
-      if (isQuotaErrorText(lastErrText)) continue keyLoop; // this key's quota is exhausted -- move on to the next key entirely
-      if (!/503|UNAVAILABLE|high demand/i.test(lastErrText)) break keyLoop; // not a capacity error -- retrying won't help
+      if (isKeySpecificErrorText(lastErrText)) continue keyLoop; // something's wrong with THIS key -- move on to the next key entirely
+      if (!/503|UNAVAILABLE|high demand/i.test(lastErrText)) break keyLoop; // a request-shaped error -- every key would fail the same way
       // else: capacity error, keep trying the next model with this same key
     }
   }
 
   if (!geminiRes || !geminiRes.ok) {
-    const detail = isQuotaErrorText(lastErrText) && apiKeys.length > 1
-      ? `All ${apiKeys.length} configured Gemini keys have used up their free quota for now.`
+    const detail = isKeySpecificErrorText(lastErrText) && apiKeys.length > 1
+      ? `None of the ${apiKeys.length} configured Gemini keys worked right now (quota exhausted or invalid).`
       : lastErrText;
     return jsonResponse({ error: 'AI request failed', detail }, 502);
   }
