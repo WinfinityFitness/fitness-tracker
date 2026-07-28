@@ -89,13 +89,13 @@
 <div class="wrap">
   <header class="hero">
     <h1>Winfinity <span class="accent">Coach Portal</span></h1>
-    <p>Owner tools for onboarding coaches, and coach tools for self-managing branding and clients.</p>
+    <p>Owner tools for onboarding coaches, and coach tools for self-managing branding and clients. <strong style="color:var(--good, #34bd7c);">FREE</strong> for everyone right now.</p>
   </header>
 
   <div id="viewLanding" class="landing">
     <button type="button" class="landing-btn" id="btnGoOwner">
       <strong>I'm the Owner</strong>
-      <span>Create coach accounts, set which features they've paid for.</span>
+      <span>Create coach accounts, see what's enabled, lock/unlock users. FREE for everyone right now.</span>
     </button>
     <button type="button" class="landing-btn" id="btnGoCoach">
       <strong>I'm a Coach</strong>
@@ -136,6 +136,23 @@
         <h2>Existing Coaches</h2>
         <div id="coachList"><p class="note">Loading…</p></div>
       </div>
+
+      <div class="card">
+        <h2>Lock / Unlock a User</h2>
+        <p class="note" style="margin-top:0;">Look up any user by Digital ID -- a locked account stops syncing to the leaderboard and can't be attached to any coach.</p>
+        <div class="row2">
+          <label class="field"><span>User Digital ID</span><input type="text" id="userLookupId" placeholder="WF-XXXXXX"></label>
+          <div style="display:flex;align-items:flex-end;"><button type="button" class="btn btn-secondary" id="btnUserLookup" style="width:100%;">Look Up</button></div>
+        </div>
+        <div id="userLookupResult" hidden>
+          <p class="note" id="userLookupInfo"></p>
+          <div class="btn-row">
+            <button type="button" class="btn btn-danger" id="btnLockUser">Lock this account</button>
+            <button type="button" class="btn btn-secondary" id="btnUnlockUser">Unlock this account</button>
+          </div>
+        </div>
+        <p class="note" id="userLookupNote"></p>
+      </div>
     </div>
 
     <!-- Coach detail/edit (owner side) -->
@@ -171,8 +188,10 @@
     <div id="coachPanel" hidden>
       <div class="card">
         <h2>Your Enabled Features</h2>
+        <p class="note" style="margin-top:0;">Free for now — pick which of these your clients (and you) get. You can change this anytime.</p>
         <div class="flags" id="coachOwnFlags"></div>
-        <p class="note">Only the owner can change these — reach out if you need something toggled.</p>
+        <button type="button" class="btn" id="btnSaveOwnFeatures">Save Features</button>
+        <p class="note" id="ownFeaturesNote"></p>
       </div>
 
       <div class="card">
@@ -219,6 +238,51 @@ const FEATURE_KEYS = [
   ['feature_nutrition_logging', 'Nutrition Logging'],
   ['feature_prep_meals', 'Prep Meals Database'],
 ];
+const FEATURE_LABEL = Object.fromEntries(FEATURE_KEYS);
+
+// Prerequisite graph, grounded in how the app actually stores data: every
+// category's entries merge into the same per-date log record, with Core
+// Tracking's daily check-in as the foundation everything else attaches to
+// -- so Training/Outdoor/Nutrition all require it. Prep Meals is a recipe
+// browser that feeds the food diary, so it requires Nutrition Logging.
+const FEATURE_REQUIRES = {
+  feature_resistance_training: ['feature_core_tracking'],
+  feature_outdoor_activity: ['feature_core_tracking'],
+  feature_nutrition_logging: ['feature_core_tracking'],
+  feature_prep_meals: ['feature_nutrition_logging'],
+};
+const FEATURE_REQUIRED_BY = {
+  feature_core_tracking: ['feature_resistance_training', 'feature_outdoor_activity', 'feature_nutrition_logging'],
+  feature_nutrition_logging: ['feature_prep_meals'],
+};
+
+// Attached once per checkbox container (not re-attached on every re-render
+// -- the container element itself persists across innerHTML rebuilds of
+// its children, so one listener here covers every future render).
+function enforceFeatureDependencies(containerEl, attr) {
+  if (!containerEl) return;
+  containerEl.addEventListener('change', (e) => {
+    const cb = e.target;
+    if (!cb.matches(`input[${attr}]`)) return;
+    const key = cb.getAttribute(attr);
+    const find = (k) => containerEl.querySelector(`input[${attr}="${k}"]`);
+    if (cb.checked) {
+      const missing = (FEATURE_REQUIRES[key] || []).filter(p => { const pcb = find(p); return pcb && !pcb.checked; });
+      if (missing.length) {
+        missing.forEach(p => { const pcb = find(p); if (pcb) pcb.checked = true; });
+        alert(`${FEATURE_LABEL[key]} needs ${missing.map(m => FEATURE_LABEL[m]).join(' and ')} to also be on -- turning that on too.`);
+      }
+    } else {
+      const toUncheck = (FEATURE_REQUIRED_BY[key] || []).filter(d => { const dcb = find(d); return dcb && dcb.checked; });
+      if (toUncheck.length) {
+        toUncheck.forEach(d => { const dcb = find(d); if (dcb) dcb.checked = false; });
+        alert(`Turning off ${FEATURE_LABEL[key]} also turns off ${toUncheck.map(d => FEATURE_LABEL[d]).join(' and ')}, since that needs ${FEATURE_LABEL[key]} to work.`);
+      }
+    }
+  });
+}
+enforceFeatureDependencies(document.getElementById('coachDetailFlags'), 'data-flag');
+enforceFeatureDependencies(document.getElementById('coachOwnFlags'), 'data-own-flag');
 
 function show(id) {
   ['viewLanding', 'viewOwner', 'viewCoach'].forEach(v => document.getElementById(v).hidden = (v !== id));
@@ -286,13 +350,21 @@ async function loadCoachList() {
     if (error) throw error;
     if (!data || !data.length) { listEl.innerHTML = '<p class="note">No coaches yet.</p>'; return; }
     listEl.innerHTML = '';
+    const SHORT_LABELS = {
+      feature_core_tracking: 'Core', feature_resistance_training: 'Resistance',
+      feature_outdoor_activity: 'Outdoor', feature_nutrition_logging: 'Nutrition', feature_prep_meals: 'Prep Meals',
+    };
     data.forEach(coach => {
       const row = document.createElement('div');
       row.className = 'coach-row';
+      const flagBadges = FEATURE_KEYS.map(([key]) =>
+        `<span class="badge ${coach[key] ? 'on' : 'off'}" style="font-size:0.66rem;">${SHORT_LABELS[key]}</span>`
+      ).join(' ');
       row.innerHTML = `
         <div>
           <div class="name">${escapeHtml(coach.brand_name)} <span class="badge ${coach.active ? 'on' : 'off'}">${coach.active ? 'Active' : 'Inactive'}</span></div>
           <div class="meta">${escapeHtml(coach.digital_id)} &middot; ${escapeHtml(coach.slug)}.winfinityfitness.com &middot; ${coach.client_count} client(s)</div>
+          <div style="margin-top:6px;">${flagBadges}</div>
         </div>`;
       row.addEventListener('click', () => openCoachDetail(coach));
       listEl.appendChild(row);
@@ -301,6 +373,62 @@ async function loadCoachList() {
     listEl.innerHTML = '<p class="note error">Could not load coaches: ' + escapeHtml(e.message || String(e)) + '</p>';
   }
 }
+
+document.getElementById('btnUserLookup').addEventListener('click', async () => {
+  const note = document.getElementById('userLookupNote');
+  const resultBox = document.getElementById('userLookupResult');
+  const targetId = document.getElementById('userLookupId').value.trim();
+  resultBox.hidden = true;
+  if (!targetId) { note.textContent = 'Enter a Digital ID.'; note.className = 'note error'; return; }
+  note.textContent = 'Looking up…'; note.className = 'note';
+  try {
+    const { data, error } = await sb.rpc('admin_get_user_status', {
+      p_admin_digital_id: ownerSession.digitalId, p_admin_password: ownerSession.password,
+      p_target_public_id: targetId,
+    });
+    if (error) throw error;
+    const status = data && data[0];
+    if (!status) { note.textContent = 'No user found with that Digital ID.'; note.className = 'note error'; return; }
+    note.textContent = '';
+    document.getElementById('userLookupInfo').innerHTML =
+      `<strong>${escapeHtml(status.code_name)}</strong> (${escapeHtml(status.public_id)}) &mdash; ` +
+      `<span class="badge ${status.locked ? 'off' : 'on'}">${status.locked ? 'Locked' : 'Unlocked'}</span>` +
+      (status.attached_coach_name ? ` &middot; coached by ${escapeHtml(status.attached_coach_name)}` : ' &middot; no coach');
+    resultBox.hidden = false;
+    resultBox.dataset.targetId = targetId;
+  } catch (e) {
+    note.textContent = 'Could not look up: ' + (e.message || e); note.className = 'note error';
+  }
+});
+
+document.getElementById('btnLockUser').addEventListener('click', async () => {
+  const targetId = document.getElementById('userLookupResult').dataset.targetId;
+  const note = document.getElementById('userLookupNote');
+  if (!confirm(`Lock ${targetId}? They will stop syncing to the leaderboard and can't be attached to a coach until unlocked.`)) return;
+  try {
+    const { error } = await sb.rpc('admin_lock_user', {
+      p_admin_digital_id: ownerSession.digitalId, p_admin_password: ownerSession.password, p_target_public_id: targetId,
+    });
+    if (error) throw error;
+    document.getElementById('btnUserLookup').click();
+  } catch (e) {
+    note.textContent = 'Could not lock: ' + (e.message || e); note.className = 'note error';
+  }
+});
+
+document.getElementById('btnUnlockUser').addEventListener('click', async () => {
+  const targetId = document.getElementById('userLookupResult').dataset.targetId;
+  const note = document.getElementById('userLookupNote');
+  try {
+    const { error } = await sb.rpc('admin_unlock_user', {
+      p_admin_digital_id: ownerSession.digitalId, p_admin_password: ownerSession.password, p_target_public_id: targetId,
+    });
+    if (error) throw error;
+    document.getElementById('btnUserLookup').click();
+  } catch (e) {
+    note.textContent = 'Could not unlock: ' + (e.message || e); note.className = 'note error';
+  }
+});
 
 let currentCoachDetail = null;
 function openCoachDetail(coach) {
@@ -403,15 +531,36 @@ async function loadCoachOwnFlags() {
     const flags = (data && data[0]) || {};
     el.innerHTML = '';
     FEATURE_KEYS.forEach(([key, label]) => {
-      const badge = document.createElement('span');
-      badge.className = 'badge ' + (flags[key] ? 'on' : 'off');
-      badge.textContent = `${label}: ${flags[key] ? 'On' : 'Off'}`;
-      el.appendChild(badge);
+      const wrap = document.createElement('label');
+      wrap.className = 'flag-toggle';
+      wrap.innerHTML = `<input type="checkbox" data-own-flag="${key}" ${flags[key] ? 'checked' : ''}> ${label}`;
+      el.appendChild(wrap);
     });
   } catch (e) {
     el.innerHTML = '<p class="note error">Could not load: ' + escapeHtml(e.message || String(e)) + '</p>';
   }
 }
+
+document.getElementById('btnSaveOwnFeatures').addEventListener('click', async () => {
+  const note = document.getElementById('ownFeaturesNote');
+  const flags = {};
+  document.querySelectorAll('#coachOwnFlags input[data-own-flag]').forEach(cb => { flags[cb.dataset.ownFlag] = cb.checked; });
+  note.textContent = 'Saving…'; note.className = 'note';
+  try {
+    const { error } = await sb.rpc('coach_set_own_features', {
+      p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
+      p_core_tracking: flags.feature_core_tracking,
+      p_resistance_training: flags.feature_resistance_training,
+      p_outdoor_activity: flags.feature_outdoor_activity,
+      p_nutrition_logging: flags.feature_nutrition_logging,
+      p_prep_meals: flags.feature_prep_meals,
+    });
+    if (error) throw error;
+    note.textContent = 'Saved.'; note.className = 'note success';
+  } catch (e) {
+    note.textContent = 'Could not save: ' + (e.message || e); note.className = 'note error';
+  }
+});
 
 document.getElementById('btnSaveBranding').addEventListener('click', async () => {
   const note = document.getElementById('brandingNote');
