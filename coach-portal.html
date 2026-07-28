@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Winfinity Coach Portal</title>
+<style>
+  :root {
+    --bg: #0a0d12;
+    --panel: #121820;
+    --panel-2: #171f2a;
+    --border: #232d3a;
+    --text-primary: #e8ecf1;
+    --text-muted: #8a97a8;
+    --accent: #ff9f43;
+    --accent-dim: #b9762f;
+    --good: #34bd7c;
+    --critical: #e6516a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 28px 20px 60px; }
+  header.hero { text-align: center; margin-bottom: 24px; }
+  header.hero h1 { font-size: clamp(1.3rem, 3vw, 1.8rem); margin: 0 0 6px; }
+  header.hero h1 .accent { color: var(--accent); }
+  header.hero p { color: var(--text-muted); margin: 0; font-size: 0.88rem; }
+
+  .landing { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-top: 30px; }
+  .landing-btn {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 22px 26px; color: var(--text-primary); cursor: pointer; font-size: 0.95rem;
+    text-align: left; width: 220px;
+  }
+  .landing-btn:hover { border-color: var(--accent); }
+  .landing-btn strong { display: block; font-size: 1.05rem; margin-bottom: 4px; }
+  .landing-btn span { color: var(--text-muted); font-size: 0.82rem; }
+
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 18px; }
+  .card h2 { font-size: 1rem; margin: 0 0 14px; }
+  .field { display: block; margin-bottom: 12px; }
+  .field span { display: block; color: var(--text-muted); font-size: 0.78rem; margin-bottom: 4px; }
+  .field input, .field select {
+    width: 100%; box-sizing: border-box; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 9px 11px; color: var(--text-primary); font-size: 0.9rem;
+  }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .btn {
+    background: var(--accent); color: #1a1200; border: none; border-radius: 8px;
+    padding: 10px 18px; font-size: 0.88rem; font-weight: 600; cursor: pointer;
+  }
+  .btn:hover { background: #ffb366; }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .btn-secondary { background: var(--panel-2); color: var(--text-primary); border: 1px solid var(--border); }
+  .btn-danger { background: var(--critical); color: #fff; }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+  .note { font-size: 0.8rem; color: var(--text-muted); margin: 8px 0 0; }
+  .note.error { color: var(--critical); }
+  .note.success { color: var(--good); }
+
+  .coach-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px;
+    background: var(--bg); cursor: pointer;
+  }
+  .coach-row:hover { border-color: var(--accent); }
+  .coach-row .name { font-weight: 600; }
+  .coach-row .meta { color: var(--text-muted); font-size: 0.78rem; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; margin-left: 6px; }
+  .badge.on { background: rgba(52,189,124,0.15); color: var(--good); }
+  .badge.off { background: rgba(138,151,168,0.15); color: var(--text-muted); }
+
+  .flags { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+  .flag-toggle { display: flex; align-items: center; gap: 8px; font-size: 0.86rem; }
+
+  .client-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.86rem; }
+  .client-row:last-child { border-bottom: none; }
+  .link-btn { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.8rem; padding: 0; }
+
+  .top-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .back-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.85rem; }
+  .back-btn:hover { color: var(--text-primary); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <h1>Winfinity <span class="accent">Coach Portal</span></h1>
+    <p>Owner tools for onboarding coaches, and coach tools for self-managing branding and clients.</p>
+  </header>
+
+  <div id="viewLanding" class="landing">
+    <button type="button" class="landing-btn" id="btnGoOwner">
+      <strong>I'm the Owner</strong>
+      <span>Create coach accounts, set which features they've paid for.</span>
+    </button>
+    <button type="button" class="landing-btn" id="btnGoCoach">
+      <strong>I'm a Coach</strong>
+      <span>Manage your own branding, splash logo, and client roster.</span>
+    </button>
+  </div>
+
+  <!-- ============ OWNER VIEW ============ -->
+  <div id="viewOwner" hidden>
+    <div class="top-actions">
+      <button type="button" class="back-btn" id="btnOwnerBack">&larr; Back</button>
+    </div>
+
+    <div class="card" id="ownerLoginCard">
+      <h2>Owner Login</h2>
+      <label class="field"><span>Digital ID</span><input type="text" id="ownerLoginId" autocomplete="off"></label>
+      <label class="field"><span>Password</span><input type="password" id="ownerLoginPassword" autocomplete="off"></label>
+      <button type="button" class="btn" id="btnOwnerLogin">Log In</button>
+      <p class="note" id="ownerLoginNote"></p>
+    </div>
+
+    <div id="ownerPanel" hidden>
+      <div class="card">
+        <h2>Create a New Coach</h2>
+        <div class="row2">
+          <label class="field"><span>Coach Digital ID</span><input type="text" id="newCoachId" placeholder="WF-COACHNAME"></label>
+          <label class="field"><span>Coach Password</span><input type="text" id="newCoachPassword"></label>
+        </div>
+        <div class="row2">
+          <label class="field"><span>Brand Name</span><input type="text" id="newCoachBrand" placeholder="Coach's Fitness Brand"></label>
+          <label class="field"><span>Subdomain Slug</span><input type="text" id="newCoachSlug" placeholder="coachslug"></label>
+        </div>
+        <button type="button" class="btn" id="btnCreateCoach">Create Coach</button>
+        <p class="note" id="createCoachNote"></p>
+      </div>
+
+      <div class="card">
+        <h2>Existing Coaches</h2>
+        <div id="coachList"><p class="note">Loading…</p></div>
+      </div>
+    </div>
+
+    <!-- Coach detail/edit (owner side) -->
+    <div id="ownerCoachDetail" class="card" hidden>
+      <div class="top-actions">
+        <button type="button" class="back-btn" id="btnCloseCoachDetail">&larr; Back to list</button>
+      </div>
+      <h2 id="coachDetailName"></h2>
+      <p class="note" id="coachDetailMeta"></p>
+      <div class="flags" id="coachDetailFlags"></div>
+      <div class="btn-row">
+        <button type="button" class="btn" id="btnSaveCoachFeatures">Save Features</button>
+        <button type="button" class="btn btn-secondary" id="btnToggleCoachActive"></button>
+      </div>
+      <p class="note" id="coachDetailNote"></p>
+    </div>
+  </div>
+
+  <!-- ============ COACH VIEW ============ -->
+  <div id="viewCoach" hidden>
+    <div class="top-actions">
+      <button type="button" class="back-btn" id="btnCoachBack">&larr; Back</button>
+    </div>
+
+    <div class="card" id="coachLoginCard">
+      <h2>Coach Login</h2>
+      <label class="field"><span>Digital ID</span><input type="text" id="coachLoginId" autocomplete="off"></label>
+      <label class="field"><span>Password</span><input type="password" id="coachLoginPassword" autocomplete="off"></label>
+      <button type="button" class="btn" id="btnCoachLogin">Log In</button>
+      <p class="note" id="coachLoginNote"></p>
+    </div>
+
+    <div id="coachPanel" hidden>
+      <div class="card">
+        <h2>Your Enabled Features</h2>
+        <div class="flags" id="coachOwnFlags"></div>
+        <p class="note">Only the owner can change these — reach out if you need something toggled.</p>
+      </div>
+
+      <div class="card">
+        <h2>Branding</h2>
+        <label class="field"><span>Brand Name</span><input type="text" id="coachBrandName"></label>
+        <label class="field"><span>Logo URL</span><input type="text" id="coachBrandLogo" placeholder="https://..."></label>
+        <div class="row2">
+          <label class="field"><span>Primary Color</span><input type="text" id="coachBrandPrimary" placeholder="#ff2d95"></label>
+          <label class="field"><span>Accent Color</span><input type="text" id="coachBrandAccent" placeholder="#2dff8f"></label>
+        </div>
+        <button type="button" class="btn" id="btnSaveBranding">Save Branding</button>
+        <p class="note" id="brandingNote"></p>
+      </div>
+
+      <div class="card">
+        <h2>Boot Splash Logo</h2>
+        <label class="field"><span>Splash Image URL</span><input type="text" id="coachSplashUrl" placeholder="https://..."></label>
+        <button type="button" class="btn" id="btnSaveSplash">Save Splash</button>
+        <p class="note" id="splashNote"></p>
+      </div>
+
+      <div class="card">
+        <h2>Your Clients</h2>
+        <div class="row2">
+          <label class="field"><span>Attach Client by Digital ID</span><input type="text" id="attachClientId" placeholder="WF-CLIENTID"></label>
+          <div style="display:flex;align-items:flex-end;"><button type="button" class="btn" id="btnAttachClient" style="width:100%;">Attach</button></div>
+        </div>
+        <p class="note" id="attachNote"></p>
+        <div id="clientList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const FEATURE_KEYS = [
+  ['feature_core_tracking', 'Core Tracking'],
+  ['feature_resistance_training', 'Resistance Training'],
+  ['feature_outdoor_activity', 'Outdoor Activity Tracker'],
+  ['feature_nutrition_logging', 'Nutrition Logging'],
+  ['feature_prep_meals', 'Prep Meals Database'],
+];
+
+function show(id) {
+  ['viewLanding', 'viewOwner', 'viewCoach'].forEach(v => document.getElementById(v).hidden = (v !== id));
+}
+document.getElementById('btnGoOwner').addEventListener('click', () => show('viewOwner'));
+document.getElementById('btnGoCoach').addEventListener('click', () => show('viewCoach'));
+document.getElementById('btnOwnerBack').addEventListener('click', () => show('viewLanding'));
+document.getElementById('btnCoachBack').addEventListener('click', () => show('viewLanding'));
+
+// --------------------------------------------------------------------
+// Owner side
+// --------------------------------------------------------------------
+let ownerSession = null; // { digitalId, password }
+
+document.getElementById('btnOwnerLogin').addEventListener('click', async () => {
+  const id = document.getElementById('ownerLoginId').value.trim();
+  const password = document.getElementById('ownerLoginPassword').value;
+  const note = document.getElementById('ownerLoginNote');
+  if (!id || !password) { note.textContent = 'Enter both Digital ID and password.'; note.className = 'note error'; return; }
+  note.textContent = 'Checking…'; note.className = 'note';
+  try {
+    const { error } = await sb.rpc('verify_admin_login', { p_digital_id: id, p_password: password });
+    if (error) throw error;
+    ownerSession = { digitalId: id, password };
+    document.getElementById('ownerLoginCard').hidden = true;
+    document.getElementById('ownerPanel').hidden = false;
+    loadCoachList();
+  } catch (e) {
+    note.textContent = 'Incorrect Digital ID or password.'; note.className = 'note error';
+  }
+});
+
+document.getElementById('btnCreateCoach').addEventListener('click', async () => {
+  const note = document.getElementById('createCoachNote');
+  const digitalId = document.getElementById('newCoachId').value.trim();
+  const password = document.getElementById('newCoachPassword').value;
+  const brand = document.getElementById('newCoachBrand').value.trim();
+  const slug = document.getElementById('newCoachSlug').value.trim().toLowerCase();
+  if (!digitalId || !password || !brand || !slug) { note.textContent = 'Fill in every field.'; note.className = 'note error'; return; }
+  note.textContent = 'Creating…'; note.className = 'note';
+  try {
+    const { error } = await sb.rpc('admin_create_coach', {
+      p_admin_digital_id: ownerSession.digitalId, p_admin_password: ownerSession.password,
+      p_coach_digital_id: digitalId, p_coach_password: password, p_brand_name: brand, p_slug: slug,
+    });
+    if (error) throw error;
+    note.textContent = 'Coach created.'; note.className = 'note success';
+    document.getElementById('newCoachId').value = '';
+    document.getElementById('newCoachPassword').value = '';
+    document.getElementById('newCoachBrand').value = '';
+    document.getElementById('newCoachSlug').value = '';
+    loadCoachList();
+  } catch (e) {
+    note.textContent = 'Could not create coach: ' + (e.message || e); note.className = 'note error';
+  }
+});
+
+async function loadCoachList() {
+  const listEl = document.getElementById('coachList');
+  listEl.innerHTML = '<p class="note">Loading…</p>';
+  try {
+    const { data, error } = await sb.rpc('admin_list_coaches', {
+      p_admin_digital_id: ownerSession.digitalId, p_admin_password: ownerSession.password,
+    });
+    if (error) throw error;
+    if (!data || !data.length) { listEl.innerHTML = '<p class="note">No coaches yet.</p>'; return; }
+    listEl.innerHTML = '';
+    data.forEach(coach => {
+      const row = document.createElement('div');
+      row.className = 'coach-row';
+      row.innerHTML = `
+        <div>
+          <div class="name">${escapeHtml(coach.brand_name)} <span class="badge ${coach.active ? 'on' : 'off'}">${coach.active ? 'Active' : 'Inactive'}</span></div>
+          <div class="meta">${escapeHtml(coach.digital_id)} &middot; ${escapeHtml(coach.slug)}.winfinityfitness.com &middot; ${coach.client_count} client(s)</div>
+        </div>`;
+      row.addEventListener('click', () => openCoachDetail(coach));
+      listEl.appendChild(row);
+    });
+  } catch (e) {
+    listEl.innerHTML = '<p class="note error">Could not load coaches: ' + escapeHtml(e.message || String(e)) + '</p>';
+  }
+}
+
+let currentCoachDetail = null;
+function openCoachDetail(coach) {
+  currentCoachDetail = coach;
+  document.getElementById('ownerPanel').hidden = true;
+  document.getElementById('ownerCoachDetail').hidden = false;
+  document.getElementById('coachDetailName').textContent = coach.brand_name;
+  document.getElementById('coachDetailMeta').textContent = `${coach.digital_id} · ${coach.slug}.winfinityfitness.com · ${coach.client_count} client(s)`;
+  const flagsEl = document.getElementById('coachDetailFlags');
+  flagsEl.innerHTML = '';
+  FEATURE_KEYS.forEach(([key, label]) => {
+    const wrap = document.createElement('label');
+    wrap.className = 'flag-toggle';
+    wrap.innerHTML = `<input type="checkbox" data-flag="${key}" ${coach[key] ? 'checked' : ''}> ${label}`;
+    flagsEl.appendChild(wrap);
+  });
+  const toggleBtn = document.getElementById('btnToggleCoachActive');
+  toggleBtn.textContent = coach.active ? 'Deactivate Coach' : 'Activate Coach';
+  toggleBtn.className = coach.active ? 'btn btn-danger' : 'btn btn-secondary';
+  document.getElementById('coachDetailNote').textContent = '';
+}
+document.getElementById('btnCloseCoachDetail').addEventListener('click', () => {
+  document.getElementById('ownerCoachDetail').hidden = true;
+  document.getElementById('ownerPanel').hidden = false;
+});
+
+document.getElementById('btnSaveCoachFeatures').addEventListener('click', async () => {
+  const note = document.getElementById('coachDetailNote');
+  const flags = {};
+  document.querySelectorAll('#coachDetailFlags input[data-flag]').forEach(cb => { flags[cb.dataset.flag] = cb.checked; });
+  note.textContent = 'Saving…'; note.className = 'note';
+  try {
+    const { error } = await sb.rpc('admin_set_coach_features', {
+      p_admin_digital_id: ownerSession.digitalId, p_admin_password: ownerSession.password,
+      p_coach_id: currentCoachDetail.id,
+      p_core_tracking: flags.feature_core_tracking,
+      p_resistance_training: flags.feature_resistance_training,
+      p_outdoor_activity: flags.feature_outdoor_activity,
+      p_nutrition_logging: flags.feature_nutrition_logging,
+      p_prep_meals: flags.feature_prep_meals,
+    });
+    if (error) throw error;
+    note.textContent = 'Saved.'; note.className = 'note success';
+    loadCoachList();
+  } catch (e) {
+    note.textContent = 'Could not save: ' + (e.message || e); note.className = 'note error';
+  }
+});
+
+document.getElementById('btnToggleCoachActive').addEventListener('click', async () => {
+  const note = document.getElementById('coachDetailNote');
+  const newActive = !currentCoachDetail.active;
+  try {
+    const { error } = await sb.rpc('admin_set_coach_active', {
+      p_admin_digital_id: ownerSession.digitalId, p_admin_password: ownerSession.password,
+      p_coach_id: currentCoachDetail.id, p_active: newActive,
+    });
+    if (error) throw error;
+    currentCoachDetail.active = newActive;
+    openCoachDetail(currentCoachDetail);
+    note.textContent = newActive ? 'Coach reactivated.' : 'Coach deactivated.'; note.className = 'note success';
+    loadCoachList();
+  } catch (e) {
+    note.textContent = 'Could not update: ' + (e.message || e); note.className = 'note error';
+  }
+});
+
+// --------------------------------------------------------------------
+// Coach side
+// --------------------------------------------------------------------
+let coachSession = null; // { digitalId, password }
+
+document.getElementById('btnCoachLogin').addEventListener('click', async () => {
+  const id = document.getElementById('coachLoginId').value.trim();
+  const password = document.getElementById('coachLoginPassword').value;
+  const note = document.getElementById('coachLoginNote');
+  if (!id || !password) { note.textContent = 'Enter both Digital ID and password.'; note.className = 'note error'; return; }
+  note.textContent = 'Checking…'; note.className = 'note';
+  try {
+    const { error } = await sb.rpc('verify_coach_login', { p_digital_id: id, p_password: password });
+    if (error) throw error;
+    coachSession = { digitalId: id, password };
+    document.getElementById('coachLoginCard').hidden = true;
+    document.getElementById('coachPanel').hidden = false;
+    loadCoachOwnFlags();
+    loadCoachClients();
+  } catch (e) {
+    note.textContent = 'Incorrect Digital ID or password.'; note.className = 'note error';
+  }
+});
+
+async function loadCoachOwnFlags() {
+  const el = document.getElementById('coachOwnFlags');
+  el.innerHTML = '<p class="note">Loading…</p>';
+  try {
+    const { data, error } = await sb.rpc('coach_get_feature_flags', {
+      p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
+    });
+    if (error) throw error;
+    const flags = (data && data[0]) || {};
+    el.innerHTML = '';
+    FEATURE_KEYS.forEach(([key, label]) => {
+      const badge = document.createElement('span');
+      badge.className = 'badge ' + (flags[key] ? 'on' : 'off');
+      badge.textContent = `${label}: ${flags[key] ? 'On' : 'Off'}`;
+      el.appendChild(badge);
+    });
+  } catch (e) {
+    el.innerHTML = '<p class="note error">Could not load: ' + escapeHtml(e.message || String(e)) + '</p>';
+  }
+}
+
+document.getElementById('btnSaveBranding').addEventListener('click', async () => {
+  const note = document.getElementById('brandingNote');
+  note.textContent = 'Saving…'; note.className = 'note';
+  try {
+    const { error } = await sb.rpc('coach_update_branding', {
+      p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
+      p_brand_name: document.getElementById('coachBrandName').value.trim(),
+      p_brand_logo_url: document.getElementById('coachBrandLogo').value.trim() || null,
+      p_brand_color_primary: document.getElementById('coachBrandPrimary').value.trim() || null,
+      p_brand_color_accent: document.getElementById('coachBrandAccent').value.trim() || null,
+    });
+    if (error) throw error;
+    note.textContent = 'Saved.'; note.className = 'note success';
+  } catch (e) {
+    note.textContent = 'Could not save: ' + (e.message || e); note.className = 'note error';
+  }
+});
+
+document.getElementById('btnSaveSplash').addEventListener('click', async () => {
+  const note = document.getElementById('splashNote');
+  note.textContent = 'Saving…'; note.className = 'note';
+  try {
+    const { error } = await sb.rpc('coach_set_splash_image', {
+      p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
+      p_image_url: document.getElementById('coachSplashUrl').value.trim() || null,
+      p_image_zoom: 1, p_image_pos_x: 50, p_image_pos_y: 50,
+    });
+    if (error) throw error;
+    note.textContent = 'Saved.'; note.className = 'note success';
+  } catch (e) {
+    note.textContent = 'Could not save: ' + (e.message || e); note.className = 'note error';
+  }
+});
+
+document.getElementById('btnAttachClient').addEventListener('click', async () => {
+  const note = document.getElementById('attachNote');
+  const clientId = document.getElementById('attachClientId').value.trim();
+  if (!clientId) { note.textContent = 'Enter a Digital ID.'; note.className = 'note error'; return; }
+  note.textContent = 'Attaching…'; note.className = 'note';
+  try {
+    const { error } = await sb.rpc('coach_attach_client', {
+      p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
+      p_client_public_id: clientId,
+    });
+    if (error) throw error;
+    note.textContent = 'Attached.'; note.className = 'note success';
+    document.getElementById('attachClientId').value = '';
+    loadCoachClients();
+  } catch (e) {
+    note.textContent = 'Could not attach: ' + (e.message || e); note.className = 'note error';
+  }
+});
+
+async function loadCoachClients() {
+  const el = document.getElementById('clientList');
+  el.innerHTML = '<p class="note">Loading…</p>';
+  try {
+    const { data, error } = await sb.rpc('coach_list_clients', {
+      p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
+    });
+    if (error) throw error;
+    if (!data || !data.length) { el.innerHTML = '<p class="note">No clients attached yet.</p>'; return; }
+    el.innerHTML = '';
+    data.forEach(client => {
+      const row = document.createElement('div');
+      row.className = 'client-row';
+      row.innerHTML = `<span>${escapeHtml(client.public_id)}</span>`;
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'link-btn';
+      removeBtn.textContent = 'Remove';
+      removeBtn.addEventListener('click', () => removeClient(client.public_id));
+      row.appendChild(removeBtn);
+      el.appendChild(row);
+    });
+  } catch (e) {
+    el.innerHTML = '<p class="note error">Could not load clients: ' + escapeHtml(e.message || String(e)) + '</p>';
+  }
+}
+
+async function removeClient(publicId) {
+  try {
+    const { error } = await sb.rpc('coach_remove_client', {
+      p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
+      p_client_public_id: publicId,
+    });
+    if (error) throw error;
+    loadCoachClients();
+  } catch (e) {
+    document.getElementById('attachNote').textContent = 'Could not remove: ' + (e.message || e);
+    document.getElementById('attachNote').className = 'note error';
+  }
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+</script>
+</body>
+</html>
