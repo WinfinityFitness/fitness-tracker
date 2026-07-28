@@ -6521,8 +6521,11 @@ if (isMessengerShellSite) setTimeout(initMessengerShell, 0);
 // Deferred via setTimeout (not called directly) so it runs after the rest of
 // this script finishes its first synchronous pass — sbConfigured() reads the
 // module-level `let sb`, declared much further down, which would otherwise
-// throw (temporal dead zone) if reached this early in the file.
-setTimeout(applyCustomSplashLogo, 0);
+// throw (temporal dead zone) if reached this early in the file. Chained
+// (not two independent setTimeouts) so applyCoachBranding's splash-logo
+// override, if any, deterministically wins over the global default instead
+// of racing it on network timing.
+setTimeout(() => { applyCustomSplashLogo().then(applyCoachBranding); }, 0);
 
 function getProfile() {
   if (wdsRemoteData) return wdsRemoteData.profile;
@@ -18001,6 +18004,75 @@ async function applyCustomSplashLogo() {
   if (!img) return;
   img.src = settings.splash_image_url;
   img.style.cssText = splashImageStyle(settings);
+}
+
+// Coach white-label branding (Phase B of the coach rebrand plan). The slug
+// was already resolved pre-paint in index.html's inline head script
+// (document.documentElement.dataset.coachSlug) -- this does the actual
+// Supabase lookup and applies it. get_coach_branding_by_slug is public/no
+// credentials, since a subdomain visitor needs to see the coach's brand
+// before necessarily having an account or being attached as a client.
+async function fetchCoachBranding(slug) {
+  if (!slug || !sbConfigured()) return null;
+  try {
+    const { data, error } = await sb.rpc('get_coach_branding_by_slug', { p_slug: slug });
+    if (error || !Array.isArray(data) || !data.length) return null;
+    return data[0];
+  } catch (e) { return null; }
+}
+
+// Injects coach colors as CSS custom properties on :root, layered as the
+// outermost override on top of a user's own --skin choice underneath
+// (unlike the 7 hand-authored skins in style.css, coach colors are
+// open-ended input, not a finite curated set, so this generates the rule
+// dynamically rather than adding a new static [data-skin="..."] block).
+// --cyan is this app's primary accent (used throughout for glows/gradient/
+// highlights); --violet is the secondary accent used in the gradient bar.
+// --cyan-glow/--cyan-dim are derived via color-mix() rather than computed
+// by hand in JS, so any valid CSS color the coach picks works correctly.
+function applyCoachBrandColors(brand) {
+  if (!brand || (!brand.brand_color_primary && !brand.brand_color_accent)) return;
+  let styleEl = document.getElementById('coachBrandStyle');
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = 'coachBrandStyle';
+    document.head.appendChild(styleEl);
+  }
+  const rules = [];
+  if (brand.brand_color_primary) {
+    rules.push(`--cyan: ${brand.brand_color_primary};`);
+    rules.push(`--cyan-glow: color-mix(in srgb, ${brand.brand_color_primary} 42%, transparent);`);
+    rules.push(`--cyan-dim: color-mix(in srgb, ${brand.brand_color_primary} 65%, black);`);
+  }
+  if (brand.brand_color_accent) {
+    rules.push(`--violet: ${brand.brand_color_accent};`);
+  }
+  styleEl.textContent = `:root { ${rules.join(' ')} }`;
+}
+
+// The coach's own splash logo (if set) takes priority over the global
+// default applied by applyCustomSplashLogo() just above -- callers chain
+// this after that one resolves (see the setTimeout below) rather than
+// firing both independently, since two competing async writes to the same
+// #splashLogo element racing on network timing could apply them in the
+// wrong order.
+async function applyCoachBranding() {
+  const slug = document.documentElement.dataset.coachSlug;
+  if (!slug) return;
+  const brand = await fetchCoachBranding(slug);
+  if (!brand) return;
+  applyCoachBrandColors(brand);
+  if (brand.splash_image_url) {
+    const img = document.getElementById('splashLogo');
+    if (img) {
+      img.src = brand.splash_image_url;
+      img.style.cssText = splashImageStyle({
+        splash_image_zoom: brand.splash_image_zoom,
+        splash_image_pos_x: brand.splash_image_pos_x,
+        splash_image_pos_y: brand.splash_image_pos_y,
+      });
+    }
+  }
 }
 
 let splashLogoCropState = { zoom: 1, x: 50, y: 50 };
