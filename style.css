@@ -189,8 +189,8 @@ body.has-custom-bg { background-color: transparent; }
 }
 .splash-screen.splash-hide { opacity: 0; pointer-events: none; }
 .splash-logo {
-  width: 96px;
-  height: 96px;
+  width: 192px;
+  height: 192px;
   border-radius: 20%;
   object-fit: cover;
   filter: drop-shadow(0 0 18px var(--cyan-glow));
