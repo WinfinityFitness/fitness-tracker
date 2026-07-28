@@ -18028,8 +18028,20 @@ function escapeHtmlText(str) {
   return div.innerHTML;
 }
 
+// The Group Page only ever opens from the Wellness topnav, i.e. always in
+// desktop-shell context -- the signed-in user's real identity there is
+// wdsRemoteData.shareKey (set by the Digital ID + PIN sign-in flow), NOT
+// getOrCreateShareKey()'s plain-mobile device-local value, which is a
+// different, unrelated identity that happens to also exist in the same
+// browser. Falls back to getOrCreateShareKey() only for Guest Log In mode
+// (wdsRemoteData null there too) or if this ever runs outside the shell --
+// harmless, just resolves to "not attached to a coach" in that case.
+function currentWellnessShareKey() {
+  return (wdsRemoteData && wdsRemoteData.shareKey) || getOrCreateShareKey();
+}
+
 async function loadCoachGroupInfo() {
-  const shareKey = getOrCreateShareKey();
+  const shareKey = currentWellnessShareKey();
   const noCoachNote = document.getElementById('coachGroupNoCoachNote');
   const content = document.getElementById('coachGroupContent');
   if (!sbConfigured() || !shareKey) { noCoachNote.hidden = false; content.hidden = true; return; }
@@ -18076,7 +18088,7 @@ function renderCoachGroupPosts(posts) {
 }
 
 async function loadCoachGroupPosts() {
-  const shareKey = getOrCreateShareKey();
+  const shareKey = currentWellnessShareKey();
   if (!sbConfigured() || !shareKey) { renderCoachGroupPosts([]); return; }
   try {
     const { data, error } = await sb.rpc('get_coach_group_posts', { p_share_key: shareKey });
@@ -18085,7 +18097,7 @@ async function loadCoachGroupPosts() {
 }
 
 async function postToCoachGroup() {
-  const shareKey = getOrCreateShareKey();
+  const shareKey = currentWellnessShareKey();
   const input = document.getElementById('coachGroupComposerInput');
   const message = input.value.trim();
   if (!message) return;
@@ -18188,6 +18200,13 @@ function applyCoachBrandColors(brand) {
 // #splashLogo element racing on network timing could apply them in the
 // wrong order.
 async function applyCoachBranding() {
+  // Name/logo/color/splash rebranding is scoped to the plain mobile FT
+  // app only -- Wellness and Messenger stay shared/unbranded per the
+  // owner's original requirement. Without this guard, the color swap
+  // (a global CSS custom property on <html>) would visibly bleed into
+  // the Wellness dashboard and Messenger too, since they share the same
+  // document root as the mobile app's own boot sequence.
+  if (isDesktopShellSite || isMessengerShellSite) return;
   const brand = await fetchCoachBranding();
   if (!brand) return;
   applyCoachBrandName(brand);
