@@ -63,25 +63,8 @@
     </div>
   </div>
 
-  <p class="wf-footer-copyright">&copy; <span id="wfFooterYear"></span> Winfinity Fitness. All rights reserved.<button type="button" class="wf-visit-admin-btn" id="wfVisitAdminBtn" title="Admin" aria-label="Admin">👁</button><span class="wf-visit-count" id="wfVisitCount" hidden></span></p>
+  <p class="wf-footer-copyright">&copy; <span id="wfFooterYear"></span> Winfinity Fitness. All rights reserved.<span class="wf-visit-count" id="wfVisitCount" hidden></span></p>
 </footer>
-
-<div class="wf-footer-overlay" id="wfAdminUnlockOverlay" hidden>
-  <div class="wf-footer-popup">
-    <button type="button" class="wf-footer-popup-close" data-wf-close>&times;</button>
-    <h3>Admin</h3>
-    <label class="wf-admin-field">
-      <span>Digital ID</span>
-      <input type="text" id="wfAdminId" autocomplete="off">
-    </label>
-    <label class="wf-admin-field">
-      <span>Password</span>
-      <input type="password" id="wfAdminPassword" autocomplete="off">
-    </label>
-    <p class="wf-admin-note" id="wfAdminNote" hidden></p>
-    <button type="button" class="wf-footer-pill" id="wfAdminUnlockBtn" style="width:100%;justify-content:center;">Unlock</button>
-  </div>
-</div>
 
 <div class="wf-footer-overlay" id="wfDonateOverlay" hidden>
   <div class="wf-footer-popup">
@@ -156,19 +139,7 @@
   }
   .wf-footer-col a[href]:not([href="#"]):hover, .wf-footer-col .wf-footer-linkbtn:hover { color: #ff9f43; }
   .wf-footer-copyright { color: #5c6675; font-size: 0.74rem; margin: 0; }
-  .wf-visit-admin-btn {
-    background: none; border: none; color: #5c6675; font-size: 0.8rem; cursor: pointer;
-    padding: 0; margin-left: 8px; vertical-align: middle; opacity: 0.45; line-height: 1;
-  }
-  .wf-visit-admin-btn:hover { opacity: 1; }
   .wf-visit-count { color: #ff9f43; font-size: 0.74rem; margin-left: 8px; font-weight: 600; }
-  .wf-admin-field { display: block; margin-bottom: 12px; }
-  .wf-admin-field span { display: block; color: #8a97a8; font-size: 0.76rem; margin-bottom: 4px; }
-  .wf-admin-field input {
-    width: 100%; box-sizing: border-box; background: #0a0d12; border: 1px solid #232d3a; border-radius: 6px;
-    padding: 8px 10px; color: #e8ecf1; font-size: 0.85rem;
-  }
-  .wf-admin-note { color: #ff6b6b; font-size: 0.78rem; margin: -4px 0 12px; }
 
   .wf-footer-overlay {
     position: fixed; inset: 0; background: rgba(4,6,9,0.72); z-index: 999;

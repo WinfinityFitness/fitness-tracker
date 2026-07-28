@@ -7258,6 +7258,7 @@ function initTabs() {
       if (target === 'leaderboard' && sbConfigured()) {
         pullLeaderboard().then(renderNexusRankings).catch(() => {});
         refreshAppOpensStat();
+        refreshSiteVisitsStat();
         fetchChatMessages().then(renderChatMessages).then(() => {
           if (!currentChatRoomId) markRoomRead('public');
         }).catch(() => {});
@@ -16181,6 +16182,22 @@ async function refreshAppOpensStat() {
     if (!error && data) {
       const el = document.getElementById('nexusAppOpens');
       if (el) el.textContent = Number(data.open_count).toLocaleString();
+    }
+  } catch (e) { /* best effort, opportunistic */ }
+}
+
+// winfinityfitness.com's public visit counter (see
+// supabase_site_visit_counter_migration.sql / footer-embed.js), now shown
+// publicly here too rather than staying admin-only. site_visits itself has
+// zero anon table-read policies (unlike app_stats), so this goes through
+// get_site_visit_count() rather than a raw table select.
+async function refreshSiteVisitsStat() {
+  if (!sbConfigured()) return;
+  try {
+    const { data, error } = await sb.rpc('get_site_visit_count');
+    if (!error && typeof data === 'number') {
+      const el = document.getElementById('nexusSiteVisits');
+      if (el) el.textContent = data.toLocaleString();
     }
   } catch (e) { /* best effort, opportunistic */ }
 }

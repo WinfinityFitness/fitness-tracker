@@ -97,27 +97,13 @@
   document.head.appendChild(sbScript);
 
   // ---------------------------------------------------------------------
-  // Site visit counter -- runs for every visitor (record_site_visit()),
-  // but the count is only ever displayed once this browser has unlocked
-  // Admin via the same Digital ID + password check the app's own admin
-  // login uses (verify_admin_login) -- everyone else just sees the plain
-  // footer with a barely-visible eye icon, nothing that looks countable.
+  // Site visit counter -- runs for every visitor (record_site_visit()) and
+  // the count is shown to everyone, no admin unlock required.
   // ---------------------------------------------------------------------
-  var VISIT_ADMIN_VERIFIED_KEY = 'wf_site_admin_verified_at';
-  var VISIT_ADMIN_VALID_MS = 12 * 60 * 60 * 1000; // re-prompt after 12h
   var VISIT_SESSION_KEY = 'wf_site_visit_recorded';
-  var latestVisitCount = null;
-
-  function isAdminVerified() {
-    var raw = localStorage.getItem(VISIT_ADMIN_VERIFIED_KEY);
-    if (!raw) return false;
-    var ts = parseInt(raw, 10);
-    return !isNaN(ts) && (Date.now() - ts) < VISIT_ADMIN_VALID_MS;
-  }
 
   function showVisitCount(count) {
     var el = document.getElementById('wfVisitCount');
-    latestVisitCount = count;
     el.textContent = count + ' visits';
     el.hidden = false;
   }
@@ -129,40 +115,13 @@
     if (!sessionStorage.getItem(VISIT_SESSION_KEY)) {
       sessionStorage.setItem(VISIT_SESSION_KEY, '1');
       sb.rpc('record_site_visit').then(function (result) {
-        if (result.data != null && isAdminVerified()) showVisitCount(result.data);
+        if (result.data != null) showVisitCount(result.data);
       }).catch(function () { /* best effort -- counter just won't move this visit */ });
-    } else if (isAdminVerified()) {
+    } else {
       sb.rpc('get_site_visit_count').then(function (result) {
         if (result.data != null) showVisitCount(result.data);
       }).catch(function () { /* best effort */ });
     }
-
-    var adminBtn = document.getElementById('wfVisitAdminBtn');
-    var overlay = document.getElementById('wfAdminUnlockOverlay');
-    var unlockBtn = document.getElementById('wfAdminUnlockBtn');
-    var noteEl = document.getElementById('wfAdminNote');
-    adminBtn.addEventListener('click', function () { overlay.hidden = false; });
-    unlockBtn.addEventListener('click', function () {
-      var id = document.getElementById('wfAdminId').value.trim();
-      var pw = document.getElementById('wfAdminPassword').value;
-      noteEl.hidden = true;
-      if (!id || !pw) { noteEl.textContent = 'Enter both Digital ID and password.'; noteEl.hidden = false; return; }
-      unlockBtn.disabled = true;
-      sb.rpc('verify_admin_login', { p_digital_id: id, p_password: pw }).then(function (result) {
-        unlockBtn.disabled = false;
-        if (result.error) { noteEl.textContent = 'Incorrect Digital ID or password.'; noteEl.hidden = false; return; }
-        localStorage.setItem(VISIT_ADMIN_VERIFIED_KEY, String(Date.now()));
-        overlay.hidden = true;
-        document.getElementById('wfAdminId').value = '';
-        document.getElementById('wfAdminPassword').value = '';
-        if (latestVisitCount != null) { showVisitCount(latestVisitCount); return; }
-        sb.rpc('get_site_visit_count').then(function (r) { if (r.data != null) showVisitCount(r.data); });
-      }).catch(function () {
-        unlockBtn.disabled = false;
-        noteEl.textContent = 'Could not verify — try again.';
-        noteEl.hidden = false;
-      });
-    });
   }
 
   // Donate / Contact popups
