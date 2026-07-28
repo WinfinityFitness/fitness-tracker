@@ -98,30 +98,39 @@
 
   // ---------------------------------------------------------------------
   // Site visit counter -- runs for every visitor (record_site_visit()) and
-  // the count is shown to everyone, no admin unlock required.
+  // the count is shown to everyone, no admin unlock required. Combined
+  // with the app's own open count (app_stats.open_count, publicly
+  // readable) into one figure -- same combined "Visits" total shown on
+  // the FT app's Nexus tab, so the two surfaces agree with each other.
   // ---------------------------------------------------------------------
   var VISIT_SESSION_KEY = 'wf_site_visit_recorded';
 
-  function showVisitCount(count) {
+  function showVisitCount(siteVisits, appOpens) {
     var el = document.getElementById('wfVisitCount');
-    el.textContent = count + ' visits';
+    el.textContent = (siteVisits + appOpens) + ' visits';
     el.hidden = false;
+  }
+
+  function fetchAppOpens(sb) {
+    return sb.from('app_stats').select('open_count').eq('id', 1).single()
+      .then(function (result) { return (result.data && typeof result.data.open_count === 'number') ? result.data.open_count : 0; })
+      .catch(function () { return 0; });
   }
 
   function initVisitCounter(sb) {
     // Guarded by sessionStorage, not localStorage -- counts once per
     // browsing session (this tab/window until closed), not once ever, so
     // it still climbs across repeat visits like a normal visit counter.
-    if (!sessionStorage.getItem(VISIT_SESSION_KEY)) {
-      sessionStorage.setItem(VISIT_SESSION_KEY, '1');
-      sb.rpc('record_site_visit').then(function (result) {
-        if (result.data != null) showVisitCount(result.data);
-      }).catch(function () { /* best effort -- counter just won't move this visit */ });
-    } else {
-      sb.rpc('get_site_visit_count').then(function (result) {
-        if (result.data != null) showVisitCount(result.data);
-      }).catch(function () { /* best effort */ });
-    }
+    var siteVisits = !sessionStorage.getItem(VISIT_SESSION_KEY)
+      ? (function () {
+          sessionStorage.setItem(VISIT_SESSION_KEY, '1');
+          return sb.rpc('record_site_visit').then(function (result) { return result.data != null ? result.data : 0; }).catch(function () { return 0; });
+        })()
+      : sb.rpc('get_site_visit_count').then(function (result) { return result.data != null ? result.data : 0; }).catch(function () { return 0; });
+
+    Promise.all([siteVisits, fetchAppOpens(sb)]).then(function (results) {
+      showVisitCount(results[0], results[1]);
+    });
   }
 
   // Donate / Contact popups
