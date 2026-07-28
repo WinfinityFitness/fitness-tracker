@@ -18015,6 +18015,129 @@ async function fetchCoachBranding() {
   } catch (e) { return null; }
 }
 
+// ---------------------------------------------------------------------
+// Wellness "Group Page" (Phase D.5) -- Facebook-Groups-style, per owner
+// reference. Only Discussion (post/read) is real -- Events/Media/Files/
+// People and the admin-tools list are visible "coming soon" stubs, same
+// showRestToast pattern already used for Reels/Marketplace elsewhere in
+// this app, per explicit owner direction to ship the full shell now.
+// ---------------------------------------------------------------------
+function escapeHtmlText(str) {
+  const div = document.createElement('div');
+  div.textContent = str == null ? '' : String(str);
+  return div.innerHTML;
+}
+
+async function loadCoachGroupInfo() {
+  const shareKey = getOrCreateShareKey();
+  const noCoachNote = document.getElementById('coachGroupNoCoachNote');
+  const content = document.getElementById('coachGroupContent');
+  if (!sbConfigured() || !shareKey) { noCoachNote.hidden = false; content.hidden = true; return; }
+  try {
+    const { data, error } = await sb.rpc('get_coach_group_info', { p_share_key: shareKey });
+    const info = (!error && Array.isArray(data) && data[0]) ? data[0] : null;
+    if (!info || !info.has_coach) {
+      noCoachNote.hidden = false;
+      content.hidden = true;
+      return;
+    }
+    noCoachNote.hidden = true;
+    content.hidden = false;
+    document.getElementById('coachGroupName').textContent = info.brand_name + ' Group';
+    document.getElementById('coachGroupMemberCount').textContent =
+      `${info.member_count} member${info.member_count === 1 ? '' : 's'}`;
+    const logoEl = document.getElementById('coachGroupLogo');
+    if (info.brand_logo_url) logoEl.src = info.brand_logo_url;
+  } catch (e) {
+    noCoachNote.hidden = false;
+    content.hidden = true;
+  }
+}
+
+function renderCoachGroupPosts(posts) {
+  const listEl = document.getElementById('coachGroupPosts');
+  const emptyEl = document.getElementById('coachGroupPostsEmpty');
+  if (!posts || !posts.length) {
+    listEl.innerHTML = '';
+    emptyEl.hidden = false;
+    return;
+  }
+  emptyEl.hidden = true;
+  listEl.innerHTML = posts.map(p => `
+    <div class="coach-group-post">
+      <div class="coach-group-post-head">
+        <span class="coach-group-post-author">${escapeHtmlText(p.code_name)}</span>
+        <span class="coach-group-post-time">${new Date(p.created_at).toLocaleString()}</span>
+      </div>
+      <div class="coach-group-post-message">${escapeHtmlText(p.message)}</div>
+      ${p.image_url ? `<img src="${escapeHtmlText(p.image_url)}" alt="" style="max-width:100%;border-radius:8px;margin-top:8px;">` : ''}
+    </div>
+  `).join('');
+}
+
+async function loadCoachGroupPosts() {
+  const shareKey = getOrCreateShareKey();
+  if (!sbConfigured() || !shareKey) { renderCoachGroupPosts([]); return; }
+  try {
+    const { data, error } = await sb.rpc('get_coach_group_posts', { p_share_key: shareKey });
+    renderCoachGroupPosts(!error && Array.isArray(data) ? data : []);
+  } catch (e) { renderCoachGroupPosts([]); }
+}
+
+async function postToCoachGroup() {
+  const shareKey = getOrCreateShareKey();
+  const input = document.getElementById('coachGroupComposerInput');
+  const message = input.value.trim();
+  if (!message) return;
+  if (!sbConfigured() || !shareKey) { showRestToast('Could not post -- try again.'); return; }
+  try {
+    const { error } = await sb.rpc('post_to_coach_group', { p_share_key: shareKey, p_message: message, p_image_url: null });
+    if (error) throw error;
+    input.value = '';
+    loadCoachGroupPosts();
+  } catch (e) {
+    showRestToast('Could not post: ' + (e.message || e));
+  }
+}
+
+function openCoachGroupOverlay() {
+  document.getElementById('coachGroupOverlay').hidden = false;
+  loadCoachGroupInfo();
+  loadCoachGroupPosts();
+}
+function closeCoachGroupOverlay() {
+  document.getElementById('coachGroupOverlay').hidden = true;
+}
+
+function initCoachGroupPage() {
+  const btn = document.getElementById('wdsGroupsBtn');
+  if (btn) btn.addEventListener('click', openCoachGroupOverlay);
+  const closeBtn = document.getElementById('btnCloseCoachGroup');
+  if (closeBtn) closeBtn.addEventListener('click', closeCoachGroupOverlay);
+  const postBtn = document.getElementById('btnCoachGroupPost');
+  if (postBtn) postBtn.addEventListener('click', postToCoachGroup);
+
+  const inviteBtn = document.getElementById('btnCoachGroupInvite');
+  if (inviteBtn) inviteBtn.addEventListener('click', () => showRestToast('Inviting members from here is coming soon -- for now, your coach attaches clients from the Coach Portal.'));
+  const shareBtn = document.getElementById('btnCoachGroupShare');
+  if (shareBtn) shareBtn.addEventListener('click', () => showRestToast('Sharing your group is coming soon.'));
+
+  document.querySelectorAll('#coachGroupTabs .coach-group-tab').forEach(tabBtn => {
+    tabBtn.addEventListener('click', () => {
+      document.querySelectorAll('#coachGroupTabs .coach-group-tab').forEach(b => b.classList.remove('is-active'));
+      tabBtn.classList.add('is-active');
+      const isDiscussion = tabBtn.dataset.groupTab === 'discussion';
+      document.getElementById('coachGroupPanelDiscussion').hidden = !isDiscussion;
+      document.getElementById('coachGroupPanelStub').hidden = isDiscussion;
+      if (!isDiscussion) showRestToast(`${tabBtn.textContent} is coming soon.`);
+    });
+  });
+
+  document.querySelectorAll('#coachGroupAdminTools .coach-group-stub-item').forEach(stubBtn => {
+    stubBtn.addEventListener('click', () => showRestToast(`${stubBtn.dataset.stub} is coming soon.`));
+  });
+}
+
 // Swaps the app's displayed name (header title + small header logo) for an
 // attached client -- deliberately NOT the ~20+ other hardcoded "Winfinity"
 // references (footer copyright, legal pages, donation dialogs); those stay
@@ -21539,6 +21662,7 @@ safeInit(initSplashLogoManager, 'initSplashLogoManager');
 safeInit(initSyncLogsShare, 'initSyncLogsShare');
 safeInit(initMediaSyncWidget, 'initMediaSyncWidget');
 safeInit(initFoodPrepsOverlay, 'initFoodPrepsOverlay');
+safeInit(initCoachGroupPage, 'initCoachGroupPage');
 safeInit(initPrepMealManager, 'initPrepMealManager');
 safeInit(initPrepMealEditor, 'initPrepMealEditor');
 safeInit(() => initClickToRevealHint('adjustedBmiTile', 'adjustedBmiHint'), 'initAdjustedBmiHint');

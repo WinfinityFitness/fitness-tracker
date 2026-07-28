@@ -3265,6 +3265,79 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
+<!-- ============ WELLNESS: COACH GROUP PAGE ============
+     Facebook-Groups-style, per owner-provided reference screenshots.
+     Only the Discussion tab is real (posts to/reads from
+     coach_group_posts) -- Events/Media/Files/People and the admin-tools
+     sidebar are a visible "coming soon" preview of the eventual shape,
+     not backed by anything yet, per explicit owner direction to ship the
+     full shell now and sort out which pieces are worth building later. -->
+<div class="sheet-overlay sheet-overlay--fullscreen" id="coachGroupOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>My Group</h2>
+      <button class="sheet-close" id="btnCloseCoachGroup">✕</button>
+    </div>
+
+    <div id="coachGroupNoCoachNote" class="empty-note" hidden>
+      You're not attached to a coach yet — once your coach adds you, your group will show up here.
+    </div>
+
+    <div id="coachGroupContent" hidden>
+      <div class="coach-group-cover">
+        <img id="coachGroupLogo" src="icons/icon-192.png" alt="">
+        <div class="coach-group-cover-info">
+          <h3 id="coachGroupName">Coach Group</h3>
+          <p id="coachGroupMemberCount" class="coach-group-meta">– members</p>
+        </div>
+      </div>
+      <div class="coach-group-actions">
+        <button type="button" class="btn glass-emboss" id="btnCoachGroupInvite">+ Invite</button>
+        <button type="button" class="btn btn-secondary" id="btnCoachGroupShare">Share</button>
+      </div>
+
+      <div class="coach-group-tabs" id="coachGroupTabs">
+        <button type="button" class="coach-group-tab is-active" data-group-tab="discussion">Discussion</button>
+        <button type="button" class="coach-group-tab" data-group-tab="events">Events</button>
+        <button type="button" class="coach-group-tab" data-group-tab="media">Media</button>
+        <button type="button" class="coach-group-tab" data-group-tab="files">Files</button>
+        <button type="button" class="coach-group-tab" data-group-tab="people">People</button>
+      </div>
+
+      <div id="coachGroupPanelDiscussion">
+        <div class="coach-group-composer">
+          <textarea id="coachGroupComposerInput" placeholder="Write something to your group…" rows="2"></textarea>
+          <button type="button" class="btn glass-emboss" id="btnCoachGroupPost" style="width:100%;margin-top:8px;">Post</button>
+        </div>
+        <div id="coachGroupPosts"></div>
+        <p class="empty-note" id="coachGroupPostsEmpty" hidden>No posts yet — be the first to write something.</p>
+      </div>
+
+      <div id="coachGroupPanelStub" hidden>
+        <p class="empty-note">Coming soon.</p>
+      </div>
+
+      <div class="chart-card" style="margin-top:14px;">
+        <p class="field-group-heading" style="margin-top:0;">Featured</p>
+        <p class="empty-note">Members won't see this section when it's empty.</p>
+      </div>
+      <div class="chart-card">
+        <p class="field-group-heading" style="margin-top:0;">About</p>
+        <p class="coach-group-meta">🔒 Private — only your coach's members can see this group.</p>
+      </div>
+      <div class="chart-card" id="coachGroupAdminTools">
+        <p class="field-group-heading" style="margin-top:0;">Group Tools</p>
+        <button type="button" class="coach-group-stub-item" data-stub="Participant requests">Participant requests</button>
+        <button type="button" class="coach-group-stub-item" data-stub="Pending posts">Pending posts</button>
+        <button type="button" class="coach-group-stub-item" data-stub="Group rules">Group rules</button>
+        <button type="button" class="coach-group-stub-item" data-stub="Insights">Insights</button>
+        <button type="button" class="coach-group-stub-item" data-stub="Activity log">Activity log</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="prep-meal-thumb-preview" id="foodPrepsThumbPreview" hidden>
   <img id="foodPrepsThumbPreviewImg" src="" alt="">
 </div>
@@ -3566,6 +3639,9 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
           </div>
           <div class="wds-chat-list-items" id="wdsChatListItems"><p class="empty-note">Loading…</p></div>
         </div>
+        <button type="button" class="wds-icon-btn" id="wdsGroupsBtn" aria-label="My Group" title="My Coach Group">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </button>
         <button type="button" class="wds-icon-btn" id="wdsBellBtn" aria-label="Notifications">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           <span class="wds-bell-badge" id="wdsBellBadge" hidden>0</span>

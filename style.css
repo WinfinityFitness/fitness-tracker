@@ -6642,3 +6642,51 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
   .wds-grid, .wds-grid--nexus { grid-template-columns: 1fr; }
   .wds-card--wide, .wds-tile-row, .wds-card--protocol { grid-column: span 1; }
 }
+
+/* ---------- Coach Group Page (Wellness) ---------- */
+.coach-group-cover {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px; margin-bottom: 12px;
+  background: linear-gradient(135deg, var(--cyan-dim), var(--violet));
+  border-radius: var(--card-radius);
+}
+.coach-group-cover img { width: 56px; height: 56px; border-radius: 14px; object-fit: cover; background: var(--bg); }
+.coach-group-cover-info h3 { margin: 0 0 4px; font-size: 1.1rem; color: #fff; }
+.coach-group-meta { color: var(--text-secondary); font-size: 0.8rem; margin: 0; }
+.coach-group-cover .coach-group-meta { color: rgba(255,255,255,0.82); }
+.coach-group-actions { display: flex; gap: 10px; margin-bottom: 14px; }
+.coach-group-actions .btn { flex: 1; }
+
+.coach-group-tabs {
+  display: flex; gap: 4px; overflow-x: auto; margin-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.coach-group-tab {
+  background: none; border: none; color: var(--text-muted);
+  padding: 9px 12px; font-size: 0.84rem; cursor: pointer; white-space: nowrap;
+  border-bottom: 2px solid transparent;
+}
+.coach-group-tab.is-active { color: var(--cyan); border-bottom-color: var(--cyan); font-weight: 600; }
+
+.coach-group-composer { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--card-radius); padding: 12px; margin-bottom: 14px; }
+.coach-group-composer textarea {
+  width: 100%; box-sizing: border-box; background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 9px 11px; color: var(--text-primary); font-size: 0.88rem;
+  font-family: inherit; resize: vertical;
+}
+.coach-group-post {
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--card-radius);
+  padding: 12px; margin-bottom: 10px;
+}
+.coach-group-post-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.coach-group-post-author { font-weight: 600; font-size: 0.86rem; }
+.coach-group-post-time { color: var(--text-muted); font-size: 0.72rem; }
+.coach-group-post-message { font-size: 0.88rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+
+.coach-group-stub-item {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; background: none; border: none; border-top: 1px solid var(--border);
+  color: var(--text-secondary); padding: 10px 2px; font-size: 0.85rem; cursor: pointer; text-align: left;
+}
+.coach-group-stub-item:first-child { border-top: none; }
+.coach-group-stub-item::after { content: 'Coming soon'; font-size: 0.68rem; color: var(--text-muted); }
