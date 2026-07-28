@@ -18199,6 +18199,42 @@ function applyCoachBrandColors(brand) {
 // firing both independently, since two competing async writes to the same
 // #splashLogo element racing on network timing could apply them in the
 // wrong order.
+// Cached coach feature-flag state (Phase C). null = not attached to a coach
+// (or not loaded yet) -- both cases mean "unrestricted," matching this
+// app's default-open posture for anyone not opted into coaching. This is
+// a soft, client-side UI layer for 4 of the 5 flags -- confirmed by
+// reading the actual write path (updateLogFields() -> localStorage only,
+// no per-entry Supabase RPC to gate server-side), same honor-system trust
+// level as everything else in this codebase. Prep Meals is the one flag
+// with real server-side enforcement (get_prep_meals RPC), independent of
+// this client-side layer.
+let coachFeatureFlags = null;
+function isFeatureEnabled(key) {
+  if (!coachFeatureFlags || !coachFeatureFlags.has_coach) return true;
+  return !!coachFeatureFlags[key];
+}
+
+// Hides the well-scoped sub-sections that can be safely toggled without
+// touching tab-routing/default-landing logic: Resistance Training and
+// Outdoor Activity (both live inside the Training tab, gated independently
+// per the owner's spec even though they share a tab). Core Tracking (whole
+// Status tab) and Nutrition Logging (whole Fuel tab) are NOT gated here yet
+// -- both tabs have identity/system elements (e.g. the Status tab's Digital
+// ID display) that must stay visible regardless of the tracking flag, and
+// gating them correctly needs untangling that from the tracking-specific
+// content first rather than hiding the whole tab wholesale.
+function applyCoachFeatureGating() {
+  const resistanceEl = document.getElementById('resistanceTrainingSection');
+  if (resistanceEl) resistanceEl.hidden = !isFeatureEnabled('feature_resistance_training');
+  const outdoorEl = document.getElementById('outdoorActivitySection');
+  if (outdoorEl) outdoorEl.hidden = !isFeatureEnabled('feature_outdoor_activity');
+  // Prep Meals' entry point (the Media Sync "food prep options" widget) --
+  // renderMediaSyncWidget() itself checks isFeatureEnabled('feature_prep_meals')
+  // (see the guard added there), this just re-triggers it now that the
+  // flag is known, in case it already rendered before this resolved.
+  if (typeof renderMediaSyncWidget === 'function') renderMediaSyncWidget();
+}
+
 async function applyCoachBranding() {
   // Name/logo/color/splash rebranding is scoped to the plain mobile FT
   // app only -- Wellness and Messenger stay shared/unbranded per the
@@ -18208,6 +18244,8 @@ async function applyCoachBranding() {
   // document root as the mobile app's own boot sequence.
   if (isDesktopShellSite || isMessengerShellSite) return;
   const brand = await fetchCoachBranding();
+  coachFeatureFlags = brand; // null if unattached -- isFeatureEnabled() treats that as unrestricted
+  applyCoachFeatureGating();
   if (!brand) return;
   applyCoachBrandName(brand);
   applyCoachBrandColors(brand);
@@ -18498,6 +18536,7 @@ async function renderMediaSyncWidget() {
   const card = document.getElementById('mediaSyncCard');
   if (!card) return;
   if (!sbConfigured()) { card.hidden = true; return; }
+  if (typeof isFeatureEnabled === 'function' && !isFeatureEnabled('feature_prep_meals')) { card.hidden = true; return; }
   const settings = await fetchMediaSyncSettings();
   mediaSyncSettings = settings || { mode: 'still', image_urls: [], duration_sec: 10, randomize: false };
   const img = document.getElementById('mediaSyncImage');
