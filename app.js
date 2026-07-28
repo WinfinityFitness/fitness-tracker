@@ -18685,7 +18685,15 @@ function applyPrepMealImage(imgEl, meal) {
 async function fetchPrepMeals() {
   if (!sbConfigured()) return [];
   try {
-    const { data, error } = await sb.from('prep_meals').select('*').order('created_at', { ascending: true });
+    // Admin management (renderPrepMealManager) needs the full, unfiltered
+    // catalog regardless of the admin's own device's coach-attachment
+    // status -- only the regular browsing view is feature-gated.
+    if (isAdminLoggedIn()) {
+      const { data, error } = await sb.from('prep_meals').select('*').order('created_at', { ascending: true });
+      if (error) return [];
+      return data || [];
+    }
+    const { data, error } = await sb.rpc('get_prep_meals', { p_share_key: getOrCreateShareKey() });
     if (error) return [];
     return data || [];
   } catch (e) { return []; }
