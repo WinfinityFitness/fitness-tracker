@@ -35,25 +35,6 @@ if (location.hostname === 'messenger.winfinityfitness.com' || new URLSearchParam
 if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operator_pin')) {
   document.documentElement.classList.add('wf-resume-session');
 }
-// Coach white-label subdomains (<slug>.winfinityfitness.com), same "tag
-// before first paint" reasoning as wf-desktop-shell above -- this does NOT
-// fetch branding from Supabase here (that would block first paint on a
-// network call); it only tags the DOM so app.js's fetchCoachBranding()
-// knows which slug to look up once it runs, and CSS can key off
-// [data-coach-slug] if needed. ?coachPreview=<slug> is the local-testing
-// escape hatch, matching the existing ?wdsPreview/?wdsMsgPreview pattern.
-(function () {
-  var reserved = ['wellness', 'messenger', 'app', 'www'];
-  var preview = new URLSearchParams(location.search).get('coachPreview');
-  var slug = null;
-  if (preview) {
-    slug = preview.toLowerCase();
-  } else {
-    var m = location.hostname.match(/^([a-z0-9-]+)\.winfinityfitness\.com$/i);
-    if (m && reserved.indexOf(m[1].toLowerCase()) === -1) slug = m[1].toLowerCase();
-  }
-  if (slug) document.documentElement.dataset.coachSlug = slug;
-})();
 </script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
@@ -414,8 +395,8 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
 
 <header class="app-header">
   <div class="brand">
-    <img class="brand-logo" src="icons/icon-192.png" alt="" width="28" height="28">
-    <h1>WINFINITY</h1>
+    <img class="brand-logo" src="icons/icon-192.png" alt="" width="28" height="28" id="brandHeaderLogo">
+    <h1 id="brandHeaderTitle">WINFINITY</h1>
   </div>
   <div class="header-right">
     <span class="app-header-sub" id="headerToday"></span>

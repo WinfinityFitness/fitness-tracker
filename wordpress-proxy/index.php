@@ -46,49 +46,6 @@ function fetchUpstream($url) {
     ];
 }
 
-// Resolves a coach subdomain slug to their brand config via Supabase,
-// with a short-lived on-disk cache. Never throws -- any failure (network,
-// bad response, unknown slug) returns null and the caller falls back to
-// default Winfinity branding, since a branding lookup failing is not a
-// reason to break the page load.
-function fetchCoachBranding($slug) {
-    $cacheFile = sys_get_temp_dir() . '/wf_coach_brand_' . preg_replace('/[^a-z0-9-]/', '', $slug) . '.json';
-    $cacheTtlSeconds = 300;
-    if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < $cacheTtlSeconds) {
-        $cached = json_decode(file_get_contents($cacheFile), true);
-        return $cached === null ? null : ($cached ?: null); // cached {} means "looked up, no match"
-    }
-
-    $supabaseUrl = 'https://mzkjboplfalauivwcnni.supabase.co';
-    $supabaseAnonKey = 'sb_publishable_YwHBnvbBjd8Oj8hgPXb_JA_buurC92v';
-
-    $ch = curl_init($supabaseUrl . '/rest/v1/rpc/get_coach_branding_by_slug');
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['p_slug' => $slug]));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'apikey: ' . $supabaseAnonKey,
-        'Content-Type: application/json',
-    ]);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 4);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 6);
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    if ($response === false || $httpCode !== 200) {
-        // Don't cache a failure -- retry on the very next request rather
-        // than pinning "no branding" for the full TTL on a transient error.
-        return null;
-    }
-    $rows = json_decode($response, true);
-    $brand = (is_array($rows) && count($rows) > 0) ? $rows[0] : [];
-    // Cache even the empty-result case (unknown slug) so a bad/typo'd
-    // subdomain doesn't hammer Supabase on every request either.
-    @file_put_contents($cacheFile, json_encode($brand));
-    return $brand ?: null;
-}
-
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 if ($path === '/' || $path === '' || $path === null) {
     $path = '/index.html';
@@ -166,32 +123,10 @@ if ($host === 'wellness.winfinityfitness.com') {
         'title' => 'Winfinity Messenger',
         'icon' => 'icons/icon-192.png',
     ];
-} else {
-    // Coach white-label subdomains: <slug>.winfinityfitness.com. Looked up
-    // against Supabase (get_coach_branding_by_slug — a public RPC, coaches
-    // itself has zero anon table-read policies so a raw REST select would
-    // always return empty) rather than hardcoded, since this needs to
-    // scale to any number of coaches without editing this file per coach.
-    // Cached briefly on disk so this doesn't add a network round-trip to
-    // every single request on an actively-loading page.
-    $reserved = ['wellness', 'messenger', 'app', 'www'];
-    if (preg_match('/^([a-z0-9-]+)\.winfinityfitness\.com$/', $host, $m) && !in_array($m[1], $reserved, true)) {
-        $slug = $m[1];
-        $coachBrand = fetchCoachBranding($slug);
-        if ($coachBrand) {
-            $brand = [
-                // No per-coach manifest file exists (that would need a
-                // dynamically-generated manifest endpoint, not just a
-                // string swap to a static file like wellness/messenger
-                // use) -- left pointing at the default manifest for now.
-                // Title/icon still correctly reflect the coach's brand.
-                'manifest' => 'manifest.webmanifest',
-                'title' => $coachBrand['brand_name'],
-                'icon' => $coachBrand['brand_logo_url'] ?: 'icons/icon-192.png',
-            ];
-        }
-    }
 }
+// No per-coach subdomain branch -- coach branding resolves per attached
+// client (coach_clients, via get_my_coach_features) inside the running
+// app, not per URL. There is no separate install/subdomain per coach.
 if ($brand && $result['contentType'] && stripos($result['contentType'], 'text/html') !== false) {
     $body = str_replace(
         '<link rel="manifest" href="manifest.webmanifest">',

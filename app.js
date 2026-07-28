@@ -17995,19 +17995,36 @@ async function applyCustomSplashLogo() {
   img.style.cssText = splashImageStyle(settings);
 }
 
-// Coach white-label branding (Phase B of the coach rebrand plan). The slug
-// was already resolved pre-paint in index.html's inline head script
-// (document.documentElement.dataset.coachSlug) -- this does the actual
-// Supabase lookup and applies it. get_coach_branding_by_slug is public/no
-// credentials, since a subdomain visitor needs to see the coach's brand
-// before necessarily having an account or being attached as a client.
-async function fetchCoachBranding(slug) {
-  if (!slug || !sbConfigured()) return null;
+// Coach white-label branding (Phase B, reworked). There is no per-coach
+// subdomain/website -- everyone uses the same shared app/URL/install. A
+// client sees their own coach's name/logo based on which coach they're
+// ATTACHED to (coach_clients), resolved from this device's own share_key
+// via get_my_coach_features -- the same self-service, no-credentials call
+// already used for feature-flag lookup, extended to also carry brand/
+// splash fields. Before attachment (or if get_my_coach_features can't be
+// reached), the client just sees default Winfinity branding -- same as
+// anyone else.
+async function fetchCoachBranding() {
+  if (!sbConfigured()) return null;
   try {
-    const { data, error } = await sb.rpc('get_coach_branding_by_slug', { p_slug: slug });
-    if (error || !Array.isArray(data) || !data.length) return null;
+    const shareKey = getOrCreateShareKey();
+    if (!shareKey) return null;
+    const { data, error } = await sb.rpc('get_my_coach_features', { p_share_key: shareKey });
+    if (error || !Array.isArray(data) || !data.length || !data[0].has_coach) return null;
     return data[0];
   } catch (e) { return null; }
+}
+
+// Swaps the app's displayed name (header title + small header logo) for an
+// attached client -- deliberately NOT the ~20+ other hardcoded "Winfinity"
+// references (footer copyright, legal pages, donation dialogs); those stay
+// as-is for now, an explicit scope decision, not an oversight.
+function applyCoachBrandName(brand) {
+  if (!brand || !brand.brand_name) return;
+  const titleEl = document.getElementById('brandHeaderTitle');
+  if (titleEl) titleEl.textContent = brand.brand_name.toUpperCase();
+  const logoEl = document.getElementById('brandHeaderLogo');
+  if (logoEl && brand.brand_logo_url) logoEl.src = brand.brand_logo_url;
 }
 
 // Injects coach colors as CSS custom properties on :root, layered as the
@@ -18048,10 +18065,9 @@ function applyCoachBrandColors(brand) {
 // #splashLogo element racing on network timing could apply them in the
 // wrong order.
 async function applyCoachBranding() {
-  const slug = document.documentElement.dataset.coachSlug;
-  if (!slug) return;
-  const brand = await fetchCoachBranding(slug);
+  const brand = await fetchCoachBranding();
   if (!brand) return;
+  applyCoachBrandName(brand);
   applyCoachBrandColors(brand);
   if (brand.splash_image_url) {
     const img = document.getElementById('splashLogo');
