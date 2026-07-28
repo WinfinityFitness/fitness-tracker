@@ -7260,8 +7260,7 @@ function initTabs() {
       }
       if (target === 'leaderboard' && sbConfigured()) {
         pullLeaderboard().then(renderNexusRankings).catch(() => {});
-        refreshAppOpensStat();
-        refreshSiteVisitsStat();
+        refreshTotalVisitsStat();
         fetchChatMessages().then(renderChatMessages).then(() => {
           if (!currentChatRoomId) markRoomRead('public');
         }).catch(() => {});
@@ -16160,48 +16159,38 @@ function sbConfigured() {
 }
 
 // Global (all-users, not per-device) counter of how many times the app has
-// been opened — shown on the Nexus tab. Fires once per app load; the write
-// itself happens server-side via increment_app_opens() (see
-// supabase_app_opens_migration.sql) so a client can never set the count to
-// an arbitrary value, only bump it by one.
+// been opened. Fires once per app load; the write itself happens
+// server-side via increment_app_opens() (see supabase_app_opens_migration.sql)
+// so a client can never set the count to an arbitrary value, only bump it
+// by one. The Nexus tab shows this combined with the website's own visit
+// counter (see refreshTotalVisitsStat below), not on its own, so this
+// doesn't paint any element directly -- just records the open.
 async function incrementAppOpens() {
   if (!sbConfigured()) return;
-  try {
-    const { data, error } = await sb.rpc('increment_app_opens');
-    if (!error && typeof data === 'number') {
-      const el = document.getElementById('nexusAppOpens');
-      if (el) el.textContent = data.toLocaleString();
-    }
-  } catch (e) { /* best effort, opportunistic */ }
+  try { await sb.rpc('increment_app_opens'); } catch (e) { /* best effort, opportunistic */ }
 }
 
-// Re-reads the current total (not just the value from our own increment)
-// so it stays accurate against everyone else's opens too, each time the
-// Nexus tab is actually viewed.
-async function refreshAppOpensStat() {
+// Nexus tab shows one combined "total visits" figure -- app opens (this
+// app being launched) plus winfinityfitness.com's own visit counter (see
+// supabase_site_visit_counter_migration.sql / footer-embed.js, now public
+// rather than admin-only). Deliberately a rough combined estimate, not a
+// deduplicated unique-visitor count -- the two counters track genuinely
+// different things (an app launch vs. a website page load), simply added
+// together per the owner's own request, for a single at-a-glance number.
+// site_visits itself has zero anon table-read policies (unlike app_stats),
+// so that half goes through get_site_visit_count() rather than a raw
+// table select.
+async function refreshTotalVisitsStat() {
   if (!sbConfigured()) return;
   try {
-    const { data, error } = await sb.from('app_stats').select('open_count').eq('id', 1).single();
-    if (!error && data) {
-      const el = document.getElementById('nexusAppOpens');
-      if (el) el.textContent = Number(data.open_count).toLocaleString();
-    }
-  } catch (e) { /* best effort, opportunistic */ }
-}
-
-// winfinityfitness.com's public visit counter (see
-// supabase_site_visit_counter_migration.sql / footer-embed.js), now shown
-// publicly here too rather than staying admin-only. site_visits itself has
-// zero anon table-read policies (unlike app_stats), so this goes through
-// get_site_visit_count() rather than a raw table select.
-async function refreshSiteVisitsStat() {
-  if (!sbConfigured()) return;
-  try {
-    const { data, error } = await sb.rpc('get_site_visit_count');
-    if (!error && typeof data === 'number') {
-      const el = document.getElementById('nexusSiteVisits');
-      if (el) el.textContent = data.toLocaleString();
-    }
+    const [appOpensRes, siteVisitsRes] = await Promise.all([
+      sb.from('app_stats').select('open_count').eq('id', 1).single(),
+      sb.rpc('get_site_visit_count'),
+    ]);
+    const appOpens = (!appOpensRes.error && appOpensRes.data) ? Number(appOpensRes.data.open_count) : 0;
+    const siteVisits = (!siteVisitsRes.error && typeof siteVisitsRes.data === 'number') ? siteVisitsRes.data : 0;
+    const el = document.getElementById('nexusTotalVisits');
+    if (el) el.textContent = (appOpens + siteVisits).toLocaleString();
   } catch (e) { /* best effort, opportunistic */ }
 }
 
