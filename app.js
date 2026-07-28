@@ -18032,22 +18032,24 @@ async function fetchCoachBranding(slug) {
 // by hand in JS, so any valid CSS color the coach picks works correctly.
 function applyCoachBrandColors(brand) {
   if (!brand || (!brand.brand_color_primary && !brand.brand_color_accent)) return;
-  let styleEl = document.getElementById('coachBrandStyle');
-  if (!styleEl) {
-    styleEl = document.createElement('style');
-    styleEl.id = 'coachBrandStyle';
-    document.head.appendChild(styleEl);
-  }
-  const rules = [];
+  // Set as an INLINE style on <html>, not a <style> block with a :root
+  // selector -- the active skin's own rule is :root[data-skin="X"], whose
+  // attribute selector has higher CSS specificity than a bare :root
+  // regardless of which one loads later, so a stylesheet-based override
+  // was silently losing to it (confirmed via Playwright: the computed
+  // --cyan stayed the skin's color even after the override rule was
+  // correctly injected with the right value). An inline style beats any
+  // non-!important selector rule no matter its specificity, so this wins
+  // regardless of which skin the user has picked.
+  const root = document.documentElement.style;
   if (brand.brand_color_primary) {
-    rules.push(`--cyan: ${brand.brand_color_primary};`);
-    rules.push(`--cyan-glow: color-mix(in srgb, ${brand.brand_color_primary} 42%, transparent);`);
-    rules.push(`--cyan-dim: color-mix(in srgb, ${brand.brand_color_primary} 65%, black);`);
+    root.setProperty('--cyan', brand.brand_color_primary);
+    root.setProperty('--cyan-glow', `color-mix(in srgb, ${brand.brand_color_primary} 42%, transparent)`);
+    root.setProperty('--cyan-dim', `color-mix(in srgb, ${brand.brand_color_primary} 65%, black)`);
   }
   if (brand.brand_color_accent) {
-    rules.push(`--violet: ${brand.brand_color_accent};`);
+    root.setProperty('--violet', brand.brand_color_accent);
   }
-  styleEl.textContent = `:root { ${rules.join(' ')} }`;
 }
 
 // The coach's own splash logo (if set) takes priority over the global
