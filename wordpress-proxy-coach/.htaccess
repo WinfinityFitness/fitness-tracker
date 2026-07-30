@@ -1,0 +1,10 @@
+# Without this, any request under /coach-portal/ that isn't a real file on
+# disk (e.g. config.js, which index.php serves dynamically by fetching it
+# from GitHub Pages) falls through to WordPress's own root .htaccess and
+# gets WordPress's themed 404 page instead of reaching our proxy script.
+# This file's rules take priority for anything under this folder, routing
+# all of it to index.php first.
+RewriteEngine On
+RewriteBase /coach-portal/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^(.*)$ index.php [QSA,L]

@@ -169,6 +169,11 @@
         <button type="button" class="btn btn-secondary" id="btnViewCoachActivity">View Activity Log</button>
       </div>
       <p class="note" id="coachDetailNote"></p>
+      <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px;">
+        <p style="margin:0 0 8px;color:var(--text-muted);font-size:0.78rem;text-transform:uppercase;letter-spacing:0.06em;">Reset Password</p>
+        <label class="field"><span>New Password (for this coach)</span><input type="password" id="resetCoachPassword" autocomplete="off"></label>
+        <button type="button" class="btn btn-secondary" id="btnResetCoachPassword">Reset Coach Password</button>
+      </div>
       <div id="coachActivityLog" hidden style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px;">
         <p style="margin:0 0 8px;color:var(--text-muted);font-size:0.78rem;text-transform:uppercase;letter-spacing:0.06em;">Recent Activity</p>
         <div id="coachActivityLogList"></div>
@@ -186,7 +191,10 @@
       <h2>Coach Login</h2>
       <label class="field"><span>Digital ID</span><input type="text" id="coachLoginId" autocomplete="off"></label>
       <label class="field"><span>Password</span><input type="password" id="coachLoginPassword" autocomplete="off"></label>
-      <button type="button" class="btn" id="btnCoachLogin">Log In</button>
+      <div style="display:flex;align-items:center;gap:14px;">
+        <button type="button" class="btn" id="btnCoachLogin">Log In</button>
+        <a href="#" id="linkForgotPassword" style="color:var(--critical);font-size:0.85rem;">Forgot Password?</a>
+      </div>
       <p class="note" id="coachLoginNote"></p>
     </div>
 
@@ -490,7 +498,30 @@ function openCoachDetail(coach) {
   toggleBtn.className = coach.active ? 'btn btn-danger' : 'btn btn-secondary';
   document.getElementById('coachDetailNote').textContent = '';
   document.getElementById('coachActivityLog').hidden = true;
+  document.getElementById('resetCoachPassword').value = '';
 }
+
+document.getElementById('btnResetCoachPassword').addEventListener('click', async () => {
+  const note = document.getElementById('coachDetailNote');
+  const input = document.getElementById('resetCoachPassword');
+  const newPassword = input.value;
+  if (!newPassword || newPassword.length < 6) {
+    note.textContent = 'New password must be at least 6 characters.'; note.className = 'note error'; return;
+  }
+  if (!confirm(`Reset ${currentCoachDetail.brand_name}'s (${currentCoachDetail.digital_id}) password? They'll need to use the new password next time they log in.`)) return;
+  note.textContent = 'Resetting…'; note.className = 'note';
+  try {
+    const { error } = await sb.rpc('admin_reset_coach_password', {
+      p_admin_digital_id: ownerSession.digitalId, p_admin_password: ownerSession.password,
+      p_coach_id: currentCoachDetail.id, p_new_password: newPassword,
+    });
+    if (error) throw error;
+    input.value = '';
+    note.textContent = 'Password reset.'; note.className = 'note success';
+  } catch (e) {
+    note.textContent = 'Could not reset password: ' + (e.message || e); note.className = 'note error';
+  }
+});
 
 document.getElementById('btnViewCoachActivity').addEventListener('click', async () => {
   const logEl = document.getElementById('coachActivityLog');
@@ -566,6 +597,13 @@ document.getElementById('btnToggleCoachActive').addEventListener('click', async 
 // Coach side
 // --------------------------------------------------------------------
 let coachSession = null; // { digitalId, password }
+
+document.getElementById('linkForgotPassword').addEventListener('click', (e) => {
+  e.preventDefault();
+  const note = document.getElementById('coachLoginNote');
+  note.textContent = 'Password resets are handled by the Winfinity owner directly — contact them with your Digital ID and they can reset it for you.';
+  note.className = 'note';
+});
 
 document.getElementById('btnCoachLogin').addEventListener('click', async () => {
   const id = document.getElementById('coachLoginId').value.trim();

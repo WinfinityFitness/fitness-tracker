@@ -2092,6 +2092,8 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
           <span>Current PIN (required to change an existing PIN)</span>
           <input type="password" id="webSyncOldPinInput" minlength="6" autocomplete="off">
         </label>
+        <button type="button" class="link-btn" id="btnWebSyncForgotPin" hidden>Forgot your PIN?</button>
+        <p class="hint hint--sm" id="webSyncForgotPinNote" hidden>No problem — since you're already signed in here on your own device, you can set a new PIN directly, no old one needed.</p>
         <label class="field">
           <span>Sync PIN (at least 6 characters — you'll type this on the web dashboard along with your Digital ID)</span>
           <input type="password" id="webSyncPinInput" minlength="6" autocomplete="off">

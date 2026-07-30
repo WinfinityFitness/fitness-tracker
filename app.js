@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.44';
+const APP_VERSION = 'WF_SYS_V.1.7.45';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -16672,6 +16672,19 @@ async function enableWebSync(pin, oldPin) {
   }).then(({ error }) => { if (error) throw error; });
 }
 
+// "Forgot PIN" recovery — share_key alone (the mobile app's own trusted
+// device identity) is enough here, no old PIN required. See
+// supabase_web_sync_forgot_pin_migration.sql for why this is safe: every
+// other web-sync write already trusts share_key alone, this just applies
+// the same standard to a PIN reset.
+async function resetWebSyncPin(newPin) {
+  if (!sbConfigured()) throw new Error('Not connected.');
+  await sb.rpc('web_sync_reset_pin', {
+    p_share_key: getOrCreateShareKey(),
+    p_new_pin: newPin,
+  }).then(({ error }) => { if (error) throw error; });
+}
+
 async function disableWebSync() {
   if (!sbConfigured()) throw new Error('Not connected.');
   await sb.rpc('web_sync_disable', { p_share_key: getOrCreateShareKey() })
@@ -16741,11 +16754,15 @@ function initWebSyncSettings() {
   const fields = document.getElementById('webSyncFields');
   const oldPinField = document.getElementById('webSyncOldPinField');
   const oldPinInput = document.getElementById('webSyncOldPinInput');
+  const forgotPinBtn = document.getElementById('btnWebSyncForgotPin');
+  const forgotPinNote = document.getElementById('webSyncForgotPinNote');
   const pinInput = document.getElementById('webSyncPinInput');
   const setPinBtn = document.getElementById('btnWebSyncSetPin');
   const syncNowBtn = document.getElementById('btnWebSyncNow');
   const statusEl = document.getElementById('webSyncStatus');
   if (!toggle || !fields) return;
+
+  let resetMode = false;
 
   const renderStatus = () => {
     const lastAt = localStorage.getItem('wft_web_sync_last_at');
@@ -16754,10 +16771,23 @@ function initWebSyncSettings() {
       : 'Not synced yet.';
   };
   // A PIN's already been set once sync has ever been enabled — changing
-  // it from here on now requires proving the current one server-side.
+  // it from here on now requires proving the current one server-side,
+  // unless the user's tapped "Forgot your PIN?" (see resetMode below).
   const refreshOldPinVisibility = () => {
-    if (oldPinField) oldPinField.hidden = localStorage.getItem('wft_web_sync_enabled') !== '1';
+    const hasExistingPin = localStorage.getItem('wft_web_sync_enabled') === '1';
+    if (oldPinField) oldPinField.hidden = !hasExistingPin || resetMode;
+    if (forgotPinBtn) forgotPinBtn.hidden = !hasExistingPin || resetMode;
+    if (forgotPinNote) forgotPinNote.hidden = !resetMode;
   };
+
+  if (forgotPinBtn) {
+    forgotPinBtn.addEventListener('click', () => {
+      resetMode = true;
+      if (oldPinInput) oldPinInput.value = '';
+      refreshOldPinVisibility();
+      pinInput.focus();
+    });
+  }
 
   const enabled = localStorage.getItem('wft_web_sync_enabled') === '1';
   toggle.checked = enabled;
@@ -16781,14 +16811,22 @@ function initWebSyncSettings() {
     const pin = pinInput.value.trim();
     const oldPin = oldPinInput ? oldPinInput.value.trim() : '';
     if (pin.length < 6) { showRestToast('PIN must be at least 6 characters.'); return; }
-    if (oldPinField && !oldPinField.hidden && oldPin.length < 6) { showRestToast('Enter your current PIN to change it.'); return; }
+    if (!resetMode && oldPinField && !oldPinField.hidden && oldPin.length < 6) {
+      showRestToast('Enter your current PIN to change it.'); return;
+    }
     try {
-      await enableWebSync(pin, oldPin);
+      const wasResetMode = resetMode;
+      if (wasResetMode) {
+        await resetWebSyncPin(pin);
+      } else {
+        await enableWebSync(pin, oldPin);
+      }
       localStorage.setItem('wft_web_sync_enabled', '1');
       pinInput.value = '';
       if (oldPinInput) oldPinInput.value = '';
+      resetMode = false;
       refreshOldPinVisibility();
-      showRestToast('Web sync enabled — tap Sync Now to upload your data.');
+      showRestToast(wasResetMode ? 'PIN reset — you can sign in on the web dashboard with it now.' : 'Web sync enabled — tap Sync Now to upload your data.');
     } catch (e) { showRestToast('Could not set PIN — try again.'); }
   });
 
