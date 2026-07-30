@@ -1345,6 +1345,7 @@ async function renameClient(publicId, currentNickname) {
 }
 
 async function removeClient(publicId) {
+  if (!confirm(`Remove ${publicId} from your clients? They'll stop appearing in your list -- you can re-attach them later by Digital ID.`)) return;
   try {
     const { error } = await sb.rpc('coach_remove_client', {
       p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
