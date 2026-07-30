@@ -268,6 +268,18 @@
         <p class="note" id="assignTargetsNote"></p>
       </div>
 
+      <!-- Monitor (per client, opened from the client row above) -->
+      <div class="card" id="monitorCard" hidden>
+        <div class="top-actions">
+          <h2 style="margin:0;">Monitor &mdash; <span id="monitorClientId"></span></h2>
+          <button type="button" class="back-btn" id="btnCloseMonitor">&larr; Back</button>
+        </div>
+        <p class="note" id="monitorStatusLine"></p>
+        <div id="monitorContent">
+          <p class="note">Loading…</p>
+        </div>
+      </div>
+
       <div class="card">
         <h2>Account</h2>
         <label class="field"><span>Current Password</span><input type="password" id="cpOldPassword" autocomplete="off"></label>
@@ -780,6 +792,11 @@ async function loadCoachClients() {
       row.className = 'client-row';
       row.innerHTML = `<span>${escapeHtml(client.public_id)}</span>`;
       const btnGroup = document.createElement('span');
+      const monitorBtn = document.createElement('button');
+      monitorBtn.className = 'link-btn';
+      monitorBtn.textContent = 'Monitor';
+      monitorBtn.style.marginRight = '12px';
+      monitorBtn.addEventListener('click', () => openMonitorClient(client.public_id, client.share_key));
       const targetsBtn = document.createElement('button');
       targetsBtn.className = 'link-btn';
       targetsBtn.textContent = 'Assign Targets';
@@ -789,6 +806,7 @@ async function loadCoachClients() {
       removeBtn.className = 'link-btn';
       removeBtn.textContent = 'Remove';
       removeBtn.addEventListener('click', () => removeClient(client.public_id));
+      btnGroup.appendChild(monitorBtn);
       btnGroup.appendChild(targetsBtn);
       btnGroup.appendChild(removeBtn);
       row.appendChild(btnGroup);
@@ -796,6 +814,135 @@ async function loadCoachClients() {
     });
   } catch (e) {
     el.innerHTML = '<p class="note error">Could not load clients: ' + escapeHtml(e.message || String(e)) + '</p>';
+  }
+}
+
+function openMonitorClient(publicId, shareKey) {
+  document.getElementById('monitorCard').hidden = false;
+  document.getElementById('monitorClientId').textContent = publicId;
+  document.getElementById('monitorStatusLine').textContent = '';
+  document.getElementById('monitorContent').innerHTML = '<p class="note">Loading…</p>';
+  document.getElementById('monitorCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  loadMonitorData(shareKey);
+}
+document.getElementById('btnCloseMonitor').addEventListener('click', () => {
+  document.getElementById('monitorCard').hidden = true;
+});
+
+// Mirrors app.js's isBeginnerDayComplete() exactly (weightKg/sleep/steps/
+// stress/fatigue/hunger present, water>0, at least one meal logged) -- see
+// supabase_coach_monitor_migration.sql's comment for why this logic lives
+// here in JS rather than being reimplemented in SQL.
+function monitorDayComplete(entry) {
+  if (!entry) return false;
+  const meals = entry.meals || {};
+  const hasFood = ['breakfast', 'lunch', 'dinner', 'snacks'].some(mt => meals[mt] && meals[mt].length);
+  return entry.weightKg != null && entry.sleep != null && entry.steps != null &&
+    entry.stress != null && entry.fatigue != null && entry.hunger != null &&
+    entry.water != null && entry.water > 0 && hasFood;
+}
+
+// Mirrors renderTrainingStats()'s definition of "a workout happened" --
+// entry.workout/workoutDone are separate, sometimes-disagreeing flags the
+// main app itself does NOT use for target comparison; only a completed set
+// inside entry.exercises counts.
+function monitorHasWorkout(entry) {
+  return !!(entry && entry.exercises && entry.exercises.some(ex => ex.sets && ex.sets.some(s => s.completed)));
+}
+
+function monitorDateStr(d) { return d.toISOString().slice(0, 10); }
+
+async function loadMonitorData(shareKey) {
+  const content = document.getElementById('monitorContent');
+  const statusLine = document.getElementById('monitorStatusLine');
+  try {
+    const { data, error } = await sb.rpc('coach_get_client_monitor', {
+      p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
+      p_client_share_key: shareKey,
+    });
+    if (error) throw error;
+
+    const logsByDate = {};
+    (data.logs || []).forEach(row => { logsByDate[row.date] = row.data || {}; });
+    const targets = data.targets || {};
+
+    statusLine.textContent = data.lastSyncedAt
+      ? `Last synced ${new Date(data.lastSyncedAt).toLocaleString()}`
+      : 'Never synced.';
+
+    // Streak: walk backward from today, breaking on the first incomplete/
+    // missing day -- a day with no entry at all counts as incomplete, same
+    // as isBeginnerDayComplete's own `if (!entry) return false`.
+    let streak = 0;
+    { const cursor = new Date();
+      for (let i = 0; i < 60; i++) {
+        const ds = monitorDateStr(cursor);
+        if (monitorDayComplete(logsByDate[ds])) { streak++; cursor.setDate(cursor.getDate() - 1); }
+        else break;
+      }
+    }
+
+    // Trailing-7-day window (today-6..today) for targets-vs-actual.
+    const today = new Date();
+    const weekDates = [];
+    for (let i = 6; i >= 0; i--) { const d = new Date(today); d.setDate(d.getDate() - i); weekDates.push(monitorDateStr(d)); }
+    const weekEntries = weekDates.map(ds => logsByDate[ds]).filter(Boolean);
+    const calDays = weekEntries.filter(e => e.calories != null);
+    const avgCalories = calDays.length ? Math.round(calDays.reduce((s, e) => s + e.calories, 0) / calDays.length) : null;
+    const stepDays = weekEntries.filter(e => e.steps != null);
+    const avgSteps = stepDays.length ? Math.round(stepDays.reduce((s, e) => s + e.steps, 0) / stepDays.length) : null;
+    const workoutsThisWeek = weekDates.filter(ds => monitorHasWorkout(logsByDate[ds])).length;
+
+    // Refeed bonus only applies if TODAY falls in the assigned refeed
+    // window -- mirrors getRefeedBonusForDate()'s date-range gate.
+    const todayStr = monitorDateStr(today);
+    const inRefeed = targets.refeedStart && targets.refeedEnd && todayStr >= targets.refeedStart && todayStr <= targets.refeedEnd;
+    const effectiveCalorieTarget = targets.calorieTarget != null
+      ? targets.calorieTarget + (inRefeed ? (targets.refeedCalories || 0) : 0)
+      : null;
+
+    // Weight trend: most recent weigh-in plus a 7-calendar-day trailing
+    // average around it -- mirrors computeTrendSeries().
+    const weightEntries = Object.keys(logsByDate)
+      .filter(ds => logsByDate[ds].weightKg != null)
+      .sort()
+      .map(ds => ({ date: ds, weightKg: logsByDate[ds].weightKg }));
+    let weightTrendHtml = '<p class="note">No weigh-ins in this window.</p>';
+    if (weightEntries.length) {
+      const latest = weightEntries[weightEntries.length - 1];
+      const windowStart = new Date(latest.date); windowStart.setDate(windowStart.getDate() - 6);
+      const windowVals = weightEntries.filter(w => new Date(w.date) >= windowStart && new Date(w.date) <= new Date(latest.date)).map(w => w.weightKg);
+      const trend = windowVals.reduce((a, b) => a + b, 0) / windowVals.length;
+      weightTrendHtml = `<div class="client-row"><span>Latest weigh-in</span><span>${latest.weightKg.toFixed(1)} kg (${escapeHtml(latest.date)})</span></div>` +
+        `<div class="client-row"><span>7-day trend</span><span>${trend.toFixed(1)} kg</span></div>`;
+    }
+
+    // Recent activity: last 14 calendar days that actually have a log
+    // entry -- days with zero activity simply have no row pushed at all.
+    const recentDates = Object.keys(logsByDate).sort().reverse().slice(0, 14);
+    const activityRows = recentDates.map(ds => {
+      const e = logsByDate[ds];
+      return `<div class="client-row"><span>${escapeHtml(ds)}</span><span style="color:var(--text-muted);font-size:0.78rem;">` +
+        `${e.calories != null ? e.calories + ' kcal' : '—'} &middot; ` +
+        `${e.steps != null ? e.steps + ' steps' : '—'} &middot; ` +
+        `${monitorHasWorkout(e) ? 'Workout' : 'No workout'}` +
+        `${e.weightKg != null ? ' &middot; ' + e.weightKg.toFixed(1) + ' kg' : ''}` +
+        `</span></div>`;
+    }).join('') || '<p class="note">No activity logged in this window.</p>';
+
+    content.innerHTML = `
+      <div class="client-row"><span>Current streak</span><span>${streak} day${streak === 1 ? '' : 's'}</span></div>
+      <h3 style="margin:14px 0 6px;font-size:0.95rem;">Targets vs. actual (trailing 7 days)</h3>
+      <div class="client-row"><span>Calories (avg/day)</span><span>${avgCalories != null ? avgCalories : '—'}${effectiveCalorieTarget != null ? ' / ' + effectiveCalorieTarget : ''}${inRefeed ? ' (refeed)' : ''}</span></div>
+      <div class="client-row"><span>Steps (avg/day)</span><span>${avgSteps != null ? avgSteps : '—'}${targets.stepGoal != null ? ' / ' + targets.stepGoal : ''}</span></div>
+      <div class="client-row"><span>Workouts</span><span>${workoutsThisWeek}${targets.workoutsPerWeek != null ? ' / ' + targets.workoutsPerWeek : ''}</span></div>
+      <h3 style="margin:14px 0 6px;font-size:0.95rem;">Weight trend</h3>
+      ${weightTrendHtml}
+      <h3 style="margin:14px 0 6px;font-size:0.95rem;">Recent activity</h3>
+      ${activityRows}
+    `;
+  } catch (e) {
+    content.innerHTML = '<p class="note error">Could not load: ' + escapeHtml(e.message || String(e)) + '</p>';
   }
 }
 
