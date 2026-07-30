@@ -6,6 +6,16 @@
 
 alter table coach_splash_settings add column if not exists splash_caption text;
 
+-- CREATE OR REPLACE cannot change a function's return columns (Postgres
+-- error 42P13, "Row type defined by OUT parameters is different") or leave
+-- a stale overload behind when the argument list changes -- both
+-- get_my_coach_features/get_coach_branding_by_slug (new output column) and
+-- coach_set_splash_image (new input param) need their old signatures
+-- dropped first.
+drop function if exists get_my_coach_features(uuid);
+drop function if exists get_coach_branding_by_slug(text);
+drop function if exists coach_set_splash_image(text, text, text, numeric, numeric, numeric);
+
 create or replace function coach_set_splash_image(
   p_coach_digital_id text, p_coach_password text, p_image_url text,
   p_image_zoom numeric, p_image_pos_x numeric, p_image_pos_y numeric,
