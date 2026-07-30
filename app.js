@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.46';
+const APP_VERSION = 'WF_SYS_V.1.7.47';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -18297,6 +18297,14 @@ async function applyCoachBranding() {
         splash_image_pos_y: brand.splash_image_pos_y,
       });
     }
+  }
+  // Coach's own motto/brand text replaces the default splash-caption line
+  // (see index.html's #splashScreen) -- untouched (stays the bundled
+  // default Tagalog line) for anyone not attached to a coach, or whose
+  // coach never set one.
+  if (brand.splash_caption) {
+    const caption = document.querySelector('#splashScreen .splash-caption');
+    if (caption) caption.textContent = brand.splash_caption;
   }
 }
 

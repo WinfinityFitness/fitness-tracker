@@ -47,6 +47,15 @@
     border-radius: 8px; padding: 9px 11px; color: var(--text-primary); font-size: 0.9rem;
   }
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .color-picker-row { display: flex; gap: 10px; align-items: flex-start; }
+  .color-wheel { border-radius: 50%; cursor: crosshair; touch-action: none; box-shadow: 0 0 0 1px var(--border); flex-shrink: 0; }
+  .color-picker-controls { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .color-brightness-label { font-size: 0.7rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px; }
+  .color-brightness-slider { width: 100%; }
+  .color-hex-input {
+    width: 100%; box-sizing: border-box; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 7px 9px; color: var(--text-primary); font-size: 0.85rem;
+  }
   .btn {
     background: var(--accent); color: #1a1200; border: none; border-radius: 8px;
     padding: 10px 18px; font-size: 0.88rem; font-weight: 600; cursor: pointer;
@@ -217,13 +226,39 @@
         <label class="field"><span>Brand Name</span><input type="text" id="coachBrandName"></label>
         <label class="field"><span>Logo URL</span><input type="text" id="coachBrandLogo" placeholder="https://..."></label>
         <div class="row2">
-          <label class="field"><span>Primary Color</span><input type="text" id="coachBrandPrimary" placeholder="#ff2d95"></label>
-          <label class="field"><span>Accent Color</span><input type="text" id="coachBrandAccent" placeholder="#2dff8f"></label>
+          <div class="field">
+            <span>Primary Color</span>
+            <div class="color-picker-row">
+              <canvas id="wheelPrimary" width="110" height="110" class="color-wheel"></canvas>
+              <div class="color-picker-controls">
+                <label class="color-brightness-label">Brightness
+                  <input type="range" id="brightnessPrimary" min="0" max="100" value="100" class="color-brightness-slider">
+                </label>
+                <input type="text" id="coachBrandPrimary" placeholder="#ff2d95" class="color-hex-input">
+              </div>
+            </div>
+          </div>
+          <div class="field">
+            <span>Accent Color</span>
+            <div class="color-picker-row">
+              <canvas id="wheelAccent" width="110" height="110" class="color-wheel"></canvas>
+              <div class="color-picker-controls">
+                <label class="color-brightness-label">Brightness
+                  <input type="range" id="brightnessAccent" min="0" max="100" value="100" class="color-brightness-slider">
+                </label>
+                <input type="text" id="coachBrandAccent" placeholder="#2dff8f" class="color-hex-input">
+              </div>
+            </div>
+          </div>
         </div>
-        <p class="note" style="margin-top:0;">Preview -- roughly how your header looks to a client:</p>
-        <div id="brandPreviewBox" style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;background:#0a0d12;border:1px solid var(--border);margin-bottom:12px;">
+        <p class="note" style="margin-top:0;">Preview -- roughly how your status page looks to a client:</p>
+        <div id="brandPreviewBox" style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px 10px 0 0;background:#0a0d12;border:1px solid var(--border);border-bottom:none;">
           <img id="brandPreviewLogo" src="icons/icon-192.png" onerror="this.style.visibility='hidden'" style="width:24px;height:24px;border-radius:6px;">
           <strong id="brandPreviewName" style="font-size:1rem;letter-spacing:0.02em;">WINFINITY</strong>
+        </div>
+        <div id="brandPreviewScheme" style="display:flex;align-items:center;gap:12px;padding:14px;border-radius:0 0 10px 10px;background:#0a0d12;border:1px solid var(--border);margin-bottom:12px;">
+          <button type="button" id="brandPreviewButton" disabled style="border:none;border-radius:8px;padding:9px 16px;font-size:0.85rem;font-weight:700;cursor:default;">Sample Button</button>
+          <span id="brandPreviewBadge" style="padding:5px 12px;border-radius:20px;font-size:0.72rem;font-weight:700;">Active</span>
         </div>
         <button type="button" class="btn" id="btnSaveBranding">Save Branding</button>
         <p class="note" id="brandingNote"></p>
@@ -232,6 +267,7 @@
       <div class="card">
         <h2>Boot Splash Logo</h2>
         <label class="field"><span>Splash Image URL</span><input type="text" id="coachSplashUrl" placeholder="https://..."></label>
+        <label class="field"><span>Splash Motto / Brand Text</span><input type="text" id="coachSplashCaption" placeholder="Your own motto or brand tagline"></label>
         <button type="button" class="btn" id="btnSaveSplash">Save Splash</button>
         <p class="note" id="splashNote"></p>
       </div>
@@ -703,15 +739,143 @@ function updateBrandPreview() {
   const name = document.getElementById('coachBrandName').value.trim();
   const logo = document.getElementById('coachBrandLogo').value.trim();
   const primary = document.getElementById('coachBrandPrimary').value.trim();
+  const accent = document.getElementById('coachBrandAccent').value.trim();
   document.getElementById('brandPreviewName').textContent = (name || 'WINFINITY').toUpperCase();
   document.getElementById('brandPreviewName').style.color = primary || '#e8ecf1';
   const logoEl = document.getElementById('brandPreviewLogo');
   logoEl.style.visibility = 'visible';
   logoEl.src = logo || 'icons/icon-192.png';
+  // Same dark-on-bright text convention this page's own .btn already uses,
+  // so the sample stays readable regardless of how bright/dark the coach's
+  // picked color is.
+  const btn = document.getElementById('brandPreviewButton');
+  btn.style.background = primary || '#ff9f43';
+  btn.style.color = '#1a1200';
+  const badge = document.getElementById('brandPreviewBadge');
+  badge.style.background = accent || '#2dff8f';
+  badge.style.color = '#1a1200';
 }
-['coachBrandName', 'coachBrandLogo', 'coachBrandPrimary'].forEach(id => {
+['coachBrandName', 'coachBrandLogo', 'coachBrandPrimary', 'coachBrandAccent'].forEach(id => {
   document.getElementById(id).addEventListener('input', updateBrandPreview);
 });
+
+// ---------------------------------------------------------------------
+// Color wheel picker -- vanilla canvas HSB wheel (hue = angle, saturation
+// = distance from center) + a brightness slider, kept in sync with the
+// plain hex text input every other part of this page (and the save
+// handler) already reads from. No external dependency -- matches this
+// project's existing no-CDN-beyond-supabase-js convention.
+// ---------------------------------------------------------------------
+function hexToRgb(hex) {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec((hex || '').trim());
+  return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) } : null;
+}
+function rgbToHex(r, g, b) {
+  return '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+}
+function rgbToHsb(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  let h = 0;
+  if (d !== 0) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60; if (h < 0) h += 360;
+  }
+  return { h, s: max === 0 ? 0 : (d / max) * 100, b: max * 100 };
+}
+function hsbToRgb(h, s, v) {
+  s /= 100; v /= 100;
+  const c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c;
+  let r, g, b;
+  if (h < 60) { r = c; g = x; b = 0; }
+  else if (h < 120) { r = x; g = c; b = 0; }
+  else if (h < 180) { r = 0; g = c; b = x; }
+  else if (h < 240) { r = 0; g = x; b = c; }
+  else if (h < 300) { r = x; g = 0; b = c; }
+  else { r = c; g = 0; b = x; }
+  return { r: (r + m) * 255, g: (g + m) * 255, b: (b + m) * 255 };
+}
+
+function initColorWheel(canvasId, brightnessId, hexInputId, onChange) {
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+  const brightnessSlider = document.getElementById(brightnessId);
+  const hexInput = document.getElementById(hexInputId);
+  const size = canvas.width;
+  const radius = size / 2;
+  let state = { h: 330, s: 80, b: 100 };
+
+  function render() {
+    const img = ctx.createImageData(size, size);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const dx = x - radius, dy = y - radius;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const idx = (y * size + x) * 4;
+        if (dist <= radius) {
+          let angle = Math.atan2(dy, dx) * 180 / Math.PI; if (angle < 0) angle += 360;
+          const sat = Math.min(100, (dist / radius) * 100);
+          const rgb = hsbToRgb(angle, sat, state.b);
+          img.data[idx] = rgb.r; img.data[idx + 1] = rgb.g; img.data[idx + 2] = rgb.b; img.data[idx + 3] = 255;
+        } else {
+          img.data[idx + 3] = 0;
+        }
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    const rad = (state.s / 100) * radius;
+    const ang = state.h * Math.PI / 180;
+    const mx = radius + Math.cos(ang) * rad, my = radius + Math.sin(ang) * rad;
+    ctx.beginPath(); ctx.arc(mx, my, 6, 0, Math.PI * 2); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.arc(mx, my, 6, 0, Math.PI * 2); ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.stroke();
+  }
+
+  function setFromHex(hex, skipInputWrite) {
+    const rgb = hexToRgb(hex);
+    if (!rgb) return false;
+    state = rgbToHsb(rgb.r, rgb.g, rgb.b);
+    brightnessSlider.value = Math.round(state.b);
+    if (!skipInputWrite) hexInput.value = hex;
+    render();
+    return true;
+  }
+
+  function commit() {
+    const rgb = hsbToRgb(state.h, state.s, state.b);
+    hexInput.value = rgbToHex(rgb.r, rgb.g, rgb.b);
+    render();
+    if (onChange) onChange();
+  }
+
+  function pointerToState(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const scale = size / rect.width; // canvas may be CSS-scaled from its own pixel size
+    const x = (clientX - rect.left) * scale, y = (clientY - rect.top) * scale;
+    const dx = x - radius, dy = y - radius;
+    let angle = Math.atan2(dy, dx) * 180 / Math.PI; if (angle < 0) angle += 360;
+    state.h = angle;
+    state.s = Math.min(100, (Math.sqrt(dx * dx + dy * dy) / radius) * 100);
+    commit();
+  }
+
+  let dragging = false;
+  canvas.addEventListener('pointerdown', e => { dragging = true; canvas.setPointerCapture(e.pointerId); pointerToState(e.clientX, e.clientY); });
+  canvas.addEventListener('pointermove', e => { if (dragging) pointerToState(e.clientX, e.clientY); });
+  canvas.addEventListener('pointerup', () => { dragging = false; });
+  canvas.addEventListener('pointercancel', () => { dragging = false; });
+
+  brightnessSlider.addEventListener('input', () => { state.b = Number(brightnessSlider.value); commit(); });
+  hexInput.addEventListener('input', () => { if (setFromHex(hexInput.value, true) && onChange) onChange(); });
+
+  if (!setFromHex(hexInput.value)) render();
+  return { setFromHex };
+}
+
+const primaryWheel = initColorWheel('wheelPrimary', 'brightnessPrimary', 'coachBrandPrimary', updateBrandPreview);
+const accentWheel = initColorWheel('wheelAccent', 'brightnessAccent', 'coachBrandAccent', updateBrandPreview);
+updateBrandPreview();
 
 document.getElementById('btnSaveBranding').addEventListener('click', async () => {
   const note = document.getElementById('brandingNote');
@@ -739,6 +903,7 @@ document.getElementById('btnSaveSplash').addEventListener('click', async () => {
       p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
       p_image_url: document.getElementById('coachSplashUrl').value.trim() || null,
       p_image_zoom: 1, p_image_pos_x: 50, p_image_pos_y: 50,
+      p_splash_caption: document.getElementById('coachSplashCaption').value.trim() || null,
     });
     if (error) throw error;
     note.textContent = 'Saved.'; note.className = 'note success';
