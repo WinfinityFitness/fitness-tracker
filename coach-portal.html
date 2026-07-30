@@ -64,6 +64,11 @@
     box-shadow: 0 4px 12px rgba(0,0,0,0.4);
   }
   .tooltip-wrap:hover .tooltip-bubble { display: block; }
+  .monitor-charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+  .monitor-chart-card { margin-bottom: 0; }
+  @media (max-width: 640px) {
+    .monitor-charts-grid { grid-template-columns: 1fr; }
+  }
   .btn {
     background: var(--accent); color: #1a1200; border: none; border-radius: 8px;
     padding: 10px 18px; font-size: 0.88rem; font-weight: 600; cursor: pointer;
@@ -1238,19 +1243,24 @@ function renderMonitorContent() {
     <div class="client-row"><span>Fiber (avg/day)</span><span>${avgFiber != null ? avgFiber + ' g' : '—'}</span></div>
     <div class="client-row"><span>Water (avg/day)</span><span>${avgWater != null ? avgWater + ' mL' : '—'}</span></div>
 
-    <div class="section-title-row" style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px;">
-      <h3 style="margin:0;font-size:0.95rem;">Weight Journey</h3>
-      <button type="button" class="link-btn" id="btnMonitorWeightToggle">${st.weightFullJourney ? 'Show recent' : 'Full journey'}</button>
+    <div class="monitor-charts-grid">
+      <div class="card monitor-chart-card">
+        <div class="section-title-row" style="display:flex;justify-content:space-between;align-items:center;margin:0 0 6px;">
+          <h3 style="margin:0;font-size:0.95rem;">Weight Journey</h3>
+          <button type="button" class="link-btn" id="btnMonitorWeightToggle">${st.weightFullJourney ? 'Show recent' : 'Full journey'}</button>
+        </div>
+        ${weightChartHtml}
+        ${weightLatest ? `<p class="note" style="margin:6px 0 0;">Latest: ${weightLatest.weightKg.toFixed(1)} kg (${escapeHtml(weightLatest.date)})</p>` : ''}
+      </div>
+      <div class="card monitor-chart-card">
+        <div class="section-title-row" style="display:flex;justify-content:space-between;align-items:center;margin:0 0 6px;">
+          <h3 style="margin:0;font-size:0.95rem;">Total Lift Volume</h3>
+          <button type="button" class="link-btn" id="btnMonitorVolumeToggle">${st.volumeFullJourney ? 'Show recent' : 'Full journey'}</button>
+        </div>
+        ${volumeChartHtml}
+        <p class="note" style="margin:6px 0 0;">${Math.round(volumeTotal).toLocaleString()} kg total${st.volumeFullJourney ? '' : ' (last ' + volumeSeries.length + ' gym day' + (volumeSeries.length === 1 ? '' : 's') + ')'}</p>
+      </div>
     </div>
-    ${weightChartHtml}
-    ${weightLatest ? `<p class="note" style="margin:6px 0 0;">Latest: ${weightLatest.weightKg.toFixed(1)} kg (${escapeHtml(weightLatest.date)})</p>` : ''}
-
-    <div class="section-title-row" style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px;">
-      <h3 style="margin:0;font-size:0.95rem;">Total Lift Volume</h3>
-      <button type="button" class="link-btn" id="btnMonitorVolumeToggle">${st.volumeFullJourney ? 'Show recent' : 'Full journey'}</button>
-    </div>
-    ${volumeChartHtml}
-    <p class="note" style="margin:6px 0 0;">${Math.round(volumeTotal).toLocaleString()} kg total${st.volumeFullJourney ? '' : ' (last ' + volumeSeries.length + ' gym day' + (volumeSeries.length === 1 ? '' : 's') + ')'}</p>
 
     <h3 style="margin:14px 0 6px;font-size:0.95rem;">Recent activity</h3>
     ${activityRows}
