@@ -120,9 +120,14 @@
     <div id="ownerPanel" hidden>
       <div class="card">
         <h2>Create a New Coach</h2>
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.85rem;color:var(--text-muted);margin-bottom:10px;">
+          <input type="checkbox" id="newCoachLinked" style="width:auto;">
+          Link to an existing Digital ID (they log in with their Nexus PIN)
+        </label>
         <div class="row2">
           <label class="field"><span>Coach Digital ID</span><input type="text" id="newCoachId" placeholder="WF-COACHNAME"></label>
-          <label class="field"><span>Coach Password</span><input type="text" id="newCoachPassword"></label>
+          <label class="field" id="newCoachPasswordField"><span>Coach Password</span><input type="text" id="newCoachPassword"></label>
+          <label class="field" id="newCoachClientIdField" hidden><span>Their Digital ID (must already have a Nexus PIN set)</span><input type="text" id="newCoachClientId" placeholder="WF-CLIENT1"></label>
         </div>
         <div class="row2">
           <label class="field"><span>Brand Name</span><input type="text" id="newCoachBrand" placeholder="Coach's Fitness Brand"></label>
@@ -363,23 +368,39 @@ document.getElementById('btnOwnerLogin').addEventListener('click', async () => {
   }
 });
 
+const newCoachLinkedToggle = document.getElementById('newCoachLinked');
+newCoachLinkedToggle.addEventListener('change', () => {
+  document.getElementById('newCoachPasswordField').hidden = newCoachLinkedToggle.checked;
+  document.getElementById('newCoachClientIdField').hidden = !newCoachLinkedToggle.checked;
+});
+
 document.getElementById('btnCreateCoach').addEventListener('click', async () => {
   const note = document.getElementById('createCoachNote');
   const digitalId = document.getElementById('newCoachId').value.trim();
+  const linked = newCoachLinkedToggle.checked;
   const password = document.getElementById('newCoachPassword').value;
+  const clientId = document.getElementById('newCoachClientId').value.trim();
   const brand = document.getElementById('newCoachBrand').value.trim();
   const slug = document.getElementById('newCoachSlug').value.trim().toLowerCase();
-  if (!digitalId || !password || !brand || !slug) { note.textContent = 'Fill in every field.'; note.className = 'note error'; return; }
+  if (!digitalId || !brand || !slug || (linked ? !clientId : !password)) {
+    note.textContent = 'Fill in every field.'; note.className = 'note error'; return;
+  }
   note.textContent = 'Creating…'; note.className = 'note';
   try {
-    const { error } = await sb.rpc('admin_create_coach', {
-      p_admin_digital_id: ownerSession.digitalId, p_admin_password: ownerSession.password,
-      p_coach_digital_id: digitalId, p_coach_password: password, p_brand_name: brand, p_slug: slug,
-    });
+    const { error } = linked
+      ? await sb.rpc('admin_create_linked_coach', {
+          p_admin_digital_id: ownerSession.digitalId, p_admin_password: ownerSession.password,
+          p_coach_digital_id: digitalId, p_client_public_id: clientId, p_brand_name: brand, p_slug: slug,
+        })
+      : await sb.rpc('admin_create_coach', {
+          p_admin_digital_id: ownerSession.digitalId, p_admin_password: ownerSession.password,
+          p_coach_digital_id: digitalId, p_coach_password: password, p_brand_name: brand, p_slug: slug,
+        });
     if (error) throw error;
     note.textContent = 'Coach created.'; note.className = 'note success';
     document.getElementById('newCoachId').value = '';
     document.getElementById('newCoachPassword').value = '';
+    document.getElementById('newCoachClientId').value = '';
     document.getElementById('newCoachBrand').value = '';
     document.getElementById('newCoachSlug').value = '';
     loadCoachList();
