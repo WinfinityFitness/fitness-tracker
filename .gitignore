@@ -15,3 +15,11 @@ android-twa-messenger/
 # app, stays local. package.json/capacitor.config.json are tracked.
 capacitor-app/node_modules/
 capacitor-app/android/
+
+# Local-only Capacitor native Android shell for the Coach Dashboard (loads
+# coach.winfinityfitness.com remotely, same reasoning as capacitor-app/
+# above). Built APKs are distributed via GitHub Releases, not committed —
+# same as the other apps' installers.
+capacitor-coach-app/node_modules/
+capacitor-coach-app/android/
+capacitor-coach-app/*.apk

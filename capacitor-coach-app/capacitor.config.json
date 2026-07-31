@@ -1,0 +1,9 @@
+{
+  "appId": "io.github.winfinityfitness.coach",
+  "appName": "Winfinity Coach",
+  "webDir": "www",
+  "server": {
+    "url": "https://coach.winfinityfitness.com",
+    "cleartext": false
+  }
+}
