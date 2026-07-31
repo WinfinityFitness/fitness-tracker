@@ -61,8 +61,8 @@
   header.hero h1 { font-size: clamp(1.3rem, 3vw, 1.8rem); margin: 0 0 6px; letter-spacing: 0.02em; }
   header.hero h1 .accent { color: var(--accent); }
   header.hero p { color: var(--text-muted); margin: 0; font-size: 0.88rem; }
-  .logout-link { display: block; text-align: center; margin-top: 8px; }
-  .logout-link button { background: none; border: none; color: var(--text-muted); font-size: 0.78rem; cursor: pointer; text-decoration: underline; }
+  .logout-link { display: block; text-align: center; margin-top: 8px; color: var(--text-muted); font-size: 0.78rem; }
+  .logout-link button, .logout-link a { background: none; border: none; color: var(--text-muted); font-size: 0.78rem; cursor: pointer; text-decoration: underline; }
 
   .tabs { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 18px; }
   .tab-btn {
@@ -82,6 +82,47 @@
   .legend { display: flex; gap: 16px; margin-bottom: 14px; font-size: 0.76rem; color: var(--text-muted); flex-wrap: wrap; }
   .legend-item { display: flex; align-items: center; gap: 6px; }
   .legend-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+  /* Ported from coach-portal.html: Branding/Clients/Account sections,
+     as collapsible accordions instead of always-visible cards, since this
+     page already has the progress graph as its main focus -- see
+     .accordion-* below. */
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 640px) { .row2 { grid-template-columns: 1fr; } }
+  .link-btn { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.8rem; padding: 0; }
+  .client-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.86rem; }
+  .client-row:last-child { border-bottom: none; }
+  .tooltip-wrap { position: relative; cursor: default; border-bottom: 1px dotted var(--border); }
+  .tooltip-bubble {
+    display: none; position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 5;
+    background: #0a0d12; border: 1px solid var(--border); border-radius: 6px;
+    padding: 5px 9px; font-size: 0.78rem; color: var(--text-primary); white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  .tooltip-wrap:hover .tooltip-bubble { display: block; }
+  .color-picker-row { display: flex; gap: 10px; align-items: flex-start; }
+  .color-wheel { border-radius: 50%; cursor: crosshair; touch-action: none; box-shadow: 0 0 0 1px var(--border); flex-shrink: 0; }
+  .color-picker-controls { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .color-brightness-label { font-size: 0.7rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px; }
+  .color-brightness-slider { width: 100%; }
+  .color-hex-input {
+    width: 100%; box-sizing: border-box; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 7px 9px; color: var(--text-primary); font-size: 0.85rem;
+  }
+
+  .accordion-card { margin-top: 14px; }
+  .accordion-toggle {
+    width: 100%; display: flex; justify-content: space-between; align-items: center;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 20px; color: var(--text-primary); font-size: 1rem; font-weight: 600; cursor: pointer;
+  }
+  .accordion-toggle.is-open { border-radius: 12px 12px 0 0; border-bottom: none; }
+  .accordion-chevron { color: var(--text-muted); transition: transform 0.15s; }
+  .accordion-toggle.is-open .accordion-chevron { transform: rotate(180deg); }
+  .accordion-content {
+    background: var(--panel); border: 1px solid var(--border); border-top: none;
+    border-radius: 0 0 12px 12px; padding: 20px;
+  }
 
   .chart-body { display: flex; align-items: flex-start; gap: 14px; }
   .bars-col { flex: 1 1 auto; min-width: 0; }
@@ -183,6 +224,76 @@
         </div>
       </div>
     </div>
+
+    <!-- Branding/Your Clients/Account -- ported from coach-portal.html,
+         collapsed by default (accordion) since this page's main focus is
+         the graph above. -->
+    <div class="accordion-card">
+      <button type="button" class="accordion-toggle" data-accordion="Branding">Branding <span class="accordion-chevron">&#9662;</span></button>
+      <div class="accordion-content" id="accordionBranding" hidden>
+        <label class="field"><span>Brand Name</span><input type="text" id="coachBrandName"></label>
+        <label class="field"><span>Logo URL</span><input type="text" id="coachBrandLogo" placeholder="https://..."></label>
+        <div class="row2">
+          <div class="field">
+            <span>Primary Color</span>
+            <div class="color-picker-row">
+              <canvas id="wheelPrimary" width="110" height="110" class="color-wheel"></canvas>
+              <div class="color-picker-controls">
+                <label class="color-brightness-label">Brightness
+                  <input type="range" id="brightnessPrimary" min="0" max="100" value="100" class="color-brightness-slider">
+                </label>
+                <input type="text" id="coachBrandPrimary" placeholder="#ff2d95" class="color-hex-input">
+              </div>
+            </div>
+          </div>
+          <div class="field">
+            <span>Accent Color</span>
+            <div class="color-picker-row">
+              <canvas id="wheelAccent" width="110" height="110" class="color-wheel"></canvas>
+              <div class="color-picker-controls">
+                <label class="color-brightness-label">Brightness
+                  <input type="range" id="brightnessAccent" min="0" max="100" value="100" class="color-brightness-slider">
+                </label>
+                <input type="text" id="coachBrandAccent" placeholder="#2dff8f" class="color-hex-input">
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="note" style="margin-top:0;">Preview -- roughly how your status page looks to a client:</p>
+        <div id="brandPreviewBox" style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px 10px 0 0;background:#0a0d12;border:1px solid var(--border);border-bottom:none;">
+          <img id="brandPreviewLogo" src="icons/icon-192.png" onerror="this.style.visibility='hidden'" style="width:24px;height:24px;border-radius:6px;">
+          <strong id="brandPreviewName" style="font-size:1rem;letter-spacing:0.02em;">WINFINITY</strong>
+        </div>
+        <div id="brandPreviewScheme" style="display:flex;align-items:center;gap:12px;padding:14px;border-radius:0 0 10px 10px;background:#0a0d12;border:1px solid var(--border);margin-bottom:12px;">
+          <button type="button" id="brandPreviewButton" disabled style="border:none;border-radius:8px;padding:9px 16px;font-size:0.85rem;font-weight:700;cursor:default;">Sample Button</button>
+          <span id="brandPreviewBadge" style="padding:5px 12px;border-radius:20px;font-size:0.72rem;font-weight:700;">Active</span>
+        </div>
+        <button type="button" class="btn" id="btnSaveBranding">Save Branding</button>
+        <p class="note" id="brandingNote"></p>
+      </div>
+    </div>
+
+    <div class="accordion-card">
+      <button type="button" class="accordion-toggle" data-accordion="Clients">Your Clients <span class="accordion-chevron">&#9662;</span></button>
+      <div class="accordion-content" id="accordionClients" hidden>
+        <label class="field"><span>Attach Clients by Digital ID (one per line, or comma-separated)</span>
+          <textarea id="attachClientIds" rows="2" placeholder="WF-CLIENT1&#10;WF-CLIENT2" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text-primary);font-size:0.9rem;font-family:inherit;resize:vertical;"></textarea>
+        </label>
+        <button type="button" class="btn" id="btnAttachClient" style="width:100%;">Attach</button>
+        <p class="note" id="attachNote"></p>
+        <div id="clientList"></div>
+      </div>
+    </div>
+
+    <div class="accordion-card">
+      <button type="button" class="accordion-toggle" data-accordion="Account">Account <span class="accordion-chevron">&#9662;</span></button>
+      <div class="accordion-content" id="accordionAccount" hidden>
+        <label class="field"><span>Current Password</span><input type="password" id="cpOldPassword" autocomplete="off"></label>
+        <label class="field"><span>New Password</span><input type="password" id="cpNewPassword" autocomplete="off"></label>
+        <button type="button" class="btn" id="btnChangePassword">Change Password</button>
+        <p class="note" id="changePasswordNote"></p>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -241,6 +352,285 @@ async function applyRememberedCoachSplash() {
 }
 applyRememberedCoachSplash();
 
+// ---------------------------------------------------------------------
+// Branding / Your Clients / Account -- ported from coach-portal.html,
+// wired to the SAME coachSession this page's own login already
+// established (no second login needed, unlike an embedded iframe would
+// require).
+// ---------------------------------------------------------------------
+document.querySelectorAll('.accordion-toggle').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const name = btn.dataset.accordion;
+    const content = document.getElementById('accordion' + name);
+    const isOpen = !content.hidden;
+    content.hidden = isOpen;
+    btn.classList.toggle('is-open', !isOpen);
+  });
+});
+
+function updateBrandPreview() {
+  const name = document.getElementById('coachBrandName').value.trim();
+  const logo = document.getElementById('coachBrandLogo').value.trim();
+  const primary = document.getElementById('coachBrandPrimary').value.trim();
+  const accent = document.getElementById('coachBrandAccent').value.trim();
+  document.getElementById('brandPreviewName').textContent = (name || 'WINFINITY').toUpperCase();
+  document.getElementById('brandPreviewName').style.color = primary || '#e8ecf1';
+  const logoEl = document.getElementById('brandPreviewLogo');
+  logoEl.style.visibility = 'visible';
+  logoEl.src = logo || 'icons/icon-192.png';
+  const btnPreview = document.getElementById('brandPreviewButton');
+  btnPreview.style.background = primary || '#ff9f43';
+  btnPreview.style.color = '#1a1200';
+  const badge = document.getElementById('brandPreviewBadge');
+  badge.style.background = accent || '#2dff8f';
+  badge.style.color = '#1a1200';
+}
+['coachBrandName', 'coachBrandLogo', 'coachBrandPrimary', 'coachBrandAccent'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateBrandPreview);
+});
+
+function hexToRgb(hex) {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec((hex || '').trim());
+  return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) } : null;
+}
+function rgbToHex(r, g, b) {
+  return '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+}
+function rgbToHsb(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  let h = 0;
+  if (d !== 0) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60; if (h < 0) h += 360;
+  }
+  return { h, s: max === 0 ? 0 : (d / max) * 100, b: max * 100 };
+}
+function hsbToRgb(h, s, v) {
+  s /= 100; v /= 100;
+  const c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c;
+  let r, g, b;
+  if (h < 60) { r = c; g = x; b = 0; }
+  else if (h < 120) { r = x; g = c; b = 0; }
+  else if (h < 180) { r = 0; g = c; b = x; }
+  else if (h < 240) { r = 0; g = x; b = c; }
+  else if (h < 300) { r = x; g = 0; b = c; }
+  else { r = c; g = 0; b = x; }
+  return { r: (r + m) * 255, g: (g + m) * 255, b: (b + m) * 255 };
+}
+function initColorWheel(canvasId, brightnessId, hexInputId, onChange) {
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+  const brightnessSlider = document.getElementById(brightnessId);
+  const hexInput = document.getElementById(hexInputId);
+  const size = canvas.width;
+  const radius = size / 2;
+  let state = { h: 330, s: 80, b: 100 };
+
+  function render() {
+    const img = ctx.createImageData(size, size);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const dx = x - radius, dy = y - radius;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const idx = (y * size + x) * 4;
+        if (dist <= radius) {
+          let angle = Math.atan2(dy, dx) * 180 / Math.PI; if (angle < 0) angle += 360;
+          const sat = Math.min(100, (dist / radius) * 100);
+          const rgb = hsbToRgb(angle, sat, state.b);
+          img.data[idx] = rgb.r; img.data[idx + 1] = rgb.g; img.data[idx + 2] = rgb.b; img.data[idx + 3] = 255;
+        } else {
+          img.data[idx + 3] = 0;
+        }
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    const rad = (state.s / 100) * radius;
+    const ang = state.h * Math.PI / 180;
+    const mx = radius + Math.cos(ang) * rad, my = radius + Math.sin(ang) * rad;
+    ctx.beginPath(); ctx.arc(mx, my, 6, 0, Math.PI * 2); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.arc(mx, my, 6, 0, Math.PI * 2); ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.stroke();
+  }
+
+  function setFromHex(hex, skipInputWrite) {
+    const rgb = hexToRgb(hex);
+    if (!rgb) return false;
+    state = rgbToHsb(rgb.r, rgb.g, rgb.b);
+    brightnessSlider.value = Math.round(state.b);
+    if (!skipInputWrite) hexInput.value = hex;
+    render();
+    return true;
+  }
+
+  function commit() {
+    const rgb = hsbToRgb(state.h, state.s, state.b);
+    hexInput.value = rgbToHex(rgb.r, rgb.g, rgb.b);
+    render();
+    if (onChange) onChange();
+  }
+
+  function pointerToState(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const scale = size / rect.width;
+    const x = (clientX - rect.left) * scale, y = (clientY - rect.top) * scale;
+    const dx = x - radius, dy = y - radius;
+    let angle = Math.atan2(dy, dx) * 180 / Math.PI; if (angle < 0) angle += 360;
+    state.h = angle;
+    state.s = Math.min(100, (Math.sqrt(dx * dx + dy * dy) / radius) * 100);
+    commit();
+  }
+
+  let dragging = false;
+  canvas.addEventListener('pointerdown', e => { dragging = true; canvas.setPointerCapture(e.pointerId); pointerToState(e.clientX, e.clientY); });
+  canvas.addEventListener('pointermove', e => { if (dragging) pointerToState(e.clientX, e.clientY); });
+  canvas.addEventListener('pointerup', () => { dragging = false; });
+  canvas.addEventListener('pointercancel', () => { dragging = false; });
+
+  brightnessSlider.addEventListener('input', () => { state.b = Number(brightnessSlider.value); commit(); });
+  hexInput.addEventListener('input', () => { if (setFromHex(hexInput.value, true) && onChange) onChange(); });
+
+  if (!setFromHex(hexInput.value)) render();
+  return { setFromHex };
+}
+initColorWheel('wheelPrimary', 'brightnessPrimary', 'coachBrandPrimary', updateBrandPreview);
+initColorWheel('wheelAccent', 'brightnessAccent', 'coachBrandAccent', updateBrandPreview);
+updateBrandPreview();
+
+document.getElementById('btnSaveBranding').addEventListener('click', async () => {
+  const note = document.getElementById('brandingNote');
+  note.textContent = 'Saving…'; note.className = 'note';
+  try {
+    const { error } = await sb.rpc('coach_update_branding', {
+      p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
+      p_brand_name: document.getElementById('coachBrandName').value.trim(),
+      p_brand_logo_url: document.getElementById('coachBrandLogo').value.trim() || null,
+      p_brand_color_primary: document.getElementById('coachBrandPrimary').value.trim() || null,
+      p_brand_color_accent: document.getElementById('coachBrandAccent').value.trim() || null,
+    });
+    if (error) throw error;
+    note.textContent = 'Saved.'; note.className = 'note success';
+  } catch (e) {
+    note.textContent = 'Could not save: ' + (e.message || e); note.className = 'note error';
+  }
+});
+
+async function loadCoachClients() {
+  const el = document.getElementById('clientList');
+  el.innerHTML = '<p class="note">Loading…</p>';
+  try {
+    const { data, error } = await sb.rpc('coach_list_clients', {
+      p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
+    });
+    if (error) throw error;
+    if (!data || !data.length) { el.innerHTML = '<p class="note">No clients attached yet.</p>'; return; }
+    el.innerHTML = '';
+    data.forEach(client => {
+      const row = document.createElement('div');
+      row.className = 'client-row';
+      const label = document.createElement('span');
+      label.className = 'tooltip-wrap';
+      label.textContent = client.public_id;
+      if (client.client_nickname) {
+        const bubble = document.createElement('span');
+        bubble.className = 'tooltip-bubble';
+        bubble.textContent = client.client_nickname;
+        label.appendChild(bubble);
+      }
+      row.appendChild(label);
+      const btnGroup = document.createElement('span');
+      const renameBtn = document.createElement('button');
+      renameBtn.className = 'link-btn';
+      renameBtn.textContent = client.client_nickname ? 'Rename' : 'Add Name';
+      renameBtn.style.marginRight = '12px';
+      renameBtn.addEventListener('click', () => renameClient(client.public_id, client.client_nickname));
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'link-btn';
+      removeBtn.textContent = 'Remove';
+      removeBtn.addEventListener('click', () => removeClient(client.public_id));
+      btnGroup.appendChild(renameBtn);
+      btnGroup.appendChild(removeBtn);
+      row.appendChild(btnGroup);
+      el.appendChild(row);
+    });
+  } catch (e) {
+    el.innerHTML = '<p class="note error">Could not load clients: ' + escapeHtml(e.message || String(e)) + '</p>';
+  }
+}
+
+async function renameClient(publicId, currentNickname) {
+  const nickname = prompt(`Private name for ${publicId} (only you see this):`, currentNickname || '');
+  if (nickname === null) return;
+  try {
+    const { error } = await sb.rpc('coach_set_client_nickname', {
+      p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
+      p_client_public_id: publicId, p_nickname: nickname,
+    });
+    if (error) throw error;
+    loadCoachClients();
+  } catch (e) {
+    document.getElementById('attachNote').textContent = 'Could not rename: ' + (e.message || e);
+    document.getElementById('attachNote').className = 'note error';
+  }
+}
+
+async function removeClient(publicId) {
+  if (!confirm(`Remove ${publicId} from your clients? They'll stop appearing in your list -- you can re-attach them later by Digital ID.`)) return;
+  try {
+    const { error } = await sb.rpc('coach_remove_client', {
+      p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
+      p_client_public_id: publicId,
+    });
+    if (error) throw error;
+    loadCoachClients();
+  } catch (e) {
+    document.getElementById('attachNote').textContent = 'Could not remove: ' + (e.message || e);
+    document.getElementById('attachNote').className = 'note error';
+  }
+}
+
+document.getElementById('btnAttachClient').addEventListener('click', async () => {
+  const note = document.getElementById('attachNote');
+  const ids = document.getElementById('attachClientIds').value.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+  if (!ids.length) { note.textContent = 'Enter at least one Digital ID.'; note.className = 'note error'; return; }
+  note.textContent = 'Attaching…'; note.className = 'note';
+  try {
+    for (const id of ids) {
+      const { error } = await sb.rpc('coach_attach_client', {
+        p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
+        p_client_public_id: id,
+      });
+      if (error) throw error;
+    }
+    document.getElementById('attachClientIds').value = '';
+    note.textContent = 'Attached.'; note.className = 'note success';
+    loadCoachClients();
+  } catch (e) {
+    note.textContent = 'Could not attach: ' + (e.message || e); note.className = 'note error';
+  }
+});
+
+document.getElementById('btnChangePassword').addEventListener('click', async () => {
+  const note = document.getElementById('changePasswordNote');
+  const oldPw = document.getElementById('cpOldPassword').value;
+  const newPw = document.getElementById('cpNewPassword').value;
+  if (!oldPw || !newPw) { note.textContent = 'Fill in both fields.'; note.className = 'note error'; return; }
+  note.textContent = 'Saving…'; note.className = 'note';
+  try {
+    const { error } = await sb.rpc('coach_change_password', {
+      p_coach_digital_id: coachSession.digitalId, p_old_password: oldPw, p_new_password: newPw,
+    });
+    if (error) throw error;
+    coachSession.password = newPw;
+    document.getElementById('cpOldPassword').value = '';
+    document.getElementById('cpNewPassword').value = '';
+    note.textContent = 'Password changed.'; note.className = 'note success';
+  } catch (e) {
+    note.textContent = 'Could not change: ' + (e.message || e); note.className = 'note error';
+  }
+});
+
 const METRICS = [
   { key: 'steps', label: 'Daily Steps', domain: [0, 20000], higherIsBetter: true, format: v => Math.round(v).toLocaleString() },
   { key: 'volumeLifted', label: 'Volume Lifted', domain: [0, 8000], higherIsBetter: true, format: v => Math.round(v).toLocaleString() + ' kg' },
@@ -287,6 +677,7 @@ document.getElementById('btnLogin').addEventListener('click', async () => {
     document.getElementById('dashboardScreen').hidden = false;
     renderTabs();
     renderMetric(0);
+    loadCoachClients();
   } catch (e) {
     note.textContent = 'Incorrect Digital ID or password.'; note.className = 'note error';
   }

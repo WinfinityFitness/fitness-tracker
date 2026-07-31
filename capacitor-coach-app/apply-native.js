@@ -1,9 +1,8 @@
-// Copies tracked custom native resources over the generated android/
+// Copies tracked custom native source/resources over the generated android/
 // project -- needed because android/ is gitignored (regenerable build
 // output) and `npx cap add android` / `npm run icons` overwrite generated
-// files (styles.xml, the default stretched splash.png, etc.) with fresh
-// boilerplate. Same technique as capacitor-app/apply-native-src.js, just
-// scoped to native-res/ only (no custom Java source needed here).
+// files (MainActivity.java, the default stretched splash.png, etc.) with
+// fresh boilerplate. Same technique as capacitor-app/apply-native-src.js.
 const fs = require('fs');
 const path = require('path');
 
@@ -21,4 +20,5 @@ function copyRecursive(src, dest) {
   }
 }
 
+copyRecursive(path.join(__dirname, 'native-src'), path.join(__dirname, 'android', 'app', 'src', 'main', 'java'));
 copyRecursive(path.join(__dirname, 'native-res'), path.join(__dirname, 'android', 'app', 'src', 'main', 'res'));
