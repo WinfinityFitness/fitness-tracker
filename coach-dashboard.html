@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Winfinity Coach Dashboard</title>
+<style>
+  :root {
+    --bg: #0a0d12; --panel: #121820; --panel-2: #171f2a; --border: #232d3a;
+    --text-primary: #e8ecf1; --text-muted: #8a97a8; --text-secondary: #8a97a8;
+    --accent: #ff9f43; --accent-dim: #b9762f;
+    --tier-elite: #ff9f43; --tier-ontrack: #4fd1c5; --tier-building: #7c8ba1; --tier-behind: #e0555a;
+    --font-mono: 'Cascadia Code', 'Consolas', 'SF Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow-x: hidden;
+  }
+  [hidden] { display: none !important; }
+
+  /* Splash -- identical timing/markup convention to index.html's own
+     #splashScreen (2000ms display, 400ms fade-out), deliberately NOT
+     coach-branded -- this dashboard always opens with the default FT
+     splash regardless of which coach logs in. */
+  .splash-screen {
+    position: fixed; inset: 0; z-index: 2000; background: var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 24px; padding: 40px 24px; text-align: center; transition: opacity 0.4s ease;
+  }
+  .splash-screen.splash-hide { opacity: 0; pointer-events: none; }
+  .splash-logo {
+    width: 160px; height: 160px; border-radius: 20%; object-fit: cover;
+    filter: drop-shadow(0 0 18px rgba(255,159,67,0.42));
+    animation: splash-pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes splash-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+  .splash-caption { font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.5; color: var(--text-secondary); max-width: 320px; }
+  @media (prefers-reduced-motion: reduce) { .splash-logo { animation: none; } }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 20px 40px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .field { display: block; margin-bottom: 12px; }
+  .field span { display: block; color: var(--text-muted); font-size: 0.78rem; margin-bottom: 4px; }
+  .field input {
+    width: 100%; box-sizing: border-box; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 9px 11px; color: var(--text-primary); font-size: 0.9rem;
+  }
+  .btn {
+    background: var(--accent); color: #1a1200; border: none; border-radius: 8px;
+    padding: 10px 18px; font-size: 0.88rem; font-weight: 600; cursor: pointer;
+  }
+  .note { color: var(--text-muted); font-size: 0.82rem; }
+  .note.error { color: var(--tier-behind); }
+  #loginScreen { max-width: 360px; margin: 60px auto 0; }
+  #loginScreen h1 { font-size: 1.2rem; text-align: center; margin: 0 0 6px; }
+  #loginScreen p.sub { text-align: center; color: var(--text-muted); font-size: 0.85rem; margin: 0 0 20px; }
+
+  header.hero { text-align: center; margin-bottom: 22px; }
+  header.hero h1 { font-size: clamp(1.3rem, 3vw, 1.8rem); margin: 0 0 6px; letter-spacing: 0.02em; }
+  header.hero h1 .accent { color: var(--accent); }
+  header.hero p { color: var(--text-muted); margin: 0; font-size: 0.88rem; }
+  .logout-link { display: block; text-align: center; margin-top: 8px; }
+  .logout-link button { background: none; border: none; color: var(--text-muted); font-size: 0.78rem; cursor: pointer; text-decoration: underline; }
+
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 18px; }
+  .tab-btn {
+    background: var(--panel); color: var(--text-muted); border: 1px solid var(--border);
+    border-radius: 999px; padding: 8px 16px; font-size: 0.85rem; cursor: pointer;
+  }
+  .tab-btn.is-active { color: #0a0d12; background: var(--accent); border-color: var(--accent); font-weight: 600; }
+
+  .filter-row { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--text-muted); font-size: 0.82rem; margin-bottom: 18px; }
+  .sort-toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+
+  .chart-card { padding: 20px 20px 8px; }
+  .chart-card-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 18px; }
+  .chart-card-head h2 { font-size: 1rem; margin: 0; }
+  .chart-card-head span { color: var(--text-muted); font-size: 0.8rem; }
+
+  .legend { display: flex; gap: 16px; margin-bottom: 14px; font-size: 0.76rem; color: var(--text-muted); flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+  .chart-body { display: flex; align-items: flex-start; gap: 14px; }
+  .bars-col { flex: 1 1 auto; min-width: 0; }
+  .bars-scroll { display: flex; align-items: flex-end; gap: 6px; height: 220px; overflow-x: auto; padding: 0 4px 14px; scrollbar-width: thin; }
+  .showcase-bar {
+    flex: 0 0 auto; width: 26px; min-height: 4px; border-radius: 5px 5px 0 0;
+    border: none; cursor: pointer; transition: opacity 0.15s, transform 0.1s;
+  }
+  .showcase-bar:hover, .showcase-bar:focus-visible { transform: scaleY(1.02); outline: none; }
+  .showcase-bar[data-tier="elite"] { background: var(--tier-elite); }
+  .showcase-bar[data-tier="ontrack"] { background: var(--tier-ontrack); }
+  .showcase-bar[data-tier="building"] { background: var(--tier-building); }
+  .showcase-bar[data-tier="behind"] { background: var(--tier-behind); }
+  .bar-labels { display: flex; gap: 6px; padding: 0 4px; }
+  .bar-label { flex: 0 0 26px; text-align: center; font-size: 0.62rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .empty-note { color: var(--text-muted); text-align: center; padding: 40px 0; }
+
+  .stat-panel { flex: 0 0 auto; width: 260px; max-width: 42vw; }
+  .stat-card {
+    width: 100%; background: linear-gradient(180deg, #171f2a, #0f141b);
+    border: 1px solid var(--accent-dim); border-radius: 16px; padding: 18px 16px 14px; position: relative;
+  }
+  .stat-card-close { position: absolute; top: 12px; right: 14px; background: none; border: none; color: var(--text-muted); font-size: 0.95rem; cursor: pointer; }
+  .stat-card-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .stat-card-avatar {
+    width: 44px; height: 44px; border-radius: 50%; background: var(--panel-2);
+    display: flex; align-items: center; justify-content: center; font-weight: 700;
+    color: var(--accent); border: 1px solid var(--accent-dim); flex-shrink: 0; background-size: cover; background-position: center;
+  }
+  .stat-card-id { font-size: 0.68rem; letter-spacing: 0.06em; color: var(--text-muted); text-transform: uppercase; }
+  .stat-card-id strong { color: var(--text-primary); font-size: 0.8rem; letter-spacing: 0.03em; display: block; }
+  .stat-card-tier { display: inline-block; margin-top: 4px; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.08em; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; }
+  .stat-card-tier[data-tier="elite"] { color: var(--tier-elite); background: rgba(255,159,67,0.12); }
+  .stat-card-tier[data-tier="ontrack"] { color: var(--tier-ontrack); background: rgba(79,209,197,0.12); }
+  .stat-card-tier[data-tier="building"] { color: var(--tier-building); background: rgba(124,139,161,0.14); }
+  .stat-card-tier[data-tier="behind"] { color: var(--tier-behind); background: rgba(224,85,90,0.12); }
+  .stat-row { display: flex; justify-content: space-between; align-items: baseline; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.78rem; }
+  .stat-row span:first-child { color: var(--text-muted); }
+  .stat-row span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .stat-row.is-positive span:last-child { color: var(--tier-ontrack); }
+  .stat-row.is-negative span:last-child { color: var(--tier-behind); }
+  .consistency-block { margin-top: 14px; }
+  .consistency-label { display: flex; justify-content: space-between; font-size: 0.72rem; margin-bottom: 6px; }
+  .consistency-track { height: 6px; background: var(--panel-2); border-radius: 4px; overflow: hidden; }
+  .consistency-fill { height: 100%; background: linear-gradient(90deg, var(--tier-behind), var(--tier-elite)); border-radius: 4px; }
+  @media (max-width: 640px) { .chart-body { flex-direction: column; } .stat-panel { width: 100%; max-width: none; } }
+</style>
+</head>
+<body>
+
+<div class="splash-screen" id="splashScreen">
+  <img class="splash-logo" src="icons/icon-512.png" alt="Winfinity" id="splashLogo">
+  <p class="splash-caption">Masarap talaga kumain at matulog, pero mas masarap if ikaw mismo masarap din</p>
+</div>
+
+<div class="wrap">
+  <div id="loginScreen">
+    <h1>Coach Dashboard</h1>
+    <p class="sub">Log in with your Coach Portal credentials.</p>
+    <div class="card">
+      <label class="field"><span>Digital ID</span><input type="text" id="loginId" autocomplete="off"></label>
+      <label class="field"><span>Password</span><input type="password" id="loginPassword" autocomplete="off"></label>
+      <button type="button" class="btn" id="btnLogin" style="width:100%;">Log In</button>
+      <p class="note" id="loginNote" style="margin-top:10px;"></p>
+    </div>
+  </div>
+
+  <div id="dashboardScreen" hidden>
+    <header class="hero">
+      <h1 id="dashHeading">Coach <span class="accent">Dashboard</span></h1>
+      <p>A live look at your own clients' progress.</p>
+      <div class="logout-link"><button type="button" id="btnLogout">Log out</button></div>
+    </header>
+
+    <nav class="tabs" id="metricTabs"></nav>
+    <div class="filter-row">
+      <label class="sort-toggle"><input type="checkbox" id="sortByHeight"><span>Sort by progress</span></label>
+    </div>
+
+    <div class="card chart-card">
+      <div class="chart-card-head">
+        <h2 id="chartTitle">Daily Steps</h2>
+        <span id="chartCount"></span>
+      </div>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-dot" style="background:var(--tier-elite)"></span>Elite</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--tier-ontrack)"></span>On Track</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--tier-building)"></span>Building</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--tier-behind)"></span>Needs Attention</span>
+      </div>
+      <div class="chart-body">
+        <div class="bars-col">
+          <div class="bars-scroll" id="barsScroll"></div>
+          <div class="bar-labels" id="barLabels"></div>
+        </div>
+        <div class="stat-panel" id="statOverlay" hidden>
+          <div class="stat-card" id="statCard"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+'use strict';
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Same 2000ms display + 400ms fade convention as index.html's own splash.
+setTimeout(() => {
+  const splash = document.getElementById('splashScreen');
+  if (!splash) return;
+  splash.classList.add('splash-hide');
+  setTimeout(() => { splash.hidden = true; }, 400);
+}, 2000);
+
+const METRICS = [
+  { key: 'steps', label: 'Daily Steps', domain: [0, 20000], higherIsBetter: true, format: v => Math.round(v).toLocaleString() },
+  { key: 'volumeLifted', label: 'Volume Lifted', domain: [0, 8000], higherIsBetter: true, format: v => Math.round(v).toLocaleString() + ' kg' },
+  { key: 'weightProgressPct', label: 'Weight Progress', domain: [-10, 10], higherIsBetter: false, format: v => (v > 0 ? '+' : '') + v + '%' },
+  { key: 'furthestRunKm', label: 'Furthest Run', domain: [0, 20], higherIsBetter: true, format: v => Number(v).toFixed(1) + ' km' },
+  { key: 'fastestRunPaceSec', label: 'Fastest Pace', domain: [180, 600], higherIsBetter: false, format: v => formatPace(v) },
+  { key: 'conscientiousScore', label: 'Consistency Score', domain: [0, 100], higherIsBetter: true, format: v => Math.round(v) + '%' },
+];
+function formatPace(sec) { const m = Math.floor(sec / 60), s = Math.round(sec % 60); return m + ':' + String(s).padStart(2, '0') + '/km'; }
+function tierFor(normalizedPct) {
+  if (normalizedPct >= 80) return 'elite';
+  if (normalizedPct >= 55) return 'ontrack';
+  if (normalizedPct >= 30) return 'building';
+  return 'behind';
+}
+const TIER_LABEL = { elite: 'Elite Performer', ontrack: 'On Track', building: 'Building Momentum', behind: 'Needs Attention' };
+const MODE_ICON = { beginner: 'mode-beginner.png', warrior: 'mode-warrior.png', spartan: 'mode-spartan.png', demigod: 'mode-demigod.png' };
+
+let coachSession = null;
+let allRows = [];
+let activeMetricIndex = 0;
+let sortByHeight = false;
+
+document.getElementById('btnLogin').addEventListener('click', async () => {
+  const id = document.getElementById('loginId').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const note = document.getElementById('loginNote');
+  if (!id || !password) { note.textContent = 'Enter both Digital ID and password.'; note.className = 'note error'; return; }
+  note.textContent = 'Checking…'; note.className = 'note';
+  try {
+    const { data, error } = await sb.rpc('coach_get_showcase_data', { p_coach_digital_id: id, p_coach_password: password });
+    if (error) throw error;
+    coachSession = { digitalId: id, password };
+    allRows = (data.clients || []).map(r => ({
+      publicId: r.publicId, codeName: r.codeName, avatarDataUrl: r.avatarDataUrl, fitnessMode: r.fitnessMode,
+      steps: r.steps, volumeLifted: r.volumeLifted, volumeUnit: r.volumeUnit, weightProgressPct: r.weightProgressPct,
+      furthestRunKm: r.furthestRunKm, fastestRunPaceSec: r.fastestRunPaceSec, conscientiousScore: r.conscientiousScore,
+    }));
+    document.getElementById('dashHeading').innerHTML = data.brandName
+      ? `${escapeHtml(data.brandName)} <span class="accent">Dashboard</span>`
+      : 'Coach <span class="accent">Dashboard</span>';
+    document.getElementById('loginScreen').hidden = true;
+    document.getElementById('dashboardScreen').hidden = false;
+    renderTabs();
+    renderMetric(0);
+  } catch (e) {
+    note.textContent = 'Incorrect Digital ID or password.'; note.className = 'note error';
+  }
+});
+
+document.getElementById('btnLogout').addEventListener('click', () => {
+  coachSession = null; allRows = [];
+  document.getElementById('loginPassword').value = '';
+  document.getElementById('loginNote').textContent = '';
+  document.getElementById('dashboardScreen').hidden = true;
+  document.getElementById('loginScreen').hidden = false;
+});
+
+function renderTabs() {
+  const tabsEl = document.getElementById('metricTabs');
+  tabsEl.innerHTML = METRICS.map((m, i) => `<button type="button" class="tab-btn${i === 0 ? ' is-active' : ''}" data-metric-index="${i}">${escapeHtml(m.label)}</button>`).join('');
+  tabsEl.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabsEl.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('is-active', b === btn));
+      renderMetric(Number(btn.dataset.metricIndex));
+    });
+  });
+}
+
+function renderMetric(index) {
+  activeMetricIndex = index;
+  const metric = METRICS[index];
+  document.getElementById('chartTitle').textContent = metric.label;
+
+  const rows = allRows.filter(r => r[metric.key] != null);
+  document.getElementById('chartCount').textContent = rows.length + ' client' + (rows.length === 1 ? '' : 's');
+
+  if (sortByHeight) {
+    rows.sort((a, b) => metric.higherIsBetter ? b[metric.key] - a[metric.key] : a[metric.key] - b[metric.key]);
+  } else {
+    rows.sort((a, b) => (a.codeName || '').localeCompare(b.codeName || ''));
+  }
+
+  const barsEl = document.getElementById('barsScroll');
+  const labelsEl = document.getElementById('barLabels');
+  if (!rows.length) {
+    barsEl.innerHTML = '<p class="empty-note">No data yet for this metric.</p>';
+    labelsEl.innerHTML = '';
+    return;
+  }
+  const [domainMin, domainMax] = metric.domain;
+  barsEl.innerHTML = rows.map(r => {
+    const raw = r[metric.key];
+    const rawClamped = Math.min(domainMax, Math.max(domainMin, raw));
+    const normalized = metric.higherIsBetter
+      ? (rawClamped - domainMin) / (domainMax - domainMin) * 100
+      : (domainMax - rawClamped) / (domainMax - domainMin) * 100;
+    const tier = tierFor(normalized);
+    const heightPct = Math.max(4, normalized);
+    return `<button type="button" class="showcase-bar" data-tier="${tier}" data-public-id="${escapeHtml(r.publicId)}"
+      style="height:${heightPct}%" aria-label="${escapeHtml(r.codeName)}: ${escapeHtml(metric.format(raw))}"></button>`;
+  }).join('');
+  labelsEl.innerHTML = rows.map(r => `<span class="bar-label" title="${escapeHtml(r.codeName)}">${escapeHtml(r.codeName || '?')}</span>`).join('');
+
+  barsEl.querySelectorAll('.showcase-bar').forEach((barEl, i) => {
+    barEl.addEventListener('mouseenter', () => openStatCard(rows[i]));
+    barEl.addEventListener('click', () => openStatCard(rows[i]));
+  });
+}
+
+document.getElementById('sortByHeight').addEventListener('change', e => {
+  sortByHeight = e.target.checked;
+  renderMetric(activeMetricIndex);
+});
+
+function openStatCard(row) {
+  const consistency = row.conscientiousScore || 0;
+  const tier = tierFor(consistency);
+  const rows = [];
+  if (row.weightProgressPct != null) rows.push(['Weightloss Trend', (row.weightProgressPct > 0 ? '+' : '') + row.weightProgressPct + '%', row.weightProgressPct <= 0]);
+  if (row.steps != null) rows.push(['Daily Steps', Math.round(row.steps).toLocaleString(), null]);
+  if (row.volumeLifted != null) rows.push(['Volume Lifted', Math.round(row.volumeLifted).toLocaleString() + ' ' + (row.volumeUnit || 'kg'), null]);
+  if (row.furthestRunKm != null) rows.push(['Furthest Run', Number(row.furthestRunKm).toFixed(1) + ' km', null]);
+  if (row.fastestRunPaceSec != null) rows.push(['Fastest Pace', formatPace(row.fastestRunPaceSec), null]);
+
+  const initial = (row.codeName || '?').trim().charAt(0).toUpperCase();
+  const avatarStyle = row.avatarDataUrl ? ` style="background-image:url('${escapeHtml(row.avatarDataUrl)}')"` : '';
+  const modeIcon = MODE_ICON[row.fitnessMode];
+  const modeIconHtml = modeIcon ? `<img src="icons/${modeIcon}" alt="${escapeHtml(row.fitnessMode)}" title="${escapeHtml(row.fitnessMode)}" style="width:16px;height:16px;vertical-align:-3px;">` : '';
+
+  document.getElementById('statCard').innerHTML = `
+    <button type="button" class="stat-card-close" aria-label="Close">&times;</button>
+    <div class="stat-card-head">
+      <span class="stat-card-avatar"${avatarStyle}>${row.avatarDataUrl ? '' : escapeHtml(initial)}</span>
+      <div class="stat-card-id">
+        Digital ID
+        <strong>${escapeHtml(row.publicId)} ${modeIconHtml}</strong>
+        <span class="stat-card-tier" data-tier="${tier}">${TIER_LABEL[tier]}</span>
+      </div>
+    </div>
+    ${rows.map(([label, value, positive]) => `<div class="stat-row${positive === true ? ' is-positive' : positive === false ? ' is-negative' : ''}"><span>${escapeHtml(label)}</span><span>${escapeHtml(value)}</span></div>`).join('')}
+    <div class="consistency-block">
+      <div class="consistency-label"><span>Consistency Score</span><strong>${Math.round(consistency)}</strong></div>
+      <div class="consistency-track"><div class="consistency-fill" style="width:${Math.min(100, Math.max(0, consistency))}%"></div></div>
+    </div>
+  `;
+  document.getElementById('statCard').querySelector('.stat-card-close').addEventListener('click', closeStatCard);
+  document.getElementById('statOverlay').hidden = false;
+}
+function closeStatCard() { document.getElementById('statOverlay').hidden = true; }
+document.addEventListener('click', e => {
+  if (document.getElementById('statOverlay').hidden) return;
+  if (e.target.closest('.showcase-bar') || e.target.closest('#statOverlay')) return;
+  closeStatCard();
+});
+</script>
+</body>
+</html>
