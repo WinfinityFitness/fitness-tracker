@@ -389,7 +389,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
 </div>
 
 <div class="splash-screen" id="splashScreen">
-  <img class="splash-logo" src="icons/icon-512.png" alt="Winfinity" id="splashLogo">
+  <img class="splash-logo" src="icons/icon-splash-default-512.png" alt="Winfinity" id="splashLogo">
   <p class="splash-caption">Masarap talaga kumain at matulog, pero mas masarap if ikaw mismo masarap din</p>
 </div>
 
@@ -3594,6 +3594,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
            resets the moment the page reloads. -->
       <button type="button" class="wds-gate-btn wds-gate-btn--ghost" id="wdsGuestLoginBtn">Guest Log In</button>
       <p class="hint hint--sm">Browse and try out the dashboard with a temporary identity — nothing you post or react to here is saved or visible to real users.</p>
+      <!-- Direct APK download, same GitHub Releases hosting as the other
+           installers (see supabase_public_showcase_migration.sql-adjacent
+           release notes) -- not a JS handler, just a plain link styled to
+           match the buttons above it. -->
+      <a class="wds-gate-btn wds-gate-btn--ghost" href="https://github.com/WinfinityFitness/fitness-tracker/releases/download/ft-v1.7.39-debug/winfinity-tracker.apk" target="_blank" rel="noopener" style="display:block;box-sizing:border-box;text-align:center;text-decoration:none;margin-top:10px;">Download Fitness App</a>
     </div>
   </div>
 
