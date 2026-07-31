@@ -1,0 +1,13 @@
+# Without this, any request under this subdomain's document root that
+# isn't a real file on disk (config.js, which index.php serves dynamically
+# by fetching it from GitHub Pages) falls through to WordPress's own
+# rewrite rules and gets WordPress's themed 404 page instead of reaching
+# our proxy script -- same root cause and same fix as
+# wordpress-proxy-coach/.htaccess, just discovered here later: turns out
+# even a dedicated subdomain's document root on this Hostinger account
+# still shares the main site's .htaccess/rewrite chain, not a fully
+# independent vhost.
+RewriteEngine On
+RewriteBase /
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^(.*)$ index.php [QSA,L]
