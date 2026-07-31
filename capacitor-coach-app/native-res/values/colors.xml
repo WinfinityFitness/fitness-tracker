@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches coach-dashboard.html's own bg color (#0a0d12), so the
+         native splash's background doesn't visibly mismatch the web splash
+         right after it. -->
+    <color name="splashBackground">#0a0d12</color>
+</resources>

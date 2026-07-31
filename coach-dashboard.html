@@ -134,7 +134,7 @@
 <body>
 
 <div class="splash-screen" id="splashScreen">
-  <img class="splash-logo" src="icons/icon-coach-512.png" alt="Winfinity Coach" id="splashLogo">
+  <img class="splash-logo" src="icons/icon-512.png" alt="Winfinity" id="splashLogo">
   <p class="splash-caption">Masarap talaga kumain at matulog, pero mas masarap if ikaw mismo masarap din</p>
 </div>
 
@@ -205,6 +205,42 @@ setTimeout(() => {
   setTimeout(() => { splash.hidden = true; }, 400);
 }, 2000);
 
+// Defaults to the same FT splash everyone sees, but swaps in whichever
+// coach last logged in successfully on THIS device's own custom splash
+// (set via Coach Portal > Boot Splash Logo) if they have one -- same idea
+// as an attached client's app picking up their coach's splash, just keyed
+// off a remembered Digital ID instead of a share_key, since there's no
+// password typed yet at this point in the boot sequence. Kicked off in
+// parallel with the splash's own 2000ms timer above, same "usually
+// resolves before the timer fires" pattern app.js's applyCustomSplashLogo
+// uses.
+const COACH_DASHBOARD_LAST_ID_KEY = 'wf_coach_dashboard_last_digital_id';
+function splashImageStyle(zoom, x, y) {
+  const z = Number(zoom) || 1;
+  const px = x != null ? Number(x) : 50;
+  const py = y != null ? Number(y) : 50;
+  if (z <= 1 && px === 50 && py === 50) return '';
+  return `object-position:${px}% ${py}%;transform:scale(${z});transform-origin:${px}% ${py}%`;
+}
+async function applyRememberedCoachSplash() {
+  const lastId = localStorage.getItem(COACH_DASHBOARD_LAST_ID_KEY);
+  if (!lastId) return;
+  try {
+    const { data, error } = await sb.rpc('get_coach_splash_by_digital_id', { p_coach_digital_id: lastId });
+    if (error || !Array.isArray(data) || !data.length) return;
+    const s = data[0];
+    if (s.splash_image_url) {
+      const img = document.getElementById('splashLogo');
+      img.src = s.splash_image_url;
+      img.style.cssText = splashImageStyle(s.splash_image_zoom, s.splash_image_pos_x, s.splash_image_pos_y);
+    }
+    if (s.splash_caption) {
+      document.querySelector('#splashScreen .splash-caption').textContent = s.splash_caption;
+    }
+  } catch (e) { /* stays on the default FT splash */ }
+}
+applyRememberedCoachSplash();
+
 const METRICS = [
   { key: 'steps', label: 'Daily Steps', domain: [0, 20000], higherIsBetter: true, format: v => Math.round(v).toLocaleString() },
   { key: 'volumeLifted', label: 'Volume Lifted', domain: [0, 8000], higherIsBetter: true, format: v => Math.round(v).toLocaleString() + ' kg' },
@@ -238,6 +274,7 @@ document.getElementById('btnLogin').addEventListener('click', async () => {
     const { data, error } = await sb.rpc('coach_get_showcase_data', { p_coach_digital_id: id, p_coach_password: password });
     if (error) throw error;
     coachSession = { digitalId: id, password };
+    localStorage.setItem(COACH_DASHBOARD_LAST_ID_KEY, id);
     allRows = (data.clients || []).map(r => ({
       publicId: r.publicId, codeName: r.codeName, avatarDataUrl: r.avatarDataUrl, fitnessMode: r.fitnessMode,
       steps: r.steps, volumeLifted: r.volumeLifted, volumeUnit: r.volumeUnit, weightProgressPct: r.weightProgressPct,

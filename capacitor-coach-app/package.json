@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "description": "Capacitor native Android shell for the Winfinity Coach Dashboard. Loads coach.winfinityfitness.com remotely (same pattern as capacitor-app for the main Fitness Tracker) -- a thin WebView shortcut straight to coach login, no bundled web assets and no rebuild needed when the dashboard's own content changes.",
   "scripts": {
-    "icons": "npx @capacitor/assets generate --android --iconBackgroundColor \"#0a0d12\" --iconBackgroundColorDark \"#0a0d12\""
+    "icons": "npx @capacitor/assets generate --android --iconBackgroundColor \"#0a0d12\" --iconBackgroundColorDark \"#0a0d12\" && node apply-native-res.js",
+    "apply-native-res": "node apply-native-res.js"
   },
   "dependencies": {
     "@capacitor/android": "^7.0.0",
