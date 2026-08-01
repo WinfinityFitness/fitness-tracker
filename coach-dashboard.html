@@ -106,6 +106,13 @@
     box-shadow: 0 4px 12px rgba(0,0,0,0.4);
   }
   .tooltip-wrap:hover .tooltip-bubble { display: block; }
+  .client-picker { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 4px; }
+  .client-pill {
+    background: var(--panel-2); color: var(--text-muted); border: 1px solid var(--border);
+    border-radius: 999px; padding: 7px 14px; font-size: 0.82rem; cursor: pointer;
+    font-variant-numeric: tabular-nums; font-family: inherit;
+  }
+  .client-pill.is-active { color: #0a0d12; background: var(--accent); border-color: var(--accent); font-weight: 600; }
   .color-picker-row { display: flex; gap: 10px; align-items: flex-start; }
   .color-wheel { border-radius: 50%; cursor: crosshair; touch-action: none; box-shadow: 0 0 0 1px var(--border); flex-shrink: 0; }
   .color-picker-controls { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
@@ -299,7 +306,8 @@
         </label>
         <button type="button" class="btn" id="btnAttachClient" style="width:100%;">Attach</button>
         <p class="note" id="attachNote"></p>
-        <div id="clientList"></div>
+        <p class="note" style="margin:8px 0 0;">Tap a client to open Monitor.</p>
+        <div id="clientList" class="client-picker"></div>
 
         <!-- Assign Targets (per client, opened from the client row above) -->
         <div class="card" id="assignTargetsCard" hidden style="margin-top:14px;">
@@ -328,6 +336,11 @@
           <div class="top-actions">
             <h2 style="margin:0;">Monitor &mdash; <span id="monitorClientId"></span></h2>
             <button type="button" class="back-btn" id="btnCloseMonitor">&larr; Back</button>
+          </div>
+          <div class="btn-row" id="monitorClientActions" style="margin:0 0 12px;">
+            <button type="button" class="link-btn" id="btnMonitorRename">Rename</button>
+            <button type="button" class="link-btn" id="btnMonitorAssignTargets">Assign Targets</button>
+            <button type="button" class="link-btn" id="btnMonitorRemove">Remove</button>
           </div>
           <p class="note" id="monitorStatusLine"></p>
           <div id="monitorContent">
@@ -574,17 +587,14 @@ async function loadCoachClients() {
   if (demoMode) {
     el.innerHTML = '';
     DEMO_CLIENTS.forEach(client => {
-      const row = document.createElement('div');
-      row.className = 'client-row';
-      const label = document.createElement('span');
-      label.textContent = client.publicId;
-      row.appendChild(label);
-      const monitorBtn = document.createElement('button');
-      monitorBtn.className = 'link-btn';
-      monitorBtn.textContent = 'Monitor';
-      monitorBtn.addEventListener('click', () => openMonitorClient(client.publicId, null));
-      row.appendChild(monitorBtn);
-      el.appendChild(row);
+      const pill = document.createElement('button');
+      pill.type = 'button';
+      pill.className = 'client-pill';
+      if (monitorState && monitorState.publicId === client.publicId) pill.classList.add('is-active');
+      pill.dataset.id = client.publicId;
+      pill.textContent = client.publicId;
+      pill.addEventListener('click', () => openMonitorClient(client.publicId, null));
+      el.appendChild(pill);
     });
     return;
   }
@@ -593,52 +603,25 @@ async function loadCoachClients() {
       p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
     });
     if (error) throw error;
-    if (!data || !data.length) { el.innerHTML = '<p class="note">No clients attached yet.</p>'; return; }
+    coachClientsCache = data || [];
+    if (!coachClientsCache.length) { el.innerHTML = '<p class="note">No clients attached yet.</p>'; return; }
     el.innerHTML = '';
-    data.forEach(client => {
-      const row = document.createElement('div');
-      row.className = 'client-row';
-      const label = document.createElement('span');
-      label.className = 'tooltip-wrap';
-      label.textContent = client.public_id;
-      if (client.client_nickname) {
-        const bubble = document.createElement('span');
-        bubble.className = 'tooltip-bubble';
-        bubble.textContent = client.client_nickname;
-        label.appendChild(bubble);
-      }
-      row.appendChild(label);
-      const btnGroup = document.createElement('span');
-      const renameBtn = document.createElement('button');
-      renameBtn.className = 'link-btn';
-      renameBtn.textContent = client.client_nickname ? 'Rename' : 'Add Name';
-      renameBtn.style.marginRight = '12px';
-      renameBtn.addEventListener('click', () => renameClient(client.public_id, client.client_nickname));
-      const monitorBtn = document.createElement('button');
-      monitorBtn.className = 'link-btn';
-      monitorBtn.textContent = 'Monitor';
-      monitorBtn.style.marginRight = '12px';
-      monitorBtn.addEventListener('click', () => openMonitorClient(client.public_id, client.share_key));
-      const targetsBtn = document.createElement('button');
-      targetsBtn.className = 'link-btn';
-      targetsBtn.textContent = 'Assign Targets';
-      targetsBtn.style.marginRight = '12px';
-      targetsBtn.addEventListener('click', () => openAssignTargets(client.public_id));
-      const removeBtn = document.createElement('button');
-      removeBtn.className = 'link-btn';
-      removeBtn.textContent = 'Remove';
-      removeBtn.addEventListener('click', () => removeClient(client.public_id));
-      btnGroup.appendChild(renameBtn);
-      btnGroup.appendChild(monitorBtn);
-      btnGroup.appendChild(targetsBtn);
-      btnGroup.appendChild(removeBtn);
-      row.appendChild(btnGroup);
-      el.appendChild(row);
+    coachClientsCache.forEach(client => {
+      const pill = document.createElement('button');
+      pill.type = 'button';
+      pill.className = 'client-pill';
+      if (monitorState && monitorState.publicId === client.public_id) pill.classList.add('is-active');
+      pill.dataset.id = client.public_id;
+      pill.textContent = client.public_id;
+      if (client.client_nickname) pill.title = client.client_nickname;
+      pill.addEventListener('click', () => openMonitorClient(client.public_id, client.share_key));
+      el.appendChild(pill);
     });
   } catch (e) {
     el.innerHTML = '<p class="note error">Could not load clients: ' + escapeHtml(e.message || String(e)) + '</p>';
   }
 }
+let coachClientsCache = [];
 
 // ---------------------------------------------------------------------
 // Assign Targets -- ported verbatim from coach-portal.html.
@@ -683,15 +666,35 @@ let monitorState = null;
 function openMonitorClient(publicId, shareKey) {
   document.getElementById('monitorCard').hidden = false;
   document.getElementById('monitorClientId').textContent = publicId;
+  document.getElementById('monitorClientActions').hidden = demoMode;
   document.getElementById('monitorStatusLine').textContent = '';
   document.getElementById('monitorContent').innerHTML = '<p class="note">Loading…</p>';
   document.getElementById('monitorCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.querySelectorAll('#clientList .client-pill').forEach(p => p.classList.toggle('is-active', p.dataset.id === publicId));
   monitorState = { publicId, shareKey, loadedDays: 0, logsByDate: {}, targets: {}, lastSyncedAt: null, weightFullJourney: false, volumeFullJourney: false };
   loadMonitorData(60);
 }
 document.getElementById('btnCloseMonitor').addEventListener('click', () => {
   document.getElementById('monitorCard').hidden = true;
   monitorState = null;
+});
+document.getElementById('btnMonitorRename').addEventListener('click', () => {
+  if (!monitorState || !monitorState.publicId || demoMode) return;
+  const client = coachClientsCache.find(c => c.public_id === monitorState.publicId);
+  renameClient(monitorState.publicId, client && client.client_nickname);
+});
+document.getElementById('btnMonitorAssignTargets').addEventListener('click', () => {
+  if (!monitorState || !monitorState.publicId || demoMode) return;
+  openAssignTargets(monitorState.publicId);
+});
+document.getElementById('btnMonitorRemove').addEventListener('click', async () => {
+  if (!monitorState || !monitorState.publicId || demoMode) return;
+  const publicId = monitorState.publicId;
+  await removeClient(publicId);
+  if (!coachClientsCache.some(c => c.public_id === publicId)) {
+    document.getElementById('monitorCard').hidden = true;
+    monitorState = null;
+  }
 });
 
 // Mirrors app.js's isBeginnerDayComplete() exactly (weightKg/sleep/steps/
