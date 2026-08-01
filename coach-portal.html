@@ -118,6 +118,22 @@
   .consistency-track { height: 6px; background: var(--panel-2); border-radius: 4px; overflow: hidden; }
   .consistency-fill { height: 100%; background: linear-gradient(90deg, var(--tier-behind), var(--tier-elite)); border-radius: 4px; }
   @media (max-width: 640px) { .chart-body { flex-direction: column; } .stat-panel { width: 100%; max-width: none; } }
+
+  .version-badge {
+    position: fixed; top: 12px; right: 12px; z-index: 40;
+    background: var(--panel); border: 1px solid var(--border); color: var(--text-muted);
+    border-radius: 999px; padding: 5px 11px; font-size: 0.72rem; font-variant-numeric: tabular-nums;
+    cursor: pointer; font-family: inherit;
+  }
+  .version-badge.has-update { color: var(--accent); border-color: var(--accent-dim); }
+  .update-modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 60;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .update-modal-card {
+    position: relative; width: 100%; max-width: 320px; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 14px; padding: 20px 18px 16px;
+  }
   .tooltip-wrap { position: relative; cursor: default; border-bottom: 1px dotted var(--border); }
   .tooltip-bubble {
     display: none; position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 5;
@@ -177,6 +193,18 @@
 </style>
 </head>
 <body>
+<button type="button" class="version-badge" id="versionBadge" title="Check for updates">v<span id="versionBadgeText">1.0.0</span></button>
+<div class="update-modal-overlay" id="updateModalOverlay" hidden>
+  <div class="update-modal-card">
+    <button type="button" class="stat-card-close" id="btnCloseUpdateModal" aria-label="Close">&times;</button>
+    <h2 style="margin:0 0 6px;font-size:1.05rem;">Coach Portal Version</h2>
+    <p class="note" id="updateModalStatus">Checking for updates…</p>
+    <div class="btn-row" id="updateModalActions" hidden>
+      <button type="button" class="btn" id="btnApplyUpdate">Update Now</button>
+      <button type="button" class="btn btn-secondary" id="btnDismissUpdate">Later</button>
+    </div>
+  </div>
+</div>
 <div class="wrap">
   <header class="hero">
     <h1>Winfinity <span class="accent">Coach Portal</span></h1>
@@ -449,6 +477,68 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* --- Version / update check ---
+   coach-portal.html has no service worker or APK -- GitHub Pages is
+   already the live source of truth for every normal page load. "Update
+   Now" here just means forcing a cache-busted reload instead of quietly
+   trusting whatever the browser already has cached, not installing
+   anything. */
+const COACH_PORTAL_VERSION = '1.0.0';
+document.getElementById('versionBadgeText').textContent = COACH_PORTAL_VERSION;
+
+async function fetchLatestCoachPortalVersion() {
+  try {
+    const res = await fetch('coach-portal.html?_=' + Date.now(), { cache: 'no-store' });
+    const text = await res.text();
+    const m = text.match(/COACH_PORTAL_VERSION\s*=\s*'([^']+)'/);
+    return m ? m[1] : null;
+  } catch (e) { return null; }
+}
+
+function coachPortalVersionIsNewer(remote, current) {
+  if (!remote) return false;
+  const a = remote.split('.').map(Number);
+  const b = current.split('.').map(Number);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const av = a[i] || 0, bv = b[i] || 0;
+    if (av !== bv) return av > bv;
+  }
+  return false;
+}
+
+async function openUpdateCheck() {
+  document.getElementById('updateModalOverlay').hidden = false;
+  document.getElementById('updateModalActions').hidden = true;
+  const statusEl = document.getElementById('updateModalStatus');
+  statusEl.textContent = 'Checking for updates…';
+  const latest = await fetchLatestCoachPortalVersion();
+  if (latest && coachPortalVersionIsNewer(latest, COACH_PORTAL_VERSION)) {
+    statusEl.textContent = `New version available: v${latest} (you're on v${COACH_PORTAL_VERSION}).`;
+    document.getElementById('updateModalActions').hidden = false;
+    document.getElementById('versionBadge').classList.add('has-update');
+  } else if (latest) {
+    statusEl.textContent = `You're on the latest version (v${COACH_PORTAL_VERSION}).`;
+    document.getElementById('versionBadge').classList.remove('has-update');
+  } else {
+    statusEl.textContent = 'Could not check for updates — try again in a moment.';
+  }
+}
+
+document.getElementById('versionBadge').addEventListener('click', openUpdateCheck);
+document.getElementById('btnCloseUpdateModal').addEventListener('click', () => { document.getElementById('updateModalOverlay').hidden = true; });
+document.getElementById('btnDismissUpdate').addEventListener('click', () => { document.getElementById('updateModalOverlay').hidden = true; });
+document.getElementById('btnApplyUpdate').addEventListener('click', () => {
+  location.href = location.pathname + '?_=' + Date.now();
+});
+
+// Passive check on load so the badge already flags an available update
+// (a small dot/accent color) without the coach needing to tap it first.
+fetchLatestCoachPortalVersion().then(latest => {
+  if (latest && coachPortalVersionIsNewer(latest, COACH_PORTAL_VERSION)) {
+    document.getElementById('versionBadge').classList.add('has-update');
+  }
+});
 
 const FEATURE_KEYS = [
   ['feature_core_tracking', 'Core Tracking'],
