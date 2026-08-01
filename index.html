@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.44">
+<link rel="stylesheet" href="style.css?v=1.7.50">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -805,10 +805,34 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         <button type="button" class="btn" id="btnCardioStop" hidden>Stop &amp; save</button>
       </div>
       <p class="save-note" id="cardioSaveNote"></p>
-      <button type="button" class="btn share-result-btn" id="btnShareCardio" hidden>
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
-        Share activity
-      </button>
+      <div class="btn-row">
+        <button type="button" class="btn share-result-btn" id="btnShareCardio" hidden>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
+          Share activity
+        </button>
+        <button type="button" class="btn share-result-btn" id="btnShareCardioSelfie" hidden>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          Share to My Day
+        </button>
+      </div>
+    </div>
+
+    <input type="file" accept="image/*" capture="user" id="cardioSelfieCameraInput" hidden>
+    <div class="cardio-selfie-overlay" id="cardioSelfieOverlay" hidden>
+      <div class="cardio-selfie-stage" id="cardioSelfieStage">
+        <img id="cardioSelfiePhoto" alt="">
+        <div class="cardio-selfie-widget text-white" id="cardioSelfieWidget">
+          <svg id="cardioSelfieTrackSvg" viewBox="0 0 200 120"></svg>
+          <div class="cardio-selfie-stats" id="cardioSelfieStats"></div>
+          <div class="cardio-selfie-resize-handle" id="cardioSelfieResizeHandle" aria-label="Drag to resize">⤡</div>
+        </div>
+      </div>
+      <div class="cardio-selfie-toolbar">
+        <button type="button" class="btn" id="btnCardioSelfieTextColor">Text: White</button>
+        <button type="button" class="btn" id="btnCardioSelfieRetake">Retake</button>
+        <button type="button" class="btn btn--primary" id="btnCardioSelfieShare">Share</button>
+        <button type="button" class="btn" id="btnCardioSelfieClose">Cancel</button>
+      </div>
     </div>
 
     <button type="button" class="btn caliper-entry-toggle" id="btnToggleActivityHistory" aria-expanded="false">
@@ -4661,11 +4685,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.7.44"></script>
+<script src="config.js?v=1.7.50"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.44"></script>
+<script src="app.js?v=1.7.50"></script>
 </body>
 </html>

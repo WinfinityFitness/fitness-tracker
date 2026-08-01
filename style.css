@@ -1259,6 +1259,46 @@ tbody tr:nth-child(even) { background: rgba(255,255,255,0.02); }
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
+/* Outdoor activity "Share to My Day" — camera-then-overlay composer.
+   .cardio-selfie-widget's position (left/top, %) and its scale both apply
+   via the same transform (translate(-50%,-50%) scale(s)), so its own
+   center point never moves as it's resized — exportAndShareCardioSelfie()
+   in app.js mirrors this exact math on canvas for the final share image. */
+.cardio-selfie-overlay {
+  position: fixed; inset: 0; z-index: 400; background: #000;
+  display: flex; flex-direction: column;
+}
+.cardio-selfie-overlay[hidden] { display: none; }
+.cardio-selfie-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; touch-action: none; background: #000; }
+.cardio-selfie-stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.cardio-selfie-widget {
+  position: absolute; left: 50%; top: 78%; transform: translate(-50%, -50%) scale(1);
+  width: 220px; touch-action: none; cursor: grab; user-select: none;
+}
+.cardio-selfie-widget:active { cursor: grabbing; }
+.cardio-selfie-widget svg { width: 100%; height: auto; display: block; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6)); }
+.cardio-selfie-widget polyline { fill: none; stroke: #ff9f43; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.cardio-selfie-stats { display: flex; justify-content: center; gap: 16px; margin-top: 8px; }
+.cardio-selfie-stat { text-align: center; }
+.cardio-selfie-stat-value { display: block; font-size: 1.15rem; font-weight: 800; text-shadow: 0 1px 4px rgba(0,0,0,0.7); }
+.cardio-selfie-stat-label { display: block; font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.9; text-shadow: 0 1px 4px rgba(0,0,0,0.7); }
+.cardio-selfie-widget.text-white .cardio-selfie-stat-value,
+.cardio-selfie-widget.text-white .cardio-selfie-stat-label { color: #fff; }
+.cardio-selfie-widget.text-black .cardio-selfie-stat-value,
+.cardio-selfie-widget.text-black .cardio-selfie-stat-label { color: #111; }
+.cardio-selfie-resize-handle {
+  position: absolute; right: -8px; bottom: -8px; width: 28px; height: 28px; border-radius: 50%;
+  background: #ff9f43; color: #1a1200; display: flex; align-items: center; justify-content: center;
+  font-size: 0.95rem; line-height: 1; cursor: nwse-resize; touch-action: none; border: 2px solid #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+}
+.cardio-selfie-toolbar {
+  display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+  padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: var(--surface-1); border-top: 1px solid var(--border-soft);
+}
+.cardio-selfie-toolbar .btn { flex: 1; min-width: 100px; }
+
 .cardio-history { display: flex; flex-direction: column; gap: 0; background: var(--surface-1); border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
 .cardio-history-row {
   display: flex; align-items: center; gap: 10px; padding: 10px 12px;

@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.49';
+const APP_VERSION = 'WF_SYS_V.1.7.50';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -10381,6 +10381,7 @@ function startCardioTracking() {
   document.getElementById('btnCardioStart').hidden = true;
   document.getElementById('btnCardioStop').hidden = false;
   document.getElementById('btnShareCardio').hidden = true;
+  document.getElementById('btnShareCardioSelfie').hidden = true;
   document.getElementById('cardioType').disabled = true;
   document.getElementById('cardioDuration').textContent = '00:00';
   document.getElementById('cardioDistance').textContent = '0.00';
@@ -10478,6 +10479,7 @@ function stopCardioTracking() {
   document.getElementById('cardioSaveNote').textContent = 'Activity saved.';
   setTimeout(() => { document.getElementById('cardioSaveNote').textContent = ''; }, 2500);
   document.getElementById('btnShareCardio').hidden = false;
+  document.getElementById('btnShareCardioSelfie').hidden = false;
   renderCardioMap(cardioTrack);
   renderCardioHistory();
   autoSyncLeaderboardIfOptedIn();
@@ -10702,6 +10704,242 @@ async function shareCardioSession() {
     ],
   });
   shareViaWebShare({ title: 'Winfinity Tracker — Activity', text }, blob);
+}
+
+/* ---- Outdoor activity: "Share to My Day" selfie composer ----
+   A separate, simpler share path from shareCardioSession() above (which
+   builds a map-tile share card): this one opens the camera for a selfie,
+   then overlays the GPS track + key stats as a draggable/resizable
+   transparent widget on top of that photo before sharing — closer to how
+   Strava/Instagram's own "share to story" flows work. Reuses cardioTrack
+   and lastCardioSession (both still populated after stopCardioTracking()
+   until the next Start tracking call) rather than tracking anything new. */
+let cardioSelfieWidgetPos = { xPct: 50, yPct: 78 };
+let cardioSelfieWidgetScale = 1;
+let cardioSelfieTextColor = 'white';
+
+function openCardioSelfieCamera() {
+  const input = document.getElementById('cardioSelfieCameraInput');
+  if (input) input.click();
+}
+
+function renderCardioSelfieTrackSvg() {
+  const svg = document.getElementById('cardioSelfieTrackSvg');
+  if (cardioTrack.length < 2) { svg.innerHTML = ''; return; }
+  const lats = cardioTrack.map(p => p.lat), lons = cardioTrack.map(p => p.lon);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const minLon = Math.min(...lons), maxLon = Math.max(...lons);
+  const w = 200, h = 120, pad = 10;
+  const spanLat = Math.max(maxLat - minLat, 0.0001);
+  const spanLon = Math.max(maxLon - minLon, 0.0001);
+  const points = cardioTrack.map(p => {
+    const x = pad + ((p.lon - minLon) / spanLon) * (w - pad * 2);
+    const y = h - pad - ((p.lat - minLat) / spanLat) * (h - pad * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  svg.innerHTML = `<polyline points="${points}"></polyline>`;
+}
+
+function cardioSelfieStatsList() {
+  const unit = distUnitForProfile(getProfile());
+  const dist = unit === 'mi' ? kmToMi(lastCardioSession.distanceKm) : lastCardioSession.distanceKm;
+  const steps = estimateCardioSteps(lastCardioSession.distanceKm, lastCardioSession.type);
+  const stats = [
+    { label: 'Duration', value: formatCardioDuration(lastCardioSession.durationSec) },
+    { label: 'Distance', value: `${dist.toFixed(2)} ${unit}` },
+  ];
+  if (steps != null) stats.push({ label: 'Steps', value: steps.toLocaleString() });
+  return stats;
+}
+
+function renderCardioSelfieStats() {
+  document.getElementById('cardioSelfieStats').innerHTML = cardioSelfieStatsList().map(s =>
+    `<div class="cardio-selfie-stat"><span class="cardio-selfie-stat-value">${escapeHtml(s.value)}</span><span class="cardio-selfie-stat-label">${escapeHtml(s.label)}</span></div>`
+  ).join('');
+}
+
+function applyCardioSelfieWidgetTransform() {
+  const widget = document.getElementById('cardioSelfieWidget');
+  widget.style.left = cardioSelfieWidgetPos.xPct + '%';
+  widget.style.top = cardioSelfieWidgetPos.yPct + '%';
+  widget.style.transform = `translate(-50%, -50%) scale(${cardioSelfieWidgetScale})`;
+}
+
+function closeCardioSelfieComposer() {
+  const img = document.getElementById('cardioSelfiePhoto');
+  if (img.src) URL.revokeObjectURL(img.src);
+  img.src = '';
+  document.getElementById('cardioSelfieOverlay').hidden = true;
+}
+
+function openCardioSelfieComposer(file) {
+  if (!lastCardioSession) return;
+  const img = document.getElementById('cardioSelfiePhoto');
+  img.src = URL.createObjectURL(file);
+  cardioSelfieWidgetPos = { xPct: 50, yPct: 78 };
+  cardioSelfieWidgetScale = 1;
+  applyCardioSelfieWidgetTransform();
+  renderCardioSelfieStats();
+  renderCardioSelfieTrackSvg();
+  document.getElementById('cardioSelfieOverlay').hidden = false;
+}
+
+// Draws the widget's current on-screen position/scale onto the export
+// canvas at 1:1 CSS-pixel-equivalent coordinates (ctx is already scaled by
+// the caller) — the local 0..220 coordinate space here mirrors the
+// widget's actual CSS layout (200x120 track viewBox stretched to 220px
+// wide = 132px tall, an 8px gap, then a ~46px stats row) so the exported
+// image matches what was shown on screen instead of drifting from it.
+function drawCardioSelfieWidgetOnCanvas(ctx, centerX, centerY, scale, textColor, track, stats) {
+  const BASE_W = 220, TRACK_H = 132, GAP = 8, STAT_ROW_H = 46;
+  const naturalH = TRACK_H + GAP + STAT_ROW_H;
+  ctx.save();
+  ctx.translate(centerX, centerY);
+  ctx.scale(scale, scale);
+  ctx.translate(-BASE_W / 2, -naturalH / 2);
+
+  if (track.length > 1) {
+    const lats = track.map(p => p.lat), lons = track.map(p => p.lon);
+    const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+    const minLon = Math.min(...lons), maxLon = Math.max(...lons);
+    const spanLat = Math.max(maxLat - minLat, 0.0001);
+    const spanLon = Math.max(maxLon - minLon, 0.0001);
+    const pad = 11;
+    const pts = track.map(p => ({
+      x: pad + ((p.lon - minLon) / spanLon) * (BASE_W - pad * 2),
+      y: pad + (TRACK_H - pad * 2) - ((p.lat - minLat) / spanLat) * (TRACK_H - pad * 2),
+    }));
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 1;
+    ctx.strokeStyle = '#ff9f43';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    ctx.stroke();
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+  }
+
+  const color = textColor === 'black' ? '#111111' : '#ffffff';
+  const shadowColor = textColor === 'black' ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.65)';
+  const colX = stats.length === 3 ? [BASE_W * 0.17, BASE_W * 0.5, BASE_W * 0.83] : [BASE_W * 0.28, BASE_W * 0.72];
+  const rowY = TRACK_H + GAP;
+  ctx.textAlign = 'center';
+  ctx.shadowColor = shadowColor; ctx.shadowBlur = 4; ctx.shadowOffsetY = 1;
+  stats.forEach((s, i) => {
+    const x = colX[i];
+    ctx.fillStyle = color;
+    ctx.font = 'bold 22px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillText(s.value, x, rowY + 22);
+    ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillText(s.label.toUpperCase(), x, rowY + 38);
+  });
+  ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+  ctx.restore();
+}
+
+async function exportAndShareCardioSelfie() {
+  const stage = document.getElementById('cardioSelfieStage');
+  const img = document.getElementById('cardioSelfiePhoto');
+  const stageRect = stage.getBoundingClientRect();
+  const EXPORT_SCALE = 2; // sharper-than-CSS-pixel export, same idea as drawing at devicePixelRatio
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(stageRect.width * EXPORT_SCALE);
+  canvas.height = Math.round(stageRect.height * EXPORT_SCALE);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(EXPORT_SCALE, EXPORT_SCALE);
+
+  // object-fit:cover equivalent, so the exported photo crop matches what
+  // was actually visible behind the widget while editing.
+  const photoAspect = img.naturalWidth / img.naturalHeight;
+  const targetAspect = stageRect.width / stageRect.height;
+  let sx, sy, sw, sh;
+  if (photoAspect > targetAspect) {
+    sh = img.naturalHeight; sw = sh * targetAspect; sx = (img.naturalWidth - sw) / 2; sy = 0;
+  } else {
+    sw = img.naturalWidth; sh = sw / targetAspect; sx = 0; sy = (img.naturalHeight - sh) / 2;
+  }
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, stageRect.width, stageRect.height);
+
+  const centerX = (cardioSelfieWidgetPos.xPct / 100) * stageRect.width;
+  const centerY = (cardioSelfieWidgetPos.yPct / 100) * stageRect.height;
+  drawCardioSelfieWidgetOnCanvas(ctx, centerX, centerY, cardioSelfieWidgetScale, cardioSelfieTextColor, cardioTrack, cardioSelfieStatsList());
+
+  const blob = await new Promise(resolve => canvas.toBlob(b => resolve(b), 'image/jpeg', 0.92));
+  closeCardioSelfieComposer();
+  const typeLabel = { run: 'run', walk: 'walk', ride: 'ride' }[lastCardioSession.type] || 'activity';
+  await shareViaWebShare({ title: 'Winfinity Tracker — My Day', text: `Just finished a ${typeLabel} with Winfinity Tracker! 💪` }, blob);
+}
+
+function initCardioSelfieComposer() {
+  const cameraInput = document.getElementById('cardioSelfieCameraInput');
+  const stage = document.getElementById('cardioSelfieStage');
+  const widget = document.getElementById('cardioSelfieWidget');
+  const handle = document.getElementById('cardioSelfieResizeHandle');
+  if (!cameraInput || !stage || !widget || !handle) return;
+
+  document.getElementById('btnShareCardioSelfie').addEventListener('click', openCardioSelfieCamera);
+  cameraInput.addEventListener('change', () => {
+    const file = cameraInput.files && cameraInput.files[0];
+    cameraInput.value = '';
+    if (file) openCardioSelfieComposer(file);
+  });
+  document.getElementById('btnCardioSelfieClose').addEventListener('click', closeCardioSelfieComposer);
+  document.getElementById('btnCardioSelfieRetake').addEventListener('click', () => {
+    closeCardioSelfieComposer();
+    openCardioSelfieCamera();
+  });
+  document.getElementById('btnCardioSelfieTextColor').addEventListener('click', () => {
+    cardioSelfieTextColor = cardioSelfieTextColor === 'white' ? 'black' : 'white';
+    widget.classList.toggle('text-white', cardioSelfieTextColor === 'white');
+    widget.classList.toggle('text-black', cardioSelfieTextColor === 'black');
+    document.getElementById('btnCardioSelfieTextColor').textContent = 'Text: ' + (cardioSelfieTextColor === 'white' ? 'White' : 'Black');
+  });
+  document.getElementById('btnCardioSelfieShare').addEventListener('click', exportAndShareCardioSelfie);
+
+  // Drag to reposition (from anywhere on the widget except the resize
+  // handle) and drag-from-handle to resize, both via Pointer Events so
+  // touch and mouse share one implementation.
+  let dragging = false, dragStartX = 0, dragStartY = 0, dragStartXPct = 0, dragStartYPct = 0;
+  widget.addEventListener('pointerdown', e => {
+    if (e.target === handle) return;
+    dragging = true;
+    widget.setPointerCapture(e.pointerId);
+    dragStartX = e.clientX; dragStartY = e.clientY;
+    dragStartXPct = cardioSelfieWidgetPos.xPct; dragStartYPct = cardioSelfieWidgetPos.yPct;
+  });
+  widget.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const rect = stage.getBoundingClientRect();
+    const dxPct = ((e.clientX - dragStartX) / rect.width) * 100;
+    const dyPct = ((e.clientY - dragStartY) / rect.height) * 100;
+    cardioSelfieWidgetPos.xPct = Math.min(100, Math.max(0, dragStartXPct + dxPct));
+    cardioSelfieWidgetPos.yPct = Math.min(100, Math.max(0, dragStartYPct + dyPct));
+    applyCardioSelfieWidgetTransform();
+  });
+  widget.addEventListener('pointerup', () => { dragging = false; });
+  widget.addEventListener('pointercancel', () => { dragging = false; });
+
+  let resizing = false, resizeStartDist = 1, resizeStartScale = 1;
+  handle.addEventListener('pointerdown', e => {
+    e.stopPropagation();
+    resizing = true;
+    handle.setPointerCapture(e.pointerId);
+    const rect = widget.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+    resizeStartDist = Math.max(1, Math.hypot(e.clientX - cx, e.clientY - cy));
+    resizeStartScale = cardioSelfieWidgetScale;
+  });
+  handle.addEventListener('pointermove', e => {
+    if (!resizing) return;
+    const rect = widget.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+    const dist = Math.hypot(e.clientX - cx, e.clientY - cy);
+    cardioSelfieWidgetScale = Math.min(2.5, Math.max(0.5, resizeStartScale * (dist / resizeStartDist)));
+    applyCardioSelfieWidgetTransform();
+  });
+  handle.addEventListener('pointerup', () => { resizing = false; });
+  handle.addEventListener('pointercancel', () => { resizing = false; });
 }
 
 function deleteCardioSession(date, sessionIndex) {
@@ -21832,6 +22070,7 @@ safeInit(initDeepLinkHandling, 'initDeepLinkHandling');
 safeInit(initShareTargetHandling, 'initShareTargetHandling');
 safeInit(initWidgetActionHandling, 'initWidgetActionHandling');
 safeInit(initProgressPhotoCamera, 'initProgressPhotoCamera');
+safeInit(initCardioSelfieComposer, 'initCardioSelfieComposer');
 safeInit(initLeaderboard, 'initLeaderboard');
 safeInit(initAnnouncementWidget, 'initAnnouncementWidget');
 safeInit(initAdminDrawer, 'initAdminDrawer');
