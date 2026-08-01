@@ -64,6 +64,11 @@
   header.hero p { color: var(--text-muted); margin: 0; font-size: 0.88rem; }
   .logout-link { display: block; text-align: center; margin-top: 8px; color: var(--text-muted); font-size: 0.78rem; }
   .logout-link button, .logout-link a { background: none; border: none; color: var(--text-muted); font-size: 0.78rem; cursor: pointer; text-decoration: underline; }
+  .demo-banner {
+    background: rgba(224,85,90,0.14); border: 1px solid var(--tier-behind); color: var(--tier-behind);
+    border-radius: 8px; padding: 8px 12px; text-align: center; font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 0.03em; text-transform: uppercase; margin-bottom: 14px;
+  }
 
   .tabs { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 18px; }
   .tab-btn {
@@ -198,9 +203,13 @@
       <button type="button" class="btn" id="btnLogin" style="width:100%;">Log In</button>
       <p class="note" id="loginNote" style="margin-top:10px;"></p>
     </div>
+    <p class="note" style="text-align:center;margin-top:14px;">
+      <button type="button" class="link-btn" id="btnCoachDemo">See a live demo with sample clients</button>
+    </p>
   </div>
 
   <div id="dashboardScreen" hidden>
+    <div id="demoBanner" class="demo-banner" hidden>PREVIEW MODE — sample clients, no real account or data</div>
     <header class="hero">
       <h1 id="dashHeading">Coach <span class="accent">Dashboard</span></h1>
       <p>A live look at your own clients' progress.</p>
@@ -562,6 +571,23 @@ document.getElementById('btnSaveBranding').addEventListener('click', async () =>
 async function loadCoachClients() {
   const el = document.getElementById('clientList');
   el.innerHTML = '<p class="note">Loading…</p>';
+  if (demoMode) {
+    el.innerHTML = '';
+    DEMO_CLIENTS.forEach(client => {
+      const row = document.createElement('div');
+      row.className = 'client-row';
+      const label = document.createElement('span');
+      label.textContent = client.publicId;
+      row.appendChild(label);
+      const monitorBtn = document.createElement('button');
+      monitorBtn.className = 'link-btn';
+      monitorBtn.textContent = 'Monitor';
+      monitorBtn.addEventListener('click', () => openMonitorClient(client.publicId, null));
+      row.appendChild(monitorBtn);
+      el.appendChild(row);
+    });
+    return;
+  }
   try {
     const { data, error } = await sb.rpc('coach_list_clients', {
       p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
@@ -660,7 +686,7 @@ function openMonitorClient(publicId, shareKey) {
   document.getElementById('monitorStatusLine').textContent = '';
   document.getElementById('monitorContent').innerHTML = '<p class="note">Loading…</p>';
   document.getElementById('monitorCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
-  monitorState = { shareKey, loadedDays: 0, logsByDate: {}, targets: {}, lastSyncedAt: null, weightFullJourney: false, volumeFullJourney: false };
+  monitorState = { publicId, shareKey, loadedDays: 0, logsByDate: {}, targets: {}, lastSyncedAt: null, weightFullJourney: false, volumeFullJourney: false };
   loadMonitorData(60);
 }
 document.getElementById('btnCloseMonitor').addEventListener('click', () => {
@@ -736,6 +762,19 @@ async function loadMonitorData(days) {
   const content = document.getElementById('monitorContent');
   const st = monitorState;
   if (!st) return;
+  if (demoMode) {
+    if (!demoLogsCache[st.publicId]) {
+      const idx = DEMO_CLIENTS.findIndex(c => c.publicId === st.publicId);
+      demoLogsCache[st.publicId] = generateDemoMonitorLogs((idx + 1) * 104729 + 17);
+    }
+    const mock = demoLogsCache[st.publicId];
+    st.loadedDays = days;
+    st.logsByDate = mock.logsByDate;
+    st.targets = mock.targets;
+    st.lastSyncedAt = mock.lastSyncedAt;
+    renderMonitorContent();
+    return;
+  }
   try {
     const { data, error } = await sb.rpc('coach_get_client_monitor', {
       p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
@@ -976,6 +1015,121 @@ let allRows = [];
 let activeMetricIndex = 0;
 let sortByHeight = false;
 
+/* ---------------------------------------------------------------------
+   "See a live demo" -- entirely local, synthetic 7-client preview for
+   screenshots/screen recordings. No Supabase calls anywhere in this
+   block: demoMode gates every RPC-calling function below (loadCoachClients,
+   openMonitorClient/loadMonitorData) to use generateMockLogs() instead.
+   Digital IDs are freshly random, not reused from any real account, and
+   never written anywhere -- purely in-memory for this session.
+--------------------------------------------------------------------- */
+let demoMode = false;
+const DEMO_CLIENTS = [
+  { publicId: 'WF-7QP3ML', codeName: 'Marco', fitnessMode: 'warrior' },
+  { publicId: 'WF-K9X2VD', codeName: 'Divine', fitnessMode: 'spartan' },
+  { publicId: 'WF-4RTN8B', codeName: 'Bea', fitnessMode: 'beginner' },
+  { publicId: 'WF-Y6WFQ2', codeName: 'Jhun', fitnessMode: 'demigod' },
+  { publicId: 'WF-B3HK7T', codeName: 'Trisha', fitnessMode: 'warrior' },
+  { publicId: 'WF-N8CZ1R', codeName: 'Carlo', fitnessMode: 'spartan' },
+  { publicId: 'WF-Q2VXM5', codeName: 'Mae', fitnessMode: 'beginner' },
+];
+
+function seededRandom(seed) {
+  let s = seed;
+  return () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+}
+
+// Each client's showcase snapshot (for the top bar-chart tabs) and 60-day
+// Monitor history come from the same seeded stream, so a given client's
+// numbers stay internally consistent between the two views.
+const demoLogsCache = {};
+function demoClientData(client, seed) {
+  const rand = seededRandom(seed);
+  const isRunner = rand() < 0.65;
+  const steps = Math.round(3000 + rand() * 10000);
+  const volumeLifted = Math.round(300 + rand() * 7000);
+  const weightProgressPct = Math.round((-8 + rand() * 11) * 10) / 10;
+  const furthestRunKm = isRunner ? Math.round((2 + rand() * 13) * 10) / 10 : null;
+  const fastestRunPaceSec = isRunner ? Math.round(220 + rand() * 260) : null;
+  const conscientiousScore = Math.round(35 + rand() * 60);
+  return {
+    publicId: client.publicId, codeName: client.codeName, avatarDataUrl: null, fitnessMode: client.fitnessMode,
+    steps, volumeLifted, volumeUnit: 'kg', weightProgressPct,
+    furthestRunKm, fastestRunPaceSec, conscientiousScore,
+  };
+}
+
+function generateDemoMonitorLogs(seed) {
+  const rand = seededRandom(seed);
+  const days = 60;
+  const logConsistency = 0.55 + rand() * 0.4;
+  const gymFrequency = 0.2 + rand() * 0.4;
+  const setCompletionRate = 0.65 + rand() * 0.3;
+  const weightDirection = rand() < 0.2 ? 1 : (rand() < 0.5 ? 0 : -1);
+  const startWeight = 58 + rand() * 45;
+  const weightDriftPerDay = weightDirection * (0.01 + rand() * 0.05);
+  const startSteps = 3500 + rand() * 10000;
+  const stepsDriftPerDay = (rand() - 0.35) * 35;
+  let startVolume = 300 + rand() * 7000;
+  const volumeDriftPerGymDay = (rand() - 0.2) * 20;
+
+  const logsByDate = {};
+  const today = new Date();
+  let gymDayCount = 0;
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    const ds = d.toISOString().slice(0, 10);
+    const dayIndex = days - 1 - i;
+    if (rand() > logConsistency) continue;
+    const isGymDay = rand() < gymFrequency;
+    const entry = {
+      calories: Math.round(1500 + rand() * 1300),
+      protein: Math.round(70 + rand() * 160),
+      carbs: Math.round(120 + rand() * 200),
+      fat: Math.round(40 + rand() * 60),
+      fiber: Math.round(10 + rand() * 25),
+      sodium: Math.round(1400 + rand() * 1400),
+      steps: Math.max(500, Math.round(startSteps + stepsDriftPerDay * dayIndex + (rand() - 0.5) * 2200)),
+      weightKg: Math.round((startWeight + weightDriftPerDay * dayIndex + (rand() - 0.5) * 0.7) * 10) / 10,
+      sleep: 1 + Math.floor(rand() * 5), stress: 1 + Math.floor(rand() * 5),
+      fatigue: 1 + Math.floor(rand() * 5), hunger: 1 + Math.floor(rand() * 5),
+      water: Math.round(900 + rand() * 2200),
+      meals: { breakfast: [{ calories: 400 }], lunch: [{ calories: 600 }], dinner: [{ calories: 700 }], snacks: [] },
+    };
+    if (isGymDay) {
+      gymDayCount++;
+      const setCompleted = rand() < setCompletionRate;
+      const vol = Math.max(200, startVolume + volumeDriftPerGymDay * gymDayCount);
+      entry.exercises = [{
+        name: 'Session', sets: [
+          { reps: 6 + Math.floor(rand() * 8), weightKg: Math.round(vol / 8), completed: setCompleted },
+          { reps: 6 + Math.floor(rand() * 8), weightKg: Math.round(vol / 8), completed: setCompleted },
+        ],
+      }];
+      entry.workout = setCompleted;
+    }
+    logsByDate[ds] = entry;
+  }
+  const targets = {
+    calorieTarget: Math.round(1700 + rand() * 700), stepGoal: Math.round(5000 + rand() * 5000),
+    workoutsPerWeek: 2 + Math.floor(rand() * 5), refeedCalories: null, refeedStart: null, refeedEnd: null,
+  };
+  return { logsByDate, targets, lastSyncedAt: new Date(Date.now() - rand() * 20 * 3600 * 1000).toISOString() };
+}
+
+function startCoachDemo() {
+  demoMode = true;
+  allRows = DEMO_CLIENTS.map((c, i) => demoClientData(c, (i + 1) * 104729 + 17));
+  document.getElementById('dashHeading').innerHTML = 'Demo Coach <span class="accent">Dashboard</span>';
+  document.getElementById('demoBanner').hidden = false;
+  document.getElementById('loginScreen').hidden = true;
+  document.getElementById('dashboardScreen').hidden = false;
+  renderTabs();
+  renderMetric(0);
+  loadCoachClients();
+}
+document.getElementById('btnCoachDemo').addEventListener('click', startCoachDemo);
+
 document.getElementById('btnLogin').addEventListener('click', async () => {
   const id = document.getElementById('loginId').value.trim();
   const password = document.getElementById('loginPassword').value;
@@ -1006,9 +1160,11 @@ document.getElementById('btnLogin').addEventListener('click', async () => {
 });
 
 document.getElementById('btnLogout').addEventListener('click', () => {
-  coachSession = null; allRows = [];
+  coachSession = null; allRows = []; demoMode = false; monitorState = null;
   document.getElementById('loginPassword').value = '';
   document.getElementById('loginNote').textContent = '';
+  document.getElementById('demoBanner').hidden = true;
+  document.getElementById('monitorCard').hidden = true;
   document.getElementById('dashboardScreen').hidden = true;
   document.getElementById('loginScreen').hidden = false;
 });
