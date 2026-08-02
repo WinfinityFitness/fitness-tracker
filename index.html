@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.52">
+<link rel="stylesheet" href="style.css?v=1.7.53">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -403,6 +403,37 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
     <img class="brand-logo mode-icon" id="headerModeIcon" src="" alt="" width="28" height="28" hidden>
   </div>
 </header>
+
+<div class="game-popover" id="gamePopover" hidden>
+  <div class="game-popover-inner">
+    <div class="game-character-portrait">
+      <button type="button" class="game-play-btn" id="gamePlayBtn" hidden aria-label="Play character animation">&#9654;</button>
+      <img id="gameCharSpriteBase" class="game-char-sprite game-char-sprite--base" alt="">
+      <div id="gameCharSpriteAction" class="game-char-sprite game-char-sprite--action" hidden></div>
+    </div>
+    <p class="game-character-name"><span id="gameRankLabel"></span> &middot; Lv <span id="gameLevel"></span></p>
+    <div class="gradient-bar"><div class="gradient-bar-fill" id="gameXpBarFill" style="width:0%"></div></div>
+    <p class="hint hint--sm" id="gameXpLabel"></p>
+
+    <p class="field-group-heading" style="margin-top:16px;">Fitness Garden</p>
+    <div class="game-garden-row">
+      <div class="game-garden-icon" id="gardenStageIcon">🌱</div>
+      <div class="game-character-info">
+        <p class="game-character-name" id="gardenStageLabel">Seed</p>
+        <p class="hint hint--sm" id="gardenProgressLabel"></p>
+      </div>
+    </div>
+    <p class="hint hint--sm">Log a workout or cardio session to water your garden. It fruits into a bonus item every few training days.</p>
+    <div class="game-inventory" id="gameInventoryList"></div>
+
+    <div class="game-boss-card" id="gameBossCard" hidden style="margin-top:16px;">
+      <p class="field-group-heading"><span id="gameBossIcon"></span> Boss Battle</p>
+      <p class="hint hint--sm" id="gameBossLabel"></p>
+      <div class="gradient-bar"><div class="gradient-bar-fill" id="gameBossProgressFill" style="width:0%"></div></div>
+      <p class="hint hint--sm" id="gameBossDaysLeft"></p>
+    </div>
+  </div>
+</div>
 
 <div class="global-announcement-strip" id="globalAnnouncementStrip" hidden>
   <div class="announcement-marquee" id="globalAnnouncementMarquee">
@@ -1540,45 +1571,6 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         <button type="submit" class="btn btn--primary">Save weekly review</button>
         <p class="save-note" id="reviewSaveNote"></p>
       </form>
-      </div>
-    </div>
-
-    <div class="sheet-section">
-      <p class="mod-tag">Mod_rpg_journey</p>
-      <div class="btn-row">
-        <button type="button" class="btn caliper-entry-toggle" id="btnToggleGamePanel" aria-expanded="false">
-          <span>Fitness RPG</span>
-          <svg viewBox="0 0 24 24" width="16" height="16" class="caliper-entry-chevron" id="gamePanelChevron" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-        </button>
-      </div>
-      <div class="caliper-entry-panel" id="gamePanel" hidden>
-        <p class="field-group-heading">Character</p>
-        <div class="game-character-row">
-          <img id="gameRankIcon" class="game-rank-icon" alt="">
-          <div class="game-character-info">
-            <p class="game-character-name"><span id="gameRankLabel"></span> &middot; Lv <span id="gameLevel"></span></p>
-            <div class="gradient-bar"><div class="gradient-bar-fill" id="gameXpBarFill" style="width:0%"></div></div>
-            <p class="hint hint--sm" id="gameXpLabel"></p>
-          </div>
-        </div>
-
-        <p class="field-group-heading" style="margin-top:16px;">Fitness Garden</p>
-        <div class="game-garden-row">
-          <div class="game-garden-icon" id="gardenStageIcon">🌱</div>
-          <div class="game-character-info">
-            <p class="game-character-name" id="gardenStageLabel">Seed</p>
-            <p class="hint hint--sm" id="gardenProgressLabel"></p>
-          </div>
-        </div>
-        <p class="hint hint--sm">Log a workout or cardio session to water your garden. It fruits into a bonus item every few training days.</p>
-        <div class="game-inventory" id="gameInventoryList"></div>
-
-        <div class="game-boss-card" id="gameBossCard" hidden style="margin-top:16px;">
-          <p class="field-group-heading"><span id="gameBossIcon"></span> Boss Battle</p>
-          <p class="hint hint--sm" id="gameBossLabel"></p>
-          <div class="gradient-bar"><div class="gradient-bar-fill" id="gameBossProgressFill" style="width:0%"></div></div>
-          <p class="hint hint--sm" id="gameBossDaysLeft"></p>
-        </div>
       </div>
     </div>
 
@@ -4733,11 +4725,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.7.52"></script>
+<script src="config.js?v=1.7.53"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.52"></script>
+<script src="app.js?v=1.7.53"></script>
 </body>
 </html>

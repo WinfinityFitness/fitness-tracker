@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.52';
+const APP_VERSION = 'WF_SYS_V.1.7.53';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -21561,6 +21561,22 @@ const GAME_XP_PER_LEVEL = 100;
 const GAME_XP_TABLE = { weighIn: 5, vitals: 5, meal: 5, water: 5, workout: 10, cardio: 10, habit: 5, weeklyReview: 15 };
 const GARDEN_STAGES = ['seed', 'sprout', 'budding', 'blooming', 'fruiting'];
 const GARDEN_STAGE_ICON = { seed: '🌱', sprout: '🌿', budding: '🌼', blooming: '🌸', fruiting: '🍎' };
+// Full-body character portraits shown in the header popover only — the
+// small existing MODE_ICON rank badges (header trigger, leaderboard) are
+// unchanged. Only Spartan/Demi-God have a second "action pose" sprite so
+// far; the play button hides itself for ranks without one.
+const CHAR_SPRITE = {
+  beginner: 'icons/character/char-novice.png',
+  warrior: 'icons/character/char-warrior.png',
+  spartan: 'icons/character/char-spartan.png',
+  demigod: 'icons/character/char-demigod.png',
+};
+// 25-frame horizontal sprite strips (one attack-animation cycle each),
+// played via the CSS steps() animation on .game-char-sprite--action.
+const CHAR_ACTION_SPRITE = {
+  spartan: 'icons/character/char-spartan-action-strip.png',
+  demigod: 'icons/character/char-demigod-action-strip.png',
+};
 const GARDEN_STAGE_DAYS = 4; // cumulative training-days needed to advance one stage
 const GARDEN_ITEMS = [
   { id: 'xpPotion', name: 'XP Potion', icon: '🧪', effect: 'xp50' },
@@ -21771,8 +21787,13 @@ function renderGamificationPanel() {
   if (!p || !p.fitnessMode) return;
   const g = getGamification();
 
-  const rankIcon = document.getElementById('gameRankIcon');
-  if (rankIcon) { rankIcon.src = MODE_ICON[p.fitnessMode] || MODE_ICON.beginner; rankIcon.alt = MODE_LABEL[p.fitnessMode] || ''; }
+  const spriteBase = document.getElementById('gameCharSpriteBase');
+  if (spriteBase) { spriteBase.src = CHAR_SPRITE[p.fitnessMode] || CHAR_SPRITE.beginner; spriteBase.alt = MODE_LABEL[p.fitnessMode] || ''; }
+  const spriteAction = document.getElementById('gameCharSpriteAction');
+  const actionSrc = CHAR_ACTION_SPRITE[p.fitnessMode];
+  if (spriteAction) { if (actionSrc) spriteAction.style.backgroundImage = `url('${actionSrc}')`; spriteAction.hidden = !actionSrc; }
+  const playBtn = document.getElementById('gamePlayBtn');
+  if (playBtn) playBtn.hidden = !actionSrc;
   const rankLabel = document.getElementById('gameRankLabel');
   if (rankLabel) rankLabel.textContent = (MODE_LABEL[p.fitnessMode] || '').replace(' Mode', '');
   const levelEl = document.getElementById('gameLevel');
@@ -21814,7 +21835,33 @@ function renderGamificationPanel() {
 }
 
 function initGamificationPanel() {
-  initClickToRevealHint('btnToggleGamePanel', 'gamePanel');
+  const trigger = document.getElementById('headerModeIcon');
+  const popover = document.getElementById('gamePopover');
+  if (trigger && popover) {
+    trigger.addEventListener('click', e => {
+      e.stopPropagation();
+      popover.hidden = !popover.hidden;
+      if (!popover.hidden) renderGamificationPanel();
+    });
+    popover.addEventListener('click', e => e.stopPropagation());
+    // Tapping anywhere else on the page minimizes it.
+    document.addEventListener('click', () => { popover.hidden = true; });
+  }
+
+  const playBtn = document.getElementById('gamePlayBtn');
+  if (playBtn) {
+    playBtn.addEventListener('click', () => {
+      const action = document.getElementById('gameCharSpriteAction');
+      const base = document.getElementById('gameCharSpriteBase');
+      if (!action || action.hidden) return;
+      base.classList.add('is-paused');
+      action.classList.remove('is-playing');
+      void action.offsetWidth; // restart the CSS animation on repeat taps
+      action.classList.add('is-playing');
+      setTimeout(() => { action.classList.remove('is-playing'); base.classList.remove('is-paused'); }, 1050);
+    });
+  }
+
   const invList = document.getElementById('gameInventoryList');
   if (invList) {
     invList.addEventListener('click', e => {

@@ -1686,12 +1686,97 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 }
 
 /* ---------------- Fitness RPG (Character / Garden / Boss Battle) ---------------- */
-.game-character-row, .game-garden-row {
+.game-popover {
+  position: fixed;
+  top: 62px;
+  right: 12px;
+  left: 12px;
+  max-width: 380px;
+  margin-left: auto;
+  z-index: 150;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.45), 0 0 30px var(--cyan-glow);
+  max-height: calc(100vh - 90px);
+  overflow-y: auto;
+  padding: 16px;
+  animation: gamePopoverIn 0.18s ease-out;
+}
+.game-popover[hidden] { display: none; }
+@keyframes gamePopoverIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+#headerModeIcon { cursor: pointer; }
+.game-character-portrait {
+  position: relative;
+  width: 100%;
+  height: 170px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+.game-char-sprite {
+  max-height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 0 14px var(--cyan-glow));
+}
+.game-char-sprite--base { animation: gameCharIdle 2.4s ease-in-out infinite; }
+.game-char-sprite--base.is-paused { animation-play-state: paused; }
+/* Action sprite is a 25-frame horizontal strip (see icons/character/*-action-strip.png)
+   played as a discrete-step background-position animation — a real frame-by-frame
+   attack animation, not a crossfade. */
+.game-char-sprite--action {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 100%;
+  height: 100%;
+  background-repeat: no-repeat;
+  background-position: 0% 0%;
+  background-size: 2500% 100%;
+  opacity: 0;
+  pointer-events: none;
+}
+.game-char-sprite--action.is-playing {
+  opacity: 1;
+  animation: gameCharFrames 1s steps(24) 1;
+}
+@keyframes gameCharIdle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes gameCharFrames {
+  from { background-position-x: 0%; }
+  to { background-position-x: 100%; }
+}
+.game-play-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--cyan);
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 0 10px var(--cyan-glow);
+  padding: 0;
+}
+.game-play-btn[hidden] { display: none; }
+.game-garden-row {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-.game-rank-icon { width: 40px; height: 40px; object-fit: contain; flex: none; }
 .game-garden-icon { width: 40px; height: 40px; flex: none; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; }
 .game-character-info { flex: 1; min-width: 0; }
 .game-character-name { font-family: var(--font-mono); font-size: 0.9rem; color: var(--cyan); margin: 0 0 6px; }
