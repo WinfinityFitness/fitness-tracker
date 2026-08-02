@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.51';
+const APP_VERSION = 'WF_SYS_V.1.7.52';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -21301,6 +21301,12 @@ function promoteFitnessMode() {
   saveProfile(p);
   applyModeGating();
   autoSyncLeaderboardIfOptedIn();
+  if (BOSS_TASKS[nextMode]) {
+    const g = getGamification();
+    startBossBattle(g, nextMode);
+    saveGamification(g);
+    pendingBossStartPopup = g.bossBattle;
+  }
   showModeTransitionPopup({
     icon: '🎉',
     title: 'CONGRATULATIONS!',
@@ -21502,8 +21508,16 @@ function initFitnessModeGate(onComplete) {
 
 function initModeTransitionPopup() {
   const overlay = document.getElementById('modeTransitionOverlay');
-  document.getElementById('btnModeTransitionClose').addEventListener('click', () => { overlay.hidden = true; });
-  bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
+  const closeAndShowPendingBoss = () => {
+    overlay.hidden = true;
+    if (pendingBossStartPopup) {
+      const battle = pendingBossStartPopup;
+      pendingBossStartPopup = null;
+      showBossBattlePopup('start', battle);
+    }
+  };
+  document.getElementById('btnModeTransitionClose').addEventListener('click', closeAndShowPendingBoss);
+  bindOverlayBackdropClose(overlay, closeAndShowPendingBoss);
 }
 
 function initRestartJourney() {
@@ -21531,7 +21545,292 @@ function initRestartJourney() {
     renderMeasureHistory();
     renderBodyFatHistory();
     updateTabDots();
+    const gReset = getGamification();
+    saveGamification(Object.assign(gReset, freshGamification()));
+    renderGamificationPanel();
   });
+}
+
+/* ---------------------------------------------------------------- */
+/* Fitness RPG layer: Character XP, Fitness Garden, Boss Battles.     */
+/* Purely additive/cosmetic on top of the Fitness Journey Mode above  */
+/* — never reads or writes fitnessMode/modeProgress itself, so the    */
+/* real feature-gating stays exactly as earned through normal use.    */
+/* ---------------------------------------------------------------- */
+const GAME_XP_PER_LEVEL = 100;
+const GAME_XP_TABLE = { weighIn: 5, vitals: 5, meal: 5, water: 5, workout: 10, cardio: 10, habit: 5, weeklyReview: 15 };
+const GARDEN_STAGES = ['seed', 'sprout', 'budding', 'blooming', 'fruiting'];
+const GARDEN_STAGE_ICON = { seed: '🌱', sprout: '🌿', budding: '🌼', blooming: '🌸', fruiting: '🍎' };
+const GARDEN_STAGE_DAYS = 4; // cumulative training-days needed to advance one stage
+const GARDEN_ITEMS = [
+  { id: 'xpPotion', name: 'XP Potion', icon: '🧪', effect: 'xp50' },
+  { id: 'bossWard', name: 'Boss Ward', icon: '🛡️', effect: 'ward' },
+];
+const BOSS_TASKS = {
+  warrior: { name: 'The Iron Brute', icon: '⚔️', taskType: 'workout', targetCount: 4, desc: 'Log 4 workouts before the week is up.' },
+  spartan: { name: 'The Endurance Wraith', icon: '🐉', taskType: 'cardio', targetCount: 3, desc: 'Complete 3 cardio sessions before the week is up.' },
+  demigod: { name: 'The Ascendant Trial', icon: '👑', taskType: 'habit', targetCount: 5, desc: 'Hit 5 fully-logged days before the week is up.' },
+};
+const BOSS_BATTLE_DAYS = 7;
+// Set by promoteFitnessMode() when a new boss battle starts, so the popup
+// only appears after the user closes the rank-up popup — showing both
+// full-screen overlays at once would just have one bury the other.
+let pendingBossStartPopup = null;
+
+function freshGamification() {
+  return { xp: 0, lastProcessedDate: null, garden: { stage: 'seed', trainingDays: 0 }, inventory: [], bossBattle: null };
+}
+function getGamification() {
+  const p = getProfile();
+  return (p && p.gamification) || freshGamification();
+}
+function saveGamification(g) {
+  const p = getProfile();
+  if (!p) return;
+  p.gamification = g;
+  saveProfile(p);
+}
+function gameLevel(xp) { return Math.floor(xp / GAME_XP_PER_LEVEL) + 1; }
+function gameXpIntoLevel(xp) { return xp % GAME_XP_PER_LEVEL; }
+function addGameXp(g, amount) { g.xp += amount; }
+function addGameItem(g, itemId, qty) {
+  const def = GARDEN_ITEMS.find(i => i.id === itemId);
+  if (!def) return;
+  const existing = g.inventory.find(i => i.id === itemId);
+  if (existing) existing.qty += qty;
+  else g.inventory.push({ id: def.id, name: def.name, icon: def.icon, qty });
+}
+
+// Reads what a finalized calendar day actually earned, from real logged
+// data only (same fields the Fitness Journey Mode check already reads at
+// isBeginnerDayComplete above) — never invents new tracking of its own.
+function evaluateGameDay(dateISO) {
+  const entry = getLogs()[dateISO];
+  if (!entry) return { xp: 0, workedOut: false, didCardio: false, habitComplete: false };
+  let xp = 0;
+  if (entry.weightKg != null) xp += GAME_XP_TABLE.weighIn;
+  if (entry.sleep != null) xp += GAME_XP_TABLE.vitals;
+  if (entry.steps != null) xp += GAME_XP_TABLE.vitals;
+  if (entry.water != null && entry.water > 0) xp += GAME_XP_TABLE.water;
+  const meals = entry.meals || {};
+  if (['breakfast', 'lunch', 'dinner', 'snacks'].some(mt => meals[mt] && meals[mt].length)) xp += GAME_XP_TABLE.meal;
+  const workedOut = !!(entry.exercises && entry.exercises.length > 0);
+  const didCardio = !!(entry.cardioSessions && entry.cardioSessions.length > 0);
+  if (workedOut) xp += GAME_XP_TABLE.workout;
+  if (didCardio) xp += GAME_XP_TABLE.cardio;
+  if (Array.isArray(entry.extra)) xp += entry.extra.filter(Boolean).length * GAME_XP_TABLE.habit;
+  if (getReviews()[dateISO]) xp += GAME_XP_TABLE.weeklyReview;
+  return { xp, workedOut, didCardio, habitComplete: isBeginnerDayComplete(dateISO) };
+}
+
+// Advances (or harvests) the garden by one stage — called once per
+// training day accumulated, not once per calendar day, so only actual
+// workout/cardio activity ever grows it.
+function advanceGardenStage(g) {
+  const idx = GARDEN_STAGES.indexOf(g.garden.stage);
+  if (idx < GARDEN_STAGES.length - 1) {
+    g.garden.stage = GARDEN_STAGES[idx + 1];
+  } else {
+    const drop = GARDEN_ITEMS[Math.floor(Math.random() * GARDEN_ITEMS.length)];
+    addGameItem(g, drop.id, 1);
+    g.garden.stage = 'seed';
+  }
+  g.garden.trainingDays = 0;
+}
+
+function startBossBattle(g, rank) {
+  const def = BOSS_TASKS[rank];
+  if (!def) return;
+  const now = Date.now();
+  g.bossBattle = {
+    rank, name: def.name, icon: def.icon, taskType: def.taskType, desc: def.desc,
+    targetCount: def.targetCount, progressCount: 0,
+    startedAt: now, deadline: now + BOSS_BATTLE_DAYS * 86400000, status: 'active',
+  };
+}
+
+// Returns 'defeated' if this day's progress just cleared the battle, so
+// the caller can decide whether to pop the defeat popup.
+function progressBossBattle(g, day) {
+  const b = g.bossBattle;
+  if (!b || b.status !== 'active') return null;
+  const matched =
+    (b.taskType === 'workout' && day.workedOut) ||
+    (b.taskType === 'cardio' && day.didCardio) ||
+    (b.taskType === 'habit' && day.habitComplete);
+  if (matched) b.progressCount++;
+  if (b.progressCount >= b.targetCount) {
+    b.status = 'defeated';
+    addGameXp(g, 75);
+    const drop = GARDEN_ITEMS[Math.floor(Math.random() * GARDEN_ITEMS.length)];
+    addGameItem(g, drop.id, 1);
+    return 'defeated';
+  }
+  return null;
+}
+
+// Missing the 7-day window just quietly clears the battle — no penalty,
+// it simply won't reappear until the next real rank-up.
+function expireBossBattleIfDue(g) {
+  if (g.bossBattle && g.bossBattle.status === 'active' && Date.now() > g.bossBattle.deadline) {
+    g.bossBattle = null;
+  }
+}
+
+// Runs once per app open, walking every finalized day since the last
+// check — mirrors processDailyModeCheck's day-walking approach above but
+// keeps its own cursor, so it never touches modeProgress.
+function processDailyGameCheck() {
+  const p = getProfile();
+  if (!p || !p.fitnessMode) return;
+  const g = getGamification();
+  const today = todayISO();
+  if (!g.lastProcessedDate) { g.lastProcessedDate = today; saveGamification(g); return; }
+  if (g.lastProcessedDate >= today) return;
+
+  const cursor = parseISO(g.lastProcessedDate);
+  const todayDate = parseISO(today);
+  let guard = 0;
+  let defeatedBattle = null;
+  while (cursor < todayDate && guard < 60) {
+    guard++;
+    const cursorISO = cursor.getFullYear() + '-' + String(cursor.getMonth() + 1).padStart(2, '0') + '-' + String(cursor.getDate()).padStart(2, '0');
+    const day = evaluateGameDay(cursorISO);
+    if (day.xp > 0) addGameXp(g, day.xp);
+    if (day.workedOut || day.didCardio) {
+      g.garden.trainingDays++;
+      if (g.garden.trainingDays >= GARDEN_STAGE_DAYS) advanceGardenStage(g);
+    }
+    if (progressBossBattle(g, day) === 'defeated') defeatedBattle = Object.assign({}, g.bossBattle);
+    expireBossBattleIfDue(g);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  g.lastProcessedDate = today;
+  saveGamification(g);
+  renderGamificationPanel();
+  if (defeatedBattle) showBossBattlePopup('defeated', defeatedBattle);
+}
+
+function useGameItem(itemId) {
+  const g = getGamification();
+  const item = g.inventory.find(i => i.id === itemId);
+  const def = GARDEN_ITEMS.find(i => i.id === itemId);
+  if (!item || !def || item.qty <= 0) return;
+
+  if (def.effect === 'xp50') {
+    addGameXp(g, 50);
+    showRestToast('🧪 XP Potion used — +50 XP!');
+  } else if (def.effect === 'ward') {
+    if (g.bossBattle && g.bossBattle.status === 'active') {
+      const defeated = progressBossBattle(g, {
+        workedOut: g.bossBattle.taskType === 'workout',
+        didCardio: g.bossBattle.taskType === 'cardio',
+        habitComplete: g.bossBattle.taskType === 'habit',
+      });
+      showRestToast('🛡️ Boss Ward used — +1 progress on your active boss battle!');
+      if (defeated === 'defeated') {
+        item.qty--;
+        if (item.qty <= 0) g.inventory = g.inventory.filter(i => i.id !== itemId);
+        saveGamification(g);
+        renderGamificationPanel();
+        showBossBattlePopup('defeated', g.bossBattle);
+        return;
+      }
+    } else {
+      addGameXp(g, 25);
+      showRestToast('🛡️ No active boss battle — Boss Ward converted to +25 XP instead.');
+    }
+  }
+  item.qty--;
+  if (item.qty <= 0) g.inventory = g.inventory.filter(i => i.id !== itemId);
+  saveGamification(g);
+  renderGamificationPanel();
+}
+
+function showBossBattlePopup(type, battle) {
+  const overlay = document.getElementById('bossBattleOverlay');
+  if (!overlay) return;
+  const icon = document.getElementById('bossBattleIcon');
+  const title = document.getElementById('bossBattleTitle');
+  const message = document.getElementById('bossBattleMessage');
+  if (type === 'start') {
+    icon.textContent = battle.icon;
+    title.textContent = 'BOSS BATTLE!';
+    message.textContent = `${battle.name} has appeared! ${battle.desc} Defeat it within 7 days for bonus XP and a rare item.`;
+  } else {
+    icon.textContent = '🏆';
+    title.textContent = 'BOSS DEFEATED!';
+    message.textContent = `You defeated ${battle.name}! +75 bonus XP and a reward item were added to your garden inventory.`;
+  }
+  overlay.hidden = false;
+  renderGamificationPanel();
+}
+
+function renderGamificationPanel() {
+  const p = getProfile();
+  if (!p || !p.fitnessMode) return;
+  const g = getGamification();
+
+  const rankIcon = document.getElementById('gameRankIcon');
+  if (rankIcon) { rankIcon.src = MODE_ICON[p.fitnessMode] || MODE_ICON.beginner; rankIcon.alt = MODE_LABEL[p.fitnessMode] || ''; }
+  const rankLabel = document.getElementById('gameRankLabel');
+  if (rankLabel) rankLabel.textContent = (MODE_LABEL[p.fitnessMode] || '').replace(' Mode', '');
+  const levelEl = document.getElementById('gameLevel');
+  if (levelEl) levelEl.textContent = String(gameLevel(g.xp));
+  const xpFill = document.getElementById('gameXpBarFill');
+  if (xpFill) xpFill.style.width = gameXpIntoLevel(g.xp) + '%';
+  const xpLabel = document.getElementById('gameXpLabel');
+  if (xpLabel) xpLabel.textContent = `${gameXpIntoLevel(g.xp)}/${GAME_XP_PER_LEVEL} XP to next level`;
+
+  const gardenIcon = document.getElementById('gardenStageIcon');
+  if (gardenIcon) gardenIcon.textContent = GARDEN_STAGE_ICON[g.garden.stage];
+  const gardenLabel = document.getElementById('gardenStageLabel');
+  if (gardenLabel) gardenLabel.textContent = g.garden.stage.charAt(0).toUpperCase() + g.garden.stage.slice(1);
+  const gardenProgress = document.getElementById('gardenProgressLabel');
+  if (gardenProgress) gardenProgress.textContent = `${g.garden.trainingDays}/${GARDEN_STAGE_DAYS} training days`;
+
+  const invList = document.getElementById('gameInventoryList');
+  if (invList) {
+    invList.innerHTML = g.inventory.length
+      ? g.inventory.map(i => `<div class="game-inventory-item"><span>${i.icon} ${escapeHtml(i.name)} &times;${i.qty}</span><button type="button" class="btn game-item-use-btn" data-item-id="${i.id}">Use</button></div>`).join('')
+      : '<p class="hint hint--sm">No items yet — grow your garden to harvest boosts.</p>';
+  }
+
+  const bossCard = document.getElementById('gameBossCard');
+  const b = g.bossBattle;
+  if (bossCard) {
+    if (b && b.status === 'active') {
+      bossCard.hidden = false;
+      document.getElementById('gameBossIcon').textContent = b.icon;
+      document.getElementById('gameBossLabel').textContent = `${b.name} — ${b.progressCount}/${b.targetCount}`;
+      const fill = document.getElementById('gameBossProgressFill');
+      if (fill) fill.style.width = Math.min(100, (b.progressCount / b.targetCount) * 100) + '%';
+      const daysLeft = Math.max(0, Math.ceil((b.deadline - Date.now()) / 86400000));
+      document.getElementById('gameBossDaysLeft').textContent = `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`;
+    } else {
+      bossCard.hidden = true;
+    }
+  }
+}
+
+function initGamificationPanel() {
+  initClickToRevealHint('btnToggleGamePanel', 'gamePanel');
+  const invList = document.getElementById('gameInventoryList');
+  if (invList) {
+    invList.addEventListener('click', e => {
+      const btn = e.target.closest('.game-item-use-btn');
+      if (!btn) return;
+      useGameItem(btn.dataset.itemId);
+    });
+  }
+  renderGamificationPanel();
+}
+
+function initBossBattlePopup() {
+  const overlay = document.getElementById('bossBattleOverlay');
+  if (!overlay) return;
+  document.getElementById('btnBossBattleClose').addEventListener('click', () => { overlay.hidden = true; });
+  bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
 }
 
 /* ---------------------------------------------------------------- */
@@ -22115,6 +22414,9 @@ safeInit(initModeTransitionPopup, 'initModeTransitionPopup');
 safeInit(initRestartJourney, 'initRestartJourney');
 safeInit(initModeGatedClickGuard, 'initModeGatedClickGuard');
 safeInit(() => { processDailyModeCheck(); checkModeProgressNudge(); applyModeGating(); }, 'fitnessModeDaily');
+safeInit(initGamificationPanel, 'initGamificationPanel');
+safeInit(initBossBattlePopup, 'initBossBattlePopup');
+safeInit(processDailyGameCheck, 'gamificationDaily');
 
 if (initFailures.length) {
   setTimeout(() => {

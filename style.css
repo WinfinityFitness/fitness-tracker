@@ -1685,6 +1685,35 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   font-weight: 700;
 }
 
+/* ---------------- Fitness RPG (Character / Garden / Boss Battle) ---------------- */
+.game-character-row, .game-garden-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.game-rank-icon { width: 40px; height: 40px; object-fit: contain; flex: none; }
+.game-garden-icon { width: 40px; height: 40px; flex: none; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; }
+.game-character-info { flex: 1; min-width: 0; }
+.game-character-name { font-family: var(--font-mono); font-size: 0.9rem; color: var(--cyan); margin: 0 0 6px; }
+.game-inventory { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.game-inventory-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+}
+.game-inventory-item .btn { padding: 5px 10px; font-size: 0.76rem; }
+.game-boss-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+}
+
 /* Locked-but-visible sections (e.g. Bio measurements before Warrior Mode) —
    dimmed for a "locked" look, but NOT pointer-events:none: taps still need
    to reach the gated entry-point buttons inside so they can show the
