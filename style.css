@@ -1693,7 +1693,10 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   left: 12px;
   max-width: 380px;
   margin-left: auto;
-  z-index: 150;
+  /* #wdsShell (the desktop dashboard) sits at z-index 999999 and covers the
+     whole viewport — outrank it here the same way .chat-lightbox does, or
+     this renders correctly-shown-but-invisible underneath it on desktop. */
+  z-index: 1000000;
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--card-radius);
@@ -1725,16 +1728,21 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   filter: drop-shadow(0 0 14px var(--cyan-glow));
 }
 .game-char-sprite--base { animation: gameCharIdle 2.4s ease-in-out infinite; }
-.game-char-sprite--base.is-paused { animation-play-state: paused; }
+/* Hidden (not just paused) while the action animation plays, so the two
+   don't composite into a double-exposed character. */
+.game-char-sprite--base.is-paused { animation-play-state: paused; opacity: 0; }
 /* Action sprite is a 25-frame horizontal strip (see icons/character/*-action-strip.png)
    played as a discrete-step background-position animation — a real frame-by-frame
-   attack animation, not a crossfade. */
+   attack animation, not a crossfade. Each frame is a square 256x256 crop, so the
+   box is sized as a square (height-driven, via aspect-ratio) rather than stretched
+   to the popover's full width. */
 .game-char-sprite--action {
   position: absolute;
   inset: 0;
   margin: auto;
-  width: 100%;
   height: 100%;
+  width: auto;
+  aspect-ratio: 1 / 1;
   background-repeat: no-repeat;
   background-position: 0% 0%;
   background-size: 2500% 100%;

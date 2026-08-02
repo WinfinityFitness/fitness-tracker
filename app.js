@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.53';
+const APP_VERSION = 'WF_SYS_V.1.7.54';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -21697,6 +21697,13 @@ function expireBossBattleIfDue(g) {
 // check — mirrors processDailyModeCheck's day-walking approach above but
 // keeps its own cursor, so it never touches modeProgress.
 function processDailyGameCheck() {
+  // getProfile()/getGamification() transparently read wdsRemoteData on the
+  // desktop shell, but saveProfile() always writes to THIS device's own
+  // localStorage — running the catch-up loop here would silently write a
+  // signed-in operator's remote data into a stranger's local browser
+  // storage. The mobile app already ran this catch-up and synced it, so
+  // desktop only ever needs to display the result, never recompute it.
+  if (wdsRemoteData) return;
   const p = getProfile();
   if (!p || !p.fitnessMode) return;
   const g = getGamification();
@@ -21728,6 +21735,10 @@ function processDailyGameCheck() {
 }
 
 function useGameItem(itemId) {
+  // Same reasoning as processDailyGameCheck's guard above — consuming an
+  // item has to write back via saveProfile(), which can't reach a remote
+  // operator's real account from here.
+  if (wdsRemoteData) { showRestToast('Use items from the mobile app — this view is read-only.'); return; }
   const g = getGamification();
   const item = g.inventory.find(i => i.id === itemId);
   const def = GARDEN_ITEMS.find(i => i.id === itemId);
@@ -21784,7 +21795,15 @@ function showBossBattlePopup(type, battle) {
 
 function renderGamificationPanel() {
   const p = getProfile();
-  if (!p || !p.fitnessMode) return;
+  const emptyState = document.getElementById('gamePopoverEmpty');
+  const content = document.getElementById('gamePopoverContent');
+  if (!p || !p.fitnessMode) {
+    if (emptyState) emptyState.hidden = false;
+    if (content) content.hidden = true;
+    return;
+  }
+  if (emptyState) emptyState.hidden = true;
+  if (content) content.hidden = false;
   const g = getGamification();
 
   const spriteBase = document.getElementById('gameCharSpriteBase');
@@ -21835,13 +21854,18 @@ function renderGamificationPanel() {
 }
 
 function initGamificationPanel() {
-  const trigger = document.getElementById('headerModeIcon');
   const popover = document.getElementById('gamePopover');
-  if (trigger && popover) {
-    trigger.addEventListener('click', e => {
-      e.stopPropagation();
-      popover.hidden = !popover.hidden;
-      if (!popover.hidden) renderGamificationPanel();
+  // Two triggers share one popover: the mobile header rank icon, and the
+  // desktop shell's own topnav icon (mobile's header sits underneath
+  // #wdsShell there, unreachable — see the z-index note on .game-popover).
+  const triggers = ['headerModeIcon', 'wdsFitnessRpgBtn'].map(id => document.getElementById(id)).filter(Boolean);
+  if (triggers.length && popover) {
+    triggers.forEach(trigger => {
+      trigger.addEventListener('click', e => {
+        e.stopPropagation();
+        popover.hidden = !popover.hidden;
+        if (!popover.hidden) renderGamificationPanel();
+      });
     });
     popover.addEventListener('click', e => e.stopPropagation());
     // Tapping anywhere else on the page minimizes it.

@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.53">
+<link rel="stylesheet" href="style.css?v=1.7.54">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -406,6 +406,8 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
 
 <div class="game-popover" id="gamePopover" hidden>
   <div class="game-popover-inner">
+    <p class="hint hint--sm" id="gamePopoverEmpty" hidden>No Fitness Journey data to show for this session — sign in with a Digital ID that has a fitness profile set up, or open the mobile app.</p>
+    <div id="gamePopoverContent">
     <div class="game-character-portrait">
       <button type="button" class="game-play-btn" id="gamePlayBtn" hidden aria-label="Play character animation">&#9654;</button>
       <img id="gameCharSpriteBase" class="game-char-sprite game-char-sprite--base" alt="">
@@ -431,6 +433,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <p class="hint hint--sm" id="gameBossLabel"></p>
       <div class="gradient-bar"><div class="gradient-bar-fill" id="gameBossProgressFill" style="width:0%"></div></div>
       <p class="hint hint--sm" id="gameBossDaysLeft"></p>
+    </div>
     </div>
   </div>
 </div>
@@ -3714,6 +3717,9 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
           </div>
           <div class="wds-chat-list-items" id="wdsChatListItems"><p class="empty-note">Loading…</p></div>
         </div>
+        <button type="button" class="wds-icon-btn" id="wdsFitnessRpgBtn" aria-label="Fitness RPG" title="Fitness RPG: Character, Garden &amp; Boss Battles">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="m13 19 6-6"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/></svg>
+        </button>
         <button type="button" class="wds-icon-btn" id="wdsGroupsBtn" aria-label="My Group" title="My Coach Group">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         </button>
@@ -4725,11 +4731,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.7.53"></script>
+<script src="config.js?v=1.7.54"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.53"></script>
+<script src="app.js?v=1.7.54"></script>
 </body>
 </html>
