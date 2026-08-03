@@ -1906,6 +1906,10 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   color: transparent;
 }
 .arena-map-marker.is-boss { background: #c0392b; width: 32px; height: 32px; color: #fff; font-size: 0.9rem; }
+/* Side quests are always fogged for now (no side-quest content built yet) —
+   only the shape/size is sidequest-specific, .is-fogged still wins the
+   background/blur so it reads as "not revealed" rather than an active gold marker. */
+.arena-map-marker.is-sidequest { width: 20px; height: 20px; font-size: 0.65rem; }
 .arena-map-marker.is-current { animation: arenaMarkerPulse 1.6s ease-in-out infinite; }
 @keyframes arenaMarkerPulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(51,200,204,0.6); }

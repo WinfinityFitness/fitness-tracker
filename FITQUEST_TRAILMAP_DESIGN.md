@@ -21,7 +21,7 @@ Generated via Stitch, now processed and living in the project:
 | Novice | Serpents Hive (jungle ruins) | `icons/maps/map-novice-serpents-hive.webp` |
 | Warrior | Frozen Ascent (ice mountains) | `icons/maps/map-warrior-frozen-ascent.webp` |
 | Spartan | Burning Plains (volcanic) | `icons/maps/map-spartan-burning-plains.webp` |
-| Demi-God | Celestial Map (floating islands) | `icons/maps/map-demigod-celestial.webp` |
+| Demi-God | Celestial Realm (floating islands) | `icons/maps/map-demigod-celestial.webp` |
 
 (Converted from the original 2MB+ PNGs at `E:\Icons\Adventure Maps\stitch_fitquest_adventure_map\` to ~230-300KB WebP each, 900px wide — full source PNGs still there if a higher-res source is ever needed.)
 

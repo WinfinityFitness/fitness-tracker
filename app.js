@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.56';
+const APP_VERSION = 'WF_SYS_V.1.7.57';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -21942,19 +21942,85 @@ const ARENA_PHASE_DURATION_MS = 15000;
 const ARENA_REP_DAMAGE = 15;
 const ARENA_HIT_STAMINA_LOSS = 20;
 
-// Approximate {x,y}% positions along the winding path in the Serpents Hive
-// artwork (icons/maps/map-novice-serpents-hive.webp), bottom (start) to top
-// (temple) — eyeballed against that specific piece, reused as a placeholder
-// shape for the other maps until each gets its own tuned set. No real
-// station-progress tracking exists yet (see FITQUEST_TRAILMAP_DESIGN.md) —
-// this map view is a preview: station 1 always shows as "nearest," 2-9
-// always fogged, purely informational (a note, not a playable encounter).
-const TRAILMAP_STATION_POSITIONS = [
-  { x: 52, y: 88 }, { x: 10, y: 78 }, { x: 30, y: 68 }, { x: 68, y: 73 },
-  { x: 58, y: 60 }, { x: 28, y: 52 }, { x: 48, y: 42 }, { x: 72, y: 40 },
-  { x: 55, y: 22 },
-];
-const TRAILMAP_BOSS_POSITION = { x: 68, y: 12 };
+// Per-rank {x,y}% marker layouts, read directly off the user's own
+// hand-annotated copies of each map. Station counts legitimately differ
+// per map (Serpents Hive has 10, Frozen Ascent has 11) — that's fine, each
+// map's own natural path length. Spartan/Demi-God haven't been annotated
+// yet, so they fall back to Serpents Hive's shape as a placeholder until
+// their own layouts are provided. No real station-progress tracking exists
+// yet (see FITQUEST_TRAILMAP_DESIGN.md) — the map view is a preview only:
+// station 1 always shows as "nearest," everything else (all side quests
+// included) always fogged, purely informational until real per-station
+// tracking lands.
+const TRAILMAP_LAYOUTS = {
+  beginner: {
+    stations: [
+      { x: 58, y: 66 }, { x: 85, y: 79 }, { x: 48, y: 92 }, { x: 8, y: 74 },
+      { x: 27, y: 61 }, { x: 64, y: 43 }, { x: 48, y: 39 }, { x: 20, y: 32 },
+      { x: 48, y: 26 }, { x: 68, y: 18 },
+    ],
+    sideQuests: [
+      { x: 45, y: 72 }, // SQ1 — near the lower stump
+      { x: 8, y: 46 },  // SQ2 — left ruin, mid-map
+      { x: 82, y: 36 }, // SQ3 — right side, upper-mid
+      { x: 13, y: 20 }, // SQ4 — left, near the big banyan tree
+      { x: 90, y: 36 }, // SQ5 — far right, upper-mid
+    ],
+    boss: { x: 75, y: 9 },
+  },
+  warrior: {
+    stations: [
+      { x: 88, y: 78 }, { x: 58, y: 66 }, { x: 25, y: 61 }, { x: 8, y: 74 },
+      { x: 48, y: 88 }, { x: 64, y: 46 }, { x: 50, y: 39 }, { x: 18, y: 30 },
+      { x: 48, y: 24 }, { x: 65, y: 18 }, { x: 50, y: 10 },
+    ],
+    sideQuests: [
+      { x: 45, y: 74 }, // SQ1 — bottom, dark cave entrance
+      { x: 83, y: 61 }, // SQ2 — right, near the ice giant
+      { x: 8, y: 47 },  // SQ3 — left, mid-map
+      { x: 88, y: 37 }, // SQ4 — right side, upper-mid
+      { x: 12, y: 20 }, // SQ5 — upper-left, near the tree/rock
+    ],
+    boss: { x: 50, y: 4 },
+  },
+};
+TRAILMAP_LAYOUTS.spartan = {
+  stations: [
+    { x: 65, y: 63 }, { x: 88, y: 76 }, { x: 48, y: 87 }, { x: 8, y: 68 },
+    { x: 25, y: 58 }, { x: 65, y: 43 }, { x: 48, y: 37 }, { x: 20, y: 30 },
+    { x: 48, y: 24 }, { x: 68, y: 18 },
+  ],
+  sideQuests: [
+    { x: 45, y: 71 }, // SQ1 — center-bottom
+    { x: 10, y: 47 }, // SQ2 — left, mid-lower
+    { x: 92, y: 38 }, // SQ3 — far right, mid
+    { x: 75, y: 33 }, // SQ4 — right side, upper-mid
+    { x: 12, y: 20 }, // SQ5 — upper-left
+  ],
+  boss: { x: 70, y: 12 },
+};
+// Celestial Realm has more branch points in its own art than the other
+// three maps (8 side quests instead of 5) — the 5-side-quest count
+// elsewhere is a general pattern, not a hard rule, so this just reflects
+// what's actually annotated on this map.
+TRAILMAP_LAYOUTS.demigod = {
+  stations: [
+    { x: 38, y: 65 }, { x: 15, y: 72 }, { x: 48, y: 82 }, { x: 58, y: 63 },
+    { x: 28, y: 50 }, { x: 65, y: 40 }, { x: 55, y: 37 }, { x: 35, y: 27 },
+    { x: 48, y: 20 }, { x: 50, y: 15 },
+  ],
+  sideQuests: [
+    { x: 78, y: 60 }, // SQ1 — right, near a temple
+    { x: 18, y: 46 }, // SQ2 — left
+    { x: 88, y: 52 }, // SQ3 — far right
+    { x: 75, y: 35 }, // SQ4 — right, near a temple
+    { x: 10, y: 32 }, // SQ5 — left
+    { x: 15, y: 20 }, // SQ6 — upper-left
+    { x: 78, y: 20 }, // SQ7 — upper-right
+    { x: 90, y: 22 }, // SQ8 — far upper-right
+  ],
+  boss: { x: 50, y: 8 },
+};
 
 let arenaStream = null;
 let arenaRafId = null;
@@ -22266,9 +22332,10 @@ function renderArenaMap() {
   const wrap = document.getElementById('arenaMapMarkers');
   const bg = document.getElementById('arenaMapBg');
   if (!wrap || !bg || !arenaState) return;
+  const layout = TRAILMAP_LAYOUTS[arenaState.rank] || TRAILMAP_LAYOUTS.beginner;
   bg.src = arenaState.boss.map;
   wrap.innerHTML = '';
-  TRAILMAP_STATION_POSITIONS.forEach((pos, i) => {
+  layout.stations.forEach((pos, i) => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'arena-map-marker' + (i === 0 ? ' is-current' : ' is-fogged');
@@ -22279,11 +22346,22 @@ function renderArenaMap() {
     btn.setAttribute('aria-label', 'Station ' + (i + 1));
     wrap.appendChild(btn);
   });
+  layout.sideQuests.forEach((pos, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'arena-map-marker is-sidequest is-fogged';
+    btn.style.left = pos.x + '%';
+    btn.style.top = pos.y + '%';
+    btn.textContent = '★';
+    btn.dataset.stationIndex = 'sq' + i;
+    btn.setAttribute('aria-label', 'Side Quest ' + (i + 1));
+    wrap.appendChild(btn);
+  });
   const bossBtn = document.createElement('button');
   bossBtn.type = 'button';
   bossBtn.className = 'arena-map-marker is-boss';
-  bossBtn.style.left = TRAILMAP_BOSS_POSITION.x + '%';
-  bossBtn.style.top = TRAILMAP_BOSS_POSITION.y + '%';
+  bossBtn.style.left = layout.boss.x + '%';
+  bossBtn.style.top = layout.boss.y + '%';
   bossBtn.textContent = '👑';
   bossBtn.dataset.stationIndex = 'boss';
   bossBtn.setAttribute('aria-label', arenaState.boss.name);
@@ -22312,6 +22390,10 @@ function handleArenaMarkerClick(e) {
     showStationNote(arenaState.boss.name,
       "The main boss guarding this rank's temple. Station-by-station travel is still being built — for now you can challenge it directly.",
       '⚔️ Enter the Arena', 'startFight');
+    return;
+  }
+  if (btn.classList.contains('is-sidequest')) {
+    showStationNote('??? (Side Quest)', "A hidden path branches off the trail here — not revealed yet. Clear the nearby stations first to uncover it.", 'Got it', null);
     return;
   }
   if (btn.classList.contains('is-fogged')) {
