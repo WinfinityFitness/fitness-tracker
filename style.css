@@ -1877,6 +1877,62 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 .arena-bar-row { display: flex; align-items: center; gap: 10px; }
 .arena-bar-row .gradient-bar { flex: 1; }
 
+.arena-map-wrap { position: relative; width: 100%; border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
+.arena-map-bg { width: 100%; display: block; }
+.arena-map-markers { position: absolute; inset: 0; }
+.arena-map-marker {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  border: 2px solid #fff;
+  background: var(--cyan);
+  box-shadow: 0 0 10px rgba(0,0,0,0.5);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #04181a;
+  padding: 0;
+}
+.arena-map-marker.is-fogged {
+  background: rgba(255,255,255,0.4);
+  filter: blur(1px);
+  opacity: 0.6;
+  color: transparent;
+}
+.arena-map-marker.is-boss { background: #c0392b; width: 32px; height: 32px; color: #fff; font-size: 0.9rem; }
+.arena-map-marker.is-current { animation: arenaMarkerPulse 1.6s ease-in-out infinite; }
+@keyframes arenaMarkerPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(51,200,204,0.6); }
+  50% { box-shadow: 0 0 0 9px rgba(51,200,204,0); }
+}
+.arena-station-note {
+  position: fixed;
+  inset: 0;
+  z-index: 1000000;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.arena-station-note[hidden] { display: none; }
+.arena-station-note-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  padding: 20px;
+  max-width: 320px;
+  width: 100%;
+  text-align: center;
+}
+.arena-station-note-card h3 { font-family: var(--font-mono); color: var(--cyan); margin: 0 0 10px; }
+
 /* Locked-but-visible sections (e.g. Bio measurements before Warrior Mode) —
    dimmed for a "locked" look, but NOT pointer-events:none: taps still need
    to reach the gated entry-point buttons inside so they can show the

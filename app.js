@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.55';
+const APP_VERSION = 'WF_SYS_V.1.7.56';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -21915,21 +21915,25 @@ function initBossBattlePopup() {
 const TRAILMAP_BOSSES = {
   beginner: {
     name: "The Serpent's Hive Guardian", desc: 'A many-headed hydra guards the jungle temple.',
+    map: 'icons/maps/map-novice-serpents-hive.webp',
     room: 'icons/boss/novice-boss-room.webp', sprite: 'icons/boss/novice-boss-sprite.webp', attackSprite: 'icons/boss/novice-boss-sprite-attack.webp',
     cycles: 2, playable: true,
   },
   warrior: {
     name: 'The Frozen Sovereign', desc: 'A six-armed ice queen wields blades of frost.',
+    map: 'icons/maps/map-warrior-frozen-ascent.webp',
     room: 'icons/boss/warrior-boss-room.webp', sprite: 'icons/boss/warrior-boss-sprite.webp', attackSprite: 'icons/boss/warrior-boss-sprite-attack.webp',
     cycles: 3, playable: false,
   },
   spartan: {
     name: 'The Ashen Hound', desc: 'A three-headed lava cerberus prowls the burning plains.',
+    map: 'icons/maps/map-spartan-burning-plains.webp',
     room: 'icons/boss/spartan-boss-room.webp', sprite: 'icons/boss/spartan-boss-sprite.webp', attackSprite: 'icons/boss/spartan-boss-sprite-attack.webp',
     cycles: 4, playable: false,
   },
   demigod: {
     name: 'The Solar Seraphim', desc: 'A winged guardian wields a blade of pure sunlight.',
+    map: 'icons/maps/map-demigod-celestial.webp',
     room: 'icons/boss/demigod-boss-room.webp', sprite: 'icons/boss/demigod-boss-sprite.webp', attackSprite: 'icons/boss/demigod-boss-sprite-attack.webp',
     cycles: 4, playable: false,
   },
@@ -21938,6 +21942,20 @@ const ARENA_PHASE_DURATION_MS = 15000;
 const ARENA_REP_DAMAGE = 15;
 const ARENA_HIT_STAMINA_LOSS = 20;
 
+// Approximate {x,y}% positions along the winding path in the Serpents Hive
+// artwork (icons/maps/map-novice-serpents-hive.webp), bottom (start) to top
+// (temple) — eyeballed against that specific piece, reused as a placeholder
+// shape for the other maps until each gets its own tuned set. No real
+// station-progress tracking exists yet (see FITQUEST_TRAILMAP_DESIGN.md) —
+// this map view is a preview: station 1 always shows as "nearest," 2-9
+// always fogged, purely informational (a note, not a playable encounter).
+const TRAILMAP_STATION_POSITIONS = [
+  { x: 52, y: 88 }, { x: 10, y: 78 }, { x: 30, y: 68 }, { x: 68, y: 73 },
+  { x: 58, y: 60 }, { x: 28, y: 52 }, { x: 48, y: 42 }, { x: 72, y: 40 },
+  { x: 55, y: 22 },
+];
+const TRAILMAP_BOSS_POSITION = { x: 68, y: 12 };
+
 let arenaStream = null;
 let arenaRafId = null;
 let arenaPoseDetector = null;
@@ -21945,6 +21963,7 @@ let arenaPoseLibsPromise = null;
 let arenaLatestKeypoints = null;
 let arenaLastPoseTime = 0;
 let arenaState = null; // the active fight's mutable state, or null when closed
+let arenaNoteAction = null; // what the station-note's action button should do, if anything
 
 // Generic script-tag lazy-loader — no equivalent exists elsewhere in this
 // codebase (Leaflet/Supabase/JSZip all load eagerly in index.html), but a
@@ -22214,15 +22233,20 @@ function openBossArena() {
   const boss = TRAILMAP_BOSSES[rank] || TRAILMAP_BOSSES.beginner;
   arenaState = { rank, boss, cycle: 0, bossHp: 100, stamina: 100 };
 
+  // Opening the arena replaces the popover rather than stacking on top of it.
+  const popover = document.getElementById('gamePopover');
+  if (popover) popover.hidden = true;
+
   document.getElementById('adventureMapOverlay').hidden = false;
   document.getElementById('arenaTeaser').hidden = false;
+  document.getElementById('arenaMapView').hidden = true;
   document.getElementById('arenaFight').hidden = true;
   document.getElementById('arenaResult').hidden = true;
   document.getElementById('arenaTeaserBg').style.backgroundImage = `url('${boss.room}')`;
   document.getElementById('arenaTeaserBossImg').src = boss.sprite;
   document.getElementById('arenaTeaserTitle').textContent = boss.name;
   document.getElementById('arenaTeaserDesc').textContent = boss.desc;
-  document.getElementById('btnArenaStartFight').hidden = !boss.playable;
+  document.getElementById('btnArenaEnterMap').hidden = !boss.playable;
   document.getElementById('arenaLockedNote').hidden = boss.playable;
 }
 
@@ -22230,13 +22254,82 @@ function closeBossArena() {
   stopArenaCamera();
   const overlay = document.getElementById('adventureMapOverlay');
   if (overlay) overlay.hidden = true;
+  document.getElementById('arenaStationNote').hidden = true;
   arenaState = null;
+}
+
+// Map preview: no station-progress tracking exists yet, so this is
+// deliberately just a fog-of-war preview, not a playable traversal —
+// Station 1 always shows as "nearest," 2-9 are always fogged, and
+// tapping any of them (or the boss) just pops up an informational note.
+function renderArenaMap() {
+  const wrap = document.getElementById('arenaMapMarkers');
+  const bg = document.getElementById('arenaMapBg');
+  if (!wrap || !bg || !arenaState) return;
+  bg.src = arenaState.boss.map;
+  wrap.innerHTML = '';
+  TRAILMAP_STATION_POSITIONS.forEach((pos, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'arena-map-marker' + (i === 0 ? ' is-current' : ' is-fogged');
+    btn.style.left = pos.x + '%';
+    btn.style.top = pos.y + '%';
+    btn.textContent = String(i + 1);
+    btn.dataset.stationIndex = String(i);
+    btn.setAttribute('aria-label', 'Station ' + (i + 1));
+    wrap.appendChild(btn);
+  });
+  const bossBtn = document.createElement('button');
+  bossBtn.type = 'button';
+  bossBtn.className = 'arena-map-marker is-boss';
+  bossBtn.style.left = TRAILMAP_BOSS_POSITION.x + '%';
+  bossBtn.style.top = TRAILMAP_BOSS_POSITION.y + '%';
+  bossBtn.textContent = '👑';
+  bossBtn.dataset.stationIndex = 'boss';
+  bossBtn.setAttribute('aria-label', arenaState.boss.name);
+  wrap.appendChild(bossBtn);
+}
+
+function openArenaMap() {
+  document.getElementById('arenaTeaser').hidden = true;
+  document.getElementById('arenaMapView').hidden = false;
+  renderArenaMap();
+}
+
+function showStationNote(title, body, actionLabel, action) {
+  document.getElementById('arenaStationNoteTitle').textContent = title;
+  document.getElementById('arenaStationNoteBody').textContent = body;
+  const btn = document.getElementById('btnArenaStationNoteAction');
+  btn.textContent = actionLabel || 'Got it';
+  arenaNoteAction = action || null;
+  document.getElementById('arenaStationNote').hidden = false;
+}
+
+function handleArenaMarkerClick(e) {
+  const btn = e.target.closest('.arena-map-marker');
+  if (!btn) return;
+  if (btn.dataset.stationIndex === 'boss') {
+    showStationNote(arenaState.boss.name,
+      "The main boss guarding this rank's temple. Station-by-station travel is still being built — for now you can challenge it directly.",
+      '⚔️ Enter the Arena', 'startFight');
+    return;
+  }
+  if (btn.classList.contains('is-fogged')) {
+    showStationNote('???', "This part of the trail hasn't been revealed yet — get closer to uncover it.", 'Got it', null);
+    return;
+  }
+  const idx = Number(btn.dataset.stationIndex);
+  const threshold = 4000 + 1000 * idx;
+  showStationNote(`Station ${idx + 1}`,
+    `Hit ${threshold.toLocaleString()} steps/day for 3 days to reach this station. A short mini-boss battle awaits here — coming soon.`,
+    'Got it', null);
 }
 
 async function startBossFight() {
   const status = document.getElementById('arenaStatus');
   const video = document.getElementById('arenaVideo');
   document.getElementById('arenaTeaser').hidden = true;
+  document.getElementById('arenaMapView').hidden = true;
   document.getElementById('arenaFight').hidden = false;
   document.getElementById('arenaBossSprite').src = arenaState.boss.sprite;
   updateArenaBars();
@@ -22266,8 +22359,26 @@ function initAdventureMap() {
   if (openBtn) openBtn.addEventListener('click', openBossArena);
   const closeBtn = document.getElementById('btnArenaClose');
   if (closeBtn) closeBtn.addEventListener('click', closeBossArena);
-  const startBtn = document.getElementById('btnArenaStartFight');
-  if (startBtn) startBtn.addEventListener('click', startBossFight);
+
+  const enterMapBtn = document.getElementById('btnArenaEnterMap');
+  if (enterMapBtn) enterMapBtn.addEventListener('click', openArenaMap);
+  const mapBackBtn = document.getElementById('btnArenaMapBack');
+  if (mapBackBtn) mapBackBtn.addEventListener('click', () => {
+    document.getElementById('arenaMapView').hidden = true;
+    document.getElementById('arenaTeaser').hidden = false;
+  });
+  const markersWrap = document.getElementById('arenaMapMarkers');
+  if (markersWrap) markersWrap.addEventListener('click', handleArenaMarkerClick);
+  const noteActionBtn = document.getElementById('btnArenaStationNoteAction');
+  if (noteActionBtn) {
+    noteActionBtn.addEventListener('click', () => {
+      document.getElementById('arenaStationNote').hidden = true;
+      const action = arenaNoteAction;
+      arenaNoteAction = null;
+      if (action === 'startFight') startBossFight();
+    });
+  }
+
   const resultCloseBtn = document.getElementById('btnArenaResultClose');
   if (resultCloseBtn) resultCloseBtn.addEventListener('click', closeBossArena);
 }

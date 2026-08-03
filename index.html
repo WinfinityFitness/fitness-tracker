@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.55">
+<link rel="stylesheet" href="style.css?v=1.7.56">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3603,8 +3603,17 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       </div>
       <h2 id="arenaTeaserTitle"></h2>
       <p class="hint" id="arenaTeaserDesc"></p>
-      <button type="button" class="btn btn--primary" id="btnArenaStartFight" style="width:100%;">Enter the Arena</button>
+      <button type="button" class="btn btn--primary" id="btnArenaEnterMap" style="width:100%;">&#128506;&#65039; Enter the Map</button>
       <p class="hint hint--sm" id="arenaLockedNote" hidden>Coming soon for this rank — defeat your current rank's boss first.</p>
+    </div>
+
+    <div id="arenaMapView" hidden>
+      <div class="arena-map-wrap">
+        <img class="arena-map-bg" id="arenaMapBg" src="" alt="">
+        <div class="arena-map-markers" id="arenaMapMarkers"></div>
+      </div>
+      <p class="hint hint--sm">Only the nearest part of the trail is revealed. Tap a marker to learn what it takes to reach it.</p>
+      <button type="button" class="btn" id="btnArenaMapBack" style="width:100%;margin-top:6px;">Back</button>
     </div>
 
     <div id="arenaFight" hidden>
@@ -3633,6 +3642,14 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <p id="arenaResultMessage"></p>
       <button type="button" class="btn btn--primary" id="btnArenaResultClose" style="width:100%;margin-top:10px;">Continue</button>
     </div>
+  </div>
+</div>
+
+<div class="arena-station-note" id="arenaStationNote" hidden>
+  <div class="arena-station-note-card">
+    <h3 id="arenaStationNoteTitle"></h3>
+    <p class="hint" id="arenaStationNoteBody"></p>
+    <button type="button" class="btn btn--primary" id="btnArenaStationNoteAction" style="width:100%;">Got it</button>
   </div>
 </div>
 
@@ -4776,11 +4793,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.7.55"></script>
+<script src="config.js?v=1.7.56"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.55"></script>
+<script src="app.js?v=1.7.56"></script>
 </body>
 </html>
