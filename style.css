@@ -1807,6 +1807,76 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   padding: 12px;
 }
 
+/* ---------------- Adventure Map: Boss Arena ---------------- */
+.arena-card { position: relative; max-width: 420px; }
+.arena-close-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 1;
+}
+.arena-teaser-bg {
+  position: relative;
+  height: 180px;
+  border-radius: 10px;
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+.arena-teaser-boss { max-height: 85%; max-width: 85%; object-fit: contain; filter: drop-shadow(0 0 14px rgba(0,0,0,0.5)); }
+.arena-viewport {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 320 / 360;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #000;
+  margin-bottom: 12px;
+}
+.arena-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.arena-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.arena-boss-sprite {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  max-height: 45%;
+  max-width: 45%;
+  object-fit: contain;
+  filter: drop-shadow(0 0 10px rgba(0,0,0,0.6));
+  transition: transform 0.12s ease;
+}
+.arena-boss-sprite.is-hit { transform: scale(0.9) translateX(-6px); filter: drop-shadow(0 0 14px var(--cyan-glow)); }
+.arena-phase-banner {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+}
+.arena-bars { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.arena-bar-row { display: flex; align-items: center; gap: 10px; }
+.arena-bar-row .gradient-bar { flex: 1; }
+
 /* Locked-but-visible sections (e.g. Bio measurements before Warrior Mode) —
    dimmed for a "locked" look, but NOT pointer-events:none: taps still need
    to reach the gated entry-point buttons inside so they can show the

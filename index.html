@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.54">
+<link rel="stylesheet" href="style.css?v=1.7.55">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -434,6 +434,8 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <div class="gradient-bar"><div class="gradient-bar-fill" id="gameBossProgressFill" style="width:0%"></div></div>
       <p class="hint hint--sm" id="gameBossDaysLeft"></p>
     </div>
+
+    <button type="button" class="btn btn--primary" id="btnOpenAdventureMap" style="margin-top:16px;width:100%;">&#9876;&#65039; Adventure Map</button>
     </div>
   </div>
 </div>
@@ -3591,6 +3593,49 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
+<div class="lock-overlay" id="adventureMapOverlay" hidden>
+  <div class="lock-card lock-card--wide arena-card">
+    <button type="button" class="arena-close-btn" id="btnArenaClose" aria-label="Close">&times;</button>
+
+    <div id="arenaTeaser">
+      <div class="arena-teaser-bg" id="arenaTeaserBg">
+        <img id="arenaTeaserBossImg" class="arena-teaser-boss" src="" alt="">
+      </div>
+      <h2 id="arenaTeaserTitle"></h2>
+      <p class="hint" id="arenaTeaserDesc"></p>
+      <button type="button" class="btn btn--primary" id="btnArenaStartFight" style="width:100%;">Enter the Arena</button>
+      <p class="hint hint--sm" id="arenaLockedNote" hidden>Coming soon for this rank — defeat your current rank's boss first.</p>
+    </div>
+
+    <div id="arenaFight" hidden>
+      <div class="arena-viewport">
+        <video id="arenaVideo" class="arena-video" playsinline muted></video>
+        <canvas id="arenaCanvas" class="arena-canvas" width="320" height="360"></canvas>
+        <img id="arenaBossSprite" class="arena-boss-sprite" src="" alt="">
+        <div class="arena-phase-banner" id="arenaPhaseBanner"></div>
+      </div>
+      <div class="arena-bars">
+        <div class="arena-bar-row">
+          <span class="hint hint--sm">Boss</span>
+          <div class="gradient-bar"><div class="gradient-bar-fill" id="arenaBossHpFill" style="width:100%"></div></div>
+        </div>
+        <div class="arena-bar-row">
+          <span class="hint hint--sm">You</span>
+          <div class="gradient-bar"><div class="gradient-bar-fill" id="arenaStaminaFill" style="width:100%"></div></div>
+        </div>
+      </div>
+      <p class="hint" id="arenaStatus"></p>
+    </div>
+
+    <div id="arenaResult" hidden>
+      <div class="lock-icon" id="arenaResultIcon">🏆</div>
+      <h2 id="arenaResultTitle"></h2>
+      <p id="arenaResultMessage"></p>
+      <button type="button" class="btn btn--primary" id="btnArenaResultClose" style="width:100%;margin-top:10px;">Continue</button>
+    </div>
+  </div>
+</div>
+
 <div class="lock-overlay" id="consentGateOverlay" hidden>
   <div class="lock-card">
     <div class="lock-icon">📜</div>
@@ -4731,11 +4776,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.7.54"></script>
+<script src="config.js?v=1.7.55"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.54"></script>
+<script src="app.js?v=1.7.55"></script>
 </body>
 </html>

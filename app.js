@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.54';
+const APP_VERSION = 'WF_SYS_V.1.7.55';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -21594,7 +21594,7 @@ const BOSS_BATTLE_DAYS = 7;
 let pendingBossStartPopup = null;
 
 function freshGamification() {
-  return { xp: 0, lastProcessedDate: null, garden: { stage: 'seed', trainingDays: 0 }, inventory: [], bossBattle: null };
+  return { xp: 0, lastProcessedDate: null, garden: { stage: 'seed', trainingDays: 0 }, inventory: [], bossBattle: null, trailmap: { defeatedMainBosses: [] } };
 }
 function getGamification() {
   const p = getProfile();
@@ -21902,6 +21902,374 @@ function initBossBattlePopup() {
   if (!overlay) return;
   document.getElementById('btnBossBattleClose').addEventListener('click', () => { overlay.hidden = true; });
   bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
+}
+
+/* ---------------------------------------------------------------- */
+/* Adventure Map: Boss Arena ("Clash Phases") — camera-tracked fights. */
+/* Phase 1: standalone main-boss fights only (no 9-station map yet).  */
+/* Lazy-loads TensorFlow.js + pose-detection only when opened, so the */
+/* base app never pays for it. Only ever calls into the real rank     */
+/* system through promoteFitnessMode() — never mutates fitnessMode/   */
+/* modeProgress directly.                                             */
+/* ---------------------------------------------------------------- */
+const TRAILMAP_BOSSES = {
+  beginner: {
+    name: "The Serpent's Hive Guardian", desc: 'A many-headed hydra guards the jungle temple.',
+    room: 'icons/boss/novice-boss-room.webp', sprite: 'icons/boss/novice-boss-sprite.webp', attackSprite: 'icons/boss/novice-boss-sprite-attack.webp',
+    cycles: 2, playable: true,
+  },
+  warrior: {
+    name: 'The Frozen Sovereign', desc: 'A six-armed ice queen wields blades of frost.',
+    room: 'icons/boss/warrior-boss-room.webp', sprite: 'icons/boss/warrior-boss-sprite.webp', attackSprite: 'icons/boss/warrior-boss-sprite-attack.webp',
+    cycles: 3, playable: false,
+  },
+  spartan: {
+    name: 'The Ashen Hound', desc: 'A three-headed lava cerberus prowls the burning plains.',
+    room: 'icons/boss/spartan-boss-room.webp', sprite: 'icons/boss/spartan-boss-sprite.webp', attackSprite: 'icons/boss/spartan-boss-sprite-attack.webp',
+    cycles: 4, playable: false,
+  },
+  demigod: {
+    name: 'The Solar Seraphim', desc: 'A winged guardian wields a blade of pure sunlight.',
+    room: 'icons/boss/demigod-boss-room.webp', sprite: 'icons/boss/demigod-boss-sprite.webp', attackSprite: 'icons/boss/demigod-boss-sprite-attack.webp',
+    cycles: 4, playable: false,
+  },
+};
+const ARENA_PHASE_DURATION_MS = 15000;
+const ARENA_REP_DAMAGE = 15;
+const ARENA_HIT_STAMINA_LOSS = 20;
+
+let arenaStream = null;
+let arenaRafId = null;
+let arenaPoseDetector = null;
+let arenaPoseLibsPromise = null;
+let arenaLatestKeypoints = null;
+let arenaLastPoseTime = 0;
+let arenaState = null; // the active fight's mutable state, or null when closed
+
+// Generic script-tag lazy-loader — no equivalent exists elsewhere in this
+// codebase (Leaflet/Supabase/JSZip all load eagerly in index.html), but a
+// pose-detection model is heavy enough that only loading it when the
+// Boss Arena actually opens is worth the one-off new pattern.
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+    const el = document.createElement('script');
+    el.src = src;
+    el.onload = () => resolve();
+    el.onerror = () => reject(new Error('Failed to load ' + src));
+    document.head.appendChild(el);
+  });
+}
+
+async function ensurePoseDetector() {
+  if (arenaPoseDetector) return arenaPoseDetector;
+  if (!arenaPoseLibsPromise) {
+    arenaPoseLibsPromise = (async () => {
+      await loadScriptOnce('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js');
+      await loadScriptOnce('https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js');
+    })();
+  }
+  await arenaPoseLibsPromise;
+  arenaPoseDetector = await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, {
+    modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
+  });
+  return arenaPoseDetector;
+}
+
+// Mirrors the barcode scanner's camera pattern (startBarcodeScan/
+// stopBarcodeCamera above) — same getUserMedia shape, same teardown.
+async function startArenaCamera(videoEl) {
+  arenaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+  videoEl.srcObject = arenaStream;
+  await videoEl.play();
+}
+function stopArenaCamera() {
+  if (arenaRafId) { cancelAnimationFrame(arenaRafId); arenaRafId = null; }
+  if (arenaStream) { arenaStream.getTracks().forEach(t => t.stop()); arenaStream = null; }
+  arenaLatestKeypoints = null;
+}
+
+// Runs continuously while a fight is open, throttled to ~10fps — a rep
+// counter or a dodge game doesn't need full framerate pose inference.
+async function arenaPoseTick(videoEl) {
+  if (!arenaStream) return; // camera was stopped since this tick was scheduled
+  const now = performance.now();
+  if (now - arenaLastPoseTime >= 100) {
+    arenaLastPoseTime = now;
+    try {
+      const poses = await arenaPoseDetector.estimatePoses(videoEl);
+      if (poses && poses[0]) arenaLatestKeypoints = poses[0].keypoints;
+    } catch (e) { /* skip this tick, try again next frame */ }
+  }
+  arenaRafId = requestAnimationFrame(() => arenaPoseTick(videoEl));
+}
+
+function arenaKeypoint(name) {
+  if (!arenaLatestKeypoints) return null;
+  const k = arenaLatestKeypoints.find(p => p.name === name);
+  if (!k || (k.score != null && k.score < 0.3)) return null;
+  return k;
+}
+// Angle at point b, formed by rays b->a and b->c, in degrees.
+function arenaAngle(a, b, c) {
+  const ab = { x: a.x - b.x, y: a.y - b.y };
+  const cb = { x: c.x - b.x, y: c.y - b.y };
+  const magAb = Math.hypot(ab.x, ab.y), magCb = Math.hypot(cb.x, cb.y);
+  if (magAb === 0 || magCb === 0) return null;
+  const cos = Math.max(-1, Math.min(1, (ab.x * cb.x + ab.y * cb.y) / (magAb * magCb)));
+  return Math.acos(cos) * (180 / Math.PI);
+}
+
+// Down->up angle-cycle rep counter — squats use hip-knee-ankle, push-ups
+// use shoulder-elbow-wrist. Debounced by requiring a full cycle through
+// both thresholds rather than a single frame crossing one value.
+function createRepCounter(exerciseType) {
+  const state = { phase: 'up' };
+  return {
+    update() {
+      let angle = null;
+      if (exerciseType === 'pushup') {
+        const shoulder = arenaKeypoint('left_shoulder'), elbow = arenaKeypoint('left_elbow'), wrist = arenaKeypoint('left_wrist');
+        if (shoulder && elbow && wrist) angle = arenaAngle(shoulder, elbow, wrist);
+      } else {
+        const hip = arenaKeypoint('left_hip'), knee = arenaKeypoint('left_knee'), ankle = arenaKeypoint('left_ankle');
+        if (hip && knee && ankle) angle = arenaAngle(hip, knee, ankle);
+      }
+      if (angle == null) return false;
+      if (state.phase === 'up' && angle < 100) { state.phase = 'down'; return false; }
+      if (state.phase === 'down' && angle > 150) { state.phase = 'up'; return true; }
+      return false;
+    },
+  };
+}
+
+// A ~2s "move to the top, now the bottom" calibration so the dodge game
+// maps to each person's actual head range-of-motion/camera distance.
+function arenaCalibrate(durationMs, onDone) {
+  const status = document.getElementById('arenaStatus');
+  let topY = null, bottomY = null;
+  const startTime = performance.now();
+  status.textContent = 'Calibrating — move your head to the TOP of your reach…';
+  function sample(ts) {
+    const elapsed = ts - startTime;
+    const nose = arenaKeypoint('nose');
+    if (nose) {
+      if (elapsed < durationMs / 2) topY = topY == null ? nose.y : Math.min(topY, nose.y);
+      else bottomY = bottomY == null ? nose.y : Math.max(bottomY, nose.y);
+    }
+    if (elapsed >= durationMs / 2 && status.textContent.indexOf('BOTTOM') === -1) status.textContent = 'Now move to the BOTTOM of your reach…';
+    if (elapsed < durationMs) { arenaRafId = requestAnimationFrame(sample); return; }
+    if (topY == null || bottomY == null || bottomY - topY < 10) { topY = 0; bottomY = 300; }
+    onDone({ topY, bottomY });
+  }
+  arenaRafId = requestAnimationFrame(sample);
+}
+
+function arenaPlayerY(calib, canvasH) {
+  const nose = arenaKeypoint('nose');
+  if (!nose) return canvasH / 2;
+  const t = Math.max(0, Math.min(1, (nose.y - calib.topY) / (calib.bottomY - calib.topY)));
+  return t * canvasH;
+}
+
+// Canvas obstacle-dodge game — head position (calibrated) dodges gaps
+// scrolling toward the player. onEnd(survived).
+function runDodgePhase(canvas, durationMs, calib, onEnd) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  let obstacles = [];
+  let lastSpawn = 0;
+  let done = false;
+  const startTime = performance.now();
+
+  function loop(ts) {
+    if (done) return;
+    const elapsed = ts - startTime;
+    ctx.clearRect(0, 0, W, H);
+    if (elapsed - lastSpawn > 1100) {
+      lastSpawn = elapsed;
+      obstacles.push({ x: W, gapY: 40 + Math.random() * (H - 80), gapH: 90, passed: false });
+    }
+    const py = arenaPlayerY(calib, H);
+    obstacles.forEach(o => { o.x -= 4.5; });
+    obstacles = obstacles.filter(o => o.x > -40);
+    ctx.fillStyle = 'rgba(220,80,60,0.85)';
+    for (const o of obstacles) {
+      ctx.fillRect(o.x, 0, 24, o.gapY - o.gapH / 2);
+      ctx.fillRect(o.x, o.gapY + o.gapH / 2, 24, H - (o.gapY + o.gapH / 2));
+      if (!o.passed && o.x < 60 && o.x > 20) {
+        o.passed = true;
+        if (Math.abs(py - o.gapY) > o.gapH / 2) {
+          arenaState.stamina = Math.max(0, arenaState.stamina - ARENA_HIT_STAMINA_LOSS);
+          updateArenaBars();
+        }
+      }
+    }
+    ctx.beginPath();
+    ctx.arc(50, py, 14, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffd24d';
+    ctx.fill();
+
+    if (arenaState.stamina <= 0) { done = true; onEnd(false); return; }
+    if (elapsed >= durationMs) { done = true; onEnd(true); return; }
+    arenaRafId = requestAnimationFrame(loop);
+  }
+  arenaRafId = requestAnimationFrame(loop);
+}
+
+// Rep-counted damage window. onEnd(bossDefeated).
+function runAttackPhase(durationMs, repCounter, onEnd) {
+  const startTime = performance.now();
+  let done = false;
+  function loop(ts) {
+    if (done) return;
+    const elapsed = ts - startTime;
+    if (repCounter.update()) {
+      arenaState.bossHp = Math.max(0, arenaState.bossHp - ARENA_REP_DAMAGE);
+      updateArenaBars();
+      flashBossHit();
+      if (arenaState.bossHp <= 0) { done = true; onEnd(true); return; }
+    }
+    if (elapsed >= durationMs) { done = true; onEnd(false); return; }
+    arenaRafId = requestAnimationFrame(loop);
+  }
+  arenaRafId = requestAnimationFrame(loop);
+}
+
+function updateArenaBars() {
+  const hpFill = document.getElementById('arenaBossHpFill');
+  const stFill = document.getElementById('arenaStaminaFill');
+  if (hpFill) hpFill.style.width = arenaState.bossHp + '%';
+  if (stFill) stFill.style.width = arenaState.stamina + '%';
+}
+function flashBossHit() {
+  const el = document.getElementById('arenaBossSprite');
+  if (!el) return;
+  el.classList.add('is-hit');
+  setTimeout(() => el.classList.remove('is-hit'), 150);
+}
+
+function runFightCycle() {
+  const banner = document.getElementById('arenaPhaseBanner');
+  const status = document.getElementById('arenaStatus');
+  arenaState.cycle++;
+  banner.textContent = 'DODGE!';
+  status.textContent = "Duck and lean to dodge the boss's attack!";
+  document.getElementById('arenaBossSprite').src = arenaState.boss.attackSprite;
+  arenaCalibrate(2000, calib => {
+    banner.textContent = 'DODGE!';
+    runDodgePhase(document.getElementById('arenaCanvas'), ARENA_PHASE_DURATION_MS, calib, survived => {
+      if (!survived) { endFight(false); return; }
+      banner.textContent = 'ATTACK!';
+      status.textContent = 'Do squats to strike the boss!';
+      document.getElementById('arenaBossSprite').src = arenaState.boss.sprite;
+      const repCounter = createRepCounter('squat');
+      runAttackPhase(ARENA_PHASE_DURATION_MS, repCounter, bossDefeated => {
+        if (bossDefeated) { endFight(true); return; }
+        if (arenaState.cycle >= arenaState.boss.cycles) { endFight(false); return; }
+        runFightCycle();
+      });
+    });
+  });
+}
+
+function endFight(won) {
+  stopArenaCamera();
+  document.getElementById('arenaFight').hidden = true;
+  document.getElementById('arenaResult').hidden = false;
+  const icon = document.getElementById('arenaResultIcon');
+  const title = document.getElementById('arenaResultTitle');
+  const msg = document.getElementById('arenaResultMessage');
+  if (won) {
+    icon.textContent = '🏆';
+    title.textContent = 'VICTORY!';
+    msg.textContent = `You defeated ${arenaState.boss.name}!`;
+    defeatTrailmapMainBoss(arenaState.rank);
+  } else {
+    icon.textContent = '💤';
+    title.textContent = 'Not this time…';
+    msg.textContent = "No penalty — rest up and try again whenever you're ready.";
+  }
+}
+
+// The only thing this whole feature is allowed to do to the real rank
+// system: call the existing promoteFitnessMode(), same as a real 7-day
+// streak would — never sets fitnessMode/modeProgress directly. Works
+// alongside the streak system, not instead of it.
+function defeatTrailmapMainBoss(rank) {
+  const g = getGamification();
+  if (!g.trailmap) g.trailmap = { defeatedMainBosses: [] };
+  if (!g.trailmap.defeatedMainBosses.includes(rank)) g.trailmap.defeatedMainBosses.push(rank);
+  saveGamification(g);
+  if (getFitnessMode() === rank && MODE_ORDER[MODE_ORDER.indexOf(rank) + 1]) {
+    promoteFitnessMode();
+  }
+}
+
+function openBossArena() {
+  if (wdsRemoteData) { showRestToast('The Adventure Map needs your camera — open it in the mobile app.'); return; }
+  const p = getProfile();
+  if (!p || !p.fitnessMode) return;
+  const rank = p.fitnessMode;
+  const boss = TRAILMAP_BOSSES[rank] || TRAILMAP_BOSSES.beginner;
+  arenaState = { rank, boss, cycle: 0, bossHp: 100, stamina: 100 };
+
+  document.getElementById('adventureMapOverlay').hidden = false;
+  document.getElementById('arenaTeaser').hidden = false;
+  document.getElementById('arenaFight').hidden = true;
+  document.getElementById('arenaResult').hidden = true;
+  document.getElementById('arenaTeaserBg').style.backgroundImage = `url('${boss.room}')`;
+  document.getElementById('arenaTeaserBossImg').src = boss.sprite;
+  document.getElementById('arenaTeaserTitle').textContent = boss.name;
+  document.getElementById('arenaTeaserDesc').textContent = boss.desc;
+  document.getElementById('btnArenaStartFight').hidden = !boss.playable;
+  document.getElementById('arenaLockedNote').hidden = boss.playable;
+}
+
+function closeBossArena() {
+  stopArenaCamera();
+  const overlay = document.getElementById('adventureMapOverlay');
+  if (overlay) overlay.hidden = true;
+  arenaState = null;
+}
+
+async function startBossFight() {
+  const status = document.getElementById('arenaStatus');
+  const video = document.getElementById('arenaVideo');
+  document.getElementById('arenaTeaser').hidden = true;
+  document.getElementById('arenaFight').hidden = false;
+  document.getElementById('arenaBossSprite').src = arenaState.boss.sprite;
+  updateArenaBars();
+  status.textContent = 'Requesting camera access…';
+  try {
+    await startArenaCamera(video);
+  } catch (e) {
+    status.textContent = 'Camera access denied or unavailable — the Boss Arena needs your camera to track movement.';
+    return;
+  }
+  status.textContent = 'Loading the arena…';
+  try {
+    await ensurePoseDetector();
+  } catch (e) {
+    status.textContent = 'Could not load the fight engine — check your connection and try again.';
+    stopArenaCamera();
+    return;
+  }
+  arenaPoseTick(video);
+  runFightCycle();
+}
+
+function initAdventureMap() {
+  const overlay = document.getElementById('adventureMapOverlay');
+  if (!overlay) return;
+  const openBtn = document.getElementById('btnOpenAdventureMap');
+  if (openBtn) openBtn.addEventListener('click', openBossArena);
+  const closeBtn = document.getElementById('btnArenaClose');
+  if (closeBtn) closeBtn.addEventListener('click', closeBossArena);
+  const startBtn = document.getElementById('btnArenaStartFight');
+  if (startBtn) startBtn.addEventListener('click', startBossFight);
+  const resultCloseBtn = document.getElementById('btnArenaResultClose');
+  if (resultCloseBtn) resultCloseBtn.addEventListener('click', closeBossArena);
 }
 
 /* ---------------------------------------------------------------- */
@@ -22487,6 +22855,7 @@ safeInit(initModeGatedClickGuard, 'initModeGatedClickGuard');
 safeInit(() => { processDailyModeCheck(); checkModeProgressNudge(); applyModeGating(); }, 'fitnessModeDaily');
 safeInit(initGamificationPanel, 'initGamificationPanel');
 safeInit(initBossBattlePopup, 'initBossBattlePopup');
+safeInit(initAdventureMap, 'initAdventureMap');
 safeInit(processDailyGameCheck, 'gamificationDaily');
 
 if (initFailures.length) {
