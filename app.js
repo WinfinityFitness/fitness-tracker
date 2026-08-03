@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.57';
+const APP_VERSION = 'WF_SYS_V.1.7.59';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -6561,6 +6561,30 @@ function migrateWaterUnitsIfNeeded() {
   });
   if (changed) saveLogs(logs);
   localStorage.setItem('wft_water_migrated_v1', '1');
+}
+
+// One-time migration: every user's Fitness Journey rank moves back to
+// Novice as feature-gating is relaxed (see MODE_GATED_ELEMENTS below) —
+// almost everything is unlocked at every rank now except the Food Preps
+// browser (Spartan-gated), so there's no reason to leave anyone parked
+// at a rank that barely restricts anything anymore. Idempotent, same
+// pattern as migrateWaterUnitsIfNeeded above.
+function resetAllRanksToNoviceOnce() {
+  // Same reasoning as processDailyGameCheck/useGameItem's guard elsewhere —
+  // getProfile() reads a remote operator's data on the desktop shell, but
+  // saveProfile() always writes to THIS device's own local storage.
+  if (wdsRemoteData) return;
+  if (localStorage.getItem('wft_rank_reset_v1')) return;
+  const p = getProfile();
+  // No profile yet (still mid-onboarding) — don't burn the flag; retry on
+  // a later load once a real profile (and rank) actually exists to reset.
+  if (!p) return;
+  if (p.fitnessMode) {
+    p.fitnessMode = 'beginner';
+    p.modeProgress = freshModeProgress();
+    saveProfile(p);
+  }
+  localStorage.setItem('wft_rank_reset_v1', '1');
 }
 
 function updateLogFields(date, partial) {
@@ -21225,25 +21249,19 @@ function updateHeaderModeIcon() {
   icon.title = MODE_LABEL[mode] || '';
   icon.hidden = false;
 }
+// Almost everything unlocks at every rank now — only the Food Preps
+// browser stays gated (moved from Warrior to Spartan). Ranks still exist
+// and still matter (Adventure Map bosses/maps are keyed to them), they
+// just don't restrict much of the app anymore.
 const MODE_UNLOCK_FEATURES = {
-  warrior: ['Training Log (exercises & sets)', 'Outdoor Activity Tracker (GPS)', 'Body Measurements', 'Weekly Review', 'Progress Photo & Measurements reminder', 'Food Preps browser'],
-  spartan: ['AI food/photo nutrition estimate', 'Barcode scanner'],
-  demigod: ['Body Fat Percentage (caliper entry)', 'Custom Habit Protocols (Extra Habits)'],
+  spartan: ['Food Preps browser'],
 };
 // Entry points gated behind a mode — gating just the entry point (rather
 // than every downstream field) is enough, since nothing past it is
 // reachable through normal UI flow when it's blocked. Leaderboard/Nexus
 // sync is deliberately NOT in this list — it's available at every tier.
 const MODE_GATED_ELEMENTS = [
-  { id: 'btnOpenTrainingLogQuick', required: 'warrior' },
-  { id: 'btnToggleWeeklyReview', required: 'warrior' },
-  { id: 'progressPhotoReminderEnabled', required: 'warrior' },
-  { id: 'btnOpenMeasureEntry', required: 'warrior' },
-  { id: 'btnMediaSyncBrowse', required: 'warrior' },
-  { id: 'btnEstimateAiNutrition', required: 'spartan' },
-  { id: 'btnEstimateAiPhoto', required: 'spartan' },
-  { id: 'btnScanBarcode', required: 'spartan' },
-  { id: 'btnToggleCaliperEntry', required: 'demigod' },
+  { id: 'btnMediaSyncBrowse', required: 'spartan' },
 ];
 
 function getFitnessMode() {
@@ -21413,38 +21431,30 @@ function applyModeGating() {
     (el.closest('label') || el).classList.toggle('mode-locked-el', locked);
   });
 
+  // Training tab, Bio measurements, Weekly Review, and Caliper entry are no
+  // longer rank-gated (see MODE_GATED_ELEMENTS above) — only Food Preps
+  // still is. Explicitly un-gating these rather than leaving them checking
+  // a rank everyone now starts at, so a fresh Novice reset doesn't leave
+  // them looking locked.
   const trainingTabBtn = document.querySelector('.tab-btn[data-target="training"]');
-  if (trainingTabBtn) trainingTabBtn.classList.toggle('mode-locked-el', !isModeUnlocked('warrior'));
+  if (trainingTabBtn) trainingTabBtn.classList.remove('mode-locked-el');
 
   const measureSection = document.getElementById('bioMeasurementSection');
-  if (measureSection) measureSection.classList.toggle('mode-locked-visual', !isModeUnlocked('warrior'));
-
-  // Force-close panels that may have been left open from before a demotion.
-  if (!isModeUnlocked('warrior')) {
-    const weeklyReviewPanel = document.getElementById('weeklyReviewPanel');
-    if (weeklyReviewPanel) weeklyReviewPanel.hidden = true;
-  }
-  if (!isModeUnlocked('demigod')) {
-    const caliperPanel = document.getElementById('caliperEntryPanel');
-    if (caliperPanel) caliperPanel.hidden = true;
-  }
+  if (measureSection) measureSection.classList.remove('mode-locked-visual');
 
   applyHabitProtocolsGating();
 }
 
-// Custom Habit Protocols is a small cluster of inputs/buttons rather than
-// one click target, so it's disabled directly instead of going through the
-// click-guard list — without a defined habit there's nothing for the daily
-// check-in's "Extra habits" checkboxes to show either, so gating just this
-// definition point is enough to lock the whole feature.
+// Custom Habit Protocols is no longer rank-gated either — kept as its own
+// function (rather than deleted outright) so a future rank requirement is
+// a one-line change here instead of rebuilding this gating point.
 function applyHabitProtocolsGating() {
-  const locked = !isModeUnlocked('demigod');
   const section = document.getElementById('customHabitProtocolsSection');
   const badge = document.getElementById('habitProtocolsLockBadge');
-  if (badge) badge.hidden = !locked;
+  if (badge) badge.hidden = true;
   if (!section) return;
-  section.classList.toggle('mode-locked-visual', locked);
-  section.querySelectorAll('input, button').forEach(el => { el.disabled = locked; });
+  section.classList.remove('mode-locked-visual');
+  section.querySelectorAll('input, button').forEach(el => { el.disabled = false; });
 }
 
 // Capture phase so this runs before the real feature's own click handler,
@@ -21454,13 +21464,6 @@ function initModeGatedClickGuard() {
   document.addEventListener('click', e => {
     const gated = MODE_GATED_ELEMENTS.find(g => e.target.closest && e.target.closest('#' + g.id));
     if (gated && !isModeUnlocked(gated.required)) {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      showLockedFeatureNotice();
-      return;
-    }
-    const trainingTabBtn = e.target.closest && e.target.closest('.tab-btn[data-target="training"]');
-    if (trainingTabBtn && !isModeUnlocked('warrior')) {
       e.preventDefault();
       e.stopImmediatePropagation();
       showLockedFeatureNotice();
@@ -21962,7 +21965,7 @@ const TRAILMAP_LAYOUTS = {
     sideQuests: [
       { x: 45, y: 72 }, // SQ1 — near the lower stump
       { x: 8, y: 46 },  // SQ2 — left ruin, mid-map
-      { x: 82, y: 36 }, // SQ3 — right side, upper-mid
+      { x: 68, y: 33 }, // SQ3 — right side, upper-mid, at the path fork
       { x: 13, y: 20 }, // SQ4 — left, near the big banyan tree
       { x: 90, y: 36 }, // SQ5 — far right, upper-mid
     ],
@@ -22919,6 +22922,7 @@ function safeInit(fn, label) {
 }
 
 safeInit(migrateWaterUnitsIfNeeded, 'migrateWaterUnitsIfNeeded');
+safeInit(resetAllRanksToNoviceOnce, 'resetAllRanksToNoviceOnce');
 safeInit(initTabs, 'initTabs');
 safeInit(initSwipeNavigation, 'initSwipeNavigation');
 safeInit(initBackButtonNav, 'initBackButtonNav');
