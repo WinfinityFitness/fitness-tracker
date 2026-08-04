@@ -86,7 +86,7 @@
   .hero-download-btn svg { width: 18px; height: 18px; flex: none; }
   @media (prefers-reduced-motion: reduce) { .hero-download-btn { transition: none; } }
 
-  /* Hero seal: enlarged 5x (96px -> 480px), set inside a "ruins wall"
+  /* Hero seal: enlarged 5x (was 168px), set inside a "ruins wall"
      stone-block backdrop with an antique gold scale-textured ring around
      it. Both textures are procedural CSS (gradients), not image assets --
      a real photographic texture would look more literal; this is the
@@ -104,8 +104,11 @@
   }
   /* Antique gold ring: a tiled fish-scale/overlapping-arc motif (a
      standard CSS-only scale-texture trick — repeating scalloped circles,
-     not a straight repeating-conic-gradient which reads as sunburst rays
-     rather than scales) masked down to just the ring band. */
+     not a repeating-conic-gradient, which reads as sunburst rays rather
+     than scales) masked down to just the ring band. Explicit pixel radii
+     in the mask, not bare "circle" + %-based calc() -- an unsized circle
+     defaults to farthest-corner sizing, which doesn't resolve to the
+     box's own radius the way % math would suggest. */
   .hero-seal-frame::before {
     content: ''; position: absolute; inset: -14px; border-radius: 50%;
     background-color: #6b4e10;
@@ -114,10 +117,6 @@
       radial-gradient(circle at 50% -8%, transparent 0 56%, #f7e3a1 56% 62%, #c9962e 62% 68%, transparent 68% 100%);
     background-size: 26px 26px, 26px 26px;
     background-position: 0 0, 13px 13px;
-    /* Explicit pixel radius (not a bare "circle" + %-based calc()) --
-       radial-gradient defaults an unsized circle to farthest-corner, which
-       made the % math above resolve nothing like the box's own radius and
-       left almost no room for the stone-wall band to show through. */
     -webkit-mask: radial-gradient(circle 254px at center, transparent 0 205px, #000 209px);
             mask: radial-gradient(circle 254px at center, transparent 0 205px, #000 209px);
     box-shadow: 0 10px 26px -10px rgba(0,0,0,0.6);
