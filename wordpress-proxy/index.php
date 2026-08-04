@@ -51,13 +51,17 @@ if ($path === '/' || $path === '' || $path === null) {
     $path = '/index.html';
 }
 // adventure.winfinityfitness.com is a single static page (the Fitness RPG
-// field guide), not the tracker app itself -- every request on this host
-// serves adventure-guide.html regardless of path, same one-page-site idea
-// as the SPA fallback below but simpler since there's no other route to
-// preserve. Checked before the SPA-fallback logic since that only concerns
-// the app's own client-side routing.
+// field guide), not the tracker app itself -- the site ROOT serves
+// adventure-guide.html instead of index.html. Only rewrite the root request
+// though -- everything else on this host (icons/guide/*.png, icons/character/*,
+// icons/maps/*, fonts/*) is a real asset the page itself references by
+// relative path, and must proxy through untouched. Forcing every path to
+// adventure-guide.html unconditionally (the first version of this) broke
+// every image on the page: the browser's img/font requests got HTML back
+// instead of the actual file. Checked before the SPA-fallback logic since
+// that only concerns the app's own client-side routing.
 $hostEarly = isset($_SERVER['HTTP_HOST']) ? strtolower($_SERVER['HTTP_HOST']) : '';
-if ($hostEarly === 'adventure.winfinityfitness.com') {
+if ($hostEarly === 'adventure.winfinityfitness.com' && $path === '/index.html') {
     $path = '/adventure-guide.html';
 }
 $query = parse_url($_SERVER['REQUEST_URI'], PHP_URL_QUERY);
