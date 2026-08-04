@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.67';
+const APP_VERSION = 'WF_SYS_V.1.7.68';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -21609,10 +21609,19 @@ function getCharSprite(rank, gender) {
 }
 // 25-frame horizontal sprite strips (one attack-animation cycle each),
 // played via the CSS steps() animation on .game-char-sprite--action.
+// Every rank now has one for both genders (Novice/Warrior added later
+// than Spartan/Demi-God, same male/female split as CHAR_SPRITE).
 const CHAR_ACTION_SPRITE = {
-  spartan: 'icons/character/char-spartan-action-strip.png',
-  demigod: 'icons/character/char-demigod-action-strip.png',
+  beginner: { male: 'icons/character/char-novice-action-strip.png', female: 'icons/character/char-novice-female-action-strip.png' },
+  warrior: { male: 'icons/character/char-warrior-action-strip.png', female: 'icons/character/char-warrior-female-action-strip.png' },
+  spartan: { male: 'icons/character/char-spartan-action-strip.png', female: 'icons/character/char-spartan-female-action-strip.png' },
+  demigod: { male: 'icons/character/char-demigod-action-strip.png', female: 'icons/character/char-demigod-female-action-strip.png' },
 };
+function getCharActionSprite(rank, gender) {
+  const entry = CHAR_ACTION_SPRITE[rank];
+  if (!entry) return null;
+  return entry[gender === 'female' ? 'female' : 'male'];
+}
 const GARDEN_STAGE_DAYS = 4; // cumulative training-days needed to advance one stage
 const GARDEN_ITEMS = [
   { id: 'xpPotion', name: 'XP Potion', icon: '🧪', effect: 'xp50' },
@@ -21863,7 +21872,7 @@ function renderGamificationPanel() {
   const spriteBase = document.getElementById('gameCharSpriteBase');
   if (spriteBase) { spriteBase.src = getCharSprite(p.fitnessMode, p.gender); spriteBase.alt = MODE_LABEL[p.fitnessMode] || ''; }
   const spriteAction = document.getElementById('gameCharSpriteAction');
-  const actionSrc = CHAR_ACTION_SPRITE[p.fitnessMode];
+  const actionSrc = getCharActionSprite(p.fitnessMode, p.gender);
   if (spriteAction) { if (actionSrc) spriteAction.style.backgroundImage = `url('${actionSrc}')`; spriteAction.hidden = !actionSrc; }
   const playBtn = document.getElementById('gamePlayBtn');
   if (playBtn) playBtn.hidden = !actionSrc;
