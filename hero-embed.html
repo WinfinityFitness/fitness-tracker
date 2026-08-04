@@ -8,12 +8,22 @@
      Arsenal's Wellness download-icon link (ad_settings.download_url_
      wellness), which points at the installer file instead. Two different
      destinations by design: this button launches the live app, Arsenal's
-     downloads the installer. No Supabase fetch needed here at all. -->
+     downloads the installer. No Supabase fetch needed here at all.
+
+     Second CTA ("Fitness Adventure") links to adventure.winfinityfitness.com
+     -- a standalone static page (adventure-guide.html in the fitness-tracker
+     repo, served through the same wordpress-proxy used by Wellness/Messenger,
+     see wordpress-proxy/index.php's host branch) walking through the in-app
+     Fitness RPG / Adventure Map feature. Outline style so it reads as the
+     secondary action next to Launch Nexus. -->
 <section class="wf-hero-embed" id="wfHeroEmbed">
   <img class="wf-hero-logo" src="https://winfinityfitness.github.io/fitness-tracker/icons/icon-192.png" alt="Winfinity">
   <h1 class="wf-hero-title">The Future Of<br><em>Performance</em></h1>
   <p class="wf-hero-subtitle">Unlock your latent potential through the Global Neural Grid. Real-time bio-syncing for the modern shinobi.</p>
-  <a class="wf-hero-cta" href="https://wellness.winfinityfitness.com" target="_blank" rel="noopener">Launch Nexus</a>
+  <div class="wf-hero-cta-row">
+    <a class="wf-hero-cta" href="https://wellness.winfinityfitness.com" target="_blank" rel="noopener">Launch Nexus</a>
+    <a class="wf-hero-cta wf-hero-cta--ghost" href="https://adventure.winfinityfitness.com" target="_blank" rel="noopener">Fitness Adventure</a>
+  </div>
 </section>
 
 <style>
@@ -49,10 +59,17 @@
     color: #8a97a8; font-size: 0.92rem; line-height: 1.6; max-width: 480px;
     margin: 0 auto 32px;
   }
+  .wf-hero-cta-row {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 16px;
+  }
   .wf-hero-cta {
     display: inline-block; background: #ff9f43; color: #0a0d12; text-decoration: none;
     font-weight: 700; font-size: 0.85rem; letter-spacing: 0.03em; text-transform: uppercase;
     padding: 14px 32px; clip-path: polygon(4% 0, 100% 0, 96% 100%, 0 100%);
   }
   .wf-hero-cta:hover { background: #ffb668; }
+  .wf-hero-cta--ghost {
+    background: transparent; color: #ff9f43 !important; box-shadow: inset 0 0 0 1.5px #ff9f43;
+  }
+  .wf-hero-cta--ghost:hover { background: rgba(255,159,67,0.12); }
 </style>

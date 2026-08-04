@@ -50,6 +50,16 @@ $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 if ($path === '/' || $path === '' || $path === null) {
     $path = '/index.html';
 }
+// adventure.winfinityfitness.com is a single static page (the Fitness RPG
+// field guide), not the tracker app itself -- every request on this host
+// serves adventure-guide.html regardless of path, same one-page-site idea
+// as the SPA fallback below but simpler since there's no other route to
+// preserve. Checked before the SPA-fallback logic since that only concerns
+// the app's own client-side routing.
+$hostEarly = isset($_SERVER['HTTP_HOST']) ? strtolower($_SERVER['HTTP_HOST']) : '';
+if ($hostEarly === 'adventure.winfinityfitness.com') {
+    $path = '/adventure-guide.html';
+}
 $query = parse_url($_SERVER['REQUEST_URI'], PHP_URL_QUERY);
 $upstreamUrl = $upstreamBase . $path . ($query ? '?' . $query : '');
 
