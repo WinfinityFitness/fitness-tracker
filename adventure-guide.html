@@ -86,46 +86,14 @@
   .hero-download-btn svg { width: 18px; height: 18px; flex: none; }
   @media (prefers-reduced-motion: reduce) { .hero-download-btn { transition: none; } }
 
-  /* Hero seal: enlarged 5x (was 168px), set inside a "ruins wall"
-     stone-block backdrop with an antique gold scale-textured ring around
-     it. Both textures are procedural CSS (gradients), not image assets --
-     a real photographic texture would look more literal; this is the
-     self-contained approximation. */
-  .hero-seal-frame {
-    width: 480px; height: 480px; max-width: 84vw; max-height: 84vw;
-    margin: 0 auto 26px; border-radius: 50%; position: relative;
-    display: flex; align-items: center; justify-content: center;
-    background:
-      repeating-linear-gradient(0deg, rgba(0,0,0,0.4) 0 3px, transparent 3px 34px),
-      repeating-linear-gradient(90deg, rgba(0,0,0,0.3) 0 3px, transparent 3px 48px),
-      repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 17px),
-      radial-gradient(circle at 30% 25%, #b8a37e 0%, #8c7a5a 42%, #4a4030 100%);
-    box-shadow: inset 0 0 46px rgba(0,0,0,0.65), 0 26px 54px -22px var(--shadow);
-  }
-  /* Antique gold ring: a tiled fish-scale/overlapping-arc motif (a
-     standard CSS-only scale-texture trick — repeating scalloped circles,
-     not a repeating-conic-gradient, which reads as sunburst rays rather
-     than scales) masked down to just the ring band. Explicit pixel radii
-     in the mask, not bare "circle" + %-based calc() -- an unsized circle
-     defaults to farthest-corner sizing, which doesn't resolve to the
-     box's own radius the way % math would suggest. */
-  .hero-seal-frame::before {
-    content: ''; position: absolute; inset: -14px; border-radius: 50%;
-    background-color: #6b4e10;
-    background-image:
-      radial-gradient(circle at 50% -8%, transparent 0 56%, #f7e3a1 56% 62%, #c9962e 62% 68%, transparent 68% 100%),
-      radial-gradient(circle at 50% -8%, transparent 0 56%, #f7e3a1 56% 62%, #c9962e 62% 68%, transparent 68% 100%);
-    background-size: 26px 26px, 26px 26px;
-    background-position: 0 0, 13px 13px;
-    -webkit-mask: radial-gradient(circle 254px at center, transparent 0 205px, #000 209px);
-            mask: radial-gradient(circle 254px at center, transparent 0 205px, #000 209px);
-    box-shadow: 0 10px 26px -10px rgba(0,0,0,0.6);
-  }
-  .hero-seal {
-    width: 62%; height: 62%; object-fit: contain; display: block;
-    border-radius: 50%; box-shadow: 0 14px 28px -14px var(--shadow);
-    position: relative; z-index: 1;
-  }
+  /* Hero seal: the medallion image already carries its own gold ring
+     (baked into icons/guide/adventure-seal.png) -- no extra CSS frame
+     around it, just a clean drop shadow so it lifts off the page. Kept
+     plain deliberately after the ornate stone/scale-ring version was
+     tried and rejected as cluttered -- don't re-add a decorative frame
+     here without checking first. */
+  .hero-seal-frame { width: 168px; margin: 0 auto 26px; }
+  .hero-seal { width: 100%; height: auto; display: block; border-radius: 50%; box-shadow: 0 16px 32px -16px var(--shadow); }
 
   .manual { background: var(--card); border: 1px solid var(--hairline); border-radius: 14px; padding: 30px 32px; margin-bottom: 88px; box-shadow: 0 1px 0 var(--hairline) inset, 0 18px 40px -30px var(--shadow); }
   .manual h2 { font-family: 'Syne', sans-serif; font-size: 1.5rem; margin: 0 0 6px; font-weight: 700; }
