@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.61';
+const APP_VERSION = 'WF_SYS_V.1.7.62';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -7363,39 +7363,9 @@ function initSettingsOverlay() {
 
   initHydrationReminderSettings();
   initWebSyncSettings();
-  initShowcaseOptinSettings();
   initPersonalGeminiKeySettings();
 }
 
-// Separate, explicit opt-in from the in-app Nexus Leaderboard sharing
-// (which is forced on unconditionally now, see initLeaderboard() below) --
-// "visible to other signed-in app users" and "visible publicly with no
-// login at all, on winfinityfitness.com" are different consent levels, so
-// this gets its own toggle and its own server-side flag (showcase_optins,
-// see supabase_public_showcase_migration.sql) rather than reusing
-// wft_lb_optin. Local flag mirrors server state as a fast-path UI cache,
-// same best-effort convention as the Web Dashboard Sync toggle above.
-function initShowcaseOptinSettings() {
-  const toggle = document.getElementById('showcaseOptinEnabled');
-  const note = document.getElementById('showcaseOptinNote');
-  if (!toggle) return;
-  toggle.checked = localStorage.getItem('wft_showcase_optin') === '1';
-  toggle.addEventListener('change', async () => {
-    if (!sbConfigured()) { toggle.checked = !toggle.checked; note.textContent = 'Not available offline.'; return; }
-    const enabled = toggle.checked;
-    const shareKey = getOrCreateShareKey();
-    getOrCreatePublicId(); // ensures a public_id exists -- get_public_showcase_data() requires one
-    try {
-      const { error } = await sb.rpc('set_showcase_optin', { p_share_key: shareKey, p_optin: enabled });
-      if (error) throw error;
-      localStorage.setItem('wft_showcase_optin', enabled ? '1' : '0');
-      note.textContent = enabled ? "You're now visible on the public showcase." : 'Removed from the public showcase.';
-    } catch (e) {
-      toggle.checked = !enabled;
-      note.textContent = 'Could not update — try again.';
-    }
-  });
-}
 
 // Per-device, per-user BYOK Gemini key(s) -- same idea as QuizForge's
 // multi-key setup, but isolated to just this device/user's own requests
@@ -21561,7 +21531,7 @@ function initRestartJourney() {
 /* real feature-gating stays exactly as earned through normal use.    */
 /* ---------------------------------------------------------------- */
 const GAME_XP_PER_LEVEL = 100;
-const GAME_XP_TABLE = { weighIn: 5, vitals: 5, meal: 5, water: 5, workout: 10, cardio: 10, habit: 5, weeklyReview: 15 };
+const GAME_XP_TABLE = { weighIn: 5, vitals: 5, meal: 10, water: 5, workout: 10, cardio: 10, weeklyReview: 15 };
 const GARDEN_STAGES = ['seed', 'sprout', 'budding', 'blooming', 'fruiting'];
 const GARDEN_STAGE_ICON = { seed: '🌱', sprout: '🌿', budding: '🌼', blooming: '🌸', fruiting: '🍎' };
 // Full-body character portraits shown in the header popover only — the
@@ -21640,7 +21610,6 @@ function evaluateGameDay(dateISO) {
   const didCardio = !!(entry.cardioSessions && entry.cardioSessions.length > 0);
   if (workedOut) xp += GAME_XP_TABLE.workout;
   if (didCardio) xp += GAME_XP_TABLE.cardio;
-  if (Array.isArray(entry.extra)) xp += entry.extra.filter(Boolean).length * GAME_XP_TABLE.habit;
   if (getReviews()[dateISO]) xp += GAME_XP_TABLE.weeklyReview;
   return { xp, workedOut, didCardio, habitComplete: isBeginnerDayComplete(dateISO) };
 }
@@ -22148,7 +22117,7 @@ function advanceTrailmapLegIfReady(rank, t) {
     t.legIndex++;
     advanced = true;
   }
-  if (advanced) showRestToast(`🚶 Arrived at Station ${t.legIndex + 1}!`);
+  if (advanced) showRestToast(`🚶 Arrived at Station ${t.legIndex}!`);
   return advanced;
 }
 
@@ -22478,9 +22447,9 @@ function renderArenaMap() {
     btn.className = cls;
     btn.style.left = pos.x + '%';
     btn.style.top = pos.y + '%';
-    btn.textContent = String(i + 1);
+    btn.textContent = i === 0 ? '🏁' : String(i);
     btn.dataset.stationIndex = String(i);
-    btn.setAttribute('aria-label', 'Station ' + (i + 1));
+    btn.setAttribute('aria-label', i === 0 ? 'Start' : 'Station ' + i);
     wrap.appendChild(btn);
   });
   layout.sideQuests.forEach((pos, i) => {
@@ -22572,11 +22541,15 @@ function handleArenaMarkerClick(e) {
   }
   const idx = Number(btn.dataset.stationIndex);
   if (idx <= t.legIndex) {
-    showStationNote(`Station ${idx + 1}`, "You've already passed through here.", 'Got it', null);
+    if (idx === 0) {
+      showStationNote('Start', 'Starting your adventure! Goodluck!', 'Got it', null);
+    } else {
+      showStationNote(`Station ${idx}`, "You've already passed through here.", 'Got it', null);
+    }
     return;
   }
   const cost = trailmapLegCost(t.legIndex + 1);
-  showStationNote(`Station ${idx + 1}`,
+  showStationNote(`Station ${idx}`,
     `${t.ap.toLocaleString()} / ${cost.toLocaleString()} AP — log real Walk sessions on the Outdoor Activity Tracker (auto-credited), or convert a Run/Ride in the Forge, to get there.`,
     'Got it', null);
 }
