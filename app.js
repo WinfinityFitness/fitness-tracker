@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.62';
+const APP_VERSION = 'WF_SYS_V.1.7.63';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -7992,7 +7992,7 @@ function renderWeatherLocationResults(results) {
   if (!results.length) { container.innerHTML = '<p class="empty-note">No matches found.</p>'; return; }
   container.innerHTML = results.map(r => {
     const label = [r.name, r.admin2, r.admin1, r.country].filter(Boolean).join(', ');
-    return `<button type="button" class="weather-location-row" data-lat="${r.latitude}" data-lon="${r.longitude}" data-label="${escapeHtml(label)}">${escapeHtml(label)}</button>`;
+    return `<button type="button" class="weather-location-row" data-lat="${r.latitude}" data-lon="${r.longitude}" data-label="${escapeHtml(label)}" data-country="${escapeHtml(r.country || '')}">${escapeHtml(label)}</button>`;
   }).join('');
 }
 
@@ -8020,12 +8020,13 @@ function initWeatherLocationPicker() {
     const row = e.target.closest('.weather-location-row');
     if (!row) return;
     const lat = parseFloat(row.dataset.lat), lon = parseFloat(row.dataset.lon);
-    localStorage.setItem('wft_weather_location', JSON.stringify({ lat, lon, label: row.dataset.label }));
+    localStorage.setItem('wft_weather_location', JSON.stringify({ lat, lon, label: row.dataset.label, country: row.dataset.country || null }));
     localStorage.removeItem('wft_weather_cache');
     fetchWeather(lat, lon).then(w => {
       renderWeather(w);
       localStorage.setItem('wft_weather_cache', JSON.stringify({ ...w, time: Date.now() }));
     }).catch(() => {});
+    autoSyncLeaderboardIfOptedIn(); // picks up the new country on the next best-effort sync
     const note = document.getElementById('weatherLocationNote');
     note.textContent = `Location set to ${row.dataset.label}.`;
     setTimeout(() => { overlay.hidden = true; note.textContent = ''; }, 1200);
@@ -10391,10 +10392,20 @@ function startCardioTracking() {
   renderCardioRouteSketch();
   cardioGpsErrorShown = false;
   cardioStatsErrorShown = false;
+  const gpsStatus = document.getElementById('cardioGpsStatus');
+  if (gpsStatus) { gpsStatus.textContent = '📡 Waiting for GPS fix…'; gpsStatus.hidden = false; }
 
   cardioWatchId = startGpsWatch(pos => {
     const { latitude, longitude, accuracy } = pos.coords;
-    if (accuracy != null && accuracy > 50) return;
+    // A poor fix (accuracy worse than 50m — common indoors/under cover) was
+    // previously dropped with zero feedback: the timer kept ticking (it's
+    // plain elapsed-time, no GPS needed) while distance/pace/steps sat
+    // frozen at zero forever with nothing on screen explaining why. Now
+    // surfaced instead of silently discarded.
+    if (accuracy != null && accuracy > 50) {
+      if (gpsStatus) { gpsStatus.textContent = `⚠️ Weak GPS signal (~${Math.round(accuracy)}m accuracy) — move to open sky for tracking to start.`; gpsStatus.hidden = false; }
+      return;
+    }
     const point = { lat: latitude, lon: longitude, t: Date.now(), accuracy: accuracy || 0 };
     if (cardioTrack.length) {
       const last = cardioTrack[cardioTrack.length - 1];
@@ -10415,8 +10426,10 @@ function startCardioTracking() {
         cardioTrack.push(point);
         renderCardioRouteSketch();
       }
+      if (gpsStatus && !gpsStatus.hidden) gpsStatus.hidden = true;
     } else {
       cardioTrack.push(point);
+      if (gpsStatus) { gpsStatus.textContent = '✅ GPS locked — tracking.'; setTimeout(() => { if (gpsStatus) gpsStatus.hidden = true; }, 3000); }
     }
   }, err => {
     // Keep the timer running either way — a transient GPS blip shouldn't end
@@ -10427,6 +10440,7 @@ function startCardioTracking() {
       cardioGpsErrorShown = true;
       const msg = (err && (err.message || err.code)) || 'unknown error';
       showRestToast(`⚠️ GPS tracking issue: ${msg}. Check location/notification permissions in phone settings.`);
+      if (gpsStatus) { gpsStatus.textContent = `⚠️ GPS error: ${msg}`; gpsStatus.hidden = false; }
     }
   });
 
@@ -16566,6 +16580,16 @@ async function pushLeaderboardEntry() {
       p_code_name: effectiveLeaderboardName(), p_public_id: getOrCreatePublicId(),
     });
   } catch (e) { /* best effort — avatar just stays an initial circle until this succeeds */ }
+  try {
+    // Only ever set from a manually-searched weather location (has a real
+    // geocoded country) — GPS auto-detect never populates this, so most
+    // users stay null and the Public Showcase just groups them under "All
+    // locations", same as today. Never touches demo users (own table).
+    const weatherLoc = getManualWeatherLocation();
+    if (weatherLoc && weatherLoc.country) {
+      await sb.rpc('set_leaderboard_country', { p_share_key: shareKey, p_country: weatherLoc.country });
+    }
+  } catch (e) { /* best effort — showcase location just stays whatever it was until this succeeds */ }
   if (shareKey) await checkPendingAdminModeOverride(shareKey);
 }
 
@@ -22466,10 +22490,11 @@ function renderArenaMap() {
   });
   const bossBtn = document.createElement('button');
   bossBtn.type = 'button';
-  bossBtn.className = 'arena-map-marker is-boss';
+  const bossLocked = t.legIndex < layout.stations.length - 1;
+  bossBtn.className = 'arena-map-marker is-boss' + (bossLocked ? ' is-locked' : '');
   bossBtn.style.left = layout.boss.x + '%';
   bossBtn.style.top = layout.boss.y + '%';
-  bossBtn.textContent = '👑';
+  bossBtn.textContent = bossLocked ? '🔒' : '👑';
   bossBtn.dataset.stationIndex = 'boss';
   bossBtn.setAttribute('aria-label', arenaState.boss.name);
   wrap.appendChild(bossBtn);
@@ -22519,9 +22544,18 @@ function handleArenaMarkerClick(e) {
   const g = getGamification();
   const t = ensureTrailmapState(g);
   if (btn.dataset.stationIndex === 'boss') {
-    showStationNote(arenaState.boss.name,
-      "The main boss guarding this rank's temple. Station-by-station travel is still being built — for now you can challenge it directly.",
-      '⚔️ Enter the Arena', 'startFight');
+    const layout = TRAILMAP_LAYOUTS[arenaState.rank] || TRAILMAP_LAYOUTS.beginner;
+    const clearedAllStations = t.legIndex >= layout.stations.length - 1;
+    if (clearedAllStations) {
+      showStationNote(arenaState.boss.name,
+        "The main boss guarding this rank's temple. You've cleared every station — the way is open.",
+        '⚔️ Enter the Arena', 'startFight');
+    } else {
+      const remaining = layout.stations.length - 1 - t.legIndex;
+      showStationNote(arenaState.boss.name,
+        `The main boss guarding this rank's temple. Locked until you reach the last station — ${remaining} station${remaining === 1 ? '' : 's'} to go.`,
+        'Got it', null);
+    }
     return;
   }
   if (btn.classList.contains('is-sidequest')) {
