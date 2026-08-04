@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.63';
+const APP_VERSION = 'WF_SYS_V.1.7.64';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -21563,11 +21563,15 @@ const GARDEN_STAGE_ICON = { seed: '🌱', sprout: '🌿', budding: '🌼', bloom
 // unchanged. Only Spartan/Demi-God have a second "action pose" sprite so
 // far; the play button hides itself for ranks without one.
 const CHAR_SPRITE = {
-  beginner: 'icons/character/char-novice.png',
-  warrior: 'icons/character/char-warrior.png',
-  spartan: 'icons/character/char-spartan.png',
-  demigod: 'icons/character/char-demigod.png',
+  beginner: { male: 'icons/character/char-novice.png', female: 'icons/character/char-novice-female.png' },
+  warrior: { male: 'icons/character/char-warrior.png', female: 'icons/character/char-warrior-female.png' },
+  spartan: { male: 'icons/character/char-spartan.png', female: 'icons/character/char-spartan-female.png' },
+  demigod: { male: 'icons/character/char-demigod.png', female: 'icons/character/char-demigod-female.png' },
 };
+function getCharSprite(rank, gender) {
+  const entry = CHAR_SPRITE[rank] || CHAR_SPRITE.beginner;
+  return entry[gender === 'female' ? 'female' : 'male'];
+}
 // 25-frame horizontal sprite strips (one attack-animation cycle each),
 // played via the CSS steps() animation on .game-char-sprite--action.
 const CHAR_ACTION_SPRITE = {
@@ -21822,7 +21826,7 @@ function renderGamificationPanel() {
   const g = getGamification();
 
   const spriteBase = document.getElementById('gameCharSpriteBase');
-  if (spriteBase) { spriteBase.src = CHAR_SPRITE[p.fitnessMode] || CHAR_SPRITE.beginner; spriteBase.alt = MODE_LABEL[p.fitnessMode] || ''; }
+  if (spriteBase) { spriteBase.src = getCharSprite(p.fitnessMode, p.gender); spriteBase.alt = MODE_LABEL[p.fitnessMode] || ''; }
   const spriteAction = document.getElementById('gameCharSpriteAction');
   const actionSrc = CHAR_ACTION_SPRITE[p.fitnessMode];
   if (spriteAction) { if (actionSrc) spriteAction.style.backgroundImage = `url('${actionSrc}')`; spriteAction.hidden = !actionSrc; }
@@ -22459,6 +22463,7 @@ function renderArenaMap() {
   const layout = TRAILMAP_LAYOUTS[arenaState.rank] || TRAILMAP_LAYOUTS.beginner;
   const g = getGamification();
   const t = ensureTrailmapState(g);
+  const p = getProfile();
   bg.src = arenaState.boss.map;
   wrap.innerHTML = '';
   layout.stations.forEach((pos, i) => {
@@ -22504,7 +22509,7 @@ function renderArenaMap() {
   // between the two known station points (no continuous path-curve data
   // exists yet). Once every station is reached, park it at the boss spot.
   if (avatar) {
-    avatar.src = CHAR_SPRITE[arenaState.rank] || CHAR_SPRITE.beginner;
+    avatar.src = getCharSprite(arenaState.rank, p && p.gender);
     let from, to, frac;
     if (t.legIndex >= layout.stations.length - 1) {
       from = layout.stations[layout.stations.length - 1];
