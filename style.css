@@ -397,11 +397,11 @@ body.has-custom-bg { background-color: transparent; }
   align-items: center;
   gap: 12px;
 }
-.datetime-info { flex: 7; min-width: 0; }
+.datetime-info { flex: 5; min-width: 0; }
 .datetime-label {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 6px;
   font-family: var(--font-mono);
   font-size: 0.62rem;
@@ -463,6 +463,36 @@ body.has-custom-bg { background-color: transparent; }
 .weather-widget .datetime-label { justify-content: center; margin-bottom: 3px; }
 .weather-icon { font-size: 1.4rem; line-height: 1; cursor: pointer; }
 .weather-temp { cursor: pointer; }
+
+/* Compact rank/level readout, fitted into the datetime card's middle
+   column (between date/time and weather) — opens the same Character/
+   Garden/Boss popover as the header rank icon when tapped. */
+.dashboard-level-widget {
+  flex: 3;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+.dashboard-level-widget .datetime-label { justify-content: center; margin-bottom: 3px; }
+.dashboard-level-icon { width: 22px; height: 22px; object-fit: contain; filter: drop-shadow(0 0 4px var(--cyan-glow)); }
+.dashboard-level-value {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  white-space: nowrap;
+  margin: 0;
+}
 .weather-icon .wx-icon { width: 24px; height: 24px; display: block; }
 .weather-temp {
   font-family: var(--font-mono);

@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.60';
+const APP_VERSION = 'WF_SYS_V.1.7.61';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -21799,7 +21799,23 @@ function showBossBattlePopup(type, battle) {
   renderGamificationPanel();
 }
 
+// Compact rank/level readout embedded in the dashboard's datetime card
+// (between the date/time and weather columns) — kept in sync alongside
+// the full popover rather than only rendering when the popover opens.
+function renderDashboardLevelWidget() {
+  const icon = document.getElementById('dashboardLevelIcon');
+  const val = document.getElementById('dashboardLevelValue');
+  if (!icon || !val) return;
+  const p = getProfile();
+  if (!p || !p.fitnessMode) return;
+  const g = getGamification();
+  icon.src = MODE_ICON[p.fitnessMode] || MODE_ICON.beginner;
+  icon.alt = MODE_LABEL[p.fitnessMode] || '';
+  val.textContent = 'Lv ' + gameLevel(g.xp);
+}
+
 function renderGamificationPanel() {
+  renderDashboardLevelWidget();
   const p = getProfile();
   const emptyState = document.getElementById('gamePopoverEmpty');
   const content = document.getElementById('gamePopoverContent');
@@ -21864,7 +21880,7 @@ function initGamificationPanel() {
   // Two triggers share one popover: the mobile header rank icon, and the
   // desktop shell's own topnav icon (mobile's header sits underneath
   // #wdsShell there, unreachable — see the z-index note on .game-popover).
-  const triggers = ['headerModeIcon', 'wdsFitnessRpgBtn'].map(id => document.getElementById(id)).filter(Boolean);
+  const triggers = ['headerModeIcon', 'wdsFitnessRpgBtn', 'dashboardLevelWidget'].map(id => document.getElementById(id)).filter(Boolean);
   if (triggers.length && popover) {
     triggers.forEach(trigger => {
       trigger.addEventListener('click', e => {

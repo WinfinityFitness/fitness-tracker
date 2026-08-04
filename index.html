@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.60">
+<link rel="stylesheet" href="style.css?v=1.7.61">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -543,6 +543,12 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         <p class="datetime-date" id="dtDate">–</p>
         <p class="datetime-clock" id="dtClock">--:--:--</p>
       </div>
+      <div class="datetime-divider"></div>
+      <button type="button" class="dashboard-level-widget" id="dashboardLevelWidget" aria-label="Open Fitness RPG">
+        <p class="datetime-label"><span>Level</span></p>
+        <img id="dashboardLevelIcon" class="dashboard-level-icon" src="" alt="">
+        <p class="dashboard-level-value" id="dashboardLevelValue">Lv 1</p>
+      </button>
       <div class="datetime-divider"></div>
       <div class="weather-widget" id="weatherWidget">
         <p class="datetime-label">
@@ -4828,11 +4834,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.7.60"></script>
+<script src="config.js?v=1.7.61"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.60"></script>
+<script src="app.js?v=1.7.61"></script>
 </body>
 </html>
