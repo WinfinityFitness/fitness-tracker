@@ -195,7 +195,14 @@
     <p class="hero-eyebrow">Winfinity Fitness Tracker — Field Guide</p>
     <h1 class="hero-title">The <em>Fitness&nbsp;RPG&nbsp;Adventure</em></h1>
     <p class="hero-sub">A walkthrough of the Fitness RPG layer — how a real workout becomes a step down a jungle trail, and what it takes to reach the guardian at the end of it.</p>
-    <a class="hero-download-btn" href="https://winfinityfitness.github.io/fitness-tracker/" target="_blank" rel="noopener">
+    <!-- Direct APK download, same GitHub Releases asset as index.html's
+         "Download Fitness App" button. Deliberately NOT a GitHub
+         /releases/latest/download/ link -- this repo publishes FT/
+         Wellness/Messenger as separate tagged releases, and GitHub's
+         "Latest" flag is repo-wide (whichever of the three shipped most
+         recently), so /latest/ can silently point at the wrong app's
+         installer. Update this tag by hand when a new FT build ships. -->
+    <a class="hero-download-btn" href="https://github.com/WinfinityFitness/fitness-tracker/releases/download/ft-v1.7.39-debug/winfinity-tracker.apk" target="_blank" rel="noopener">
       <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M10 2.5v10.4M10 12.9l-3.8-3.8M10 12.9l3.8-3.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 15.5v1.2a1.3 1.3 0 0 0 1.3 1.3h9.4a1.3 1.3 0 0 0 1.3-1.3v-1.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
       Download Winfinity Fitness Tracker
     </a>
