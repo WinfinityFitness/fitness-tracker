@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.65">
+<link rel="stylesheet" href="style.css?v=1.7.66">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -418,14 +418,14 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
     <p class="hint hint--sm" id="gameXpLabel"></p>
 
     <p class="field-group-heading" style="margin-top:16px;">Fitness Garden</p>
-    <div class="game-garden-row">
+    <div class="game-garden-row" id="btnOpenAdventureMap" role="button" tabindex="0" aria-label="Open Adventure Map" title="Open Adventure Map" style="cursor:pointer;">
       <div class="game-garden-icon" id="gardenStageIcon">🌱</div>
       <div class="game-character-info">
         <p class="game-character-name" id="gardenStageLabel">Seed</p>
         <p class="hint hint--sm" id="gardenProgressLabel"></p>
       </div>
     </div>
-    <p class="hint hint--sm">Log a workout or cardio session to water your garden. It fruits into a bonus item every few training days.</p>
+    <p class="hint hint--sm">Log a workout or cardio session to water your garden. It fruits into a bonus item every few training days. Tap the garden to open the Adventure Map.</p>
     <div class="game-inventory" id="gameInventoryList"></div>
 
     <div class="game-boss-card" id="gameBossCard" hidden style="margin-top:16px;">
@@ -434,8 +434,6 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <div class="gradient-bar"><div class="gradient-bar-fill" id="gameBossProgressFill" style="width:0%"></div></div>
       <p class="hint hint--sm" id="gameBossDaysLeft"></p>
     </div>
-
-    <button type="button" class="btn btn--primary" id="btnOpenAdventureMap" style="margin-top:16px;width:100%;">&#9876;&#65039; Adventure Map</button>
     </div>
   </div>
 </div>
@@ -4396,6 +4394,17 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
           <div id="wdsPendingFriendRequestsList"></div>
           <div id="wdsProfileFriendsList"><p class="empty-note">No friends yet.</p></div>
         </div>
+        <div class="wds-card" id="wdsProfileAdventureMapCard" hidden>
+          <h3 class="wds-card-title">Adventure Map</h3>
+          <div class="game-garden-row">
+            <div class="game-garden-icon" id="wdsProfileMapModeIcon">🌱</div>
+            <div class="game-character-info">
+              <p class="game-character-name" id="wdsProfileMapRankLabel">–</p>
+              <p class="hint hint--sm" id="wdsProfileMapProgressLabel"></p>
+            </div>
+          </div>
+          <p class="hint hint--sm" id="wdsProfileMapBossLabel"></p>
+        </div>
       </div>
       <div class="wds-profile-main">
         <div class="wds-profile-tab-panel" id="wdsProfileTabAll">
@@ -4819,11 +4828,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.7.65"></script>
+<script src="config.js?v=1.7.66"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.65"></script>
+<script src="app.js?v=1.7.66"></script>
 </body>
 </html>

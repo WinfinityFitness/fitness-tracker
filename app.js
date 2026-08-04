@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.65';
+const APP_VERSION = 'WF_SYS_V.1.7.66';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -6103,6 +6103,7 @@ async function wdsShowProfilePage(targetShareKey) {
   const page = document.getElementById('wdsProfilePage');
   if (!page) return;
   const isOwn = !targetShareKey || targetShareKey === wdsRemoteData.shareKey;
+  let profileRow = null;
   try {
     const { data, error } = await sb.rpc('get_public_profile_by_share_key', {
       p_share_key: isOwn ? wdsRemoteData.shareKey : targetShareKey,
@@ -6110,6 +6111,7 @@ async function wdsShowProfilePage(targetShareKey) {
     });
     if (error) throw error;
     const row = (data && data[0]) || null;
+    profileRow = row;
     if (isOwn) {
       wdsViewedProfile = null;
       wdsOwnWallPermission = (row && row.wall_post_permission) || 'friends';
@@ -6136,12 +6138,45 @@ async function wdsShowProfilePage(targetShareKey) {
   page.hidden = false;
   wdsSwitchProfileTab('all');
   renderWdsProfileHeader();
+  renderWdsProfileAdventureMapCard(profileRow);
   await refreshWdsProfilePosts();
   await refreshWdsFriendsList(isOwn ? null : targetShareKey);
   if (isOwn) await refreshWdsPendingFriendRequestsList();
   else await wdsRefreshViewedProfileFriendButton(targetShareKey);
   wdsSaveLastView({ type: 'profile', shareKey: isOwn ? 'own' : targetShareKey });
 }
+// Read-only Adventure Map summary for whichever profile is showing (own
+// or a friend's) — same trailmap_* fields get_public_profile_by_share_key
+// pulls straight out of that operator's synced profile JSONB, so this is
+// real progress, not a stub. Hidden entirely for an operator with no
+// fitness mode set yet (never onboarded / trailmap not applicable).
+function renderWdsProfileAdventureMapCard(row) {
+  const card = document.getElementById('wdsProfileAdventureMapCard');
+  if (!card) return;
+  const rank = row && row.fitness_mode;
+  if (!rank) { card.hidden = true; return; }
+  card.hidden = false;
+  const legIndex = (row.trailmap_leg_index) || 0;
+  const defeated = Array.isArray(row.trailmap_defeated_bosses) ? row.trailmap_defeated_bosses : [];
+  const layout = TRAILMAP_LAYOUTS[rank] || TRAILMAP_LAYOUTS.beginner;
+  const totalStations = layout.stations.length;
+  const clearedAll = legIndex >= totalStations - 1;
+  const bossDefeated = defeated.includes(rank);
+
+  const icon = document.getElementById('wdsProfileMapModeIcon');
+  if (icon) icon.innerHTML = `<img src="icons/mode-${rank}.png" alt="" style="width:22px;height:22px;">`;
+  const rankLabel = document.getElementById('wdsProfileMapRankLabel');
+  if (rankLabel) rankLabel.textContent = (MODE_LABEL[rank] || '').replace(' Mode', '');
+  const progressLabel = document.getElementById('wdsProfileMapProgressLabel');
+  if (progressLabel) progressLabel.textContent = `${legIndex}/${totalStations - 1} stations cleared`;
+  const bossLabel = document.getElementById('wdsProfileMapBossLabel');
+  if (bossLabel) {
+    bossLabel.textContent = bossDefeated
+      ? `👑 ${(TRAILMAP_BOSSES[rank] || {}).name || 'Main boss'} defeated`
+      : clearedAll ? "Main boss unlocked — hasn't been fought yet" : `Main boss locked — ${totalStations - 1 - legIndex} station${totalStations - 1 - legIndex === 1 ? '' : 's'} to go`;
+  }
+}
+
 // Sets the "+ Add Friend" button's actual state (none/pending/already
 // friends/declined) against the real friendships row for this exact pair,
 // instead of refreshWdsFriendsList's old "are we already friends" check —
@@ -22421,7 +22456,6 @@ function defeatTrailmapMainBoss(rank) {
 }
 
 function openBossArena() {
-  if (wdsRemoteData) { showRestToast('The Adventure Map needs your camera — open it in the mobile app.'); return; }
   const p = getProfile();
   if (!p || !p.fitnessMode) return;
   const rank = p.fitnessMode;
@@ -22433,6 +22467,21 @@ function openBossArena() {
   if (popover) popover.hidden = true;
 
   document.getElementById('adventureMapOverlay').hidden = false;
+
+  // Desktop/Nexus: view-only. getProfile()/getGamification() already
+  // transparently read wdsRemoteData, so the map below is real synced FT
+  // progress, not a stub — it just skips straight past the boss-room
+  // teaser (which exists to lead into a camera fight) since there's
+  // nothing to "enter" here. The boss-room teaser and camera fight stay
+  // mobile-only — see the wdsRemoteData guard in handleArenaMarkerClick
+  // and startBossFight().
+  if (wdsRemoteData) {
+    document.getElementById('arenaFight').hidden = true;
+    document.getElementById('arenaResult').hidden = true;
+    openArenaMap();
+    return;
+  }
+
   document.getElementById('arenaTeaser').hidden = false;
   document.getElementById('arenaMapView').hidden = true;
   document.getElementById('arenaFight').hidden = true;
@@ -22553,7 +22602,11 @@ function handleArenaMarkerClick(e) {
   if (btn.dataset.stationIndex === 'boss') {
     const layout = TRAILMAP_LAYOUTS[arenaState.rank] || TRAILMAP_LAYOUTS.beginner;
     const clearedAllStations = t.legIndex >= layout.stations.length - 1;
-    if (clearedAllStations) {
+    if (clearedAllStations && wdsRemoteData) {
+      showStationNote(arenaState.boss.name,
+        "The main boss guarding this rank's temple. You've cleared every station — the way is open. Open the Adventure Map in the mobile app to fight (needs your camera).",
+        'Got it', null);
+    } else if (clearedAllStations) {
       showStationNote(arenaState.boss.name,
         "The main boss guarding this rank's temple. You've cleared every station — the way is open.",
         '⚔️ Enter the Arena', 'startFight');
@@ -22596,6 +22649,10 @@ function handleArenaMarkerClick(e) {
 }
 
 async function startBossFight() {
+  // Backstop: the UI no longer offers a path here on desktop (see
+  // openBossArena/handleArenaMarkerClick), but guard the entry point
+  // itself too — camera Clash fights stay mobile-only.
+  if (wdsRemoteData) { showRestToast('The Adventure Map needs your camera — open it in the mobile app.'); return; }
   const status = document.getElementById('arenaStatus');
   const video = document.getElementById('arenaVideo');
   document.getElementById('arenaTeaser').hidden = true;
@@ -22652,8 +22709,15 @@ function switchArenaTab(tabName) {
 function initAdventureMap() {
   const overlay = document.getElementById('adventureMapOverlay');
   if (!overlay) return;
+  // Now the Fitness Garden row itself (a div, not a real <button> — see
+  // index.html) rather than a separate "Adventure Map" button below it.
   const openBtn = document.getElementById('btnOpenAdventureMap');
-  if (openBtn) openBtn.addEventListener('click', openBossArena);
+  if (openBtn) {
+    openBtn.addEventListener('click', openBossArena);
+    openBtn.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openBossArena(); }
+    });
+  }
   const closeBtn = document.getElementById('btnArenaClose');
   if (closeBtn) closeBtn.addEventListener('click', closeBossArena);
 
