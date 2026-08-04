@@ -66,15 +66,22 @@
     display: inline-block; background: #ff9f43; color: #0a0d12; text-decoration: none;
     font-weight: 700; font-size: 0.85rem; letter-spacing: 0.03em; text-transform: uppercase;
     padding: 14px 32px; clip-path: polygon(4% 0, 100% 0, 96% 100%, 0 100%);
-    box-sizing: border-box; min-width: 230px; text-align: center;
+    box-sizing: border-box; min-width: 230px; text-align: center; position: relative;
   }
   .wf-hero-cta:hover { background: #ffb668; }
-  /* A real border (not box-shadow: inset) so the outline actually follows
-     the clip-path's diagonal corners instead of leaving a gap there --
-     box-shadow doesn't hug a clipped edge the way a border does, which is
-     what made the top-left/bottom-right corners look cropped/open. */
-  .wf-hero-cta--ghost {
-    background: transparent; color: #ff9f43 !important; border: 1.5px solid #ff9f43;
+  /* A real border/box-shadow can't follow clip-path's diagonal cut edges
+     at all -- clip-path only crops pixels, it never draws a stroke along
+     the new cut line, so both approaches leave the slanted sides bare
+     (the bug in the last fix). The only way to get an outline that
+     actually follows every edge, including the diagonals, is a "clipped
+     picture frame": this element's own background IS the outline color
+     (inheriting .wf-hero-cta's orange fill + clip-path above), and a
+     ::before inset by the border width, clipped to the same shape, sits
+     on top in the page's own background color to punch out the middle. */
+  .wf-hero-cta--ghost { color: #ff9f43 !important; }
+  .wf-hero-cta--ghost::before {
+    content: ''; position: absolute; inset: 1.5px; z-index: -1;
+    background: #0a0d12; clip-path: polygon(4% 0, 100% 0, 96% 100%, 0 100%);
   }
-  .wf-hero-cta--ghost:hover { background: rgba(255,159,67,0.12); }
+  .wf-hero-cta--ghost:hover::before { background: #271d1b; }
 </style>
