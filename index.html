@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.59">
+<link rel="stylesheet" href="style.css?v=1.7.60">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3608,12 +3608,47 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
     </div>
 
     <div id="arenaMapView" hidden>
-      <div class="arena-map-wrap">
-        <img class="arena-map-bg" id="arenaMapBg" src="" alt="">
-        <div class="arena-map-markers" id="arenaMapMarkers"></div>
+      <div class="arena-subnav">
+        <button type="button" class="arena-subnav-btn" id="arenaNavBtn_forge">
+          <span class="arena-subnav-icon">&#9876;&#65039;</span><span>Forge</span>
+        </button>
+        <button type="button" class="arena-subnav-btn is-active" id="arenaNavBtn_wilds">
+          <span class="arena-subnav-icon">&#128506;&#65039;</span><span>Wilds</span>
+        </button>
+        <button type="button" class="arena-subnav-btn" id="arenaNavBtn_armory">
+          <span class="arena-subnav-icon">&#128737;&#65039;</span><span>Armory</span>
+        </button>
+        <button type="button" class="arena-subnav-btn" id="arenaNavBtn_tavern">
+          <span class="arena-subnav-icon">&#127866;</span><span>Tavern</span>
+        </button>
       </div>
-      <p class="hint hint--sm">Only the nearest part of the trail is revealed. Tap a marker to learn what it takes to reach it.</p>
-      <button type="button" class="btn" id="btnArenaMapBack" style="width:100%;margin-top:6px;">Back</button>
+
+      <div id="arenaTab_wilds">
+        <div class="arena-map-wrap">
+          <img class="arena-map-bg" id="arenaMapBg" src="" alt="">
+          <div class="arena-map-markers" id="arenaMapMarkers"></div>
+          <img class="arena-map-avatar" id="arenaMapAvatar" src="" alt="Your hero">
+        </div>
+        <p class="hint hint--sm">Only the nearest part of the trail is revealed. Tap a marker to learn what it takes to reach it.</p>
+      </div>
+
+      <div id="arenaTab_forge" hidden>
+        <p class="field-group-heading">The Forge</p>
+        <p class="hint hint--sm">Convert logged Run/Ride sessions into AP. Walk sessions credit automatically — no conversion needed.</p>
+        <div class="game-inventory" id="arenaForgeList"></div>
+      </div>
+
+      <div id="arenaTab_armory" hidden>
+        <p class="field-group-heading">The Armory</p>
+        <p class="hint hint--sm">Coming soon — gear and rewards from your adventures will show up here.</p>
+      </div>
+
+      <div id="arenaTab_tavern" hidden>
+        <p class="field-group-heading">The Tavern</p>
+        <p class="hint hint--sm">Coming soon.</p>
+      </div>
+
+      <button type="button" class="btn" id="btnArenaMapBack" style="width:100%;margin-top:10px;">Back</button>
     </div>
 
     <div id="arenaFight" hidden>
@@ -4793,11 +4828,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.7.59"></script>
+<script src="config.js?v=1.7.60"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.59"></script>
+<script src="app.js?v=1.7.60"></script>
 </body>
 </html>

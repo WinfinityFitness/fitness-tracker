@@ -1911,10 +1911,56 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
    background/blur so it reads as "not revealed" rather than an active gold marker. */
 .arena-map-marker.is-sidequest { width: 20px; height: 20px; font-size: 0.65rem; }
 .arena-map-marker.is-current { animation: arenaMarkerPulse 1.6s ease-in-out infinite; }
+.arena-map-marker.is-reached { background: var(--good, #3ecf8e); }
 @keyframes arenaMarkerPulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(51,200,204,0.6); }
   50% { box-shadow: 0 0 0 9px rgba(51,200,204,0); }
 }
+
+/* Hero avatar walking the trail — glows/throbs continuously, position set
+   inline (left/top %) by renderArenaMap()'s leg-interpolation. */
+.arena-map-avatar {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  transform: translate(-50%, -100%);
+  filter: drop-shadow(0 0 6px var(--cyan-glow));
+  animation: arenaAvatarGlow 1.8s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 2;
+}
+@keyframes arenaAvatarGlow {
+  0%, 100% { filter: drop-shadow(0 0 6px var(--cyan-glow)); }
+  50% { filter: drop-shadow(0 0 14px var(--cyan-glow)); }
+}
+
+/* Sub-nav inside the Adventure Map overlay: Forge / Wilds / Armory / Tavern */
+.arena-subnav {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 4px;
+}
+.arena-subnav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 2px;
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.arena-subnav-btn.is-active { background: var(--surface-1); color: var(--cyan); box-shadow: 0 0 8px var(--cyan-glow); }
+.arena-subnav-icon { font-size: 1.05rem; }
 .arena-station-note {
   position: fixed;
   inset: 0;

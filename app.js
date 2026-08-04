@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.59';
+const APP_VERSION = 'WF_SYS_V.1.7.60';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -21596,8 +21596,11 @@ const BOSS_BATTLE_DAYS = 7;
 // full-screen overlays at once would just have one bury the other.
 let pendingBossStartPopup = null;
 
+function freshTrailmapState() {
+  return { defeatedMainBosses: [], legIndex: 0, ap: 0, creditedSessionKeys: [], sideQuestsUnlocked: [] };
+}
 function freshGamification() {
-  return { xp: 0, lastProcessedDate: null, garden: { stage: 'seed', trainingDays: 0 }, inventory: [], bossBattle: null, trailmap: { defeatedMainBosses: [] } };
+  return { xp: 0, lastProcessedDate: null, garden: { stage: 'seed', trainingDays: 0 }, inventory: [], bossBattle: null, trailmap: freshTrailmapState() };
 }
 function getGamification() {
   const p = getProfile();
@@ -22025,6 +22028,114 @@ TRAILMAP_LAYOUTS.demigod = {
   boss: { x: 50, y: 8 },
 };
 
+/* ---------------------------------------------------------------- */
+/* Adventure Map: AP economy — real outdoor-tracked activity only,    */
+/* never manual step entry. Walk sessions auto-credit; Run/Ride queue */
+/* in the Forge tab for a manual convert. See FITQUEST_TRAILMAP_      */
+/* DESIGN.md and the Phase 2 plan for the formula rationale.          */
+/* ---------------------------------------------------------------- */
+const AP_WALK_STEPS_PER_KM = 1300;
+const AP_RUN_RIDE_PER_KM = 433; // ~1/3 of walking's rate — steps > running, same weighting as the design doc
+const AP_SIDEQUEST_COST = 6000;
+
+// leg n (1-indexed): dailyPace 4000, 5500, 7000... ; legCost = dailyPace * 3
+function trailmapLegCost(legNumber1Indexed) {
+  const dailyPace = 4000 + 1500 * (legNumber1Indexed - 1);
+  return dailyPace * 3;
+}
+
+// Fills in any fields missing from an older/Phase-1 trailmap object
+// (which only had `defeatedMainBosses`) rather than assuming the shape.
+function ensureTrailmapState(g) {
+  if (!g.trailmap) g.trailmap = freshTrailmapState();
+  const t = g.trailmap;
+  if (t.legIndex == null) t.legIndex = 0;
+  if (t.ap == null) t.ap = 0;
+  if (!Array.isArray(t.creditedSessionKeys)) t.creditedSessionKeys = [];
+  if (!Array.isArray(t.sideQuestsUnlocked)) t.sideQuestsUnlocked = [];
+  if (!Array.isArray(t.defeatedMainBosses)) t.defeatedMainBosses = [];
+  return t;
+}
+
+// Scans every logged cardio session once, crediting Walk sessions straight
+// to the AP pool and leaving Run/Ride sessions queued for the Forge tab —
+// dedup'd via a composite key since sessions have no id of their own.
+// Returns true if anything changed (so callers know to re-render/save).
+function creditWalkSessionsAndQueueRunRide(g) {
+  const t = ensureTrailmapState(g);
+  const credited = new Set(t.creditedSessionKeys);
+  let changed = false;
+  const logs = getLogs();
+  Object.keys(logs).forEach(date => {
+    const sessions = logs[date].cardioSessions;
+    if (!sessions || !sessions.length) return;
+    sessions.forEach(s => {
+      const key = date + '|' + s.startedAt;
+      if (credited.has(key)) return;
+      if (s.type === 'walk') {
+        t.ap += Math.round((s.distanceKm || 0) * AP_WALK_STEPS_PER_KM);
+        credited.add(key);
+        t.creditedSessionKeys.push(key);
+        changed = true;
+      }
+      // run/ride: left uncredited here on purpose — they show up in the
+      // Forge tab (getPendingForgeSessions) until manually converted.
+    });
+  });
+  return changed;
+}
+
+// Run/Ride sessions not yet in creditedSessionKeys — the Forge's queue.
+function getPendingForgeSessions(g) {
+  const t = ensureTrailmapState(g);
+  const credited = new Set(t.creditedSessionKeys);
+  const logs = getLogs();
+  const pending = [];
+  Object.keys(logs).forEach(date => {
+    const sessions = logs[date].cardioSessions;
+    if (!sessions || !sessions.length) return;
+    sessions.forEach(s => {
+      if (s.type === 'walk') return;
+      const key = date + '|' + s.startedAt;
+      if (credited.has(key)) return;
+      pending.push({ key, date, type: s.type, distanceKm: s.distanceKm || 0, ap: Math.round((s.distanceKm || 0) * AP_RUN_RIDE_PER_KM) });
+    });
+  });
+  pending.sort((a, b) => b.date.localeCompare(a.date));
+  return pending;
+}
+
+function convertForgeSession(rank, key) {
+  const g = getGamification();
+  const t = ensureTrailmapState(g);
+  const pending = getPendingForgeSessions(g);
+  const entry = pending.find(p => p.key === key);
+  if (!entry) return;
+  t.ap += entry.ap;
+  t.creditedSessionKeys.push(key);
+  advanceTrailmapLegIfReady(rank, t);
+  saveGamification(g);
+  renderForgeTab();
+  renderArenaMap();
+}
+
+// Crosses a leg boundary if AP now covers it — can only ever cross one
+// leg per call site's worth of AP gain in practice, but loop anyway so a
+// big single session can't get stuck mid-way through multiple legs.
+function advanceTrailmapLegIfReady(rank, t) {
+  const layout = TRAILMAP_LAYOUTS[rank] || TRAILMAP_LAYOUTS.beginner;
+  let advanced = false;
+  while (t.legIndex < layout.stations.length - 1) {
+    const cost = trailmapLegCost(t.legIndex + 1);
+    if (t.ap < cost) break;
+    t.ap -= cost;
+    t.legIndex++;
+    advanced = true;
+  }
+  if (advanced) showRestToast(`🚶 Arrived at Station ${t.legIndex + 1}!`);
+  return advanced;
+}
+
 let arenaStream = null;
 let arenaRafId = null;
 let arenaPoseDetector = null;
@@ -22286,8 +22397,8 @@ function endFight(won) {
 // alongside the streak system, not instead of it.
 function defeatTrailmapMainBoss(rank) {
   const g = getGamification();
-  if (!g.trailmap) g.trailmap = { defeatedMainBosses: [] };
-  if (!g.trailmap.defeatedMainBosses.includes(rank)) g.trailmap.defeatedMainBosses.push(rank);
+  const t = ensureTrailmapState(g);
+  if (!t.defeatedMainBosses.includes(rank)) t.defeatedMainBosses.push(rank);
   saveGamification(g);
   if (getFitnessMode() === rank && MODE_ORDER[MODE_ORDER.indexOf(rank) + 1]) {
     promoteFitnessMode();
@@ -22327,21 +22438,28 @@ function closeBossArena() {
   arenaState = null;
 }
 
-// Map preview: no station-progress tracking exists yet, so this is
-// deliberately just a fog-of-war preview, not a playable traversal —
-// Station 1 always shows as "nearest," 2-9 are always fogged, and
-// tapping any of them (or the boss) just pops up an informational note.
+// Real progression: legIndex/ap drive both the fog state and the avatar's
+// position. Station i: reached (i <= legIndex), current/active destination
+// (i === legIndex+1), or still fogged (further out). Side quests unlock
+// independently via a flat AP spend, not tied to legIndex.
 function renderArenaMap() {
   const wrap = document.getElementById('arenaMapMarkers');
   const bg = document.getElementById('arenaMapBg');
+  const avatar = document.getElementById('arenaMapAvatar');
   if (!wrap || !bg || !arenaState) return;
   const layout = TRAILMAP_LAYOUTS[arenaState.rank] || TRAILMAP_LAYOUTS.beginner;
+  const g = getGamification();
+  const t = ensureTrailmapState(g);
   bg.src = arenaState.boss.map;
   wrap.innerHTML = '';
   layout.stations.forEach((pos, i) => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'arena-map-marker' + (i === 0 ? ' is-current' : ' is-fogged');
+    let cls = 'arena-map-marker';
+    if (i <= t.legIndex) cls += ' is-reached';
+    else if (i === t.legIndex + 1) cls += ' is-current';
+    else cls += ' is-fogged';
+    btn.className = cls;
     btn.style.left = pos.x + '%';
     btn.style.top = pos.y + '%';
     btn.textContent = String(i + 1);
@@ -22352,7 +22470,8 @@ function renderArenaMap() {
   layout.sideQuests.forEach((pos, i) => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'arena-map-marker is-sidequest is-fogged';
+    const unlocked = t.sideQuestsUnlocked.includes(i);
+    btn.className = 'arena-map-marker is-sidequest' + (unlocked ? ' is-reached' : ' is-fogged');
     btn.style.left = pos.x + '%';
     btn.style.top = pos.y + '%';
     btn.textContent = '★';
@@ -22369,12 +22488,35 @@ function renderArenaMap() {
   bossBtn.dataset.stationIndex = 'boss';
   bossBtn.setAttribute('aria-label', arenaState.boss.name);
   wrap.appendChild(bossBtn);
+
+  // Avatar position: linear interpolation along the current leg by AP
+  // fraction — a straight-line approximation of "following the path"
+  // between the two known station points (no continuous path-curve data
+  // exists yet). Once every station is reached, park it at the boss spot.
+  if (avatar) {
+    avatar.src = CHAR_SPRITE[arenaState.rank] || CHAR_SPRITE.beginner;
+    let from, to, frac;
+    if (t.legIndex >= layout.stations.length - 1) {
+      from = layout.stations[layout.stations.length - 1];
+      to = layout.boss;
+      frac = 0;
+    } else {
+      from = layout.stations[t.legIndex];
+      to = layout.stations[t.legIndex + 1];
+      const cost = trailmapLegCost(t.legIndex + 1);
+      frac = cost > 0 ? Math.max(0, Math.min(1, t.ap / cost)) : 0;
+    }
+    avatar.style.left = (from.x + (to.x - from.x) * frac) + '%';
+    avatar.style.top = (from.y + (to.y - from.y) * frac) + '%';
+  }
 }
 
 function openArenaMap() {
   document.getElementById('arenaTeaser').hidden = true;
   document.getElementById('arenaMapView').hidden = false;
-  renderArenaMap();
+  const g = getGamification();
+  if (creditWalkSessionsAndQueueRunRide(g)) saveGamification(g);
+  switchArenaTab('wilds');
 }
 
 function showStationNote(title, body, actionLabel, action) {
@@ -22388,7 +22530,9 @@ function showStationNote(title, body, actionLabel, action) {
 
 function handleArenaMarkerClick(e) {
   const btn = e.target.closest('.arena-map-marker');
-  if (!btn) return;
+  if (!btn || !arenaState) return;
+  const g = getGamification();
+  const t = ensureTrailmapState(g);
   if (btn.dataset.stationIndex === 'boss') {
     showStationNote(arenaState.boss.name,
       "The main boss guarding this rank's temple. Station-by-station travel is still being built — for now you can challenge it directly.",
@@ -22396,7 +22540,14 @@ function handleArenaMarkerClick(e) {
     return;
   }
   if (btn.classList.contains('is-sidequest')) {
-    showStationNote('??? (Side Quest)', "A hidden path branches off the trail here — not revealed yet. Clear the nearby stations first to uncover it.", 'Got it', null);
+    const idx = Number(btn.dataset.stationIndex.slice(2));
+    if (t.sideQuestsUnlocked.includes(idx)) {
+      showStationNote(`Side Quest ${idx + 1}`, 'Unlocked! The quest itself is still being built — check back soon.', 'Got it', null);
+    } else {
+      showStationNote(`Side Quest ${idx + 1}`,
+        `Costs a flat ${AP_SIDEQUEST_COST.toLocaleString()} AP to enter — optional, and doesn't spend from your progress toward the next station. The quest itself is still being built, so this just marks it for later.`,
+        'Got it', null);
+    }
     return;
   }
   if (btn.classList.contains('is-fogged')) {
@@ -22404,9 +22555,13 @@ function handleArenaMarkerClick(e) {
     return;
   }
   const idx = Number(btn.dataset.stationIndex);
-  const threshold = 4000 + 1000 * idx;
+  if (idx <= t.legIndex) {
+    showStationNote(`Station ${idx + 1}`, "You've already passed through here.", 'Got it', null);
+    return;
+  }
+  const cost = trailmapLegCost(t.legIndex + 1);
   showStationNote(`Station ${idx + 1}`,
-    `Hit ${threshold.toLocaleString()} steps/day for 3 days to reach this station. A short mini-boss battle awaits here — coming soon.`,
+    `${t.ap.toLocaleString()} / ${cost.toLocaleString()} AP — log real Walk sessions on the Outdoor Activity Tracker (auto-credited), or convert a Run/Ride in the Forge, to get there.`,
     'Got it', null);
 }
 
@@ -22437,6 +22592,33 @@ async function startBossFight() {
   runFightCycle();
 }
 
+function renderForgeTab() {
+  const list = document.getElementById('arenaForgeList');
+  if (!list || !arenaState) return;
+  const g = getGamification();
+  const pending = getPendingForgeSessions(g);
+  const typeIcon = { run: '🏃', ride: '🚴' };
+  list.innerHTML = pending.length
+    ? pending.map(p => `
+      <div class="game-inventory-item">
+        <span>${typeIcon[p.type] || '🏅'} ${p.type.charAt(0).toUpperCase() + p.type.slice(1)} ${p.distanceKm}km &middot; ${p.date} &mdash; <strong>+${p.ap.toLocaleString()} AP</strong></span>
+        <button type="button" class="btn arena-forge-convert-btn" data-key="${p.key}">Convert</button>
+      </div>`).join('')
+    : '<p class="hint hint--sm">No Run/Ride sessions waiting. Log one on the Outdoor Activity Tracker to convert it here — Walk sessions credit AP automatically, no conversion needed.</p>';
+}
+
+const ARENA_TABS = ['forge', 'wilds', 'armory', 'tavern'];
+function switchArenaTab(tabName) {
+  ARENA_TABS.forEach(name => {
+    const panel = document.getElementById('arenaTab_' + name);
+    if (panel) panel.hidden = name !== tabName;
+    const btn = document.getElementById('arenaNavBtn_' + name);
+    if (btn) btn.classList.toggle('is-active', name === tabName);
+  });
+  if (tabName === 'wilds') renderArenaMap();
+  if (tabName === 'forge') renderForgeTab();
+}
+
 function initAdventureMap() {
   const overlay = document.getElementById('adventureMapOverlay');
   if (!overlay) return;
@@ -22452,8 +22634,22 @@ function initAdventureMap() {
     document.getElementById('arenaMapView').hidden = true;
     document.getElementById('arenaTeaser').hidden = false;
   });
+
+  ARENA_TABS.forEach(name => {
+    const btn = document.getElementById('arenaNavBtn_' + name);
+    if (btn) btn.addEventListener('click', () => switchArenaTab(name));
+  });
+
   const markersWrap = document.getElementById('arenaMapMarkers');
   if (markersWrap) markersWrap.addEventListener('click', handleArenaMarkerClick);
+  const forgeList = document.getElementById('arenaForgeList');
+  if (forgeList) {
+    forgeList.addEventListener('click', e => {
+      const btn = e.target.closest('.arena-forge-convert-btn');
+      if (!btn || !arenaState) return;
+      convertForgeSession(arenaState.rank, btn.dataset.key);
+    });
+  }
   const noteActionBtn = document.getElementById('btnArenaStationNoteAction');
   if (noteActionBtn) {
     noteActionBtn.addEventListener('click', () => {
@@ -23053,6 +23249,11 @@ safeInit(() => { processDailyModeCheck(); checkModeProgressNudge(); applyModeGat
 safeInit(initGamificationPanel, 'initGamificationPanel');
 safeInit(initBossBattlePopup, 'initBossBattlePopup');
 safeInit(initAdventureMap, 'initAdventureMap');
+safeInit(() => {
+  if (wdsRemoteData) return; // same reasoning as the other gamification guards
+  const g = getGamification();
+  if (creditWalkSessionsAndQueueRunRide(g)) saveGamification(g);
+}, 'trailmapApCredit');
 safeInit(processDailyGameCheck, 'gamificationDaily');
 
 if (initFailures.length) {
