@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.69';
+const APP_VERSION = 'WF_SYS_V.1.7.70';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -21947,7 +21947,7 @@ function initGamificationPanel() {
       action.classList.remove('is-playing');
       void action.offsetWidth; // restart the CSS animation on repeat taps
       action.classList.add('is-playing');
-      setTimeout(() => { action.classList.remove('is-playing'); base.classList.remove('is-paused'); }, 1050);
+      setTimeout(() => { action.classList.remove('is-playing'); base.classList.remove('is-paused'); }, 1380);
     });
   }
 

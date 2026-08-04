@@ -158,7 +158,7 @@
     background-repeat: no-repeat; background-position: 0% 0%; background-size: 2500% 100%;
     opacity: 0; pointer-events: none;
   }
-  .sprite-stage .action.is-playing { opacity: 1; animation: spriteFrames 1s steps(24) 1; }
+  .sprite-stage .action.is-playing { opacity: 1; animation: spriteFrames 1.33s steps(24) 1; }
   @keyframes spriteFrames { from { background-position-x: 0%; } to { background-position-x: 100%; } }
   .sprite-play {
     position: absolute; top: 2px; right: 2px; width: 30px; height: 30px; border-radius: 50%;
@@ -172,11 +172,30 @@
 
   .map-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
   @media (max-width: 640px) { .map-grid { grid-template-columns: 1fr; } }
-  .map-card { background: var(--card); border: 1px solid var(--hairline); border-radius: 14px; overflow: hidden; box-shadow: 0 18px 36px -26px var(--shadow); }
+  .map-card { background: var(--card); border: 1px solid var(--hairline); border-radius: 14px; overflow: hidden; box-shadow: 0 18px 36px -26px var(--shadow); cursor: pointer; }
   .map-card img { width: 100%; display: block; aspect-ratio: 4/3; object-fit: cover; }
   .map-card-body { padding: 14px 16px 16px; }
   .map-card .rank { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); font-weight: 700; }
   .map-card h3 { font-family: 'Syne', sans-serif; font-size: 1.15rem; margin: 6px 0 0; font-weight: 700; }
+
+  /* Full-view lightbox: tap a map card to open, tap anywhere (image or
+     backdrop) to close -- one shared overlay reused for all four maps. */
+  .map-lightbox {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(10, 8, 5, 0.86);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 32px; cursor: zoom-out;
+  }
+  .map-lightbox[hidden] { display: none; }
+  .map-lightbox img { max-width: min(92vw, 900px); max-height: 78vh; display: block; border-radius: 10px; box-shadow: 0 30px 60px -20px rgba(0,0,0,0.7); }
+  .map-lightbox-caption { margin-top: 16px; text-align: center; color: var(--parchment-50); }
+  .map-lightbox-caption .rank { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold-bright); font-weight: 700; }
+  .map-lightbox-caption h3 { font-family: 'Syne', sans-serif; font-size: 1.3rem; margin: 6px 0 0; font-weight: 700; }
+  .map-lightbox-hint { margin-top: 14px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--parchment-100); opacity: 0.7; }
+  @media (prefers-reduced-motion: no-preference) {
+    .map-lightbox img { animation: mapLightboxIn 0.25s ease both; }
+  }
+  @keyframes mapLightboxIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
 
   footer { margin-top: 96px; padding-top: 28px; border-top: 1px solid var(--hairline); text-align: center; color: var(--ink-faint); font-size: 0.85rem; }
   footer .v { font-family: 'JetBrains Mono', monospace; color: var(--gold); }
@@ -441,25 +460,34 @@
       <h2>Four maps, one per rank</h2>
       <p>Each realm hides its own trail, side quests, and guardian at the end of it.</p>
     </div>
-    <div class="map-grid">
-      <div class="map-card">
+    <div class="map-grid" id="mapGrid">
+      <div class="map-card" data-rank="Novice" data-title="Serpent's Hive" data-src="icons/maps/map-novice-serpents-hive.webp">
         <img src="icons/maps/map-novice-serpents-hive.webp" alt="Serpent's Hive map">
         <div class="map-card-body"><div class="rank">Novice</div><h3>Serpent's Hive</h3></div>
       </div>
-      <div class="map-card">
+      <div class="map-card" data-rank="Warrior" data-title="Frozen Ascent" data-src="icons/maps/map-warrior-frozen-ascent.webp">
         <img src="icons/maps/map-warrior-frozen-ascent.webp" alt="Frozen Ascent map">
         <div class="map-card-body"><div class="rank">Warrior</div><h3>Frozen Ascent</h3></div>
       </div>
-      <div class="map-card">
+      <div class="map-card" data-rank="Spartan" data-title="Burning Plains" data-src="icons/maps/map-spartan-burning-plains.webp">
         <img src="icons/maps/map-spartan-burning-plains.webp" alt="Burning Plains map">
         <div class="map-card-body"><div class="rank">Spartan</div><h3>Burning Plains</h3></div>
       </div>
-      <div class="map-card">
+      <div class="map-card" data-rank="Demi-God" data-title="Celestial Realm" data-src="icons/maps/map-demigod-celestial.webp">
         <img src="icons/maps/map-demigod-celestial.webp" alt="Celestial Realm map">
         <div class="map-card-body"><div class="rank">Demi-God</div><h3>Celestial Realm</h3></div>
       </div>
     </div>
   </section>
+
+  <div class="map-lightbox" id="mapLightbox" hidden>
+    <img id="mapLightboxImg" src="" alt="">
+    <div class="map-lightbox-caption">
+      <div class="rank" id="mapLightboxRank"></div>
+      <h3 id="mapLightboxTitle"></h3>
+    </div>
+    <p class="map-lightbox-hint">Tap anywhere to close</p>
+  </div>
 
   <footer>
     A field guide for <a href="https://winfinityfitness.github.io/fitness-tracker/" target="_blank" rel="noopener">Winfinity Fitness Tracker</a>
@@ -479,8 +507,30 @@
     setTimeout(function () {
       action.classList.remove('is-playing');
       base.classList.remove('is-hidden');
-    }, 1000);
+    }, 1330);
   });
+
+  (function () {
+    var lightbox = document.getElementById('mapLightbox');
+    var lbImg = document.getElementById('mapLightboxImg');
+    var lbRank = document.getElementById('mapLightboxRank');
+    var lbTitle = document.getElementById('mapLightboxTitle');
+
+    document.getElementById('mapGrid').addEventListener('click', function (e) {
+      var card = e.target.closest('.map-card');
+      if (!card) return;
+      lbImg.src = card.dataset.src;
+      lbImg.alt = card.dataset.title + ' map, full view';
+      lbRank.textContent = card.dataset.rank;
+      lbTitle.textContent = card.dataset.title;
+      lightbox.hidden = false;
+    });
+    // Any tap inside the lightbox closes it too (image or backdrop) --
+    // there's no separate close button, the whole overlay is the target.
+    lightbox.addEventListener('click', function () {
+      lightbox.hidden = true;
+    });
+  })();
 </script>
 </body>
 </html>

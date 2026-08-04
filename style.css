@@ -1781,7 +1781,7 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
 }
 .game-char-sprite--action.is-playing {
   opacity: 1;
-  animation: gameCharFrames 1s steps(24) 1;
+  animation: gameCharFrames 1.33s steps(24) 1;
 }
 @keyframes gameCharIdle {
   0%, 100% { transform: translateY(0); }
