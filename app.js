@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.64';
+const APP_VERSION = 'WF_SYS_V.1.7.65';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -21875,9 +21875,11 @@ function renderGamificationPanel() {
 function initGamificationPanel() {
   const popover = document.getElementById('gamePopover');
   // Two triggers share one popover: the mobile header rank icon, and the
-  // desktop shell's own topnav icon (mobile's header sits underneath
-  // #wdsShell there, unreachable — see the z-index note on .game-popover).
-  const triggers = ['headerModeIcon', 'wdsFitnessRpgBtn', 'dashboardLevelWidget'].map(id => document.getElementById(id)).filter(Boolean);
+  // desktop shell's own dashboard level widget (mobile's header sits
+  // underneath #wdsShell there, unreachable — see the z-index note on
+  // .game-popover). The topnav sword icon (wdsFitnessRpgBtn) was removed —
+  // dashboardLevelWidget is the desktop entry point now.
+  const triggers = ['headerModeIcon', 'dashboardLevelWidget'].map(id => document.getElementById(id)).filter(Boolean);
   if (triggers.length && popover) {
     triggers.forEach(trigger => {
       trigger.addEventListener('click', e => {
