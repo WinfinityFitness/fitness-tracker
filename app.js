@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.75';
+const APP_VERSION = 'WF_SYS_V.1.7.76';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -17461,28 +17461,36 @@ function closeAdminDrawerAll() {
 // closeAdminDrawerPill) when a sub-icon is tapped — both dials are meant to
 // stay open behind whatever panel that opens, per the explicit ask, closing
 // only via a retap of the Adventure icon or the shared backdrop.
-function openAdventureDial() {
+// anchorEl is the actual Adventure pill-item button that was tapped —
+// since it's a real item inside the main rotating arc (like every other
+// admin-drawer-pill-item), it only opens once rotated to the front/focused
+// position, same as any other icon there. Centering on its live
+// getBoundingClientRect() at the moment of the tap is what makes this open
+// "where it was chosen" regardless of which way the arc's been rotated or
+// which edge the tab is currently docked to.
+function openAdventureDial(anchorEl) {
   const dial = document.getElementById('adventureDialPill');
-  const tab = document.getElementById('adventureDialTab');
-  if (!dial) return;
+  if (!dial || !anchorEl) return;
   adventureDialOpen = true;
-  if (tab) { positionAdminDrawerPill(tab, dial); tab.classList.add('is-active'); }
+  const rect = anchorEl.getBoundingClientRect();
+  dial.style.top = (rect.top + rect.height / 2) + 'px';
+  dial.style.left = (rect.left + rect.width / 2) + 'px';
+  const mainTab = document.getElementById('adminDrawerTab');
+  dial.classList.toggle('admin-drawer-pill--left', !!(mainTab && mainTab.classList.contains('admin-drawer-tab--left')));
   dial.hidden = false;
   requestAnimationFrame(() => dial.classList.add('is-open'));
   syncAdminDrawerBackdrop();
 }
 function closeAdventureDial() {
   const dial = document.getElementById('adventureDialPill');
-  const tab = document.getElementById('adventureDialTab');
   if (!dial || !adventureDialOpen) return;
   adventureDialOpen = false;
   dial.classList.remove('is-open');
-  if (tab) tab.classList.remove('is-active');
   setTimeout(() => { dial.hidden = true; }, 220);
   syncAdminDrawerBackdrop();
 }
-function toggleAdventureDial() {
-  if (adventureDialOpen) closeAdventureDial(); else openAdventureDial();
+function toggleAdventureDial(anchorEl) {
+  if (adventureDialOpen) closeAdventureDial(); else openAdventureDial(anchorEl);
 }
 // Jumps straight to a Forge/Wilds/Armory/Tavern tab from anywhere in the
 // app, bypassing the teaser screen — same underlying flow as tapping the
@@ -17565,23 +17573,6 @@ function applyAdminTabPosition(tab) {
   tab.classList.toggle('admin-drawer-tab--left', edge === 'left');
 }
 
-// Keeps #adventureDialTab paired 46px above wherever the main drawer tab
-// currently sits (its default position, or wherever it's been dragged to) —
-// called everywhere the main tab's own position changes: init, window
-// resize, and live during a reposition drag. Reads the main tab's already-
-// resolved edge/top rather than re-deriving from storage, so it's always in
-// sync with whatever applyAdminTabPosition/the drag handler just set.
-function positionAdventureTab(tab) {
-  const adv = document.getElementById('adventureDialTab');
-  if (!adv || !tab) return;
-  const rect = tab.getBoundingClientRect();
-  const isLeft = tab.classList.contains('admin-drawer-tab--left');
-  adv.style.top = Math.max(8, rect.top - 46) + 'px';
-  adv.style.right = isLeft ? 'auto' : (tab.style.right || '4px');
-  adv.style.left = isLeft ? (tab.style.left || '4px') : 'auto';
-  adv.classList.toggle('admin-drawer-tab--left', isLeft);
-}
-
 function initAdminDrawer() {
   const tab = document.getElementById('adminDrawerTab');
   const pill = document.getElementById('adminDrawerPill');
@@ -17598,14 +17589,6 @@ function initAdminDrawer() {
   closeBtn.addEventListener('click', () => { closeAdminDrawer(); openAdminDrawerPill(); });
   backdrop.addEventListener('click', closeAdminDrawerAll);
 
-  const adventureTab = document.getElementById('adventureDialTab');
-  if (adventureTab) {
-    adventureTab.addEventListener('click', e => {
-      e.stopPropagation();
-      toggleAdventureDial();
-    });
-  }
-
   // A short drag (or a plain tap) on the edge tab opens the pill — both
   // just measure the gesture on release and hand off to the same
   // CSS-transition-driven open, rather than tracking the finger live, so
@@ -17620,8 +17603,7 @@ function initAdminDrawer() {
   // nearer, and Y is clamped (adminTabYBounds) so it can never land on top
   // of the header or the bottom tab bar.
   applyAdminTabPosition(tab);
-  positionAdventureTab(tab);
-  window.addEventListener('resize', () => { applyAdminTabPosition(tab); positionAdventureTab(tab); });
+  window.addEventListener('resize', () => applyAdminTabPosition(tab));
 
   const LONG_PRESS_MS = 2000;
   const MOVE_CANCEL_PX = 8;
@@ -17656,7 +17638,6 @@ function initAdminDrawer() {
       tab.style.right = edge === 'right' ? '4px' : 'auto';
       tab.style.left = edge === 'left' ? '4px' : 'auto';
       tab.classList.toggle('admin-drawer-tab--left', edge === 'left');
-      positionAdventureTab(tab);
       return;
     }
     if (holdTimer && (Math.abs(e.clientX - gestureStartX) > MOVE_CANCEL_PX || Math.abs(e.clientY - gestureStartY) > MOVE_CANCEL_PX)) {
@@ -17737,6 +17718,11 @@ function initAdminDrawer() {
     if (arcJustDragged) { arcJustDragged = false; return; }
     const btn = e.target.closest('.admin-drawer-pill-item');
     if (!btn) return;
+    // Opens the nested sub-dial centered exactly on this icon's current
+    // on-screen position — deliberately does NOT close this pill (see
+    // openAdventureDial's own comment). Like every other item here, this
+    // one only opens once rotated to the front/focused position first.
+    if (btn.dataset.dialToggle === 'adventure') { toggleAdventureDial(btn); return; }
     if (btn.dataset.target) { openAdminDrawerSection(btn.dataset.target.split(',')); return; }
     if (btn.dataset.action) {
       closeAdminDrawerPill();
