@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.73';
+const APP_VERSION = 'WF_SYS_V.1.7.74';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -22577,12 +22577,14 @@ function defeatTrailmapMainBoss(rank) {
 // overlay stays open (started in openBossArena, stopped in closeBossArena)
 // — best effort, same as the rest of the app's Supabase side-channel syncs.
 let gamePresenceHeartbeatId = null;
-function touchGamePresenceOnce() {
+async function touchGamePresenceOnce() {
   if (!sbConfigured()) return;
-  sb.rpc('touch_game_presence', {
-    p_share_key: getOrCreateShareKey(),
-    p_code_name: effectiveLeaderboardName(),
-  }).catch(() => {});
+  try {
+    await sb.rpc('touch_game_presence', {
+      p_share_key: getOrCreateShareKey(),
+      p_code_name: effectiveLeaderboardName(),
+    });
+  } catch (e) { /* best effort */ }
 }
 function startGamePresenceHeartbeat() {
   stopGamePresenceHeartbeat();

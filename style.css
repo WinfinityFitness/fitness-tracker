@@ -1627,6 +1627,13 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   padding: 24px;
 }
 .lock-overlay[hidden] { display: none; }
+/* The Adventure dial deliberately leaves #adminDrawerBackdrop (z-index 399)
+   open behind whatever a sub-icon opens (see openAdventureDial in app.js),
+   so the Adventure Map overlay needs its own scoped bump above that and
+   above .adventure-dial-pill (401) -- otherwise the backdrop sits on top of
+   it and swallows every tap, including the arena's own close button. Only
+   this one #lock-overlay instance is bumped, not the shared class. */
+#adventureMapOverlay { z-index: 402; }
 .lock-card {
   background: var(--surface-1);
   border: 1px solid var(--border);
