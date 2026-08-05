@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.71">
+<link rel="stylesheet" href="style.css?v=1.7.72">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -143,14 +143,22 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <button type="button" class="admin-drawer-pill-item" data-quicklog-key="communityLog" hidden data-action="btnOpenCommunityQuick" aria-label="Community" title="Community">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
   </button>
-  <!-- Opens #adventureDialPill instead of navigating -- handled as a third
-       branch (data-dial-toggle) in the pill's click dispatcher, alongside
-       the existing data-target/data-action branches, see initAdminDrawer. -->
-  <button type="button" class="admin-drawer-pill-item" data-dial-toggle="adventure" aria-label="Adventure Map" title="Adventure">
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l14 14M20 4L6 18"/><path d="M4 20l2.5-.7.7-2.5"/><path d="M20 20l-2.5-.7-.7-2.5"/></svg>
-  </button>
   <div class="admin-drawer-arc-label" id="adminDrawerArcLabel" aria-hidden="true"></div>
 </div>
+
+<!-- Second small always-visible tab, paired with #adminDrawerTab and
+     repositioned alongside it whenever the main tab moves (drag-reposition,
+     resize, edge flip — see positionAdventureTab in app.js, called from the
+     same places applyAdminTabPosition is). NOT one of the rotating arc's
+     items: that arc only makes its single frontmost ("focused") icon
+     actually clickable at any given time (pointer-events:none on the rest),
+     which would make this unreliable to tap depending on rotation state —
+     a real, separate tab sidesteps that entirely. -->
+<button type="button" class="admin-drawer-tab adventure-dial-tab" id="adventureDialTab" aria-label="Open Adventure dial" title="Adventure">
+  <span class="admin-drawer-tab-bar" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l14 14M20 4L6 18"/><path d="M4 20l2.5-.7.7-2.5"/><path d="M20 20l-2.5-.7-.7-2.5"/></svg>
+  </span>
+</button>
 
 <!-- Nested sub-dial opened by the Adventure icon above. Unlike the main
      pill's items, tapping one of these does NOT close either dial (see
@@ -4858,11 +4866,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.7.71"></script>
+<script src="config.js?v=1.7.72"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.71"></script>
+<script src="app.js?v=1.7.72"></script>
 </body>
 </html>

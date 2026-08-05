@@ -3026,6 +3026,14 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
    looks identical either way, so this variant only needs to flip which
    side the container itself hugs. */
 .admin-drawer-tab--left { right: auto; left: 4px; }
+/* Paired secondary tab (see #adventureDialTab / positionAdventureTab in
+   app.js) — same base .admin-drawer-tab positioning, JS keeps it offset
+   ~50px above the main tab's actual (possibly dragged) position on init,
+   resize, and every drag-reposition frame. This top value is only the
+   pre-JS fallback. Slightly smaller than the main tab so the pair doesn't
+   read as two equally-weighted primary actions. */
+.adventure-dial-tab { top: calc(50% - 50px); width: 34px; height: 34px; }
+.adventure-dial-tab .admin-drawer-tab-bar { width: 26px; height: 26px; }
 .admin-drawer-tab-bar {
   width: 30px;
   height: 30px;
@@ -3185,35 +3193,58 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   box-shadow: 0 0 14px var(--cyan-glow);
 }
 /* Nested Adventure sub-dial — reuses .admin-drawer-pill/.admin-drawer-pill-item
-   wholesale for container positioning, sizing, transitions, and item shape
-   (see openAdventureDial/closeAdventureDial in app.js, which position it via
-   the same positionAdminDrawerPill helper the main pill uses). The only new
-   thing is these five fixed transforms: unlike the main arc, there's no
-   drag-to-rotate and no is-focused/dimming state — all 5 icons sit at fixed
-   angles (-70/-35/0/35/70deg) around the container's own implicit 170px
-   radius (half of the reused 340x340 box) and are always visible/tappable.
-   Deliberately a touch further out than the main pill's own (variable,
-   ~90-140px) radius so the two read as concentric rings, not an overlapping
-   mess, when both are open at once. */
-.adventure-dial-pill { z-index: 401; }
-.adventure-dial-item:nth-child(1) { transform: translate(-58px, -160px); }
-.adventure-dial-item:nth-child(2) { transform: translate(-139px, -98px); }
-.adventure-dial-item:nth-child(3) { transform: translate(-170px, 0); }
-.adventure-dial-item:nth-child(4) { transform: translate(-139px, 98px); }
-.adventure-dial-item:nth-child(5) { transform: translate(-58px, 160px); }
-/* positionAdminDrawerPill (reused as-is for this dial too, see
-   openAdventureDial) toggles the shared "admin-drawer-pill--left" class,
-   not a dial-specific one -- key off that combined with .adventure-dial-pill
-   rather than a nonexistent "adventure-dial-pill--left". */
-.admin-drawer-pill--left.adventure-dial-pill .adventure-dial-item:nth-child(1) { transform: translate(58px, -160px); }
-.admin-drawer-pill--left.adventure-dial-pill .adventure-dial-item:nth-child(2) { transform: translate(139px, -98px); }
-.admin-drawer-pill--left.adventure-dial-pill .adventure-dial-item:nth-child(3) { transform: translate(170px, 0); }
-.admin-drawer-pill--left.adventure-dial-pill .adventure-dial-item:nth-child(4) { transform: translate(139px, 98px); }
-.admin-drawer-pill--left.adventure-dial-pill .adventure-dial-item:nth-child(5) { transform: translate(58px, 160px); }
+   for item shape/transitions (see openAdventureDial/closeAdventureDial in
+   app.js, which position the container via the same positionAdminDrawerPill
+   helper the main pill uses). Two things deliberately differ from that base:
+   1. The container itself does NOT capture clicks (pointer-events:none even
+      while .is-open) — only the 5 .adventure-dial-item buttons do. The main
+      pill needs its whole hit-area interactive so a drag started between
+      icons can still rotate the arc; this dial has no drag, and leaving the
+      340x340 box fully interactive was silently swallowing taps on
+      #adventureDialTab underneath it (the tab sits at this container's own
+      center).
+   2. A tight ~270deg arc (5 icons, 40deg apart, small ~70px radius) wrapping
+      around the Adventure tab from top, over the open side, to bottom —
+      NOT the same fan angle the main arc uses, and small/close enough to
+      read as its own distinct halo rather than a second copy of the main
+      dial. Not a full 360deg circle: the tab normally docks within 4px of
+      the screen edge (see applyAdminTabPosition), so a symmetric ring would
+      push half its icons off-screen on the dock side — this arc instead
+      leans entirely toward the open side, mirrored via the shared
+      admin-drawer-pill--left class for left-docked tabs same as the main
+      pill. */
+/* .is-open in the selector matches the shared .admin-drawer-pill.is-open
+   rule's own specificity (two classes) -- pointer-events:none here would
+   otherwise lose to that rule's pointer-events:auto regardless of source
+   order, since this element carries both classes at once. */
+.adventure-dial-pill.is-open { z-index: 401; pointer-events: none; }
+.adventure-dial-item { pointer-events: auto; }
+.adventure-dial-item:nth-child(1) { transform: translate(-32px, 69px); }
+.adventure-dial-item:nth-child(2) { transform: translate(-74px, 45px); }
+.adventure-dial-item:nth-child(3) { transform: translate(-90px, 0px); }
+.adventure-dial-item:nth-child(4) { transform: translate(-74px, -45px); }
+.adventure-dial-item:nth-child(5) { transform: translate(-32px, -69px); }
+.admin-drawer-pill--left.adventure-dial-pill .adventure-dial-item:nth-child(1) { transform: translate(32px, 69px); }
+.admin-drawer-pill--left.adventure-dial-pill .adventure-dial-item:nth-child(2) { transform: translate(74px, 45px); }
+.admin-drawer-pill--left.adventure-dial-pill .adventure-dial-item:nth-child(3) { transform: translate(90px, 0px); }
+.admin-drawer-pill--left.adventure-dial-pill .adventure-dial-item:nth-child(4) { transform: translate(74px, -45px); }
+.admin-drawer-pill--left.adventure-dial-pill .adventure-dial-item:nth-child(5) { transform: translate(32px, -69px); }
 .adventure-dial-item:hover, .adventure-dial-item:active {
   background: var(--cyan-dim);
   border-color: var(--cyan);
   box-shadow: 0 0 14px var(--cyan-glow);
+}
+/* Faded halo behind the Adventure tab itself while its sub-dial is open
+   (is-active toggled alongside adventureDialOpen in app.js) — signals which
+   of the two tabs is the currently-expanded one. */
+.adventure-dial-tab.is-active::before {
+  content: '';
+  position: absolute;
+  inset: -14px;
+  border-radius: 50%;
+  background: var(--cyan-dim);
+  opacity: 0.4;
+  z-index: -1;
 }
 
 /* Small readout naming the currently-focused (blown-up) icon, kept in sync
