@@ -200,6 +200,7 @@
   footer { margin-top: 96px; padding-top: 28px; border-top: 1px solid var(--hairline); text-align: center; color: var(--ink-faint); font-size: 0.85rem; }
   footer .v { font-family: 'JetBrains Mono', monospace; color: var(--gold); }
   footer a { color: var(--moss); }
+  footer .visit-count { margin-top: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em; color: var(--gold); opacity: 0.85; }
 
   @media (prefers-reduced-motion: no-preference) {
     .chapter, .manual, .sprite-card, .map-card { animation: rise 0.7s ease both; }
@@ -491,6 +492,7 @@
 
   <footer>
     A field guide for <a href="https://winfinityfitness.github.io/fitness-tracker/" target="_blank" rel="noopener">Winfinity Fitness Tracker</a>
+    <div id="wfAdventureVisitCount" class="visit-count" hidden></div>
   </footer>
 </div>
 
@@ -530,6 +532,40 @@
     lightbox.addEventListener('click', function () {
       lightbox.hidden = true;
     });
+  })();
+
+  // View counter -- mirrors footer-embed.js's site visit counter (see
+  // supabase_adventure_visit_counter_migration.sql), but tracks opens of
+  // THIS page specifically rather than the main site or the app. Guarded
+  // by sessionStorage, not localStorage, so it counts once per browsing
+  // session (not once ever) but doesn't multi-count repeat views/refreshes
+  // within the same visit.
+  (function () {
+    var SUPABASE_URL = 'https://mzkjboplfalauivwcnni.supabase.co';
+    var SUPABASE_ANON_KEY = 'sb_publishable_YwHBnvbBjd8Oj8hgPXb_JA_buurC92v';
+    var SESSION_KEY = 'wf_adventure_visit_recorded';
+
+    function showCount(n) {
+      var el = document.getElementById('wfAdventureVisitCount');
+      el.textContent = n.toLocaleString() + ' adventurers have opened this guide';
+      el.hidden = false;
+    }
+
+    var sbScript = document.createElement('script');
+    sbScript.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+    sbScript.onload = function () {
+      if (!window.supabase || typeof window.supabase.createClient !== 'function') return;
+      try {
+        var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        var alreadyRecorded = sessionStorage.getItem(SESSION_KEY);
+        var rpcName = alreadyRecorded ? 'get_adventure_visit_count' : 'record_adventure_visit';
+        if (!alreadyRecorded) sessionStorage.setItem(SESSION_KEY, '1');
+        sb.rpc(rpcName).then(function (result) {
+          if (typeof result.data === 'number') showCount(result.data);
+        }).catch(function () { /* best effort, opportunistic */ });
+      } catch (e) { /* best effort, opportunistic */ }
+    };
+    document.head.appendChild(sbScript);
   })();
 </script>
 </body>
