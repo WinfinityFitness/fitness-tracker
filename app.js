@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.74';
+const APP_VERSION = 'WF_SYS_V.1.7.75';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -22650,6 +22650,7 @@ function openBossArena() {
 function closeBossArena() {
   stopArenaCamera();
   stopGamePresenceHeartbeat();
+  stopTavernPolling();
   const overlay = document.getElementById('adventureMapOverlay');
   if (overlay) overlay.hidden = true;
   document.getElementById('arenaStationNote').hidden = true;
@@ -22858,6 +22859,244 @@ function switchArenaTab(tabName) {
   });
   if (tabName === 'wilds') renderArenaMap();
   if (tabName === 'forge') renderForgeTab();
+  // Always re-enter Tavern fresh on World Chat rather than resuming
+  // whatever DM thread was open last time — a simpler mental model than
+  // silently reopening a conversation the user may not expect. Leaving the
+  // tab (to Forge/Wilds/Armory, or closing the whole overlay via
+  // closeBossArena) stops the poll either way.
+  if (tabName === 'tavern') setTavernMode('world'); else stopTavernPolling();
+}
+
+/* ---------------------------------------------------------------------
+   Tavern — an extension of the same Nexus chat backend (chat_messages/
+   postChatMessage/fetchChatMessages's own query shape, start_dm_by_name),
+   surfaced as a second chat UI scoped to the Adventure Map: World Chat is
+   literally the same public room Nexus's Public Chat posts to (room_id IS
+   NULL — see fetchTavernPublicMessages), and Direct Message only lists
+   players currently present in the game (fetchGamePresence, Phase B) as
+   the people you can start one with, rather than the whole Nexus
+   userbase. Deliberately does NOT touch currentChatRoomId/lbChatList/
+   pendingChatImageDataUrl — those are the plain Nexus tab's own state;
+   this is a fully separate (if data-source-sharing) surface with its own
+   #tavernChatList and #tavernPendingImage so the two can't clobber each
+   other if a user has both open across tab switches in the same session.
+--------------------------------------------------------------------- */
+let tavernMode = 'world'; // 'world' | 'dm-picker' | 'dm-thread'
+let tavernDmRoomId = null;
+let tavernPollId = null;
+let tavernPendingImageDataUrl = null;
+
+async function fetchTavernPublicMessages() {
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await sb.from('chat_messages')
+    .select('id, code_name, message, image_url, created_at, deleted, sender_share_key')
+    .gte('created_at', cutoff).is('room_id', null)
+    .order('created_at', { ascending: false }).limit(50);
+  if (error) throw error;
+  return (data || []).slice().reverse();
+}
+async function fetchTavernDmMessages(roomId) {
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await sb.from('chat_messages')
+    .select('id, code_name, message, image_url, created_at, deleted, sender_share_key')
+    .gte('created_at', cutoff).eq('room_id', roomId)
+    .order('created_at', { ascending: false }).limit(50);
+  if (error) throw error;
+  return (data || []).slice().reverse();
+}
+// Deliberately simpler than the Nexus tab's own renderChatMessages: no
+// reactions, no press-and-hold unsend/reaction menu, no tap-name-to-DM
+// (Tavern's DM entry point is the presence list, not a bubble's name) —
+// same .chat-row/.chat-bubble/.chat-msg classes for free visual
+// consistency with Nexus, just a lighter feature set for this surface.
+function renderTavernChatMessages(messages) {
+  const list = document.getElementById('tavernChatList');
+  if (!list) return;
+  list.innerHTML = '';
+  if (!messages.length) {
+    list.innerHTML = '<p class="empty-note">No messages yet. Say hi!</p>';
+    return;
+  }
+  const myName = effectiveLeaderboardName();
+  messages.forEach(m => {
+    const isOwn = m.code_name === myName;
+    const row = document.createElement('div');
+    row.className = 'chat-row ' + (isOwn ? 'chat-row--own' : 'chat-row--other');
+    const time = new Date(m.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    const nameHtml = !isOwn ? `<span class="chat-name">${escapeHtml(m.code_name)}</span>` : '';
+    const imageHtml = (!m.deleted && m.image_url) ? `<img class="chat-msg-image" src="${m.image_url}" alt="Shared photo" data-lightbox="${m.image_url}">` : '';
+    const bubbleInner = m.deleted
+      ? `<span class="chat-msg chat-msg-unsent">Unsent a message</span>`
+      : `${imageHtml}<span class="chat-msg">${escapeHtml(m.message)}</span>`;
+    const bubbleClass = 'chat-bubble' + (imageHtml ? ' chat-bubble--has-image' : '');
+    row.innerHTML = `${nameHtml}<div class="chat-bubble-line"><div class="${bubbleClass}">${bubbleInner}</div><span class="chat-time">${time}</span></div>`;
+    list.appendChild(row);
+  });
+  list.querySelectorAll('[data-lightbox]').forEach(img => {
+    img.addEventListener('click', e => { e.stopPropagation(); openChatLightbox(img.dataset.lightbox); });
+  });
+  list.scrollTop = list.scrollHeight;
+}
+async function refreshTavernChat() {
+  try {
+    const messages = (tavernMode === 'dm-thread' && tavernDmRoomId)
+      ? await fetchTavernDmMessages(tavernDmRoomId)
+      : await fetchTavernPublicMessages();
+    renderTavernChatMessages(messages);
+  } catch (e) { /* best effort, same as Nexus polling */ }
+}
+function startTavernPolling() {
+  stopTavernPolling();
+  refreshTavernChat();
+  tavernPollId = setInterval(refreshTavernChat, 5000);
+}
+function stopTavernPolling() {
+  if (tavernPollId) { clearInterval(tavernPollId); tavernPollId = null; }
+}
+
+async function renderTavernPresenceList() {
+  const list = document.getElementById('tavernPresenceList');
+  const empty = document.getElementById('tavernPresenceEmpty');
+  if (!list) return;
+  list.innerHTML = '<p class="hint hint--sm">Loading…</p>';
+  const players = await fetchGamePresence();
+  list.innerHTML = '';
+  if (empty) empty.hidden = players.length > 0;
+  players.forEach(p => {
+    const item = document.createElement('div');
+    item.className = 'game-inventory-item';
+    item.innerHTML = `<span>&#128100; ${escapeHtml(p.code_name)}</span><button type="button" class="btn btn--sm tavern-dm-start-btn" data-name="${escapeHtml(p.code_name)}">Message</button>`;
+    list.appendChild(item);
+  });
+}
+
+// One tavernMode drives which of the picker / back-button / chat thread
+// show at once, mirroring the earlier CHAR_SPRITE-style single-state-
+// variable pattern rather than several independently-toggled [hidden]s
+// that could drift out of sync with each other.
+function setTavernMode(mode) {
+  tavernMode = mode;
+  const worldBtn = document.getElementById('tavernNavBtn_world');
+  const dmBtn = document.getElementById('tavernNavBtn_dm');
+  if (worldBtn) worldBtn.classList.toggle('is-active', mode === 'world');
+  if (dmBtn) dmBtn.classList.toggle('is-active', mode !== 'world');
+  const presencePanel = document.getElementById('tavernPresencePanel');
+  if (presencePanel) presencePanel.hidden = mode !== 'dm-picker';
+  const backBtn = document.getElementById('btnTavernDmBack');
+  if (backBtn) backBtn.hidden = mode !== 'dm-thread';
+  const chatShown = mode !== 'dm-picker';
+  const chatList = document.getElementById('tavernChatList');
+  if (chatList) chatList.hidden = !chatShown;
+  const inputRow = document.getElementById('tavernInputRow');
+  if (inputRow) inputRow.hidden = !chatShown;
+  if (!chatShown) clearTavernPendingImage();
+
+  if (mode === 'dm-picker') {
+    tavernDmRoomId = null;
+    stopTavernPolling();
+    renderTavernPresenceList();
+  } else {
+    startTavernPolling();
+  }
+}
+
+async function openTavernDm(otherName) {
+  if (!sbConfigured()) return;
+  const shareKey = getOrCreateShareKey();
+  try {
+    const { data, error } = await sb.rpc('start_dm_by_name', {
+      p_my_key: shareKey,
+      p_my_name: effectiveLeaderboardName(),
+      p_other_name: otherName,
+    });
+    if (error) throw error;
+    if (!data) { showRestToast(`Couldn't find "${otherName}" — they may not be synced to Nexus.`); return; }
+    tavernDmRoomId = data;
+    setTavernMode('dm-thread');
+  } catch (e) { showRestToast('Could not start DM: ' + (e.message || 'check your connection')); }
+}
+
+function clearTavernPendingImage() {
+  tavernPendingImageDataUrl = null;
+  const wrap = document.getElementById('tavernPendingImage');
+  if (wrap) wrap.hidden = true;
+  const fileInput = document.getElementById('tavernImageInput');
+  if (fileInput) fileInput.value = '';
+  const camInput = document.getElementById('tavernCameraInput');
+  if (camInput) camInput.value = '';
+}
+function setTavernPendingImageFromFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    tavernPendingImageDataUrl = reader.result;
+    const preview = document.getElementById('tavernPendingImagePreview');
+    const wrap = document.getElementById('tavernPendingImage');
+    if (preview) preview.src = tavernPendingImageDataUrl;
+    if (wrap) wrap.hidden = false;
+  };
+  reader.readAsDataURL(file);
+}
+async function sendTavernMessage() {
+  const input = document.getElementById('tavernChatInput');
+  if (!input) return;
+  const text = input.value;
+  const imageToSend = tavernPendingImageDataUrl;
+  if (!text.trim() && !imageToSend) return;
+  const roomOverride = (tavernMode === 'dm-thread' && tavernDmRoomId) ? tavernDmRoomId : null;
+  try {
+    await postChatMessage(text, imageToSend, undefined, undefined, roomOverride);
+    input.value = '';
+    clearTavernPendingImage();
+    await refreshTavernChat();
+  } catch (e) { showRestToast('Could not send: ' + (e.message || 'check your connection')); }
+}
+
+function initTavernChat() {
+  const worldBtn = document.getElementById('tavernNavBtn_world');
+  const dmBtn = document.getElementById('tavernNavBtn_dm');
+  if (worldBtn) worldBtn.addEventListener('click', () => setTavernMode('world'));
+  if (dmBtn) dmBtn.addEventListener('click', () => setTavernMode('dm-picker'));
+
+  const backBtn = document.getElementById('btnTavernDmBack');
+  if (backBtn) backBtn.addEventListener('click', () => setTavernMode('dm-picker'));
+
+  const presenceList = document.getElementById('tavernPresenceList');
+  if (presenceList) {
+    presenceList.addEventListener('click', e => {
+      const btn = e.target.closest('.tavern-dm-start-btn');
+      if (btn) openTavernDm(btn.dataset.name);
+    });
+  }
+
+  const sendBtn = document.getElementById('btnTavernChatSend');
+  if (sendBtn) sendBtn.addEventListener('click', sendTavernMessage);
+  const input = document.getElementById('tavernChatInput');
+  if (input) {
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') sendTavernMessage(); });
+    // Ctrl/Cmd+V image paste — same extraction helper the WDS chat popups
+    // already use, generalized to a native listener here since the mobile
+    // Nexus tab's own composer never had paste support to begin with.
+    input.addEventListener('paste', e => {
+      const file = wdsGetPastedImageFile(e);
+      if (file) setTavernPendingImageFromFile(file);
+    });
+  }
+
+  const attachBtn = document.getElementById('btnTavernAttachImage');
+  const imageInput = document.getElementById('tavernImageInput');
+  if (attachBtn && imageInput) {
+    attachBtn.addEventListener('click', () => imageInput.click());
+    imageInput.addEventListener('change', () => setTavernPendingImageFromFile(imageInput.files[0]));
+  }
+  const cameraBtn = document.getElementById('btnTavernCamera');
+  const cameraInput = document.getElementById('tavernCameraInput');
+  if (cameraBtn && cameraInput) {
+    cameraBtn.addEventListener('click', () => cameraInput.click());
+    cameraInput.addEventListener('change', () => setTavernPendingImageFromFile(cameraInput.files[0]));
+  }
+  const removeBtn = document.getElementById('btnTavernPendingImageRemove');
+  if (removeBtn) removeBtn.addEventListener('click', clearTavernPendingImage);
 }
 
 function initAdventureMap() {
@@ -22910,6 +23149,8 @@ function initAdventureMap() {
 
   const resultCloseBtn = document.getElementById('btnArenaResultClose');
   if (resultCloseBtn) resultCloseBtn.addEventListener('click', closeBossArena);
+
+  initTavernChat();
 }
 
 /* ---------------------------------------------------------------- */
