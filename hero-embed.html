@@ -17,7 +17,7 @@
      Fitness RPG / Adventure Map feature. Outline style so it reads as the
      secondary action next to Launch Nexus. -->
 <section class="wf-hero-embed" id="wfHeroEmbed">
-  <img class="wf-hero-logo" src="https://winfinityfitness.github.io/fitness-tracker/icons/icon-192.png" alt="Winfinity">
+  <img class="wf-hero-logo" src="https://winfinityfitness.github.io/fitness-tracker/icons/wf-logo-3d.png" alt="Winfinity">
   <h1 class="wf-hero-title">The Future Of<br><em>Performance</em></h1>
   <p class="wf-hero-subtitle">Unlock your latent potential through the Global Neural Grid. Real-time bio-syncing for the modern shinobi.</p>
   <div class="wf-hero-cta-row">
@@ -32,7 +32,10 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
   .wf-hero-logo {
-    width: 64px; height: 64px; object-fit: contain; margin: 0 auto 28px; display: block;
+    /* Sized to match the Adventure guide's hero seal (.hero-seal-frame,
+       adventure-guide.html) so the same logo reads consistently large
+       across both pages. */
+    width: 252px; height: 252px; object-fit: contain; margin: 0 auto 28px; display: block;
     animation: wf-hero-glow-pulse 2.4s ease-in-out infinite alternate;
   }
   @keyframes wf-hero-glow-pulse {
