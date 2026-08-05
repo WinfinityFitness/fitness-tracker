@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.70';
+const APP_VERSION = 'WF_SYS_V.1.7.71';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -110,8 +110,8 @@ function wdsUpdateAdminBadge() {
   // Compact glow-ring replacement for the text badge on mobile (see its
   // own @media rule in style.css) -- toggled alongside the badge itself
   // rather than duplicating the login-state check at every call site.
-  const modeIcon = document.getElementById('wdsUserModeIcon');
-  if (modeIcon) modeIcon.classList.toggle('wds-user-mode-icon--admin', loggedIn);
+  const composerAvatarEl = document.getElementById('wdsComposerAvatar');
+  if (composerAvatarEl) composerAvatarEl.classList.toggle('wds-user-mode-icon--admin', loggedIn);
 }
 
 // ---------------------------------------------------------------------
@@ -254,9 +254,13 @@ function initDesktopShell() {
   const signOutBtn = document.getElementById('wdsSignOutBtn');
   const errorEl = document.getElementById('wdsGateError');
   const operatorNameEl = document.getElementById('wdsOperatorName');
-  const modeIconEl = document.getElementById('wdsUserModeIcon');
-  const modeIconImgEl = document.getElementById('wdsUserModeIconImg');
-  modeIconEl.addEventListener('click', openWdsProfilePage);
+  // Profile now opens from the composer avatar (before "What's on your
+  // mind?") instead of the old topnav avatar icon.
+  const composerAvatarBtn = document.getElementById('wdsComposerAvatar');
+  if (composerAvatarBtn) {
+    composerAvatarBtn.addEventListener('click', openWdsProfilePage);
+    composerAvatarBtn.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openWdsProfilePage(); } });
+  }
   const profileBackBtn = document.getElementById('btnWdsProfileBack');
   if (profileBackBtn) profileBackBtn.addEventListener('click', closeWdsProfilePage);
   const brandEl = document.getElementById('wdsTopnavBrand');
@@ -381,12 +385,7 @@ function initDesktopShell() {
     wdsApplyThemeOverride();
     const displayName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || cleanId;
     operatorNameEl.textContent = displayName;
-    const mode = getFitnessMode();
     const myPhotoRaw = wdsRemoteData.profile && wdsRemoteData.profile.photoDataUrl;
-    const myPhoto = myPhotoRaw; // mode icon deliberately shows the fitness-mode icon (not a default avatar) when no real photo is set
-    modeIconImgEl.src = myPhoto || MODE_ICON[mode] || MODE_ICON.beginner;
-    modeIconEl.classList.toggle('wds-user-mode-icon--photo', !!myPhoto);
-    modeIconEl.title = myPhoto ? 'View profile' : (MODE_LABEL[mode] || mode);
     const composerAvatarEl = document.getElementById('wdsComposerAvatar');
     wdsSetAvatarVisual(composerAvatarEl, wdsResolveOwnAvatarUrl(myPhotoRaw, wdsRemoteData.shareKey), displayName.trim().charAt(0).toUpperCase());
     const composerInputEl = document.getElementById('wdsComposerInput');
@@ -476,9 +475,6 @@ function initDesktopShell() {
     // when no web-only override exists) -- see its own definition.
     wdsApplyThemeOverride();
     operatorNameEl.textContent = WDS_GUEST_NAME;
-    modeIconImgEl.src = MODE_ICON.beginner;
-    modeIconEl.classList.remove('wds-user-mode-icon--photo');
-    modeIconEl.title = WDS_GUEST_NAME;
     const composerAvatarEl = document.getElementById('wdsComposerAvatar');
     wdsSetAvatarVisual(composerAvatarEl, null, 'G');
     const composerInputEl = document.getElementById('wdsComposerInput');
@@ -17285,8 +17281,9 @@ let adminDrawerPanelOpen = false;
 // entry point on the Nutrition tab widget, which shouldn't pop the dial
 // back open on close.
 let adminDrawerLaunchedOverlay = false;
+let adventureDialOpen = false;
 function isAdminDrawerAnythingOpen() {
-  return adminDrawerPillOpen || adminDrawerPanelOpen;
+  return adminDrawerPillOpen || adminDrawerPanelOpen || adventureDialOpen;
 }
 let adminDrawerBackdropHideTimer = null;
 function syncAdminDrawerBackdrop() {
@@ -17436,6 +17433,47 @@ function closeAdminDrawer() {
 function closeAdminDrawerAll() {
   closeAdminDrawerPill();
   closeAdminDrawer();
+  closeAdventureDial();
+}
+
+// Nested sub-dial opened by the Adventure icon in the main pill — a fixed
+// 5-item fan (Forge/Wilds/Armory/Tavern/Character), not a second rotatable
+// arc (see the CSS comment on .adventure-dial-pill for why). Reuses
+// positionAdminDrawerPill for the same tab-anchored top/left-right logic
+// the main pill uses, but deliberately does NOT call closeAdventureDial (or
+// closeAdminDrawerPill) when a sub-icon is tapped — both dials are meant to
+// stay open behind whatever panel that opens, per the explicit ask, closing
+// only via a retap of the Adventure icon or the shared backdrop.
+function openAdventureDial() {
+  const dial = document.getElementById('adventureDialPill');
+  const tab = document.getElementById('adminDrawerTab');
+  if (!dial) return;
+  adventureDialOpen = true;
+  if (tab) positionAdminDrawerPill(tab, dial);
+  dial.hidden = false;
+  requestAnimationFrame(() => dial.classList.add('is-open'));
+  syncAdminDrawerBackdrop();
+}
+function closeAdventureDial() {
+  const dial = document.getElementById('adventureDialPill');
+  if (!dial || !adventureDialOpen) return;
+  adventureDialOpen = false;
+  dial.classList.remove('is-open');
+  setTimeout(() => { dial.hidden = true; }, 220);
+  syncAdminDrawerBackdrop();
+}
+function toggleAdventureDial() {
+  if (adventureDialOpen) closeAdventureDial(); else openAdventureDial();
+}
+// Jumps straight to a Forge/Wilds/Armory/Tavern tab from anywhere in the
+// app, bypassing the teaser screen — same underlying flow as tapping the
+// popover's own "Adventure Map" button (openBossArena) followed immediately
+// by "Enter the Map" (openArenaMap), then switchArenaTab does the rest.
+// Neither dial closes afterward (see comment above openAdventureDial).
+function openAdventureTabFromDial(tabName) {
+  openBossArena();
+  openArenaMap();
+  switchArenaTab(tabName);
 }
 // Hides every other admin-drawer-section so only the tapped feature (or
 // group of features, e.g. Account Admin bundles three together) shows,
@@ -17653,6 +17691,9 @@ function initAdminDrawer() {
     if (arcJustDragged) { arcJustDragged = false; return; }
     const btn = e.target.closest('.admin-drawer-pill-item');
     if (!btn) return;
+    // Opens the nested sub-dial instead of navigating — deliberately does
+    // NOT close this pill (see openAdventureDial's own comment).
+    if (btn.dataset.dialToggle === 'adventure') { toggleAdventureDial(); return; }
     if (btn.dataset.target) { openAdminDrawerSection(btn.dataset.target.split(',')); return; }
     if (btn.dataset.action) {
       closeAdminDrawerPill();
@@ -17660,6 +17701,27 @@ function initAdminDrawer() {
       if (target) target.click();
     }
   });
+
+  const adventureDial = document.getElementById('adventureDialPill');
+  if (adventureDial) {
+    adventureDial.addEventListener('click', e => {
+      const btn = e.target.closest('.adventure-dial-item');
+      if (!btn) return;
+      // Neither dial closes here — both stay open behind whatever this
+      // opens, per the explicit ask (see openAdventureDial's comment).
+      if (btn.dataset.adventureTab) { openAdventureTabFromDial(btn.dataset.adventureTab); return; }
+      if (btn.hasAttribute('data-adventure-character')) {
+        // initGamificationPanel's own document-level "any click closes the
+        // popover" listener would otherwise fire right after this same
+        // click bubbles past #gamePopover (which isn't the target here) and
+        // undo the open in the same tick — stop it here, same as the
+        // popover's own triggers do.
+        e.stopPropagation();
+        const popover = document.getElementById('gamePopover');
+        if (popover) { popover.hidden = false; renderGamificationPanel(); }
+      }
+    });
+  }
 
   // Post Announcement / Assign Targets / Media Sync were closed after the
   // drawer opened them (adminDrawerLaunchedOverlay) — bring the dial back

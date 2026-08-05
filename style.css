@@ -3184,6 +3184,38 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   border-color: var(--cyan);
   box-shadow: 0 0 14px var(--cyan-glow);
 }
+/* Nested Adventure sub-dial — reuses .admin-drawer-pill/.admin-drawer-pill-item
+   wholesale for container positioning, sizing, transitions, and item shape
+   (see openAdventureDial/closeAdventureDial in app.js, which position it via
+   the same positionAdminDrawerPill helper the main pill uses). The only new
+   thing is these five fixed transforms: unlike the main arc, there's no
+   drag-to-rotate and no is-focused/dimming state — all 5 icons sit at fixed
+   angles (-70/-35/0/35/70deg) around the container's own implicit 170px
+   radius (half of the reused 340x340 box) and are always visible/tappable.
+   Deliberately a touch further out than the main pill's own (variable,
+   ~90-140px) radius so the two read as concentric rings, not an overlapping
+   mess, when both are open at once. */
+.adventure-dial-pill { z-index: 401; }
+.adventure-dial-item:nth-child(1) { transform: translate(-58px, -160px); }
+.adventure-dial-item:nth-child(2) { transform: translate(-139px, -98px); }
+.adventure-dial-item:nth-child(3) { transform: translate(-170px, 0); }
+.adventure-dial-item:nth-child(4) { transform: translate(-139px, 98px); }
+.adventure-dial-item:nth-child(5) { transform: translate(-58px, 160px); }
+/* positionAdminDrawerPill (reused as-is for this dial too, see
+   openAdventureDial) toggles the shared "admin-drawer-pill--left" class,
+   not a dial-specific one -- key off that combined with .adventure-dial-pill
+   rather than a nonexistent "adventure-dial-pill--left". */
+.admin-drawer-pill--left.adventure-dial-pill .adventure-dial-item:nth-child(1) { transform: translate(58px, -160px); }
+.admin-drawer-pill--left.adventure-dial-pill .adventure-dial-item:nth-child(2) { transform: translate(139px, -98px); }
+.admin-drawer-pill--left.adventure-dial-pill .adventure-dial-item:nth-child(3) { transform: translate(170px, 0); }
+.admin-drawer-pill--left.adventure-dial-pill .adventure-dial-item:nth-child(4) { transform: translate(139px, 98px); }
+.admin-drawer-pill--left.adventure-dial-pill .adventure-dial-item:nth-child(5) { transform: translate(58px, 160px); }
+.adventure-dial-item:hover, .adventure-dial-item:active {
+  background: var(--cyan-dim);
+  border-color: var(--cyan);
+  box-shadow: 0 0 14px var(--cyan-glow);
+}
+
 /* Small readout naming the currently-focused (blown-up) icon, kept in sync
    with it every layout pass — including live while dragging/rotating. */
 .admin-drawer-arc-label {
@@ -5897,20 +5929,17 @@ html.wf-resume-session .wds-reload-splash { display: flex !important; }
   color: #060a0d; font-weight: 700; display: grid; place-items: center; font-size: 0.85rem;
   flex-shrink: 0; background-size: cover; background-position: center;
 }
-.wds-user-mode-icon {
-  width: 34px; height: 34px; border-radius: 50%; background: var(--surface-2);
-  border: 1px solid var(--border); display: grid; place-items: center; padding: 5px;
-  box-sizing: border-box; flex-shrink: 0; cursor: pointer; overflow: hidden;
-}
-.wds-user-mode-icon img { width: 100%; height: 100%; object-fit: contain; display: block; }
-.wds-user-mode-icon--photo { padding: 0; border-color: var(--accent); }
-.wds-user-mode-icon--photo img { object-fit: cover; border-radius: 50%; }
+/* Composer avatar doubles as the profile-open trigger (moved here from the
+   old topnav avatar icon), so it needs the pointer affordance the shared
+   .wds-user-avatar class doesn't apply to every avatar (e.g. the one on the
+   profile page's own composer, which stays inert). */
+#wdsComposerAvatar { cursor: pointer; }
 /* Compact admin indicator on the avatar itself -- a thin cyan stroke plus
    a soft glow, replacing the "ADMIN" text badge on mobile where it ate too
    much space next to the avatar (see .wds-admin-badge's own mobile
    @media rule). Shown at every viewport, not just mobile, since it reads
    cleanly alongside the text badge on desktop too. */
-.wds-user-mode-icon--admin {
+#wdsComposerAvatar.wds-user-mode-icon--admin {
   border: 1px solid var(--cyan);
   box-shadow: 0 0 0 2px rgba(var(--surface-1-rgb), 1), 0 0 8px var(--cyan-glow);
 }
@@ -6526,8 +6555,8 @@ a.wds-link-preview-card:hover { border-color: var(--border); }
   .wds-topnav-brand-text { align-self: flex-end; }
   .wds-user-meta { display: none; }
   /* "ADMIN" text badge ate too much space next to the avatar on mobile --
-     desktop keeps the text; mobile gets a thin glow ring on the avatar
-     itself instead (see .wds-user-mode-icon--admin below). */
+     desktop keeps the text; mobile gets a thin glow ring on the composer
+     avatar itself instead (see #wdsComposerAvatar.wds-user-mode-icon--admin). */
   .wds-admin-badge { display: none; }
   .wds-logout-label { display: none; }
   .wds-logout-btn { padding: 9px; border-radius: 50%; }
