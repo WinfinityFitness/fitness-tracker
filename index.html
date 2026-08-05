@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.76">
+<link rel="stylesheet" href="style.css?v=1.7.77">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3674,23 +3674,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
 
       <div id="arenaTab_tavern" hidden>
         <p class="field-group-heading">The Tavern</p>
-        <p class="hint hint--sm">World Chat is the same Public Chat as Nexus — messages sent here show up there too. Direct Message only lists players currently in the Adventure Map.</p>
-
-        <div class="arena-subnav" style="margin:10px 0;">
-          <button type="button" class="arena-subnav-btn is-active" id="tavernNavBtn_world">
-            <span class="arena-subnav-icon">&#127760;</span><span>World Chat</span>
-          </button>
-          <button type="button" class="arena-subnav-btn" id="tavernNavBtn_dm">
-            <span class="arena-subnav-icon">&#9993;&#65039;</span><span>Direct Message</span>
-          </button>
-        </div>
-
-        <div id="tavernPresencePanel" hidden>
-          <p class="hint hint--sm" id="tavernPresenceEmpty" hidden>No one else is in the Adventure Map right now.</p>
-          <div id="tavernPresenceList" class="game-inventory"></div>
-        </div>
-
-        <button type="button" class="btn" id="btnTavernDmBack" hidden style="width:100%;margin-bottom:8px;">&#8249; Back to players</button>
+        <p class="hint hint--sm">A shared chat room, open only to players currently in the Adventure Map.</p>
 
         <div id="tavernChatList" class="chat-list"></div>
         <div class="chat-pending-image" id="tavernPendingImage" hidden>
@@ -4892,11 +4876,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.7.76"></script>
+<script src="config.js?v=1.7.77"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.76"></script>
+<script src="app.js?v=1.7.77"></script>
 </body>
 </html>
