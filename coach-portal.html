@@ -394,7 +394,11 @@
         <a href="#" id="linkForgotPassword" style="color:var(--critical);font-size:0.85rem;">Forgot Password?</a>
       </div>
       <p class="note" id="coachLoginNote"></p>
-      <div style="display:flex;justify-content:flex-end;margin-top:10px;">
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;flex-wrap:wrap;">
+        <a class="btn btn-secondary" href="https://github.com/WinfinityFitness/fitness-tracker/releases/download/coach-latest-debug/winfinity-coach.apk" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+          Coach App
+        </a>
         <a class="btn btn-secondary" href="https://github.com/WinfinityFitness/fitness-tracker/releases/download/ft-latest-debug/winfinity-tracker.apk" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
           Fitness App
@@ -565,7 +569,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
    Now" here just means forcing a cache-busted reload instead of quietly
    trusting whatever the browser already has cached, not installing
    anything. */
-const COACH_PORTAL_VERSION = '1.0.1';
+const COACH_PORTAL_VERSION = '1.0.2';
 document.getElementById('versionBadgeText').textContent = COACH_PORTAL_VERSION;
 
 async function fetchLatestCoachPortalVersion() {
