@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.72';
+const APP_VERSION = 'WF_SYS_V.1.7.73';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -10168,6 +10168,7 @@ let cardioWatchId = null;
 let cardioTickId = null;
 let cardioTrack = [];
 let cardioGpsErrorShown = false;
+let cardioPositionErrorShown = false;
 let cardioDistanceKm = 0;
 let cardioMaxSpeedKmh = 0;
 let cardioStartTime = null;
@@ -10423,10 +10424,19 @@ function startCardioTracking() {
   renderCardioRouteSketch();
   cardioGpsErrorShown = false;
   cardioStatsErrorShown = false;
+  cardioPositionErrorShown = false;
   const gpsStatus = document.getElementById('cardioGpsStatus');
   if (gpsStatus) { gpsStatus.textContent = '📡 Waiting for GPS fix…'; gpsStatus.hidden = false; }
 
   cardioWatchId = startGpsWatch(pos => {
+    // Every other per-tick path here (updateCardioStats) is wrapped the same
+    // way, for the same reason: this fires once per GPS fix for the whole
+    // session, so one unexpected exception on (e.g.) the 2nd fix — a bad
+    // renderCardioRouteSketch() call, say — would otherwise leave distance/
+    // pace/steps frozen at whatever they were on the 1st fix, silently, for
+    // the rest of the session, with nothing on screen to explain why the
+    // timer kept moving but nothing else did.
+    try {
     const { latitude, longitude, accuracy } = pos.coords;
     // A poor fix (accuracy worse than 50m — common indoors/under cover) was
     // previously dropped with zero feedback: the timer kept ticking (it's
@@ -10461,6 +10471,13 @@ function startCardioTracking() {
     } else {
       cardioTrack.push(point);
       if (gpsStatus) { gpsStatus.textContent = '✅ GPS locked — tracking.'; setTimeout(() => { if (gpsStatus) gpsStatus.hidden = true; }, 3000); }
+    }
+    } catch (e) {
+      if (!cardioPositionErrorShown) {
+        cardioPositionErrorShown = true;
+        showRestToast('⚠️ GPS position handler error: ' + (e && (e.message || e)) + (e && e.stack ? ' | ' + e.stack.split('\n')[0] : ''));
+        if (gpsStatus) { gpsStatus.textContent = '⚠️ Tracking glitch — distance may stop updating. Duration keeps counting.'; gpsStatus.hidden = false; }
+      }
     }
   }, err => {
     // Keep the timer running either way — a transient GPS blip shouldn't end
@@ -22552,6 +22569,42 @@ function defeatTrailmapMainBoss(rank) {
   }
 }
 
+// "Who's currently in the game" for the Tavern's Direct Message picker
+// (see supabase_game_presence_migration.sql) — a purpose-built table, not
+// the Nexus tab's own "online now" count (that's a derived read of
+// leaderboard sync staleness with a much coarser 5-minute window). Ticks
+// once immediately, then every 20s for as long as the Adventure Map
+// overlay stays open (started in openBossArena, stopped in closeBossArena)
+// — best effort, same as the rest of the app's Supabase side-channel syncs.
+let gamePresenceHeartbeatId = null;
+function touchGamePresenceOnce() {
+  if (!sbConfigured()) return;
+  sb.rpc('touch_game_presence', {
+    p_share_key: getOrCreateShareKey(),
+    p_code_name: effectiveLeaderboardName(),
+  }).catch(() => {});
+}
+function startGamePresenceHeartbeat() {
+  stopGamePresenceHeartbeat();
+  touchGamePresenceOnce();
+  gamePresenceHeartbeatId = setInterval(touchGamePresenceOnce, 20000);
+}
+function stopGamePresenceHeartbeat() {
+  if (gamePresenceHeartbeatId) { clearInterval(gamePresenceHeartbeatId); gamePresenceHeartbeatId = null; }
+}
+// Currently-present players, excluding self — the Tavern's DM list. Best
+// effort: an empty array on any failure just means the DM list renders
+// empty rather than the Tavern tab breaking.
+async function fetchGamePresence() {
+  if (!sbConfigured()) return [];
+  try {
+    const { data, error } = await sb.rpc('get_game_presence');
+    if (error) throw error;
+    const myKey = getOrCreateShareKey();
+    return (data || []).filter(row => row.share_key !== myKey);
+  } catch (e) { return []; }
+}
+
 function openBossArena() {
   const p = getProfile();
   if (!p || !p.fitnessMode) return;
@@ -22589,10 +22642,12 @@ function openBossArena() {
   document.getElementById('arenaTeaserDesc').textContent = boss.desc;
   document.getElementById('btnArenaEnterMap').hidden = !boss.playable;
   document.getElementById('arenaLockedNote').hidden = boss.playable;
+  startGamePresenceHeartbeat();
 }
 
 function closeBossArena() {
   stopArenaCamera();
+  stopGamePresenceHeartbeat();
   const overlay = document.getElementById('adventureMapOverlay');
   if (overlay) overlay.hidden = true;
   document.getElementById('arenaStationNote').hidden = true;
