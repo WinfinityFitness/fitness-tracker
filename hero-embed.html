@@ -34,12 +34,12 @@
   <input type="range" id="wfMusicVolume" class="wf-music-volume" min="0" max="100" value="60" aria-label="Music volume">
 </div>
 <!-- Voice narration for the prologue caption below -- a single ~60s clip,
-     not a loop. Browsers block non-muted autoplay without a prior gesture,
-     so playback is attempted immediately and, if blocked, deferred to the
-     visitor's first click/tap anywhere on the page (see the caption script
-     below). The caption's own line timings only start once narration
-     actually begins, so text and voice always start together regardless
-     of which path fires. -->
+     not a loop. Browsers block non-muted autoplay outright, so playback
+     is deferred to the visitor's first click/tap anywhere on the page
+     (see the caption script below) rather than attempted at load, which
+     left the element stuck in a permanent error state in testing. The
+     caption's own line timings only start once narration actually
+     begins, so text and voice always start together. -->
 <audio id="wfNarration" src="https://winfinityfitness.github.io/fitness-tracker/audio/ring-verse-narration.mp3" preload="auto" playsinline></audio>
 
 <section class="wf-hero-embed" id="wfHeroEmbed">
