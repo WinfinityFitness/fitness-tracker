@@ -362,19 +362,22 @@
 
   if (!narration) { start(); return; }
 
-  narration.play().then(start).catch(function () {
-    // Autoplay-with-sound was blocked -- wait for the visitor's first
-    // gesture anywhere on the page, then start narration and captions
-    // together so they never drift apart from a delayed unlock.
-    var kick = function () {
-      document.removeEventListener('click', kick);
-      document.removeEventListener('touchstart', kick);
-      narration.currentTime = 0;
-      narration.play().catch(function () {});
-      start();
-    };
-    document.addEventListener('click', kick, { once: true });
-    document.addEventListener('touchstart', kick, { once: true });
-  });
+  // Unmuted audio can't autoplay in any real browser, so there's no point
+  // attempting play() before a gesture -- every browser rejects it, and
+  // doing so anyway risks leaving the element in a broken error state that
+  // a later retry on the same element doesn't reliably recover from. Wait
+  // for the visitor's first tap/click anywhere on the page instead, then
+  // start narration and captions together so they never drift apart.
+  var kicked = false;
+  function kick() {
+    if (kicked) return;
+    kicked = true;
+    document.removeEventListener('click', kick);
+    document.removeEventListener('touchstart', kick);
+    narration.play().catch(function () {});
+    start();
+  }
+  document.addEventListener('click', kick, { once: true });
+  document.addEventListener('touchstart', kick, { once: true });
 })();
 </script>
