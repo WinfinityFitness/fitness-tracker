@@ -57,11 +57,12 @@
   <div class="wf-hero-content">
     <img class="wf-hero-logo" src="https://winfinityfitness.github.io/fitness-tracker/icons/wf-logo-3d.png" alt="Winfinity">
     <h1 class="wf-hero-title">The Future Of<br><em>Performance</em></h1>
-    <!-- Prologue-style cycling caption (see wfHeroCaptionInit below) --
-         one line fades in, holds, fades out, then the next, ending on the
-         tagline line which stays put rather than fading away. Reserves
-         its own min-height (see .wf-hero-caption) so the CTA row below
-         doesn't jump as lines change length. -->
+    <!-- Prologue-style cycling caption, synced to and repeating with the
+         narration clip below (see the caption script near the bottom of
+         this file) -- one line fades in, holds, fades out, then the
+         next, looping back to the first line 7s after the narration
+         ends. Reserves its own min-height (see .wf-hero-caption) so the
+         CTA row below doesn't jump as lines change length. -->
     <div class="wf-hero-caption" id="wfHeroCaption" aria-live="polite"></div>
     <div class="wf-hero-cta-row">
       <a class="wf-hero-cta" href="https://wellness.winfinityfitness.com" target="_blank" rel="noopener">Launch Nexus</a>
@@ -296,11 +297,11 @@
 })();
 
 // Prologue-style caption: one line fades in, holds, fades out, then the
-// next -- ending on the tagline line, which fades in and stays (no
-// further fade-out or cycling). Respects prefers-reduced-motion by
-// skipping straight to the final line instead of cycling through the
-// rest, same as the logo's own pulse animation does elsewhere on this
-// page.
+// next -- including the tagline line, which now also fades out once the
+// narration actually ends rather than staying put forever (see the
+// 'ended' listener below). Respects prefers-reduced-motion by skipping
+// straight to a static final line with no cycling and no narration at
+// all, same as the logo's own pulse animation does elsewhere on this page.
 //
 // Paced against the ~60s narration clip (see #wfNarration): three holds
 // of HOLD_MS land the final line around the 42s mark, leaving the voice
@@ -308,6 +309,11 @@
 // timestamp data for the recording, so this is an even, not word-exact,
 // split -- nudge HOLD_MS if a line visibly drifts ahead of or behind the
 // voice once previewed against the actual audio.
+//
+// The whole thing repeats indefinitely: when narration hits 'ended', the
+// caption fades out immediately and both narration and captions restart
+// together after REPEAT_GAP_MS of silence, so the two never drift apart
+// across repeats the way independent timers eventually would.
 (function () {
   var container = document.getElementById('wfHeroCaption');
   var narration = document.getElementById('wfNarration');
@@ -321,6 +327,7 @@
   ];
   var HOLD_MS = 13000;
   var FADE_MS = 1000;
+  var REPEAT_GAP_MS = 7000;
 
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (reduceMotion) {
@@ -331,7 +338,6 @@
     return;
   }
 
-  var started = false;
   var i = 0;
   function showLine() {
     var isLast = i === LINES.length - 1;
@@ -346,6 +352,9 @@
     requestAnimationFrame(function () {
       requestAnimationFrame(function () { p.classList.add('is-visible'); });
     });
+    // The final line no longer schedules its own fade-out here -- with
+    // no narration to key off of, it just holds indefinitely until (if
+    // ever) a 'narration ended' event drives the repeat below.
     if (isLast) return;
     setTimeout(function () {
       p.classList.remove('is-visible');
@@ -353,6 +362,7 @@
     }, HOLD_MS);
   }
 
+  var started = false;
   function start() {
     if (started) return;
     started = true;
@@ -379,5 +389,20 @@
   }
   document.addEventListener('click', kick, { once: true });
   document.addEventListener('touchstart', kick, { once: true });
+
+  // Not the native <audio loop> attribute -- that repeats with zero gap,
+  // and the brief wants a 7s pause of silence between reads. 'ended' only
+  // fires with loop absent, so this is also what makes the manual repeat
+  // possible at all.
+  narration.addEventListener('ended', function () {
+    var line = container.querySelector('.wf-hero-caption-line');
+    if (line) line.classList.remove('is-visible');
+    setTimeout(function () {
+      narration.currentTime = 0;
+      narration.play().catch(function () {});
+      i = 0;
+      showLine();
+    }, REPEAT_GAP_MS);
+  });
 })();
 </script>
