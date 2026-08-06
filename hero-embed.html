@@ -71,7 +71,17 @@
      Height-based sizing (not width) keeps them proportional to the
      section's height regardless of viewport width. */
   .wf-hero-side-char {
-    position: absolute; bottom: 0; height: 96%; width: auto; max-width: 42%;
+    /* height-only sizing, deliberately no max-width -- the fighter's crop
+       is nearly square while the knight's is tall and narrow, so a %-width
+       cap clamped the fighter (who needs more width per unit height) at a
+       wider viewport than the knight, and object-fit:contain then shrunk
+       HIS height to comply while the knight's stayed full size. Two
+       different-aspect-ratio images can only both stay eye/toe-aligned if
+       height is the only constraint in play. The 900px breakpoint below
+       is what actually prevents center-content overlap on narrower
+       windows, via shrinking height itself (symmetric for both images)
+       rather than width. */
+    position: absolute; bottom: 0; height: 96%; width: auto;
     object-fit: contain; z-index: 1; pointer-events: none; user-select: none;
   }
   .wf-hero-side-char--left { left: 0; object-position: left bottom; }
