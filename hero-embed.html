@@ -40,8 +40,12 @@
        runtime, so there's no per-visitor blend cost and the fade is exact
        regardless of what sits behind it. aria-hidden + empty alt since
        they're pure atmosphere, not content. -->
-  <img class="wf-hero-side-char wf-hero-side-char--left" src="https://winfinityfitness.github.io/fitness-tracker/icons/hero-fighter.png" alt="" aria-hidden="true">
-  <img class="wf-hero-side-char wf-hero-side-char--right" src="https://winfinityfitness.github.io/fitness-tracker/icons/hero-knight.png" alt="" aria-hidden="true">
+  <div class="wf-hero-side-clip wf-hero-side-clip--left">
+    <img class="wf-hero-side-char wf-hero-side-char--left" src="https://winfinityfitness.github.io/fitness-tracker/icons/hero-fighter.png" alt="" aria-hidden="true">
+  </div>
+  <div class="wf-hero-side-clip wf-hero-side-clip--right">
+    <img class="wf-hero-side-char wf-hero-side-char--right" src="https://winfinityfitness.github.io/fitness-tracker/icons/hero-knight.png" alt="" aria-hidden="true">
+  </div>
   <div class="wf-hero-content">
     <img class="wf-hero-logo" src="https://winfinityfitness.github.io/fitness-tracker/icons/wf-logo-3d.png" alt="Winfinity">
     <h1 class="wf-hero-title">The Future Of<br><em>Performance</em></h1>
@@ -68,21 +72,29 @@
   .wf-hero-content { position: relative; z-index: 2; min-width: 0; max-width: 100%; }
   /* Flanking characters -- absolutely positioned behind the content,
      bottom-aligned so their feet sit at the section's own bottom edge.
-     Height-based sizing (not width) keeps them proportional to the
-     section's height regardless of viewport width. */
+     Height-based sizing (not width) keeps both proportional to the
+     section's height regardless of viewport width -- the fighter's crop
+     is nearly square while the knight's is tall and narrow, so a %-width
+     cap would clamp one before the other and force object-fit:contain to
+     shrink just that one's height to comply, breaking the eye/toe
+     alignment between them. Two different-aspect-ratio images only stay
+     aligned if height is the only sizing constraint in play.
+
+     The logo must never be crossed, though -- so each character sits in
+     its own clipping wrapper whose boundary is fixed to the logo's own
+     edge (50% +/- half its 252px width), rather than shrinking to fit.
+     Anything past that boundary (the fighter's raised knee, at typical
+     widths) is clipped by the wrapper's overflow:hidden instead of
+     scaling the whole figure down -- explicitly fine per the brief. */
+  .wf-hero-side-clip {
+    position: absolute; top: 0; bottom: 0; overflow: hidden;
+    pointer-events: none; z-index: 1;
+  }
+  .wf-hero-side-clip--left { left: 0; width: max(0px, calc(50% - 126px)); }
+  .wf-hero-side-clip--right { right: 0; width: max(0px, calc(50% - 126px)); }
   .wf-hero-side-char {
-    /* height-only sizing, deliberately no max-width -- the fighter's crop
-       is nearly square while the knight's is tall and narrow, so a %-width
-       cap clamped the fighter (who needs more width per unit height) at a
-       wider viewport than the knight, and object-fit:contain then shrunk
-       HIS height to comply while the knight's stayed full size. Two
-       different-aspect-ratio images can only both stay eye/toe-aligned if
-       height is the only constraint in play. The 900px breakpoint below
-       is what actually prevents center-content overlap on narrower
-       windows, via shrinking height itself (symmetric for both images)
-       rather than width. */
     position: absolute; bottom: 0; height: 96%; width: auto;
-    object-fit: contain; z-index: 1; pointer-events: none; user-select: none;
+    object-fit: contain; user-select: none;
   }
   .wf-hero-side-char--left { left: 0; object-position: left bottom; }
   .wf-hero-side-char--right { right: 0; object-position: right bottom; }
@@ -92,7 +104,7 @@
   @media (max-width: 640px) {
     /* No room to flank the centered content once the layout this tight --
        they'd crowd the headline rather than read as atmosphere. */
-    .wf-hero-side-char { display: none; }
+    .wf-hero-side-clip { display: none; }
     .wf-hero-embed { min-height: 0; }
   }
   .wf-hero-logo {
