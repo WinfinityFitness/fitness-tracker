@@ -49,7 +49,12 @@
   <div class="wf-hero-content">
     <img class="wf-hero-logo" src="https://winfinityfitness.github.io/fitness-tracker/icons/wf-logo-3d.png" alt="Winfinity">
     <h1 class="wf-hero-title">The Future Of<br><em>Performance</em></h1>
-    <p class="wf-hero-subtitle">Unlock your latent potential through the Global Neural Grid. Real-time bio-syncing for the modern shinobi.</p>
+    <!-- Prologue-style cycling caption (see wfHeroCaptionInit below) --
+         one line fades in, holds, fades out, then the next, ending on the
+         tagline line which stays put rather than fading away. Reserves
+         its own min-height (see .wf-hero-caption) so the CTA row below
+         doesn't jump as lines change length. -->
+    <div class="wf-hero-caption" id="wfHeroCaption" aria-live="polite"></div>
     <div class="wf-hero-cta-row">
       <a class="wf-hero-cta" href="https://wellness.winfinityfitness.com" target="_blank" rel="noopener">Launch Nexus</a>
       <a class="wf-hero-cta wf-hero-cta--ghost" href="https://adventure.winfinityfitness.com" target="_blank" rel="noopener">Fitness Adventure</a>
@@ -134,9 +139,24 @@
     font-family: inherit !important; display: block; color: #ff9f43 !important;
     font-style: normal !important; font-weight: 800 !important;
   }
-  .wf-hero-subtitle {
-    color: #8a97a8; font-size: 0.92rem; line-height: 1.6; max-width: 480px;
-    margin: 0 auto 32px;
+  /* Prologue caption -- fixed min-height reserves space for the tallest
+     line up front so the CTA row below doesn't jump vertically as shorter/
+     longer lines swap in (see wfHeroCaptionInit). */
+  .wf-hero-caption {
+    min-height: 3.2em; max-width: 520px; margin: 0 auto 32px;
+    display: flex; align-items: center; justify-content: center; padding: 0 8px;
+  }
+  .wf-hero-caption-line {
+    margin: 0; color: #b9c2cf; font-size: 0.95rem; font-style: italic; line-height: 1.6;
+    opacity: 0; transition: opacity 1s ease;
+  }
+  .wf-hero-caption-line.is-visible { opacity: 1; }
+  .wf-hero-caption-line.is-final {
+    color: #ff9f43; font-weight: 800; font-style: normal; text-transform: uppercase;
+    letter-spacing: 0.05em; font-size: 1.05rem;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .wf-hero-caption-line { transition: none; }
   }
   .wf-hero-cta-row {
     display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 16px;
@@ -257,5 +277,56 @@
     audio.volume = v / 100;
     localStorage.setItem(VOL_KEY, String(v));
   });
+})();
+
+// Prologue-style caption: one line fades in, holds, fades out, then the
+// next -- ending on the tagline line, which fades in and stays (no
+// further fade-out or cycling). Respects prefers-reduced-motion by
+// skipping straight to the final line instead of cycling through the
+// rest, same as the logo's own pulse animation does elsewhere on this
+// page.
+(function () {
+  var container = document.getElementById('wfHeroCaption');
+  if (!container) return;
+
+  var LINES = [
+    'Long ago, the Apps of Power were forged and scattered among the seekers of many kingdoms&hellip;',
+    'One for Progress. One for Calories. One for Cardio. Scattered, and alone.',
+    'Then, in secret, in the fire of Mount Doom&hellip;',
+    'One App was forged to rule them all.'
+  ];
+  var HOLD_MS = 2400;
+  var FADE_MS = 1000;
+
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduceMotion) {
+    var finalLine = document.createElement('p');
+    finalLine.className = 'wf-hero-caption-line is-final is-visible';
+    finalLine.innerHTML = LINES[LINES.length - 1];
+    container.appendChild(finalLine);
+    return;
+  }
+
+  var i = 0;
+  function showLine() {
+    var isLast = i === LINES.length - 1;
+    var p = document.createElement('p');
+    p.className = 'wf-hero-caption-line' + (isLast ? ' is-final' : '');
+    p.innerHTML = LINES[i];
+    container.innerHTML = '';
+    container.appendChild(p);
+    // Fade-in needs the opacity:0 state to actually paint first -- adding
+    // is-visible in the same tick as appending the element would let the
+    // browser coalesce both into one paint with no transition to animate.
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { p.classList.add('is-visible'); });
+    });
+    if (isLast) return;
+    setTimeout(function () {
+      p.classList.remove('is-visible');
+      setTimeout(function () { i++; showLine(); }, FADE_MS);
+    }, HOLD_MS);
+  }
+  showLine();
 })();
 </script>
