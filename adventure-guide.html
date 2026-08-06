@@ -544,10 +544,12 @@
     <input type="range" id="musicVolumeSlider" min="0" max="100" value="45" aria-label="Music volume">
     <span class="music-volume-label" id="musicVolumeLabel">45%</span>
   </div>
-  <button type="button" class="music-toggle" id="musicToggle" aria-label="Mute background music" aria-pressed="false">
-    <svg id="musicIconOn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 8 8 8 13 4 13 20 8 16 4 16 4 8"></polygon><path d="M17 8a5 5 0 0 1 0 8"></path><path d="M19.5 5.5a9 9 0 0 1 0 13"></path></svg>
-    <svg id="musicIconOff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" hidden><polygon points="4 8 8 8 13 4 13 20 8 16 4 16 4 8"></polygon><line x1="16" y1="9" x2="21" y2="14"></line><line x1="21" y1="9" x2="16" y2="14"></line></svg>
-  </button>
+  <!-- Single icon, swapped via innerHTML rather than two SVGs toggled with
+       [hidden] -- the two-icon version was rendering both at once (the
+       flex-centered button layout doesn't reliably respect [hidden] on an
+       SVG the way a block element expects). Icon is set entirely by JS
+       (updateIcon), nothing static here. -->
+  <button type="button" class="music-toggle" id="musicToggle" aria-label="Mute background music" aria-pressed="false"></button>
 </div>
 
 <script>
@@ -629,14 +631,14 @@
   (function () {
     var audio = document.getElementById('bgMusic');
     var toggle = document.getElementById('musicToggle');
-    var iconOn = document.getElementById('musicIconOn');
-    var iconOff = document.getElementById('musicIconOff');
     var panel = document.getElementById('musicVolumePanel');
     var slider = document.getElementById('musicVolumeSlider');
     var label = document.getElementById('musicVolumeLabel');
 
     var VOL_KEY = 'wf_adventure_music_volume';
     var MUTED_KEY = 'wf_adventure_music_muted';
+    var ICON_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 8 8 8 13 4 13 20 8 16 4 16 4 8"></polygon><path d="M17 8a5 5 0 0 1 0 8"></path><path d="M19.5 5.5a9 9 0 0 1 0 13"></path></svg>';
+    var ICON_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 8 8 8 13 4 13 20 8 16 4 16 4 8"></polygon><line x1="16" y1="9" x2="21" y2="14"></line><line x1="21" y1="9" x2="16" y2="14"></line></svg>';
 
     var savedVolume = parseInt(localStorage.getItem(VOL_KEY), 10);
     if (isNaN(savedVolume)) savedVolume = 45;
@@ -646,9 +648,11 @@
     label.textContent = savedVolume + '%';
     audio.volume = savedVolume / 100;
 
+    // Single icon, swapped whole rather than two SVGs toggled with
+    // [hidden] -- the two-icon version rendered both at once inside this
+    // flex-centered button.
     function updateIcon() {
-      iconOn.hidden = muted;
-      iconOff.hidden = !muted;
+      toggle.innerHTML = muted ? ICON_OFF : ICON_ON;
       toggle.classList.toggle('is-muted', muted);
       toggle.setAttribute('aria-pressed', String(muted));
       toggle.setAttribute('aria-label', muted ? 'Unmute background music' : 'Mute background music');
