@@ -33,6 +33,14 @@
   </button>
   <input type="range" id="wfMusicVolume" class="wf-music-volume" min="0" max="100" value="60" aria-label="Music volume">
 </div>
+<!-- Voice narration for the prologue caption below -- a single ~60s clip,
+     not a loop. Browsers block non-muted autoplay without a prior gesture,
+     so playback is attempted immediately and, if blocked, deferred to the
+     visitor's first click/tap anywhere on the page (see the caption script
+     below). The caption's own line timings only start once narration
+     actually begins, so text and voice always start together regardless
+     of which path fires. -->
+<audio id="wfNarration" src="https://winfinityfitness.github.io/fitness-tracker/audio/ring-verse-narration.mp3" preload="auto" playsinline></audio>
 
 <section class="wf-hero-embed" id="wfHeroEmbed">
   <!-- Decorative flanking characters -- pre-processed (vignette-faded to
@@ -101,8 +109,16 @@
     position: absolute; bottom: 0; height: 96%; width: auto;
     object-fit: contain; user-select: none;
   }
-  .wf-hero-side-char--left { left: 0; object-position: left bottom; }
-  .wf-hero-side-char--right { right: 0; object-position: right bottom; }
+  /* Anchored to the INNER edge (facing the logo), not the outer/page
+     edge -- the two characters have very different natural widths at
+     the same height (knight's crop is much wider than the gym guy's
+     narrower one), so anchoring outer-edge left the narrower one
+     stranded far from the logo while the wider one crowded right up
+     against it. Anchoring inner-edge instead means both sit the same
+     distance from the logo regardless of their own width; any excess
+     width extends outward, where the clip wrapper still guards it. */
+  .wf-hero-side-char--left { right: 0; object-position: right bottom; }
+  .wf-hero-side-char--right { left: 0; object-position: left bottom; }
   @media (max-width: 900px) {
     .wf-hero-side-char { opacity: 0.55; height: 82%; }
   }
@@ -285,8 +301,16 @@
 // skipping straight to the final line instead of cycling through the
 // rest, same as the logo's own pulse animation does elsewhere on this
 // page.
+//
+// Paced against the ~60s narration clip (see #wfNarration): three holds
+// of HOLD_MS land the final line around the 42s mark, leaving the voice
+// room to finish speaking it before falling silent. There's no per-word
+// timestamp data for the recording, so this is an even, not word-exact,
+// split -- nudge HOLD_MS if a line visibly drifts ahead of or behind the
+// voice once previewed against the actual audio.
 (function () {
   var container = document.getElementById('wfHeroCaption');
+  var narration = document.getElementById('wfNarration');
   if (!container) return;
 
   var LINES = [
@@ -295,7 +319,7 @@
     'Then, in secret, in the fire of Mount Doom&hellip;',
     'One App was forged to rule them all.'
   ];
-  var HOLD_MS = 2400;
+  var HOLD_MS = 13000;
   var FADE_MS = 1000;
 
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -307,6 +331,7 @@
     return;
   }
 
+  var started = false;
   var i = 0;
   function showLine() {
     var isLast = i === LINES.length - 1;
@@ -327,6 +352,29 @@
       setTimeout(function () { i++; showLine(); }, FADE_MS);
     }, HOLD_MS);
   }
-  showLine();
+
+  function start() {
+    if (started) return;
+    started = true;
+    i = 0;
+    showLine();
+  }
+
+  if (!narration) { start(); return; }
+
+  narration.play().then(start).catch(function () {
+    // Autoplay-with-sound was blocked -- wait for the visitor's first
+    // gesture anywhere on the page, then start narration and captions
+    // together so they never drift apart from a delayed unlock.
+    var kick = function () {
+      document.removeEventListener('click', kick);
+      document.removeEventListener('touchstart', kick);
+      narration.currentTime = 0;
+      narration.play().catch(function () {});
+      start();
+    };
+    document.addEventListener('click', kick, { once: true });
+    document.addEventListener('touchstart', kick, { once: true });
+  });
 })();
 </script>
