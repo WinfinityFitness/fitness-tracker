@@ -35,12 +35,21 @@
 </div>
 
 <section class="wf-hero-embed" id="wfHeroEmbed">
-  <img class="wf-hero-logo" src="https://winfinityfitness.github.io/fitness-tracker/icons/wf-logo-3d.png" alt="Winfinity">
-  <h1 class="wf-hero-title">The Future Of<br><em>Performance</em></h1>
-  <p class="wf-hero-subtitle">Unlock your latent potential through the Global Neural Grid. Real-time bio-syncing for the modern shinobi.</p>
-  <div class="wf-hero-cta-row">
-    <a class="wf-hero-cta" href="https://wellness.winfinityfitness.com" target="_blank" rel="noopener">Launch Nexus</a>
-    <a class="wf-hero-cta wf-hero-cta--ghost" href="https://adventure.winfinityfitness.com" target="_blank" rel="noopener">Fitness Adventure</a>
+  <!-- Decorative flanking characters -- pre-processed (vignette-faded to
+       transparent at the edges + darkened) offline rather than at CSS/
+       runtime, so there's no per-visitor blend cost and the fade is exact
+       regardless of what sits behind it. aria-hidden + empty alt since
+       they're pure atmosphere, not content. -->
+  <img class="wf-hero-side-char wf-hero-side-char--left" src="https://winfinityfitness.github.io/fitness-tracker/icons/hero-fighter.png" alt="" aria-hidden="true">
+  <img class="wf-hero-side-char wf-hero-side-char--right" src="https://winfinityfitness.github.io/fitness-tracker/icons/hero-knight.png" alt="" aria-hidden="true">
+  <div class="wf-hero-content">
+    <img class="wf-hero-logo" src="https://winfinityfitness.github.io/fitness-tracker/icons/wf-logo-3d.png" alt="Winfinity">
+    <h1 class="wf-hero-title">The Future Of<br><em>Performance</em></h1>
+    <p class="wf-hero-subtitle">Unlock your latent potential through the Global Neural Grid. Real-time bio-syncing for the modern shinobi.</p>
+    <div class="wf-hero-cta-row">
+      <a class="wf-hero-cta" href="https://wellness.winfinityfitness.com" target="_blank" rel="noopener">Launch Nexus</a>
+      <a class="wf-hero-cta wf-hero-cta--ghost" href="https://adventure.winfinityfitness.com" target="_blank" rel="noopener">Fitness Adventure</a>
+    </div>
   </div>
 </section>
 
@@ -48,6 +57,33 @@
   .wf-hero-embed {
     background: #0a0d12; text-align: center; padding: 64px 24px 72px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    position: relative; overflow: hidden; min-height: 640px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  /* min-width:0 overrides a flex item's default min-width:auto, which
+     otherwise refuses to shrink below its text content's intrinsic width
+     -- without this, turning .wf-hero-embed into a flex container (for
+     centering the side characters) silently broke text wrapping on
+     narrow viewports, overflowing past the section instead of wrapping. */
+  .wf-hero-content { position: relative; z-index: 2; min-width: 0; max-width: 100%; }
+  /* Flanking characters -- absolutely positioned behind the content,
+     bottom-aligned so their feet sit at the section's own bottom edge.
+     Height-based sizing (not width) keeps them proportional to the
+     section's height regardless of viewport width. */
+  .wf-hero-side-char {
+    position: absolute; bottom: 0; height: 96%; width: auto; max-width: 42%;
+    object-fit: contain; z-index: 1; pointer-events: none; user-select: none;
+  }
+  .wf-hero-side-char--left { left: 0; object-position: left bottom; }
+  .wf-hero-side-char--right { right: 0; object-position: right bottom; }
+  @media (max-width: 900px) {
+    .wf-hero-side-char { opacity: 0.55; height: 82%; }
+  }
+  @media (max-width: 640px) {
+    /* No room to flank the centered content once the layout this tight --
+       they'd crowd the headline rather than read as atmosphere. */
+    .wf-hero-side-char { display: none; }
+    .wf-hero-embed { min-height: 0; }
   }
   .wf-hero-logo {
     /* Sized to match the Adventure guide's hero seal (.hero-seal-frame,
