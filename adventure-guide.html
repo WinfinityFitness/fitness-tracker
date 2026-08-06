@@ -210,6 +210,46 @@
     .chapter, .manual, .sprite-card, .map-card { animation: none; }
     .sprite-stage .action.is-playing { animation: none; opacity: 1; background-position-x: 100%; }
   }
+
+  /* Floating background-music control -- fixed mid-right, matches the
+     page's gold/parchment palette rather than a generic media-player look. */
+  .music-widget {
+    position: fixed; right: 20px; top: 50%; transform: translateY(-50%);
+    z-index: 60; display: flex; flex-direction: column; align-items: center;
+    gap: 10px;
+  }
+  .music-toggle {
+    width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--hairline);
+    background: var(--card); color: var(--gold); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 10px 24px -12px var(--shadow);
+    transition: transform 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  .music-toggle:hover { transform: scale(1.06); border-color: var(--gold); }
+  .music-toggle:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 2px; }
+  .music-toggle svg { width: 22px; height: 22px; }
+  .music-toggle.is-muted { color: var(--ink-faint); }
+
+  .music-volume-panel {
+    background: var(--card); border: 1px solid var(--hairline); border-radius: 12px;
+    padding: 12px 8px; box-shadow: 0 10px 24px -12px var(--shadow);
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  /* Vertical range slider -- rotate a normal horizontal <input type=range>
+     rather than fight browser-specific vertical-slider APIs (writing-mode/
+     orient aren't reliable cross-browser). */
+  .music-volume-panel input[type="range"] {
+    writing-mode: vertical-lr; direction: rtl;
+    width: 6px; height: 84px; accent-color: var(--gold-bright); cursor: pointer;
+  }
+  .music-volume-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-faint);
+  }
+  @media (max-width: 640px) {
+    .music-widget { right: 12px; }
+    .music-toggle { width: 40px; height: 40px; }
+    .music-toggle svg { width: 19px; height: 19px; }
+  }
 </style>
 </head>
 <body>
@@ -496,6 +536,20 @@
   </footer>
 </div>
 
+<audio id="bgMusic" loop preload="auto">
+  <source src="audio/bg-music.m4a" type="audio/mp4">
+</audio>
+<div class="music-widget">
+  <div class="music-volume-panel" id="musicVolumePanel">
+    <input type="range" id="musicVolumeSlider" min="0" max="100" value="45" aria-label="Music volume">
+    <span class="music-volume-label" id="musicVolumeLabel">45%</span>
+  </div>
+  <button type="button" class="music-toggle" id="musicToggle" aria-label="Mute background music" aria-pressed="false">
+    <svg id="musicIconOn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 8 8 8 13 4 13 20 8 16 4 16 4 8"></polygon><path d="M17 8a5 5 0 0 1 0 8"></path><path d="M19.5 5.5a9 9 0 0 1 0 13"></path></svg>
+    <svg id="musicIconOff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" hidden><polygon points="4 8 8 8 13 4 13 20 8 16 4 16 4 8"></polygon><line x1="16" y1="9" x2="21" y2="14"></line><line x1="21" y1="9" x2="16" y2="14"></line></svg>
+  </button>
+</div>
+
 <script>
   document.getElementById('spriteGrid').addEventListener('click', function (e) {
     var btn = e.target.closest('.sprite-play');
@@ -566,6 +620,83 @@
       } catch (e) { /* best effort, opportunistic */ }
     };
     document.head.appendChild(sbScript);
+  })();
+
+  // Background music -- floating icon toggles mute, the panel above it
+  // sets volume. Both persist across visits (localStorage), and a muted
+  // returning visitor stays muted rather than being forced to hear music
+  // again on their next load.
+  (function () {
+    var audio = document.getElementById('bgMusic');
+    var toggle = document.getElementById('musicToggle');
+    var iconOn = document.getElementById('musicIconOn');
+    var iconOff = document.getElementById('musicIconOff');
+    var panel = document.getElementById('musicVolumePanel');
+    var slider = document.getElementById('musicVolumeSlider');
+    var label = document.getElementById('musicVolumeLabel');
+
+    var VOL_KEY = 'wf_adventure_music_volume';
+    var MUTED_KEY = 'wf_adventure_music_muted';
+
+    var savedVolume = parseInt(localStorage.getItem(VOL_KEY), 10);
+    if (isNaN(savedVolume)) savedVolume = 45;
+    var muted = localStorage.getItem(MUTED_KEY) === '1';
+
+    slider.value = savedVolume;
+    label.textContent = savedVolume + '%';
+    audio.volume = savedVolume / 100;
+
+    function updateIcon() {
+      iconOn.hidden = muted;
+      iconOff.hidden = !muted;
+      toggle.classList.toggle('is-muted', muted);
+      toggle.setAttribute('aria-pressed', String(muted));
+      toggle.setAttribute('aria-label', muted ? 'Unmute background music' : 'Mute background music');
+    }
+
+    function play() {
+      audio.muted = muted;
+      // Browsers block autoplay-with-sound until a user gesture -- this
+      // rejects silently in that case, and the click-anywhere fallback
+      // below picks it up on first real interaction instead.
+      audio.play().catch(function () {});
+    }
+    updateIcon();
+    play();
+
+    // First user interaction anywhere on the page (not just the widget)
+    // satisfies the browser's autoplay-gesture requirement, so music
+    // starts as soon as it reasonably can rather than only if someone
+    // happens to click the speaker icon specifically.
+    function unlockOnFirstGesture() {
+      if (!muted) play();
+      document.removeEventListener('click', unlockOnFirstGesture);
+      document.removeEventListener('touchstart', unlockOnFirstGesture);
+    }
+    document.addEventListener('click', unlockOnFirstGesture);
+    document.addEventListener('touchstart', unlockOnFirstGesture);
+
+    toggle.addEventListener('click', function () {
+      muted = !muted;
+      localStorage.setItem(MUTED_KEY, muted ? '1' : '0');
+      audio.muted = muted;
+      updateIcon();
+      if (!muted) play();
+    });
+
+    slider.addEventListener('input', function () {
+      var v = parseInt(slider.value, 10);
+      label.textContent = v + '%';
+      audio.volume = v / 100;
+      localStorage.setItem(VOL_KEY, String(v));
+      if (v > 0 && muted) {
+        muted = false;
+        localStorage.setItem(MUTED_KEY, '0');
+        audio.muted = false;
+        updateIcon();
+        play();
+      }
+    });
   })();
 </script>
 </body>
