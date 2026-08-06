@@ -15,7 +15,25 @@
      repo, served through the same wordpress-proxy used by Wellness/Messenger,
      see wordpress-proxy/index.php's host branch) walking through the in-app
      Fitness RPG / Adventure Map feature. Outline style so it reads as the
-     secondary action next to Launch Nexus. -->
+     secondary action next to Launch Nexus.
+
+     Background music (#wfMusicWidget): starts muted+autoplay (the one
+     autoplay mode every browser allows without a prior user gesture) so
+     the loop is already running the instant someone unmutes -- there's no
+     click-to-first-play delay. The floating control is a plain toggle +
+     volume slider fixed to the vertical middle of the viewport, same
+     "top:50%, docked to an edge" convention the FT app's own admin-drawer
+     tab uses for its floating launcher. Unmuting on first tap also nudges
+     volume up from 0 if the slider was left at its default, so pressing
+     the speaker icon alone is enough to actually hear something. -->
+<audio id="wfMusicAudio" src="https://winfinityfitness.github.io/fitness-tracker/audio/webpage-bg-music.m4a" loop autoplay muted playsinline></audio>
+<div class="wf-music-widget" id="wfMusicWidget">
+  <button type="button" class="wf-music-toggle" id="wfMusicToggle" aria-label="Unmute background music" title="Unmute music">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 9 8 9 12 5 12 19 8 15 4 15"/><line x1="17" y1="8" x2="22" y2="16"/><line x1="22" y1="8" x2="17" y2="16"/></svg>
+  </button>
+  <input type="range" id="wfMusicVolume" class="wf-music-volume" min="0" max="100" value="60" aria-label="Music volume">
+</div>
+
 <section class="wf-hero-embed" id="wfHeroEmbed">
   <img class="wf-hero-logo" src="https://winfinityfitness.github.io/fitness-tracker/icons/wf-logo-3d.png" alt="Winfinity">
   <h1 class="wf-hero-title">The Future Of<br><em>Performance</em></h1>
@@ -87,4 +105,99 @@
     background: #0a0d12; clip-path: polygon(4% 0, 100% 0, 96% 100%, 0 100%);
   }
   .wf-hero-cta--ghost:hover::before { background: #271d1b; }
+
+  /* Floating music control -- fixed to the vertical middle of the
+     viewport (top:50%), docked to the right edge. z-index kept modest
+     (999) since this is a WordPress page with its own header/nav that
+     may need to sit above it, unlike the FT app's own full-screen
+     overlays. */
+  .wf-music-widget {
+    position: fixed; top: 50%; right: 14px; transform: translateY(-50%);
+    z-index: 999; display: flex; flex-direction: column; align-items: center; gap: 10px;
+    background: rgba(10,13,18,0.88); border: 1px solid rgba(255,159,67,0.35);
+    border-radius: 999px; padding: 14px 9px;
+    box-shadow: 0 10px 26px rgba(0,0,0,0.4);
+    backdrop-filter: blur(6px);
+  }
+  .wf-music-toggle {
+    width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer;
+    background: #ff9f43; color: #0a0d12;
+    display: flex; align-items: center; justify-content: center; flex: none;
+    transition: background 0.15s ease;
+  }
+  .wf-music-toggle:hover { background: #ffb668; }
+  .wf-music-toggle.is-muted { background: transparent; color: #ff9f43; box-shadow: inset 0 0 0 1.5px #ff9f43; }
+  /* Vertical slider -- rotating a plain horizontal <input type=range> is
+     far more consistent across browsers than the nonstandard
+     writing-mode/orient="vertical" routes, which render inconsistently
+     (particularly on iOS Safari, a WordPress visitor's likely browser). */
+  .wf-music-volume {
+    writing-mode: vertical-lr; direction: rtl; appearance: none; -webkit-appearance: none;
+    width: 5px; height: 84px; background: rgba(255,255,255,0.18); border-radius: 999px;
+    outline: none; cursor: pointer; margin: 0;
+  }
+  .wf-music-volume::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 14px; height: 14px; border-radius: 50%; background: #ff9f43;
+    border: 2px solid #0a0d12; cursor: pointer;
+  }
+  .wf-music-volume::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%; background: #ff9f43;
+    border: 2px solid #0a0d12; cursor: pointer;
+  }
+  @media (max-width: 640px) {
+    .wf-music-widget { right: 8px; padding: 12px 7px; gap: 8px; }
+    .wf-music-volume { height: 64px; }
+  }
 </style>
+
+<script>
+(function () {
+  var audio = document.getElementById('wfMusicAudio');
+  var toggle = document.getElementById('wfMusicToggle');
+  var volume = document.getElementById('wfMusicVolume');
+  if (!audio || !toggle || !volume) return;
+
+  var MUTE_KEY = 'wf_hero_music_muted';
+  var VOL_KEY = 'wf_hero_music_volume';
+  var ICON_MUTED = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 9 8 9 12 5 12 19 8 15 4 15"/><line x1="17" y1="8" x2="22" y2="16"/><line x1="22" y1="8" x2="17" y2="16"/></svg>';
+  var ICON_ON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 9 8 9 12 5 12 19 8 15 4 15"/><path d="M17 8a5 5 0 0 1 0 8"/><path d="M20 5a9 9 0 0 1 0 14"/></svg>';
+
+  var storedVol = localStorage.getItem(VOL_KEY);
+  var vol = storedVol !== null ? parseInt(storedVol, 10) : 60;
+  if (isNaN(vol)) vol = 60;
+  volume.value = vol;
+  audio.volume = vol / 100;
+
+  // Starts muted (see the <audio> tag's own muted+autoplay -- the one
+  // autoplay mode every browser allows without a prior click) unless the
+  // visitor previously unmuted, in which case honor that straight away.
+  var muted = localStorage.getItem(MUTE_KEY) !== '0';
+
+  function applyState() {
+    audio.muted = muted;
+    toggle.classList.toggle('is-muted', muted);
+    var label = muted ? 'Unmute background music' : 'Mute background music';
+    toggle.setAttribute('aria-label', label);
+    toggle.title = label.replace(' background', '');
+    toggle.innerHTML = muted ? ICON_MUTED : ICON_ON;
+  }
+  applyState();
+
+  toggle.addEventListener('click', function () {
+    muted = !muted;
+    localStorage.setItem(MUTE_KEY, muted ? '1' : '0');
+    applyState();
+    // A real click, so play() sits inside a user gesture -- covers browsers
+    // that paused the muted autoplay loop outright rather than letting it
+    // keep running silently in the background.
+    audio.play().catch(function () {});
+  });
+
+  volume.addEventListener('input', function () {
+    var v = parseInt(volume.value, 10);
+    audio.volume = v / 100;
+    localStorage.setItem(VOL_KEY, String(v));
+  });
+})();
+</script>
