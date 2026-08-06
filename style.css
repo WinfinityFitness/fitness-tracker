@@ -1861,6 +1861,7 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   cursor: pointer;
   z-index: 1;
 }
+.arena-mute-btn { right: 48px; font-size: 0.9rem; }
 .arena-teaser-bg {
   position: relative;
   height: 180px;

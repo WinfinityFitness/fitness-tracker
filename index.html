@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.77">
+<link rel="stylesheet" href="style.css?v=1.7.78">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -3625,6 +3625,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
 <div class="lock-overlay" id="adventureMapOverlay" hidden>
   <div class="lock-card lock-card--wide arena-card">
     <button type="button" class="arena-close-btn" id="btnArenaClose" aria-label="Close">&times;</button>
+    <!-- Loops for as long as the overlay is open (started in openBossArena,
+         paused in closeBossArena — see app.js), muted state persisted so it
+         doesn't reset to on every time the map reopens. -->
+    <button type="button" class="arena-close-btn arena-mute-btn" id="btnArenaMuteMusic" aria-label="Mute background music" title="Mute music">&#128264;</button>
+    <audio id="adventureBgMusic" src="audio/bg-music.m4a" loop preload="none" hidden></audio>
 
     <div id="arenaTeaser">
       <div class="arena-teaser-bg" id="arenaTeaserBg">
@@ -4876,11 +4881,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.7.77"></script>
+<script src="config.js?v=1.7.78"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.77"></script>
+<script src="app.js?v=1.7.78"></script>
 </body>
 </html>

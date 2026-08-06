@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.77';
+const APP_VERSION = 'WF_SYS_V.1.7.78';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -22581,6 +22581,30 @@ function stopGamePresenceHeartbeat() {
   if (gamePresenceHeartbeatId) { clearInterval(gamePresenceHeartbeatId); gamePresenceHeartbeatId = null; }
 }
 
+// Ambient loop for the whole Adventure Map overlay (teaser through Wilds/
+// Forge/Armory/Tavern/fights) — mute state persists across sessions so
+// toggling it off doesn't reset every time the map reopens. Uses
+// audio.muted (keeps the loop's playhead position across a mute toggle)
+// rather than pausing, so unmuting resumes exactly where the music was
+// instead of restarting.
+let adventureMusicMuted = localStorage.getItem('wft_adventure_music_muted') === '1';
+function applyAdventureMusicMuteState() {
+  const audio = document.getElementById('adventureBgMusic');
+  const btn = document.getElementById('btnArenaMuteMusic');
+  if (audio) audio.muted = adventureMusicMuted;
+  if (btn) {
+    btn.innerHTML = adventureMusicMuted ? '&#128263;' : '&#128264;';
+    const label = adventureMusicMuted ? 'Unmute background music' : 'Mute background music';
+    btn.setAttribute('aria-label', label);
+    btn.title = label.replace(' background', '');
+  }
+}
+function toggleAdventureMusicMute() {
+  adventureMusicMuted = !adventureMusicMuted;
+  localStorage.setItem('wft_adventure_music_muted', adventureMusicMuted ? '1' : '0');
+  applyAdventureMusicMuteState();
+}
+
 function openBossArena() {
   const p = getProfile();
   if (!p || !p.fitnessMode) return;
@@ -22619,12 +22643,22 @@ function openBossArena() {
   document.getElementById('btnArenaEnterMap').hidden = !boss.playable;
   document.getElementById('arenaLockedNote').hidden = boss.playable;
   startGamePresenceHeartbeat();
+  const music = document.getElementById('adventureBgMusic');
+  if (music) {
+    applyAdventureMusicMuteState();
+    // Called from a click handler (the popover's Adventure Map button, or
+    // the dial), so this play() sits inside a real user gesture — browsers
+    // that'd otherwise block autoplay-with-sound allow it here.
+    music.play().catch(() => {});
+  }
 }
 
 function closeBossArena() {
   stopArenaCamera();
   stopGamePresenceHeartbeat();
   stopTavernPolling();
+  const music = document.getElementById('adventureBgMusic');
+  if (music) music.pause();
   const overlay = document.getElementById('adventureMapOverlay');
   if (overlay) overlay.hidden = true;
   document.getElementById('arenaStationNote').hidden = true;
@@ -22989,6 +23023,10 @@ function initAdventureMap() {
   }
   const closeBtn = document.getElementById('btnArenaClose');
   if (closeBtn) closeBtn.addEventListener('click', closeBossArena);
+
+  const muteBtn = document.getElementById('btnArenaMuteMusic');
+  if (muteBtn) muteBtn.addEventListener('click', toggleAdventureMusicMute);
+  applyAdventureMusicMuteState();
 
   const enterMapBtn = document.getElementById('btnArenaEnterMap');
   if (enterMapBtn) enterMapBtn.addEventListener('click', openArenaMap);
