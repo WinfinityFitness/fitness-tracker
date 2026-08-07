@@ -1,4 +1,4 @@
-/* Coach Portal preview trigger + modal styles, for
+/* Coach Portal preview trigger + full-screen overlay styles, for
    coach-preview-embed.html's <link> tag on winfinityfitness.com.
 
    Hosted externally rather than an inline <style> block for the same
@@ -18,55 +18,35 @@
 }
 #wfCoachPreviewBtn:hover { color: #ffb668; }
 
+/* Full-viewport takeover -- reads as the actual app opening, not a modal
+   floating over the marketing page, and identical on mobile and desktop
+   (no separate "shrink into a phone frame" treatment on wider screens). */
 .wf-coach-preview-overlay {
-  position: fixed; inset: 0; z-index: 9999; background: rgba(5,7,10,0.82);
-  display: flex; align-items: center; justify-content: center; padding: 24px 16px;
-  backdrop-filter: blur(3px);
+  position: fixed; inset: 0; z-index: 9999; background: #0a0d12;
 }
 /* WordPress's own theme stylesheet loads after the browser's built-in
    [hidden]{display:none} rule and can carry equal specificity (a class
    selector vs. an attribute selector are both 0,1,0) -- whichever comes
-   LAST in the cascade wins a tie, which was letting .wf-coach-preview-
-   overlay's display:flex above beat the hidden attribute outright, so the
-   modal rendered open on every page load and toggling `hidden` via JS had
-   no visible effect. This raises specificity for the hidden state
-   specifically so it always wins regardless of stylesheet order. */
+   LAST in the cascade wins a tie, which previously let an unconditional
+   display rule on .wf-coach-preview-overlay beat the hidden attribute
+   outright. This raises specificity for the hidden state specifically so
+   it always wins regardless of stylesheet order. */
 .wf-coach-preview-overlay[hidden] { display: none !important; }
-.wf-coach-preview-modal {
-  background: #0e131a; border: 1px solid #232d3a; border-radius: 18px;
-  padding: 18px 20px 22px; max-width: 380px; width: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+
+.wf-coach-preview-overlay iframe {
+  width: 100%; height: 100%; border: none; display: block; background: #0a0d12;
 }
-.wf-coach-preview-modal-head {
-  display: flex; align-items: center; justify-content: space-between;
-  color: #e8ecf1; font-weight: 700; font-size: 0.95rem; margin-bottom: 4px;
-}
+
+/* Floating close button, pinned to the top-right corner over the iframe --
+   env(safe-area-inset-*) keeps it clear of the notch/status bar cutout on
+   iOS when this is opened as a real full-screen takeover. */
 .wf-coach-preview-close {
-  background: none; border: none; color: #8a97a8; font-size: 1.3rem; line-height: 1;
-  cursor: pointer; padding: 2px 4px;
+  position: fixed; z-index: 2;
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  right: calc(14px + env(safe-area-inset-right, 0px));
+  width: 40px; height: 40px; border-radius: 50%; border: none;
+  background: rgba(10,13,18,0.78); color: #e8ecf1; font-size: 1.5rem; line-height: 1;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.45); backdrop-filter: blur(4px);
 }
-.wf-coach-preview-close:hover { color: #e8ecf1; }
-.wf-coach-preview-note { color: #8a97a8; font-size: 0.74rem; margin: 0 0 14px; }
-
-/* Phone-shaped frame -- same 9:19.5 screen proportions the app itself
-   uses for its own phone-preview crops (.bg-crop-preview in style.css),
-   so this reads as consistent with the rest of the product's visual
-   language rather than an arbitrary iframe box. */
-.wf-coach-preview-phone {
-  position: relative; width: 100%; max-width: 260px; aspect-ratio: 9 / 19.5;
-  margin: 0 auto; background: #000; border-radius: 28px; padding: 10px;
-  border: 2px solid #2a3542; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
-}
-.wf-coach-preview-phone-notch {
-  position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-  width: 46%; height: 18px; background: #000; border-radius: 0 0 12px 12px; z-index: 2;
-}
-.wf-coach-preview-phone iframe {
-  width: 100%; height: 100%; border: none; border-radius: 18px; display: block; background: #0a0d12;
-}
-
-@media (max-width: 420px) {
-  .wf-coach-preview-modal { padding: 16px 14px 18px; }
-  .wf-coach-preview-phone { max-width: 220px; }
-}
+.wf-coach-preview-close:hover { background: rgba(10,13,18,0.94); }

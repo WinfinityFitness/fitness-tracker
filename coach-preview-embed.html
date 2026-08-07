@@ -4,13 +4,16 @@
      Fragment, not a full page, same convention as hero-embed.html/
      footer-embed.html -- inherits the page's own width.
 
-     Tapping the text link opens a phone-shaped modal iframing
+     Tapping the text link opens a full-screen takeover iframing
      coach-portal.html?demo=1 -- a fully interactive but entirely local/
      synthetic "Coach" session (sample branding, 5 sample clients, fake
      60-day histories) with no real login and no Supabase writes, so a
      prospective coach can actually tap around the real UI instead of
      looking at static screenshots. See coach-portal.html's own demoMode
-     block for how that side works.
+     block for how that side works. Full-viewport on both mobile and
+     desktop (not a small modal/phone-frame card) so it reads as the app
+     actually opening, not a preview floating over the marketing page --
+     just a floating close button pinned top-right.
 
      iframe points at the GitHub Pages URL directly (not the
      winfinityfitness.com/coach-portal proxy path) -- same convention
@@ -21,18 +24,9 @@
 </p>
 
 <div class="wf-coach-preview-overlay" id="wfCoachPreviewOverlay" hidden>
-  <div class="wf-coach-preview-modal">
-    <div class="wf-coach-preview-modal-head">
-      <span>Coach Portal &mdash; Live Preview</span>
-      <button type="button" class="wf-coach-preview-close" id="wfCoachPreviewClose" aria-label="Close preview">&times;</button>
-    </div>
-    <p class="wf-coach-preview-note">Sample coach account &middot; nothing you do here is saved</p>
-    <div class="wf-coach-preview-phone">
-      <div class="wf-coach-preview-phone-notch"></div>
-      <iframe id="wfCoachPreviewFrame" title="Winfinity Coach Portal preview" loading="lazy"
-        src="about:blank" data-src="https://winfinityfitness.github.io/fitness-tracker/coach-portal.html?demo=1"></iframe>
-    </div>
-  </div>
+  <button type="button" class="wf-coach-preview-close" id="wfCoachPreviewClose" aria-label="Close preview">&times;</button>
+  <iframe id="wfCoachPreviewFrame" title="Winfinity Coach Portal preview" loading="lazy"
+    src="about:blank" data-src="https://winfinityfitness.github.io/fitness-tracker/coach-portal.html?demo=1"></iframe>
 </div>
 
 <!-- CSS/JS hosted externally, not inline -- WordPress's content pipeline

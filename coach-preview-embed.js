@@ -28,7 +28,10 @@ function wfCoachPreviewInit() {
 
   trigger.addEventListener('click', open);
   closeBtn.addEventListener('click', close);
-  overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+  // No click-outside-to-close -- the iframe fills the entire overlay (full-
+  // screen takeover, not a modal card with visible backdrop around it), so
+  // there's no clickable backdrop left to click outside of. The close
+  // button and Escape are the only ways out, by design.
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !overlay.hidden) close(); });
 }
 
