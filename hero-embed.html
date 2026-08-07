@@ -251,6 +251,10 @@
   var audio = document.getElementById('wfMusicAudio');
   var toggle = document.getElementById('wfMusicToggle');
   var volume = document.getElementById('wfMusicVolume');
+  // Narration (#wfNarration) is a separate track from the caption script
+  // further down, but shares this one volume slider rather than getting
+  // its own control -- so its level is set here too, not just #wfMusicAudio's.
+  var narration = document.getElementById('wfNarration');
   if (!audio || !toggle || !volume) return;
 
   var MUTE_KEY = 'wf_hero_music_muted';
@@ -263,6 +267,7 @@
   if (isNaN(vol)) vol = 60;
   volume.value = vol;
   audio.volume = vol / 100;
+  if (narration) narration.volume = vol / 100;
 
   // Starts muted (see the <audio> tag's own muted+autoplay -- the one
   // autoplay mode every browser allows without a prior click) unless the
@@ -292,23 +297,25 @@
   volume.addEventListener('input', function () {
     var v = parseInt(volume.value, 10);
     audio.volume = v / 100;
+    if (narration) narration.volume = v / 100;
     localStorage.setItem(VOL_KEY, String(v));
   });
 })();
 
 // Prologue-style caption: one line fades in, holds, fades out, then the
-// next -- including the tagline line, which now also fades out once the
+// next -- including the last line, which now also fades out once the
 // narration actually ends rather than staying put forever (see the
 // 'ended' listener below). Respects prefers-reduced-motion by skipping
 // straight to a static final line with no cycling and no narration at
 // all, same as the logo's own pulse animation does elsewhere on this page.
 //
-// Paced against the ~60s narration clip (see #wfNarration): three holds
-// of HOLD_MS land the final line around the 42s mark, leaving the voice
-// room to finish speaking it before falling silent. There's no per-word
-// timestamp data for the recording, so this is an even, not word-exact,
-// split -- nudge HOLD_MS if a line visibly drifts ahead of or behind the
-// voice once previewed against the actual audio.
+// Paced against the actual ~60.3s narration clip (see #wfNarration),
+// which reads this exact 14-line poem. There's no speech-to-text in this
+// toolchain, so HOLD_MS[i] isn't measured word-for-word -- it's each
+// line's share of the clip's total speaking time in proportion to its
+// word count, with a 1.8s floor so the shortest lines ("Winfinity.")
+// don't flash by unreadably fast. Close, not frame-exact -- nudge any
+// HOLD_MS entry that visibly drifts once previewed against the audio.
 //
 // The whole thing repeats indefinitely: when narration hits 'ended', the
 // caption fades out immediately and both narration and captions restart
@@ -320,12 +327,23 @@
   if (!container) return;
 
   var LINES = [
-    'Long ago, the Apps of Power were forged and scattered among the seekers of many kingdoms&hellip;',
-    'One for Progress. One for Calories. One for Cardio. Scattered, and alone.',
-    'Then, in secret, in the fire of Mount Doom&hellip;',
-    'One App was forged to rule them all.'
+    'Long ago, the Apps of Power were forged, and scattered among the seekers of many kingdoms&hellip;',
+    'One App for Progress, climbing toward the light,',
+    'One for the Calories, counted plate by plate,',
+    'One for the Miles run beneath the open sky,',
+    'One for the Steps, the Water, and the Tribe close by &mdash;',
+    'In the heart of Mount Doom, where the embers lie,',
+    'One App was forged to rule them all, One App to find them,',
+    'One App to bring them all and in your pocket&hellip;bind them,',
+    'In the heart of Mount Doom, where the embers lie.',
+    'Then it was lost.',
+    'For centuries it lay hidden, until &mdash; through fitness logs and fumbled trackers, through six apps become sixty &mdash; the world grew desperate for what was forgotten.',
+    'And so it has returned:',
+    'Winfinity.',
+    'The one App to rule them all.'
   ];
-  var HOLD_MS = 13000;
+  // One entry per line except the last (which holds until narration ends).
+  var HOLD_MS = [5200, 2600, 2600, 2900, 3600, 3300, 4200, 3900, 3300, 1800, 8100, 1800, 1800];
   var FADE_MS = 1000;
   var REPEAT_GAP_MS = 7000;
 
@@ -341,8 +359,11 @@
   var i = 0;
   function showLine() {
     var isLast = i === LINES.length - 1;
+    // "Winfinity." and the closing line are the poem's punchline -- both
+    // get the same emphasized styling, not just the very last line.
+    var isEmphasis = isLast || i === LINES.length - 2;
     var p = document.createElement('p');
-    p.className = 'wf-hero-caption-line' + (isLast ? ' is-final' : '');
+    p.className = 'wf-hero-caption-line' + (isEmphasis ? ' is-final' : '');
     p.innerHTML = LINES[i];
     container.innerHTML = '';
     container.appendChild(p);
@@ -359,7 +380,7 @@
     setTimeout(function () {
       p.classList.remove('is-visible');
       setTimeout(function () { i++; showLine(); }, FADE_MS);
-    }, HOLD_MS);
+    }, HOLD_MS[i]);
   }
 
   var started = false;
