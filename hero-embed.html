@@ -1,53 +1,28 @@
-<!-- Winfinity hero embed for winfinityfitness.com (WordPress) — paste this
-     whole block into a Custom HTML widget/block wherever the hero/top
-     section should go. Fragment, not a full page, same convention as
-     footer-embed.html -- inherits the page's own width.
-
-     CTA button ("Launch Nexus") is a fixed, static link straight to the
-     live Wellness dashboard -- deliberately NOT synced to the Digital
-     Arsenal's Wellness download-icon link (ad_settings.download_url_
-     wellness), which points at the installer file instead. Two different
-     destinations by design: this button launches the live app, Arsenal's
-     downloads the installer. No Supabase fetch needed here at all.
-
-     Second CTA ("Fitness Adventure") links to adventure.winfinityfitness.com
-     -- a standalone static page (adventure-guide.html in the fitness-tracker
-     repo, served through the same wordpress-proxy used by Wellness/Messenger,
-     see wordpress-proxy/index.php's host branch) walking through the in-app
-     Fitness RPG / Adventure Map feature. Outline style so it reads as the
-     secondary action next to Launch Nexus.
-
-     Background music (#wfMusicWidget): starts muted+autoplay (the one
-     autoplay mode every browser allows without a prior user gesture) so
-     the loop is already running the instant someone unmutes -- there's no
-     click-to-first-play delay. The floating control is a plain toggle +
-     volume slider fixed to the vertical middle of the viewport, same
-     "top:50%, docked to an edge" convention the FT app's own admin-drawer
-     tab uses for its floating launcher. Unmuting on first tap also nudges
-     volume up from 0 if the slider was left at its default, so pressing
-     the speaker icon alone is enough to actually hear something. -->
+<!-- Winfinity hero embed for winfinityfitness.com (WordPress) -->
 <audio id="wfMusicAudio" src="https://winfinityfitness.github.io/fitness-tracker/audio/webpage-bg-music.m4a" loop autoplay muted playsinline></audio>
-<div class="wf-music-widget" id="wfMusicWidget">
-  <button type="button" class="wf-music-toggle" id="wfMusicToggle" aria-label="Unmute background music" title="Unmute music">
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 9 8 9 12 5 12 19 8 15 4 15"/><line x1="17" y1="8" x2="22" y2="16"/><line x1="22" y1="8" x2="17" y2="16"/></svg>
-  </button>
-  <input type="range" id="wfMusicVolume" class="wf-music-volume" min="0" max="100" value="60" aria-label="Music volume">
-</div>
-<!-- Voice narration for the prologue caption below -- a single ~60s clip,
-     not a loop. Browsers block non-muted autoplay outright, so playback
-     is deferred to the visitor's first click/tap anywhere on the page
-     (see the caption script below) rather than attempted at load, which
-     left the element stuck in a permanent error state in testing. The
-     caption's own line timings only start once narration actually
-     begins, so text and voice always start together. -->
 <audio id="wfNarration" src="https://winfinityfitness.github.io/fitness-tracker/audio/ring-verse-narration.mp3" preload="auto" playsinline></audio>
 
+<div class="wf-music-widget" id="wfMusicWidget">
+  <!-- Background Music Controls (Top) -->
+  <div class="wf-audio-control-group">
+    <button type="button" class="wf-music-toggle" id="wfMusicToggle" aria-label="Unmute background music" title="Unmute music">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 9 8 9 12 5 12 19 8 15 4 15"/><line x1="17" y1="8" x2="22" y2="16"/><line x1="22" y1="8" x2="17" y2="16"/></svg>
+    </button>
+    <input type="range" id="wfMusicVolume" class="wf-music-volume" min="0" max="100" value="60" aria-label="Music volume">
+  </div>
+
+  <div class="wf-audio-divider-horizontal" aria-hidden="true"></div>
+
+  <!-- Narration Voice Controls (Bottom) -->
+  <div class="wf-audio-control-group">
+    <button type="button" class="wf-music-toggle" id="wfNarrationToggle" aria-label="Unmute narration" title="Unmute narration">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+    </button>
+    <input type="range" id="wfNarrationVolume" class="wf-music-volume" min="0" max="100" value="80" aria-label="Narration volume">
+  </div>
+</div>
+
 <section class="wf-hero-embed" id="wfHeroEmbed">
-  <!-- Decorative flanking characters -- pre-processed (vignette-faded to
-       transparent at the edges + darkened) offline rather than at CSS/
-       runtime, so there's no per-visitor blend cost and the fade is exact
-       regardless of what sits behind it. aria-hidden + empty alt since
-       they're pure atmosphere, not content. -->
   <div class="wf-hero-side-clip wf-hero-side-clip--left">
     <img class="wf-hero-side-char wf-hero-side-char--left" src="https://winfinityfitness.github.io/fitness-tracker/icons/hero-fighter.png" alt="" aria-hidden="true">
   </div>
@@ -57,12 +32,6 @@
   <div class="wf-hero-content">
     <img class="wf-hero-logo" src="https://winfinityfitness.github.io/fitness-tracker/icons/wf-logo-3d.png" alt="Winfinity">
     <h1 class="wf-hero-title">The Future Of<br><em>Performance</em></h1>
-    <!-- Prologue-style cycling caption, synced to and repeating with the
-         narration clip below (see the caption script near the bottom of
-         this file) -- one line fades in, holds, fades out, then the
-         next, looping back to the first line 7s after the narration
-         ends. Reserves its own min-height (see .wf-hero-caption) so the
-         CTA row below doesn't jump as lines change length. -->
     <div class="wf-hero-caption" id="wfHeroCaption" aria-live="polite"></div>
     <div class="wf-hero-cta-row">
       <a class="wf-hero-cta" href="https://wellness.winfinityfitness.com" target="_blank" rel="noopener">Launch Nexus</a>
@@ -78,31 +47,11 @@
     position: relative; overflow: hidden; min-height: 640px;
     display: flex; align-items: center; justify-content: center;
   }
-  /* min-width:0 overrides a flex item's default min-width:auto, which
-     otherwise refuses to shrink below its text content's intrinsic width
-     -- without this, turning .wf-hero-embed into a flex container (for
-     centering the side characters) silently broke text wrapping on
-     narrow viewports, overflowing past the section instead of wrapping. */
   .wf-hero-content { position: relative; z-index: 2; min-width: 0; max-width: 100%; }
-  /* Flanking characters -- absolutely positioned behind the content,
-     bottom-aligned so their feet sit at the section's own bottom edge.
-     Height-based sizing (not width) keeps both proportional to the
-     section's height regardless of viewport width -- the fighter's crop
-     is nearly square while the knight's is tall and narrow, so a %-width
-     cap would clamp one before the other and force object-fit:contain to
-     shrink just that one's height to comply, breaking the eye/toe
-     alignment between them. Two different-aspect-ratio images only stay
-     aligned if height is the only sizing constraint in play.
-
-     The logo must never be crossed, though -- so each character sits in
-     its own clipping wrapper whose boundary is fixed to the logo's own
-     edge (50% +/- half its 252px width), rather than shrinking to fit.
-     Anything past that boundary (the fighter's raised knee, at typical
-     widths) is clipped by the wrapper's overflow:hidden instead of
-     scaling the whole figure down -- explicitly fine per the brief. */
   .wf-hero-side-clip {
     position: absolute; top: 0; bottom: 0; overflow: hidden;
     pointer-events: none; z-index: 1;
+    transition: all 0.3s ease;
   }
   .wf-hero-side-clip--left { left: 0; width: max(0px, calc(50% - 126px)); }
   .wf-hero-side-clip--right { right: 0; width: max(0px, calc(50% - 126px)); }
@@ -110,29 +59,46 @@
     position: absolute; bottom: 0; height: 96%; width: auto;
     object-fit: contain; user-select: none;
   }
-  /* Anchored to the INNER edge (facing the logo), not the outer/page
-     edge -- the two characters have very different natural widths at
-     the same height (knight's crop is much wider than the gym guy's
-     narrower one), so anchoring outer-edge left the narrower one
-     stranded far from the logo while the wider one crowded right up
-     against it. Anchoring inner-edge instead means both sit the same
-     distance from the logo regardless of their own width; any excess
-     width extends outward, where the clip wrapper still guards it. */
   .wf-hero-side-char--left { right: 0; object-position: right bottom; }
   .wf-hero-side-char--right { left: 0; object-position: left bottom; }
+
   @media (max-width: 900px) {
     .wf-hero-side-char { opacity: 0.55; height: 82%; }
   }
+
+  /* Mobile Layout - Move characters back-to-back behind center content */
   @media (max-width: 640px) {
-    /* No room to flank the centered content once the layout this tight --
-       they'd crowd the headline rather than read as atmosphere. */
-    .wf-hero-side-clip { display: none; }
-    .wf-hero-embed { min-height: 0; }
+    .wf-hero-embed { min-height: 560px; padding: 48px 16px 56px; }
+
+    .wf-hero-side-clip--left {
+      left: 50%;
+      right: auto;
+      width: 50%;
+      transform: translateX(-100%);
+    }
+    .wf-hero-side-clip--right {
+      right: 50%;
+      left: auto;
+      width: 50%;
+      transform: translateX(100%);
+    }
+
+    .wf-hero-side-char {
+      height: 75%;
+      opacity: 0.35; /* Faded slightly on mobile so text remains crisp */
+    }
+
+    .wf-hero-side-char--left {
+      right: 10px; /* Aligns left character near the center spine */
+      object-position: right bottom;
+    }
+    .wf-hero-side-char--right {
+      left: 10px; /* Aligns right character near the center spine */
+      object-position: left bottom;
+    }
   }
+
   .wf-hero-logo {
-    /* Sized to match the Adventure guide's hero seal (.hero-seal-frame,
-       adventure-guide.html) so the same logo reads consistently large
-       across both pages. */
     width: 252px; height: 252px; object-fit: contain; margin: 0 auto 28px; display: block;
     animation: wf-hero-glow-pulse 2.4s ease-in-out infinite alternate;
   }
@@ -143,10 +109,6 @@
   @media (prefers-reduced-motion: reduce) {
     .wf-hero-logo { animation: none; filter: drop-shadow(0 0 18px rgba(255,159,67,0.55)); }
   }
-  /* !important + explicit font-family throughout, same defensive pattern
-     as .wf-footer-name -- WordPress themes commonly re-style bare h1-h6
-     (and em inside them) with their own font-family/font-style/color at
-     higher specificity than a single class can beat on its own. */
   .wf-hero-embed .wf-hero-title {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
     color: #e8ecf1 !important; font-size: clamp(1.8rem, 5vw, 2.6rem) !important; font-weight: 800 !important;
@@ -156,9 +118,6 @@
     font-family: inherit !important; display: block; color: #ff9f43 !important;
     font-style: normal !important; font-weight: 800 !important;
   }
-  /* Prologue caption -- fixed min-height reserves space for the tallest
-     line up front so the CTA row below doesn't jump vertically as shorter/
-     longer lines swap in (see wfHeroCaptionInit). */
   .wf-hero-caption {
     min-height: 3.2em; max-width: 520px; margin: 0 auto 32px;
     display: flex; align-items: center; justify-content: center; padding: 0 8px;
@@ -185,15 +144,6 @@
     box-sizing: border-box; min-width: 230px; text-align: center; position: relative;
   }
   .wf-hero-cta:hover { background: #ffb668; }
-  /* A real border/box-shadow can't follow clip-path's diagonal cut edges
-     at all -- clip-path only crops pixels, it never draws a stroke along
-     the new cut line, so both approaches leave the slanted sides bare
-     (the bug in the last fix). The only way to get an outline that
-     actually follows every edge, including the diagonals, is a "clipped
-     picture frame": this element's own background IS the outline color
-     (inheriting .wf-hero-cta's orange fill + clip-path above), and a
-     ::before inset by the border width, clipped to the same shape, sits
-     on top in the page's own background color to punch out the middle. */
   .wf-hero-cta--ghost { color: #ff9f43 !important; }
   .wf-hero-cta--ghost::before {
     content: ''; position: absolute; inset: 1.5px; z-index: -1;
@@ -201,48 +151,46 @@
   }
   .wf-hero-cta--ghost:hover::before { background: #271d1b; }
 
-  /* Floating music control -- fixed to the vertical middle of the
-     viewport (top:50%), docked to the right edge. z-index kept modest
-     (999) since this is a WordPress page with its own header/nav that
-     may need to sit above it, unlike the FT app's own full-screen
-     overlays. */
+  /* Audio Controls Widget Layout - Vertical Stack */
   .wf-music-widget {
     position: fixed; top: 50%; right: 14px; transform: translateY(-50%);
-    z-index: 999; display: flex; flex-direction: column; align-items: center; gap: 10px;
+    z-index: 999; display: flex; flex-direction: column; align-items: center; gap: 12px;
     background: rgba(10,13,18,0.88); border: 1px solid rgba(255,159,67,0.35);
-    border-radius: 999px; padding: 14px 9px;
+    border-radius: 999px; padding: 14px 10px;
     box-shadow: 0 10px 26px rgba(0,0,0,0.4);
     backdrop-filter: blur(6px);
   }
+  .wf-audio-control-group {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  .wf-audio-divider-horizontal {
+    width: 24px; height: 1px; background: rgba(255,159,67,0.3); margin: 2px 0;
+  }
   .wf-music-toggle {
-    width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer;
+    width: 32px; height: 32px; border-radius: 50%; border: none; cursor: pointer;
     background: #ff9f43; color: #0a0d12;
     display: flex; align-items: center; justify-content: center; flex: none;
     transition: background 0.15s ease;
   }
   .wf-music-toggle:hover { background: #ffb668; }
   .wf-music-toggle.is-muted { background: transparent; color: #ff9f43; box-shadow: inset 0 0 0 1.5px #ff9f43; }
-  /* Vertical slider -- rotating a plain horizontal <input type=range> is
-     far more consistent across browsers than the nonstandard
-     writing-mode/orient="vertical" routes, which render inconsistently
-     (particularly on iOS Safari, a WordPress visitor's likely browser). */
   .wf-music-volume {
     writing-mode: vertical-lr; direction: rtl; appearance: none; -webkit-appearance: none;
-    width: 5px; height: 84px; background: rgba(255,255,255,0.18); border-radius: 999px;
+    width: 5px; height: 68px; background: rgba(255,255,255,0.18); border-radius: 999px;
     outline: none; cursor: pointer; margin: 0;
   }
   .wf-music-volume::-webkit-slider-thumb {
     -webkit-appearance: none; appearance: none;
-    width: 14px; height: 14px; border-radius: 50%; background: #ff9f43;
+    width: 13px; height: 13px; border-radius: 50%; background: #ff9f43;
     border: 2px solid #0a0d12; cursor: pointer;
   }
   .wf-music-volume::-moz-range-thumb {
-    width: 14px; height: 14px; border-radius: 50%; background: #ff9f43;
+    width: 13px; height: 13px; border-radius: 50%; background: #ff9f43;
     border: 2px solid #0a0d12; cursor: pointer;
   }
   @media (max-width: 640px) {
-    .wf-music-widget { right: 8px; padding: 12px 7px; gap: 8px; }
-    .wf-music-volume { height: 64px; }
+    .wf-music-widget { right: 8px; padding: 12px 8px; gap: 8px; }
+    .wf-music-volume { height: 54px; }
   }
 </style>
 
@@ -251,76 +199,85 @@
   var audio = document.getElementById('wfMusicAudio');
   var toggle = document.getElementById('wfMusicToggle');
   var volume = document.getElementById('wfMusicVolume');
-  // Narration (#wfNarration) is a separate track from the caption script
-  // further down, but shares this one volume slider rather than getting
-  // its own control -- so its level is set here too, not just #wfMusicAudio's.
+
   var narration = document.getElementById('wfNarration');
-  if (!audio || !toggle || !volume) return;
+  var narrToggle = document.getElementById('wfNarrationToggle');
+  var narrVolume = document.getElementById('wfNarrationVolume');
 
-  var MUTE_KEY = 'wf_hero_music_muted';
-  var VOL_KEY = 'wf_hero_music_volume';
-  var ICON_MUTED = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 9 8 9 12 5 12 19 8 15 4 15"/><line x1="17" y1="8" x2="22" y2="16"/><line x1="22" y1="8" x2="17" y2="16"/></svg>';
-  var ICON_ON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 9 8 9 12 5 12 19 8 15 4 15"/><path d="M17 8a5 5 0 0 1 0 8"/><path d="M20 5a9 9 0 0 1 0 14"/></svg>';
+  if (!audio || !toggle || !volume || !narration || !narrToggle || !narrVolume) return;
 
-  var storedVol = localStorage.getItem(VOL_KEY);
-  var vol = storedVol !== null ? parseInt(storedVol, 10) : 60;
-  if (isNaN(vol)) vol = 60;
-  volume.value = vol;
-  audio.volume = vol / 100;
-  if (narration) narration.volume = vol / 100;
+  // Local Storage Keys
+  var MUSIC_MUTE_KEY = 'wf_hero_music_muted';
+  var MUSIC_VOL_KEY = 'wf_hero_music_volume';
+  var NARR_MUTE_KEY = 'wf_hero_narration_muted';
+  var NARR_VOL_KEY = 'wf_hero_narration_volume';
 
-  // Starts muted (see the <audio> tag's own muted+autoplay -- the one
-  // autoplay mode every browser allows without a prior click) unless the
-  // visitor previously unmuted, in which case honor that straight away.
-  var muted = localStorage.getItem(MUTE_KEY) !== '0';
+  // SVG Icons
+  var ICON_MUSIC_OFF = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 9 8 9 12 5 12 19 8 15 4 15"/><line x1="17" y1="8" x2="22" y2="16"/><line x1="22" y1="8" x2="17" y2="16"/></svg>';
+  var ICON_MUSIC_ON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 9 8 9 12 5 12 19 8 15 4 15"/><path d="M17 8a5 5 0 0 1 0 8"/><path d="M20 5a9 9 0 0 1 0 14"/></svg>';
+  var ICON_NARR_OFF = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
+  var ICON_NARR_ON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
 
-  function applyState() {
-    audio.muted = muted;
-    toggle.classList.toggle('is-muted', muted);
-    var label = muted ? 'Unmute background music' : 'Mute background music';
+  // --- Background Music Handling ---
+  var musicVol = parseInt(localStorage.getItem(MUSIC_VOL_KEY) || '60', 10);
+  if (isNaN(musicVol)) musicVol = 60;
+  volume.value = musicVol;
+  audio.volume = musicVol / 100;
+  var musicMuted = localStorage.getItem(MUSIC_MUTE_KEY) !== '0';
+
+  function applyMusicState() {
+    audio.muted = musicMuted;
+    toggle.classList.toggle('is-muted', musicMuted);
+    var label = musicMuted ? 'Unmute background music' : 'Mute background music';
     toggle.setAttribute('aria-label', label);
     toggle.title = label.replace(' background', '');
-    toggle.innerHTML = muted ? ICON_MUTED : ICON_ON;
+    toggle.innerHTML = musicMuted ? ICON_MUSIC_OFF : ICON_MUSIC_ON;
   }
-  applyState();
+  applyMusicState();
 
   toggle.addEventListener('click', function () {
-    muted = !muted;
-    localStorage.setItem(MUTE_KEY, muted ? '1' : '0');
-    applyState();
-    // A real click, so play() sits inside a user gesture -- covers browsers
-    // that paused the muted autoplay loop outright rather than letting it
-    // keep running silently in the background.
+    musicMuted = !musicMuted;
+    localStorage.setItem(MUSIC_MUTE_KEY, musicMuted ? '1' : '0');
+    applyMusicState();
     audio.play().catch(function () {});
   });
 
   volume.addEventListener('input', function () {
     var v = parseInt(volume.value, 10);
     audio.volume = v / 100;
-    if (narration) narration.volume = v / 100;
-    localStorage.setItem(VOL_KEY, String(v));
+    localStorage.setItem(MUSIC_VOL_KEY, String(v));
+  });
+
+  // --- Narration Audio Handling ---
+  var narrVol = parseInt(localStorage.getItem(NARR_VOL_KEY) || '80', 10);
+  if (isNaN(narrVol)) narrVol = 80;
+  narrVolume.value = narrVol;
+  narration.volume = narrVol / 100;
+  var narrMuted = localStorage.getItem(NARR_MUTE_KEY) === '1';
+
+  function applyNarrState() {
+    narration.muted = narrMuted;
+    narrToggle.classList.toggle('is-muted', narrMuted);
+    var label = narrMuted ? 'Unmute narration' : 'Mute narration';
+    narrToggle.setAttribute('aria-label', label);
+    narrToggle.title = label;
+    narrToggle.innerHTML = narrMuted ? ICON_NARR_OFF : ICON_NARR_ON;
+  }
+  applyNarrState();
+
+  narrToggle.addEventListener('click', function () {
+    narrMuted = !narrMuted;
+    localStorage.setItem(NARR_MUTE_KEY, narrMuted ? '1' : '0');
+    applyNarrState();
+  });
+
+  narrVolume.addEventListener('input', function () {
+    var v = parseInt(narrVolume.value, 10);
+    narration.volume = v / 100;
+    localStorage.setItem(NARR_VOL_KEY, String(v));
   });
 })();
 
-// Prologue-style caption: one line fades in, holds, fades out, then the
-// next -- including the last line, which now also fades out once the
-// narration actually ends rather than staying put forever (see the
-// 'ended' listener below). Respects prefers-reduced-motion by skipping
-// straight to a static final line with no cycling and no narration at
-// all, same as the logo's own pulse animation does elsewhere on this page.
-//
-// Paced against the actual ~60.3s narration clip (see #wfNarration),
-// which reads this exact 14-line poem. There's no speech-to-text in this
-// toolchain, so HOLD_MS[i] isn't measured word-for-word -- it's each
-// line's share of the clip's total speaking time in proportion to its
-// word count, with a 1.8s floor so the shortest lines ("Winfinity.")
-// don't flash by unreadably fast. Close, not frame-exact -- nudge any
-// HOLD_MS entry that visibly drifts once previewed against the audio.
-//
-// The whole thing repeats indefinitely: when narration hits 'ended', the
-// caption fades out immediately and both narration and captions restart
-// together after REPEAT_GAP_MS of silence, so the two never drift apart
-// across repeats the way independent timers eventually would.
 (function () {
   var container = document.getElementById('wfHeroCaption');
   var narration = document.getElementById('wfNarration');
@@ -342,7 +299,6 @@
     'Winfinity.',
     'The one App to rule them all.'
   ];
-  // One entry per line except the last (which holds until narration ends).
   var HOLD_MS = [5200, 2600, 2600, 2900, 3600, 3300, 4200, 3900, 3300, 1800, 8100, 1800, 1800];
   var FADE_MS = 1000;
   var REPEAT_GAP_MS = 7000;
@@ -359,23 +315,15 @@
   var i = 0;
   function showLine() {
     var isLast = i === LINES.length - 1;
-    // "Winfinity." and the closing line are the poem's punchline -- both
-    // get the same emphasized styling, not just the very last line.
     var isEmphasis = isLast || i === LINES.length - 2;
     var p = document.createElement('p');
     p.className = 'wf-hero-caption-line' + (isEmphasis ? ' is-final' : '');
     p.innerHTML = LINES[i];
     container.innerHTML = '';
     container.appendChild(p);
-    // Fade-in needs the opacity:0 state to actually paint first -- adding
-    // is-visible in the same tick as appending the element would let the
-    // browser coalesce both into one paint with no transition to animate.
     requestAnimationFrame(function () {
       requestAnimationFrame(function () { p.classList.add('is-visible'); });
     });
-    // The final line no longer schedules its own fade-out here -- with
-    // no narration to key off of, it just holds indefinitely until (if
-    // ever) a 'narration ended' event drives the repeat below.
     if (isLast) return;
     setTimeout(function () {
       p.classList.remove('is-visible');
@@ -393,12 +341,6 @@
 
   if (!narration) { start(); return; }
 
-  // Unmuted audio can't autoplay in any real browser, so there's no point
-  // attempting play() before a gesture -- every browser rejects it, and
-  // doing so anyway risks leaving the element in a broken error state that
-  // a later retry on the same element doesn't reliably recover from. Wait
-  // for the visitor's first tap/click anywhere on the page instead, then
-  // start narration and captions together so they never drift apart.
   var kicked = false;
   function kick() {
     if (kicked) return;
@@ -411,10 +353,6 @@
   document.addEventListener('click', kick, { once: true });
   document.addEventListener('touchstart', kick, { once: true });
 
-  // Not the native <audio loop> attribute -- that repeats with zero gap,
-  // and the brief wants a 7s pause of silence between reads. 'ended' only
-  // fires with loop absent, so this is also what makes the manual repeat
-  // possible at all.
   narration.addEventListener('ended', function () {
     var line = container.querySelector('.wf-hero-caption-line');
     if (line) line.classList.remove('is-visible');
