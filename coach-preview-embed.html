@@ -1,0 +1,119 @@
+<!-- Coach Portal preview trigger for winfinityfitness.com (WordPress) --
+     paste this whole block into a Custom HTML widget/block directly under
+     the existing "Open Coach Portal" button in the FOR COACHES card.
+     Fragment, not a full page, same convention as hero-embed.html/
+     footer-embed.html -- inherits the page's own width.
+
+     Tapping the text link opens a phone-shaped modal iframing
+     coach-portal.html?demo=1 -- a fully interactive but entirely local/
+     synthetic "Coach" session (sample branding, 5 sample clients, fake
+     60-day histories) with no real login and no Supabase writes, so a
+     prospective coach can actually tap around the real UI instead of
+     looking at static screenshots. See coach-portal.html's own demoMode
+     block for how that side works.
+
+     iframe points at the GitHub Pages URL directly (not the
+     winfinityfitness.com/coach-portal proxy path) -- same convention
+     hero-embed.html uses for its own asset URLs, and avoids depending on
+     the PHP proxy just to preview the thing that proxy also serves. -->
+<p class="wf-coach-preview-trigger">
+  <button type="button" id="wfCoachPreviewBtn">Coach Portal Preview <span aria-hidden="true">click this</span></button>
+</p>
+
+<div class="wf-coach-preview-overlay" id="wfCoachPreviewOverlay" hidden>
+  <div class="wf-coach-preview-modal">
+    <div class="wf-coach-preview-modal-head">
+      <span>Coach Portal &mdash; Live Preview</span>
+      <button type="button" class="wf-coach-preview-close" id="wfCoachPreviewClose" aria-label="Close preview">&times;</button>
+    </div>
+    <p class="wf-coach-preview-note">Sample coach account &middot; nothing you do here is saved</p>
+    <div class="wf-coach-preview-phone">
+      <div class="wf-coach-preview-phone-notch"></div>
+      <iframe id="wfCoachPreviewFrame" title="Winfinity Coach Portal preview" loading="lazy"
+        src="about:blank" data-src="https://winfinityfitness.github.io/fitness-tracker/coach-portal.html?demo=1"></iframe>
+    </div>
+  </div>
+</div>
+
+<style>
+  .wf-coach-preview-trigger { text-align: center; margin: 10px 0 0; }
+  #wfCoachPreviewBtn {
+    background: none; border: none; cursor: pointer; padding: 4px 2px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    font-size: 0.82rem !important; color: #ff9f43 !important; text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  #wfCoachPreviewBtn:hover { color: #ffb668 !important; }
+
+  .wf-coach-preview-overlay {
+    position: fixed; inset: 0; z-index: 9999; background: rgba(5,7,10,0.82);
+    display: flex; align-items: center; justify-content: center; padding: 24px 16px;
+    backdrop-filter: blur(3px);
+  }
+  .wf-coach-preview-modal {
+    background: #0e131a; border: 1px solid #232d3a; border-radius: 18px;
+    padding: 18px 20px 22px; max-width: 380px; width: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .wf-coach-preview-modal-head {
+    display: flex; align-items: center; justify-content: space-between;
+    color: #e8ecf1; font-weight: 700; font-size: 0.95rem; margin-bottom: 4px;
+  }
+  .wf-coach-preview-close {
+    background: none; border: none; color: #8a97a8; font-size: 1.3rem; line-height: 1;
+    cursor: pointer; padding: 2px 4px;
+  }
+  .wf-coach-preview-close:hover { color: #e8ecf1; }
+  .wf-coach-preview-note { color: #8a97a8; font-size: 0.74rem; margin: 0 0 14px; }
+
+  /* Phone-shaped frame -- same 9:19.5 screen proportions the app itself
+     uses for its own phone-preview crops (.bg-crop-preview in style.css),
+     so this reads as consistent with the rest of the product's visual
+     language rather than an arbitrary iframe box. */
+  .wf-coach-preview-phone {
+    position: relative; width: 100%; max-width: 260px; aspect-ratio: 9 / 19.5;
+    margin: 0 auto; background: #000; border-radius: 28px; padding: 10px;
+    border: 2px solid #2a3542; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+  }
+  .wf-coach-preview-phone-notch {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    width: 46%; height: 18px; background: #000; border-radius: 0 0 12px 12px; z-index: 2;
+  }
+  .wf-coach-preview-phone iframe {
+    width: 100%; height: 100%; border: none; border-radius: 18px; display: block; background: #0a0d12;
+  }
+
+  @media (max-width: 420px) {
+    .wf-coach-preview-modal { padding: 16px 14px 18px; }
+    .wf-coach-preview-phone { max-width: 220px; }
+  }
+</style>
+
+<script>
+(function () {
+  var trigger = document.getElementById('wfCoachPreviewBtn');
+  var overlay = document.getElementById('wfCoachPreviewOverlay');
+  var closeBtn = document.getElementById('wfCoachPreviewClose');
+  var frame = document.getElementById('wfCoachPreviewFrame');
+  if (!trigger || !overlay || !closeBtn || !frame) return;
+
+  function open() {
+    overlay.hidden = false;
+    document.body.style.overflow = 'hidden';
+    // Deferred until first open rather than loaded eagerly on page load --
+    // this is a marketing page, not the app, so no reason to spend a
+    // Supabase-JS + full page load on every visitor who never taps Preview.
+    if (frame.src === 'about:blank' || !frame.src) frame.src = frame.dataset.src;
+  }
+  function close() {
+    overlay.hidden = true;
+    document.body.style.overflow = '';
+  }
+
+  trigger.addEventListener('click', open);
+  closeBtn.addEventListener('click', close);
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !overlay.hidden) close(); });
+})();
+</script>

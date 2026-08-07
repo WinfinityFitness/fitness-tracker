@@ -190,6 +190,15 @@
   .back-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.85rem; }
   .back-btn:hover { color: var(--text-primary); }
   [hidden] { display: none !important; }
+
+  /* Demo mode -- entered via ?demo=1 (see coach-preview-embed.html, which
+     iframes this page for the marketing site's "Coach Portal Preview").
+     Same banner treatment as coach-dashboard.html's own live-demo mode. */
+  .demo-banner {
+    background: rgba(230,81,106,0.14); border: 1px solid var(--critical); color: var(--critical);
+    border-radius: 8px; padding: 8px 12px; text-align: center; font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 0.03em; text-transform: uppercase; margin-bottom: 14px;
+  }
 </style>
 </head>
 <body>
@@ -408,6 +417,7 @@
     <p class="note" style="text-align:center;margin-top:8px;">Download the app to get your personal Digital ID and to set your Password/PIN to access Coach Portal.</p>
 
     <div id="coachPanel" hidden>
+      <div id="coachDemoBanner" class="demo-banner" hidden>Preview mode — sample coach account, nothing here is saved</div>
       <div class="card">
         <h2 style="margin-bottom:4px;">Client Progress Showcase</h2>
         <p class="note" style="margin-top:0;">Same interaction as the public Progress Showcase, scoped to your own clients only.</p>
@@ -569,7 +579,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
    Now" here just means forcing a cache-busted reload instead of quietly
    trusting whatever the browser already has cached, not installing
    anything. */
-const COACH_PORTAL_VERSION = '1.0.2';
+const COACH_PORTAL_VERSION = '1.1.0';
 document.getElementById('versionBadgeText').textContent = COACH_PORTAL_VERSION;
 
 async function fetchLatestCoachPortalVersion() {
@@ -1276,6 +1286,130 @@ document.getElementById('btnToggleCoachActive').addEventListener('click', async 
 // --------------------------------------------------------------------
 let coachSession = null; // { digitalId, password }
 
+/* ---------------------------------------------------------------------
+   Demo mode -- entered via ?demo=1, used by coach-preview-embed.html's
+   phone-frame iframe on the marketing site so a prospective coach can see
+   a populated Coach Portal without a real account or any Supabase write.
+   Entirely local/synthetic (ported from coach-dashboard.html's own "See a
+   live demo"): every RPC-calling function below checks demoMode first and
+   substitutes generated data instead. Every save/mutate action just shows
+   a "not saved" note rather than calling anything.
+--------------------------------------------------------------------- */
+const demoMode = new URLSearchParams(location.search).get('demo') === '1';
+
+const DEMO_CLIENTS = [
+  { publicId: 'WF-7QP3ML', codeName: 'Marco', fitnessMode: 'warrior' },
+  { publicId: 'WF-K9X2VD', codeName: 'Divine', fitnessMode: 'spartan' },
+  { publicId: 'WF-4RTN8B', codeName: 'Bea', fitnessMode: 'beginner' },
+  { publicId: 'WF-Y6WFQ2', codeName: 'Jhun', fitnessMode: 'demigod' },
+  { publicId: 'WF-B3HK7T', codeName: 'Trisha', fitnessMode: 'warrior' },
+];
+const DEMO_BRAND = { name: 'Ignite Coaching', logoUrl: 'icons/icon-192.png', primary: '#ff5f2d', accent: '#2dd4ff' };
+const DEMO_SPLASH = { caption: 'Stronger every single day.' };
+const DEMO_FLAGS = {
+  feature_core_tracking: true, feature_resistance_training: true, feature_outdoor_activity: true,
+  feature_nutrition_logging: true, feature_prep_meals: false,
+};
+
+function seededRandom(seed) {
+  let s = seed;
+  return () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+}
+
+// Each client's showcase snapshot and 60-day Monitor history come from the
+// same seeded stream, so a given client's numbers stay internally
+// consistent between the two views (mirrors coach-dashboard.html).
+const demoLogsCache = {};
+function demoClientData(client, seed) {
+  const rand = seededRandom(seed);
+  const isRunner = rand() < 0.65;
+  return {
+    publicId: client.publicId, codeName: client.codeName, avatarDataUrl: null, fitnessMode: client.fitnessMode,
+    steps: Math.round(3000 + rand() * 10000),
+    volumeLifted: Math.round(300 + rand() * 7000), volumeUnit: 'kg',
+    weightProgressPct: Math.round((-8 + rand() * 11) * 10) / 10,
+    furthestRunKm: isRunner ? Math.round((2 + rand() * 13) * 10) / 10 : null,
+    fastestRunPaceSec: isRunner ? Math.round(220 + rand() * 260) : null,
+    conscientiousScore: Math.round(35 + rand() * 60),
+  };
+}
+
+function generateDemoMonitorLogs(seed) {
+  const rand = seededRandom(seed);
+  const days = 60;
+  const logConsistency = 0.55 + rand() * 0.4;
+  const gymFrequency = 0.2 + rand() * 0.4;
+  const setCompletionRate = 0.65 + rand() * 0.3;
+  const weightDirection = rand() < 0.2 ? 1 : (rand() < 0.5 ? 0 : -1);
+  const startWeight = 58 + rand() * 45;
+  const weightDriftPerDay = weightDirection * (0.01 + rand() * 0.05);
+  const startSteps = 3500 + rand() * 10000;
+  const stepsDriftPerDay = (rand() - 0.35) * 35;
+  let startVolume = 300 + rand() * 7000;
+  const volumeDriftPerGymDay = (rand() - 0.2) * 20;
+
+  const logsByDate = {};
+  const today = new Date();
+  let gymDayCount = 0;
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    const ds = d.toISOString().slice(0, 10);
+    const dayIndex = days - 1 - i;
+    if (rand() > logConsistency) continue;
+    const isGymDay = rand() < gymFrequency;
+    const entry = {
+      calories: Math.round(1500 + rand() * 1300), protein: Math.round(70 + rand() * 160),
+      carbs: Math.round(120 + rand() * 200), fat: Math.round(40 + rand() * 60), fiber: Math.round(10 + rand() * 25),
+      sodium: Math.round(1400 + rand() * 1400),
+      steps: Math.max(500, Math.round(startSteps + stepsDriftPerDay * dayIndex + (rand() - 0.5) * 2200)),
+      weightKg: Math.round((startWeight + weightDriftPerDay * dayIndex + (rand() - 0.5) * 0.7) * 10) / 10,
+      sleep: 1 + Math.floor(rand() * 5), stress: 1 + Math.floor(rand() * 5),
+      fatigue: 1 + Math.floor(rand() * 5), hunger: 1 + Math.floor(rand() * 5),
+      water: Math.round(900 + rand() * 2200),
+      meals: { breakfast: [{ calories: 400 }], lunch: [{ calories: 600 }], dinner: [{ calories: 700 }], snacks: [] },
+    };
+    if (isGymDay) {
+      gymDayCount++;
+      const setCompleted = rand() < setCompletionRate;
+      const vol = Math.max(200, startVolume + volumeDriftPerGymDay * gymDayCount);
+      entry.exercises = [{
+        name: 'Session', sets: [
+          { reps: 6 + Math.floor(rand() * 8), weightKg: Math.round(vol / 8), completed: setCompleted },
+          { reps: 6 + Math.floor(rand() * 8), weightKg: Math.round(vol / 8), completed: setCompleted },
+        ],
+      }];
+      entry.workout = setCompleted;
+    }
+    logsByDate[ds] = entry;
+  }
+  const targets = {
+    calorieTarget: Math.round(1700 + rand() * 700), stepGoal: Math.round(5000 + rand() * 5000),
+    workoutsPerWeek: 2 + Math.floor(rand() * 5), refeedCalories: null, refeedStart: null, refeedEnd: null,
+  };
+  return { logsByDate, targets, lastSyncedAt: new Date(Date.now() - rand() * 20 * 3600 * 1000).toISOString() };
+}
+
+// Skips the login form entirely and drops straight into a populated
+// coachPanel -- called on load when ?demo=1, and re-runnable if the
+// visitor backs out to the landing screen and taps "I'm a Coach" again.
+function enterCoachDemo() {
+  coachSession = { digitalId: 'WF-DEMOCOACH', password: '' }; // never used for an RPC -- every call below is gated
+  document.getElementById('coachLoginCard').hidden = true;
+  document.getElementById('coachPanel').hidden = false;
+  document.getElementById('coachDemoBanner').hidden = false;
+
+  document.getElementById('coachBrandName').value = DEMO_BRAND.name;
+  document.getElementById('coachBrandLogo').value = DEMO_BRAND.logoUrl;
+  primaryWheel.setFromHex(DEMO_BRAND.primary);
+  accentWheel.setFromHex(DEMO_BRAND.accent);
+  updateBrandPreview();
+  document.getElementById('coachSplashCaption').value = DEMO_SPLASH.caption;
+
+  loadCoachOwnFlags();
+  loadCoachClients();
+  loadShowcaseData();
+}
+
 document.getElementById('linkForgotPassword').addEventListener('click', (e) => {
   e.preventDefault();
   const note = document.getElementById('coachLoginNote');
@@ -1306,6 +1440,16 @@ document.getElementById('btnCoachLogin').addEventListener('click', async () => {
 async function loadCoachOwnFlags() {
   const el = document.getElementById('coachOwnFlags');
   el.innerHTML = '<p class="note">Loading…</p>';
+  if (demoMode) {
+    el.innerHTML = '';
+    FEATURE_KEYS.forEach(([key, label]) => {
+      const wrap = document.createElement('label');
+      wrap.className = 'flag-toggle';
+      wrap.innerHTML = `<input type="checkbox" data-own-flag="${key}" ${DEMO_FLAGS[key] ? 'checked' : ''}> ${label}`;
+      el.appendChild(wrap);
+    });
+    return;
+  }
   try {
     const { data, error } = await sb.rpc('coach_get_feature_flags', {
       p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
@@ -1326,6 +1470,7 @@ async function loadCoachOwnFlags() {
 
 document.getElementById('btnSaveOwnFeatures').addEventListener('click', async () => {
   const note = document.getElementById('ownFeaturesNote');
+  if (demoMode) { note.textContent = 'Preview mode — changes aren\'t saved.'; note.className = 'note'; return; }
   const flags = {};
   document.querySelectorAll('#coachOwnFlags input[data-own-flag]').forEach(cb => { flags[cb.dataset.ownFlag] = cb.checked; });
   note.textContent = 'Saving…'; note.className = 'note';
@@ -1489,6 +1634,7 @@ updateBrandPreview();
 
 document.getElementById('btnSaveBranding').addEventListener('click', async () => {
   const note = document.getElementById('brandingNote');
+  if (demoMode) { note.textContent = 'Preview mode — changes aren\'t saved.'; note.className = 'note'; return; }
   note.textContent = 'Saving…'; note.className = 'note';
   try {
     const { error } = await sb.rpc('coach_update_branding', {
@@ -1507,6 +1653,7 @@ document.getElementById('btnSaveBranding').addEventListener('click', async () =>
 
 document.getElementById('btnSaveSplash').addEventListener('click', async () => {
   const note = document.getElementById('splashNote');
+  if (demoMode) { note.textContent = 'Preview mode — changes aren\'t saved.'; note.className = 'note'; return; }
   note.textContent = 'Saving…'; note.className = 'note';
   try {
     const { error } = await sb.rpc('coach_set_splash_image', {
@@ -1527,6 +1674,7 @@ document.getElementById('btnAttachClient').addEventListener('click', async () =>
   const raw = document.getElementById('attachClientIds').value.trim();
   const ids = raw.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
   if (!ids.length) { note.textContent = 'Enter at least one Digital ID.'; note.className = 'note error'; return; }
+  if (demoMode) { note.textContent = 'Preview mode — attaching clients isn\'t available here.'; note.className = 'note'; return; }
   note.textContent = `Attaching ${ids.length}…`; note.className = 'note';
   let okCount = 0;
   const failures = [];
@@ -1561,6 +1709,21 @@ let coachClientsCache = [];
 async function loadCoachClients() {
   const el = document.getElementById('clientList');
   el.innerHTML = '<p class="note">Loading…</p>';
+  if (demoMode) {
+    coachClientsCache = DEMO_CLIENTS.map(c => ({ public_id: c.publicId, client_nickname: null }));
+    el.innerHTML = '';
+    coachClientsCache.forEach(client => {
+      const pill = document.createElement('button');
+      pill.type = 'button';
+      pill.className = 'client-pill';
+      if (monitorState && monitorState.publicId === client.public_id) pill.classList.add('is-active');
+      pill.dataset.id = client.public_id;
+      pill.textContent = client.public_id;
+      pill.addEventListener('click', () => openMonitorClient(client.public_id, null));
+      el.appendChild(pill);
+    });
+    return;
+  }
   try {
     const { data, error } = await sb.rpc('coach_list_clients', {
       p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
@@ -1711,6 +1874,19 @@ async function loadMonitorData(days) {
   const statusLine = document.getElementById('monitorStatusLine');
   const st = monitorState;
   if (!st) return;
+  if (demoMode) {
+    if (!demoLogsCache[st.publicId]) {
+      const idx = DEMO_CLIENTS.findIndex(c => c.publicId === st.publicId);
+      demoLogsCache[st.publicId] = generateDemoMonitorLogs((idx + 1) * 104729 + 17);
+    }
+    const mock = demoLogsCache[st.publicId];
+    st.loadedDays = days;
+    st.logsByDate = mock.logsByDate;
+    st.targets = mock.targets;
+    st.lastSyncedAt = mock.lastSyncedAt;
+    renderMonitorContent();
+    return;
+  }
   try {
     const { data, error } = await sb.rpc('coach_get_client_monitor', {
       p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
@@ -1886,6 +2062,7 @@ document.getElementById('btnCloseAssignTargets').addEventListener('click', () =>
 });
 document.getElementById('btnSaveAssignTargets').addEventListener('click', async () => {
   const note = document.getElementById('assignTargetsNote');
+  if (demoMode) { note.textContent = 'Preview mode — changes aren\'t saved.'; note.className = 'note'; return; }
   const targetId = document.getElementById('assignTargetsCard').dataset.targetId;
   const numOrNull = (id) => { const v = document.getElementById(id).value; return v === '' ? null : Number(v); };
   const dateOrNull = (id) => { const v = document.getElementById(id).value; return v === '' ? null : v; };
@@ -1910,6 +2087,7 @@ document.getElementById('btnChangePassword').addEventListener('click', async () 
   const oldPw = document.getElementById('cpOldPassword').value;
   const newPw = document.getElementById('cpNewPassword').value;
   if (!oldPw || !newPw) { note.textContent = 'Fill in both fields.'; note.className = 'note error'; return; }
+  if (demoMode) { note.textContent = 'Preview mode — password changes aren\'t available here.'; note.className = 'note'; return; }
   note.textContent = 'Saving…'; note.className = 'note';
   try {
     const { error } = await sb.rpc('coach_change_password', {
@@ -1928,6 +2106,11 @@ document.getElementById('btnChangePassword').addEventListener('click', async () 
 async function renameClient(publicId, currentNickname) {
   const nickname = prompt(`Private name for ${publicId} (only you see this):`, currentNickname || '');
   if (nickname === null) return; // cancelled
+  if (demoMode) {
+    document.getElementById('attachNote').textContent = 'Preview mode — renaming isn\'t saved.';
+    document.getElementById('attachNote').className = 'note';
+    return;
+  }
   try {
     const { error } = await sb.rpc('coach_set_client_nickname', {
       p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
@@ -1943,6 +2126,11 @@ async function renameClient(publicId, currentNickname) {
 
 async function removeClient(publicId) {
   if (!confirm(`Remove ${publicId} from your clients? They'll stop appearing in your list -- you can re-attach them later by Digital ID.`)) return;
+  if (demoMode) {
+    document.getElementById('attachNote').textContent = 'Preview mode — removing isn\'t available here.';
+    document.getElementById('attachNote').className = 'note';
+    return;
+  }
   try {
     const { error } = await sb.rpc('coach_remove_client', {
       p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
@@ -1980,6 +2168,12 @@ let showcaseActiveMetricIndex = 0;
 let showcaseSortByHeight = false;
 
 async function loadShowcaseData() {
+  if (demoMode) {
+    showcaseAllRows = DEMO_CLIENTS.map((c, i) => demoClientData(c, (i + 1) * 104729 + 17));
+    renderShowcaseTabs();
+    renderShowcaseMetric(0);
+    return;
+  }
   try {
     const { data, error } = await sb.rpc('coach_get_showcase_data', {
       p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
@@ -2098,6 +2292,12 @@ function escapeHtml(str) {
   div.textContent = str;
   return div.innerHTML;
 }
+
+// Jump straight into the populated Coach view, bypassing the landing
+// screen and login form entirely -- this needs to run after primaryWheel/
+// accentWheel (declared further up) exist, so it's the very last thing
+// the script does.
+if (demoMode) { show('viewCoach'); enterCoachDemo(); }
 </script>
 </body>
 </html>
