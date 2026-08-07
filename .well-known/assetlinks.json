@@ -10,7 +10,10 @@
   "target": {
     "namespace": "android_app",
     "package_name": "io.github.winfinityfitness.twa",
-    "sha256_cert_fingerprints": ["CF:6A:B4:41:86:50:75:66:45:60:1E:FD:7D:4D:78:D3:1A:6A:91:21:B8:BC:81:31:8F:F9:74:99:A5:89:7B:FF"]
+    "sha256_cert_fingerprints": [
+      "BD:CE:65:44:C0:81:8A:F1:47:00:85:AC:95:27:44:14:2A:06:6B:4F:57:AD:80:62:DA:BD:23:27:F8:61:51:2F",
+      "CF:6A:B4:41:86:50:75:66:45:60:1E:FD:7D:4D:78:D3:1A:6A:91:21:B8:BC:81:31:8F:F9:74:99:A5:89:7B:FF"
+    ]
   }
 }, {
   "relation": ["delegate_permission/common.handle_all_urls"],
