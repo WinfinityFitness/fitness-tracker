@@ -23,6 +23,15 @@
   display: flex; align-items: center; justify-content: center; padding: 24px 16px;
   backdrop-filter: blur(3px);
 }
+/* WordPress's own theme stylesheet loads after the browser's built-in
+   [hidden]{display:none} rule and can carry equal specificity (a class
+   selector vs. an attribute selector are both 0,1,0) -- whichever comes
+   LAST in the cascade wins a tie, which was letting .wf-coach-preview-
+   overlay's display:flex above beat the hidden attribute outright, so the
+   modal rendered open on every page load and toggling `hidden` via JS had
+   no visible effect. This raises specificity for the hidden state
+   specifically so it always wins regardless of stylesheet order. */
+.wf-coach-preview-overlay[hidden] { display: none !important; }
 .wf-coach-preview-modal {
   background: #0e131a; border: 1px solid #232d3a; border-radius: 18px;
   padding: 18px 20px 22px; max-width: 380px; width: 100%;
