@@ -6,7 +6,7 @@
 // them in pasted content, which corrupts JS string literals into a syntax
 // error. A <script src> pointing at a GitHub-Pages-hosted file is immune
 // to that.
-(function () {
+function wfCoachPreviewInit() {
   var trigger = document.getElementById('wfCoachPreviewBtn');
   var overlay = document.getElementById('wfCoachPreviewOverlay');
   var closeBtn = document.getElementById('wfCoachPreviewClose');
@@ -30,4 +30,17 @@
   closeBtn.addEventListener('click', close);
   overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !overlay.hidden) close(); });
-})();
+}
+
+// Deferred to DOMContentLoaded rather than running immediately -- this
+// <script src> tag sits ABOVE the button/modal markup in the pasted
+// WordPress block (right after the arsenal-embed.js line), so a plain
+// immediately-invoked version ran before those elements existed in the
+// DOM yet, silently found nothing via getElementById, and never attached
+// any listeners at all. Waiting for DOMContentLoaded makes this correct
+// regardless of where the script tag ends up relative to the markup.
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', wfCoachPreviewInit);
+} else {
+  wfCoachPreviewInit();
+}
