@@ -229,12 +229,21 @@
     .sprite-stage .action.is-playing { animation: none; opacity: 1; background-position-x: 100%; }
   }
 
-  /* Floating background-music control -- fixed mid-right, matches the
-     page's gold/parchment palette rather than a generic media-player look. */
+  /* Floating audio controls -- fixed mid-right, matches the page's
+     gold/parchment palette rather than a generic media-player look.
+     Music and narration each get their own toggle+slider group, stacked
+     with a hairline divider between them (same split hero-embed.html's
+     widget was given). */
   .music-widget {
     position: fixed; right: 20px; top: 50%; transform: translateY(-50%);
     z-index: 60; display: flex; flex-direction: column; align-items: center;
-    gap: 10px;
+    gap: 14px;
+  }
+  .audio-control-group {
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .audio-divider {
+    width: 26px; height: 1px; background: var(--hairline);
   }
   .music-toggle {
     width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--hairline);
@@ -569,16 +578,34 @@
      anyway, and doing it regardless risks a stuck error state. -->
 <audio id="advNarration" src="audio/adventure-narration.mp3" preload="auto" playsinline></audio>
 <div class="music-widget">
-  <div class="music-volume-panel" id="musicVolumePanel">
-    <input type="range" id="musicVolumeSlider" min="0" max="100" value="45" aria-label="Music volume">
-    <span class="music-volume-label" id="musicVolumeLabel">45%</span>
+  <!-- Background music controls. Single icon, swapped via innerHTML
+       rather than two SVGs toggled with [hidden] -- the two-icon version
+       was rendering both at once (the flex-centered button layout
+       doesn't reliably respect [hidden] on an SVG the way a block
+       element expects). Icon is set entirely by JS (updateMusicIcon). -->
+  <div class="audio-control-group">
+    <div class="music-volume-panel" id="musicVolumePanel">
+      <input type="range" id="musicVolumeSlider" min="0" max="100" value="45" aria-label="Music volume">
+      <span class="music-volume-label" id="musicVolumeLabel">45%</span>
+    </div>
+    <button type="button" class="music-toggle" id="musicToggle" aria-label="Mute background music" aria-pressed="false"></button>
   </div>
-  <!-- Single icon, swapped via innerHTML rather than two SVGs toggled with
-       [hidden] -- the two-icon version was rendering both at once (the
-       flex-centered button layout doesn't reliably respect [hidden] on an
-       SVG the way a block element expects). Icon is set entirely by JS
-       (updateIcon), nothing static here. -->
-  <button type="button" class="music-toggle" id="musicToggle" aria-label="Mute background music" aria-pressed="false"></button>
+
+  <div class="audio-divider" aria-hidden="true"></div>
+
+  <!-- Narration controls -- independent mute + volume from the music
+       above, not a shared slider, same split hero-embed.html's widget
+       got. Doesn't control playback start/loop (that's still owned by
+       #advNarration's own gesture-triggered kick()/ended handlers
+       further down); this only sets muted/volume on whichever state
+       that mechanism is already driving. -->
+  <div class="audio-control-group">
+    <div class="music-volume-panel" id="narrationVolumePanel">
+      <input type="range" id="narrationVolumeSlider" min="0" max="100" value="80" aria-label="Narration volume">
+      <span class="music-volume-label" id="narrationVolumeLabel">80%</span>
+    </div>
+    <button type="button" class="music-toggle" id="narrationToggle" aria-label="Mute narration" aria-pressed="false"></button>
+  </div>
 </div>
 
 <script>
@@ -663,10 +690,6 @@
     var panel = document.getElementById('musicVolumePanel');
     var slider = document.getElementById('musicVolumeSlider');
     var label = document.getElementById('musicVolumeLabel');
-    // Narration (#advNarration) shares this one volume slider rather than
-    // getting a second icon/panel of its own -- same "one shared control"
-    // decision made for the main site's hero-embed.html widget.
-    var narration = document.getElementById('advNarration');
 
     var VOL_KEY = 'wf_adventure_music_volume';
     var MUTED_KEY = 'wf_adventure_music_muted';
@@ -680,7 +703,6 @@
     slider.value = savedVolume;
     label.textContent = savedVolume + '%';
     audio.volume = savedVolume / 100;
-    if (narration) narration.volume = savedVolume / 100;
 
     // Single icon, swapped whole rather than two SVGs toggled with
     // [hidden] -- the two-icon version rendered both at once inside this
@@ -726,7 +748,6 @@
       var v = parseInt(slider.value, 10);
       label.textContent = v + '%';
       audio.volume = v / 100;
-      if (narration) narration.volume = v / 100;
       localStorage.setItem(VOL_KEY, String(v));
       if (v > 0 && muted) {
         muted = false;
@@ -734,6 +755,65 @@
         audio.muted = false;
         updateIcon();
         play();
+      }
+    });
+  })();
+
+  // Narration volume/mute -- independent of the music controls above,
+  // same split hero-embed.html's widget got. Doesn't touch playback
+  // start or looping (that's the caption script below, via #advNarration's
+  // own gesture-triggered kick()/ended handlers); this only ever sets
+  // muted/volume on whatever state that mechanism is already driving.
+  (function () {
+    var narration = document.getElementById('advNarration');
+    var toggle = document.getElementById('narrationToggle');
+    var slider = document.getElementById('narrationVolumeSlider');
+    var label = document.getElementById('narrationVolumeLabel');
+    if (!narration || !toggle || !slider || !label) return;
+
+    var VOL_KEY = 'wf_adventure_narration_volume';
+    var MUTED_KEY = 'wf_adventure_narration_muted';
+    var ICON_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line><line x1="8.5" y1="22" x2="15.5" y2="22"></line></svg>';
+    var ICON_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 5.12 2.12"></path><path d="M15 9.34V5a3 3 0 0 0-5.94-.6"></path><path d="M17 16.95A7 7 0 0 1 5 12v-2"></path><path d="M19 10v2a7 7 0 0 1-.11 1.23"></path><line x1="12" y1="19" x2="12" y2="22"></line><line x1="8.5" y1="22" x2="15.5" y2="22"></line><line x1="1" y1="1" x2="23" y2="23"></line></svg>';
+
+    var savedVolume = parseInt(localStorage.getItem(VOL_KEY), 10);
+    if (isNaN(savedVolume)) savedVolume = 80;
+    // Defaults unmuted, unlike background music -- narration never
+    // autoplays regardless (it only ever starts on a real gesture via
+    // the caption script), so there's no autoplay-with-sound surprise
+    // to guard against by starting muted.
+    var muted = localStorage.getItem(MUTED_KEY) === '1';
+
+    slider.value = savedVolume;
+    label.textContent = savedVolume + '%';
+    narration.volume = savedVolume / 100;
+    narration.muted = muted;
+
+    function updateIcon() {
+      toggle.innerHTML = muted ? ICON_OFF : ICON_ON;
+      toggle.classList.toggle('is-muted', muted);
+      toggle.setAttribute('aria-pressed', String(muted));
+      toggle.setAttribute('aria-label', muted ? 'Unmute narration' : 'Mute narration');
+    }
+    updateIcon();
+
+    toggle.addEventListener('click', function () {
+      muted = !muted;
+      localStorage.setItem(MUTED_KEY, muted ? '1' : '0');
+      narration.muted = muted;
+      updateIcon();
+    });
+
+    slider.addEventListener('input', function () {
+      var v = parseInt(slider.value, 10);
+      label.textContent = v + '%';
+      narration.volume = v / 100;
+      localStorage.setItem(VOL_KEY, String(v));
+      if (v > 0 && muted) {
+        muted = false;
+        localStorage.setItem(MUTED_KEY, '0');
+        narration.muted = false;
+        updateIcon();
       }
     });
   })();
