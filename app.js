@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.79';
+const APP_VERSION = 'WF_SYS_V.1.7.80';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -11398,6 +11398,22 @@ function initTraining() {
         showRestToast('Session completed — saved to your Accomplishment Log.');
         renderExerciseCards();
         renderTrainingStats();
+        // Best-effort, silent -- a coach's Training Calendar/Monitor should
+        // reflect a finished session without the client having to remember
+        // to open Fuel > Web Sync and tap "Sync Now" separately. Only fires
+        // if the client has web sync enabled at all; failures (offline,
+        // etc.) are swallowed exactly like every other pushWebSyncSnapshot()
+        // call site -- "Sync Now" stays the fallback.
+        //
+        // The coach push (notify_coach_of_client_workout) is chained AFTER
+        // the sync resolves, not fired in parallel -- pushing the
+        // notification before web_sync_logs is actually updated would let
+        // a coach tap through to Coach Portal and find nothing new yet.
+        if (localStorage.getItem('wft_web_sync_enabled') === '1') {
+          pushWebSyncSnapshot()
+            .then(() => sb.rpc('notify_coach_of_client_workout', { p_share_key: getOrCreateShareKey() }))
+            .catch(() => {});
+        }
       }
       return;
     }

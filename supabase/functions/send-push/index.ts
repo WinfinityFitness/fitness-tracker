@@ -21,7 +21,14 @@
 // automatically.
 //
 // Called by the notify_dm_push() Postgres trigger on new DM messages, with
-// { share_key, title, body }.
+// { share_key, title, body }. Also called by notify_coach_of_client_workout()
+// (supabase_coach_push_notifications_migration.sql) with { coach_id, title,
+// body, url } instead of share_key -- same delivery mechanics (Web Push +
+// FCM), just reading from the coach-scoped coach_push_subscriptions/
+// coach_fcm_tokens tables instead of the client-scoped ones. Exactly one of
+// share_key/coach_id is expected per call; app_filter only applies to the
+// share_key path (coach_push_subscriptions has no "app" column -- there's
+// only one coach-facing surface).
 
 import webpush from 'https://esm.sh/web-push@3.6.7';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -119,22 +126,25 @@ async function sendFcm(sa: ServiceAccount, token: string, title: string, body: s
 }
 
 Deno.serve(async (req: Request) => {
-  let payload: { share_key?: string; title?: string; body?: string; type?: string; url?: string; app_filter?: string[] };
+  let payload: {
+    share_key?: string; coach_id?: string; title?: string; body?: string;
+    type?: string; url?: string; app_filter?: string[];
+  };
   try {
     payload = await req.json();
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400 });
   }
 
-  const { share_key, title, body, type, url, app_filter } = payload;
-  if (!share_key || !title) {
-    return new Response(JSON.stringify({ error: 'share_key and title are required' }), { status: 400 });
+  const { share_key, coach_id, title, body, type, url, app_filter } = payload;
+  if ((!share_key && !coach_id) || !title) {
+    return new Response(JSON.stringify({ error: 'share_key (or coach_id) and title are required' }), { status: 400 });
   }
 
   let webSent = 0, webTotal = 0, fcmSent = 0, fcmTotal = 0;
 
   // --- Web Push (browser / installed PWA) ---
-  if (VAPID_PRIVATE_KEY) {
+  if (VAPID_PRIVATE_KEY && share_key) {
     // app_filter restricts delivery to specific surfaces (FT/wellness/
     // messenger — see push_subscriptions.app, set at subscribe time). Rows
     // predating that column are null and count as 'ft' wherever 'ft' is in
@@ -167,6 +177,26 @@ Deno.serve(async (req: Request) => {
       if (staleEndpoints.length) await supabase.from('push_subscriptions').delete().in('endpoint', staleEndpoints);
       webSent = results.filter((r) => r.status === 'fulfilled').length;
     }
+  } else if (VAPID_PRIVATE_KEY && coach_id) {
+    // Coach Portal path -- coach_push_subscriptions has no app/app_filter
+    // concept at all, there's only the one coach-facing surface.
+    const { data: subs } = await supabase.from('coach_push_subscriptions').select('endpoint, p256dh, auth').eq('coach_id', coach_id);
+    if (subs && subs.length) {
+      webTotal = subs.length;
+      const notifPayload = JSON.stringify({ title, body: body ?? '', type: type ?? undefined, url: url ?? undefined });
+      const results = await Promise.allSettled(
+        subs.map((s) => webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, notifPayload)),
+      );
+      const staleEndpoints: string[] = [];
+      results.forEach((r, i) => {
+        if (r.status === 'rejected') {
+          const statusCode = (r.reason && (r.reason as { statusCode?: number }).statusCode) || 0;
+          if (statusCode === 404 || statusCode === 410) staleEndpoints.push(subs[i].endpoint);
+        }
+      });
+      if (staleEndpoints.length) await supabase.from('coach_push_subscriptions').delete().in('endpoint', staleEndpoints);
+      webSent = results.filter((r) => r.status === 'fulfilled').length;
+    }
   }
 
   // --- FCM (native Android app) ---
@@ -175,7 +205,7 @@ Deno.serve(async (req: Request) => {
   // any other browser install, not FCM) -- so an app_filter that excludes
   // 'ft' means skip this branch entirely rather than double-notify FT here
   // too after Web Push above already routed elsewhere.
-  if (FCM_SERVICE_ACCOUNT_JSON && (!app_filter || app_filter.includes('ft'))) {
+  if (FCM_SERVICE_ACCOUNT_JSON && share_key && (!app_filter || app_filter.includes('ft'))) {
     let sa: ServiceAccount;
     try {
       sa = JSON.parse(FCM_SERVICE_ACCOUNT_JSON);
@@ -193,6 +223,26 @@ Deno.serve(async (req: Request) => {
           else if (r.status === 'fulfilled' && r.value.stale) staleTokens.push(tokens[i].token);
         });
         if (staleTokens.length) await supabase.from('fcm_tokens').delete().in('token', staleTokens);
+      }
+    }
+  } else if (FCM_SERVICE_ACCOUNT_JSON && coach_id) {
+    let sa: ServiceAccount;
+    try {
+      sa = JSON.parse(FCM_SERVICE_ACCOUNT_JSON);
+    } catch {
+      sa = null as unknown as ServiceAccount;
+    }
+    if (sa) {
+      const { data: tokens } = await supabase.from('coach_fcm_tokens').select('token').eq('coach_id', coach_id);
+      if (tokens && tokens.length) {
+        fcmTotal = tokens.length;
+        const results = await Promise.allSettled(tokens.map((t) => sendFcm(sa, t.token, title, body ?? '')));
+        const staleTokens: string[] = [];
+        results.forEach((r, i) => {
+          if (r.status === 'fulfilled' && r.value.ok) fcmSent++;
+          else if (r.status === 'fulfilled' && r.value.stale) staleTokens.push(tokens[i].token);
+        });
+        if (staleTokens.length) await supabase.from('coach_fcm_tokens').delete().in('token', staleTokens);
       }
     }
   }

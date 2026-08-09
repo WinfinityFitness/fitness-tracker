@@ -650,6 +650,15 @@
       </div>
 
       <div class="card">
+        <h2>Notifications</h2>
+        <p class="note" style="margin-top:0;">Get a push notification (even with this tab closed) when one of your clients finishes a workout.</p>
+        <label class="flag-toggle" style="cursor:pointer;">
+          <input type="checkbox" id="coachPushToggle"> Push notifications
+        </label>
+        <p class="note" id="coachPushHint"></p>
+      </div>
+
+      <div class="card">
         <h2>Account</h2>
         <label class="field"><span>Current Password</span><input type="password" id="cpOldPassword" autocomplete="off"></label>
         <label class="field"><span>New Password</span><input type="password" id="cpNewPassword" autocomplete="off"></label>
@@ -671,7 +680,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
    Now" here just means forcing a cache-busted reload instead of quietly
    trusting whatever the browser already has cached, not installing
    anything. */
-const COACH_PORTAL_VERSION = '1.3.0';
+const COACH_PORTAL_VERSION = '1.4.0';
 document.getElementById('versionBadgeText').textContent = COACH_PORTAL_VERSION;
 
 async function fetchLatestCoachPortalVersion() {
@@ -1610,6 +1619,7 @@ document.getElementById('btnCoachLogin').addEventListener('click', async () => {
     loadCoachOwnFlags();
     loadCoachClients();
     loadShowcaseData();
+    reconnectCoachPushIfEnabled();
   } catch (e) {
     note.textContent = 'Incorrect Digital ID or password.'; note.className = 'note error';
   }
@@ -2615,6 +2625,117 @@ document.getElementById('btnChangePassword').addEventListener('click', async () 
     note.textContent = 'Could not change password: ' + (e.message || e); note.className = 'note error';
   }
 });
+
+/* ---------------------------------------------------------------------
+   Push notifications -- Web Push only here (browser / installed PWA at
+   winfinityfitness.com/coach-portal). The native "Winfinity Coach"
+   Capacitor app does NOT load this file at all -- its capacitor.config.json
+   points at coach.winfinityfitness.com, which serves coach-dashboard.html
+   instead -- so native FCM registration lives there, not here. Both paths
+   write to the same coach-scoped tables (coach_push_subscriptions /
+   coach_fcm_tokens, see supabase_coach_push_notifications_migration.sql),
+   keyed by coach_id via coach_upsert_push_subscription(), since it's the
+   same coach identity either way.
+
+   Mirrors app.js's own subscribeToPush()/unsubscribeFromPush() almost
+   exactly -- urlBase64ToUint8Array/VAPID_PUBLIC_KEY come from config.js,
+   already loaded by this page.
+--------------------------------------------------------------------- */
+function coachUrlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
+async function subscribeCoachPush() {
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) {
+    sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: coachUrlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+  }
+  const json = sub.toJSON();
+  const { error } = await sb.rpc('coach_upsert_push_subscription', {
+    p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
+    p_endpoint: json.endpoint, p_p256dh: json.keys.p256dh, p_auth: json.keys.auth,
+  });
+  if (error) throw error;
+}
+
+async function unsubscribeCoachPush() {
+  if (!('serviceWorker' in navigator)) return;
+  const reg = await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.getSubscription();
+  if (sub) {
+    const endpoint = sub.endpoint;
+    await sub.unsubscribe();
+    await sb.rpc('coach_delete_push_subscription', {
+      p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password, p_endpoint: endpoint,
+    });
+  }
+}
+
+function initCoachPushToggle() {
+  const toggle = document.getElementById('coachPushToggle');
+  const hint = document.getElementById('coachPushHint');
+  if (!toggle) return;
+  const supported = ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window);
+  if (!supported) {
+    toggle.disabled = true;
+    hint.textContent = 'Not supported in this browser.';
+    return;
+  }
+  navigator.serviceWorker.register('coach-sw.js').catch(() => {
+    toggle.disabled = true;
+    hint.textContent = 'Could not set up notifications on this device.';
+  });
+
+  const wasEnabled = localStorage.getItem('wf_coach_push_enabled') === '1';
+  toggle.checked = wasEnabled && Notification.permission === 'granted';
+
+  toggle.addEventListener('change', async () => {
+    if (demoMode) {
+      hint.textContent = 'Preview mode — not available here.';
+      toggle.checked = false;
+      return;
+    }
+    if (toggle.checked) {
+      try {
+        if (Notification.permission !== 'granted') {
+          const perm = await Notification.requestPermission();
+          if (perm !== 'granted') { toggle.checked = false; return; }
+        }
+        await subscribeCoachPush();
+        localStorage.setItem('wf_coach_push_enabled', '1');
+        hint.textContent = '';
+      } catch (e) {
+        toggle.checked = false;
+        hint.textContent = 'Could not enable — check your connection and try again.';
+      }
+    } else {
+      localStorage.setItem('wf_coach_push_enabled', '0');
+      try { await unsubscribeCoachPush(); } catch (e) { /* best effort */ }
+    }
+  });
+
+}
+initCoachPushToggle();
+
+// Re-subscribe silently once the coach actually logs in, if they'd
+// previously opted in and permission is still granted (e.g. the browser
+// dropped the old subscription) -- NOT called from initCoachPushToggle()
+// above, which runs at page load before coachSession exists at all;
+// subscribeCoachPush() needs those credentials for coach_upsert_push_subscription.
+function reconnectCoachPushIfEnabled() {
+  if (demoMode) return;
+  const toggle = document.getElementById('coachPushToggle');
+  if (toggle && toggle.checked) subscribeCoachPush().catch(() => {});
+}
 
 async function renameClient(publicId, currentNickname) {
   const nickname = prompt(`Private name for ${publicId} (only you see this):`, currentNickname || '');
