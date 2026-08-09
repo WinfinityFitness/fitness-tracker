@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.78';
+const APP_VERSION = 'WF_SYS_V.1.7.79';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -15388,6 +15388,40 @@ function loadCoachAssignment() {
   document.getElementById('coachRefeedEnd').value = (profile && profile.refeedEnd) || '';
 }
 
+// Reserved session-template id for whatever the coach most recently sent
+// -- upserted in place (not appended) so re-checking never piles up
+// duplicate copies of the same program in the Load Session dropdown, and
+// sending a new week's program cleanly replaces the old one.
+const COACH_WORKOUT_TEMPLATE_ID = 'coach-assigned-workout';
+
+// Turns an assigned_workouts row into a session template and drops it
+// into the same local store the Training tab's "Load Session" dropdown
+// already reads from (getSessionTemplates/saveSessionTemplates) -- no
+// separate coach-workout UI needed, it just shows up where session
+// templates already show up. Returns true if this was a genuinely new
+// assignment (different updated_at than last applied), so the caller can
+// decide whether to mention it in the refresh note.
+function applyAssignedWorkout(profile, workoutData) {
+  if (!workoutData) return false;
+  if (profile.coachWorkoutAssignedAt === workoutData.updated_at) return false;
+  const templateExercises = (workoutData.exercises || []).map(ex => ({
+    name: ex.name,
+    restSeconds: 180,
+    unit: 'kg',
+    sets: (ex.sets || []).map(s => ({ reps: s.reps, weightKg: s.weightKg })),
+  }));
+  const templates = getSessionTemplates().filter(t => t.id !== COACH_WORKOUT_TEMPLATE_ID);
+  templates.unshift({
+    id: COACH_WORKOUT_TEMPLATE_ID,
+    name: workoutData.program_name || 'Coach Assigned Workout',
+    exercises: templateExercises,
+  });
+  saveSessionTemplates(templates);
+  if (document.getElementById('sessionTemplateSelect')) renderSessionTemplateOptions();
+  profile.coachWorkoutAssignedAt = workoutData.updated_at;
+  return true;
+}
+
 async function refreshCoachAssignmentFromServer() {
   const note = document.getElementById('coachRefreshNote');
   const btn = document.getElementById('btnRefreshCoachAssignment');
@@ -15400,30 +15434,47 @@ async function refreshCoachAssignmentFromServer() {
     const shareKey = getOrCreateShareKey();
     const { data, error } = await sb.from('assigned_targets').select('*').eq('share_key', shareKey).maybeSingle();
     if (error) throw error;
-    if (!data) {
+    // Rides along on the same refresh tap as the calorie/step targets --
+    // a coach typically sends both together, and this avoids a second
+    // "check for updates" button just for workouts.
+    const { data: workoutData, error: workoutError } = await sb.from('assigned_workouts').select('*').eq('share_key', shareKey).maybeSingle();
+    if (workoutError) throw workoutError;
+
+    if (!data && !workoutData) {
       note.textContent = 'No assignment from your coach yet.';
       return;
     }
-    profile.coachCalorieTarget = data.calorie_target;
-    profile.coachStepGoal = data.step_goal;
-    profile.coachWorkoutsPerWeek = data.workouts_per_week;
-    profile.refeedCalories = data.refeed_calories;
-    profile.refeedStart = data.refeed_start;
-    profile.refeedEnd = data.refeed_end;
-    // Applied immediately on refresh, independent of whether the visible
-    // targets below get saved — same pull the coach assignment itself
-    // uses, just a second field riding along on it.
-    if (data.show_social_links !== null && data.show_social_links !== undefined) {
-      profile.footerSocialLinksVisible = data.show_social_links;
-      applyFooterSocialLinksVisibility(profile.footerSocialLinksVisible);
-      applyFooterSocialLinksVisibility(profile.footerSocialLinksVisible, 'wdsFooterFacebookLink', 'wdsFooterInstagramLink');
+
+    let targetsNote = '';
+    if (data) {
+      profile.coachCalorieTarget = data.calorie_target;
+      profile.coachStepGoal = data.step_goal;
+      profile.coachWorkoutsPerWeek = data.workouts_per_week;
+      profile.refeedCalories = data.refeed_calories;
+      profile.refeedStart = data.refeed_start;
+      profile.refeedEnd = data.refeed_end;
+      // Applied immediately on refresh, independent of whether the visible
+      // targets below get saved — same pull the coach assignment itself
+      // uses, just a second field riding along on it.
+      if (data.show_social_links !== null && data.show_social_links !== undefined) {
+        profile.footerSocialLinksVisible = data.show_social_links;
+        applyFooterSocialLinksVisibility(profile.footerSocialLinksVisible);
+        applyFooterSocialLinksVisibility(profile.footerSocialLinksVisible, 'wdsFooterFacebookLink', 'wdsFooterInstagramLink');
+      }
+      targetsNote = 'Refreshed — assignment updated ' + fmtDate(parseISO(data.updated_at.slice(0, 10))) + '.';
     }
+
+    const isNewWorkout = applyAssignedWorkout(profile, workoutData);
+    const workoutNote = isNewWorkout
+      ? ` New workout "${workoutData.program_name || 'Coach Assigned Workout'}" added to your saved sessions!`
+      : '';
+
     saveProfile(profile);
     loadCoachAssignment();
     renderNutritionTargets();
     renderDashboard();
     renderTrainingStats();
-    note.textContent = 'Refreshed — assignment updated ' + fmtDate(parseISO(data.updated_at.slice(0, 10))) + '.';
+    note.textContent = (targetsNote || 'No target assignment yet.') + workoutNote;
   } catch (e) {
     note.textContent = e.message || 'Could not check for an assignment — try again.';
   } finally {

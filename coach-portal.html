@@ -154,6 +154,61 @@
   @media (max-width: 640px) {
     .monitor-charts-grid { grid-template-columns: 1fr; }
   }
+
+  /* Training Calendar + day detail (Monitor panel) -- month grid marking
+     workout days, tap a date to see that day's exercise-by-exercise
+     breakdown below it. */
+  .monitor-calendar { margin: 10px 0 4px; }
+  .monitor-calendar-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .monitor-calendar-head strong { font-size: 0.86rem; font-variant-numeric: tabular-nums; }
+  .monitor-calendar-weekdays, .monitor-calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .monitor-calendar-weekdays { margin-bottom: 4px; }
+  .monitor-calendar-weekdays span { text-align: center; font-size: 0.62rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .monitor-cal-day {
+    aspect-ratio: 1; border-radius: 8px; border: 1px solid transparent; background: var(--bg);
+    color: var(--text-muted); font-size: 0.76rem; cursor: pointer; font-variant-numeric: tabular-nums;
+    display: flex; align-items: center; justify-content: center; position: relative; font-family: inherit;
+  }
+  .monitor-cal-day--empty { visibility: hidden; cursor: default; }
+  .monitor-cal-day:disabled { opacity: 0.3; cursor: default; }
+  .monitor-cal-day.has-workout { color: var(--text-primary); border-color: var(--accent-dim); }
+  .monitor-cal-day.has-workout::after { content: ''; position: absolute; bottom: 4px; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+  .monitor-cal-day.is-today { box-shadow: inset 0 0 0 1px var(--cyan); }
+  .monitor-cal-day.is-selected { background: var(--accent); color: #0a0d12; border-color: var(--accent); font-weight: 700; }
+  .monitor-cal-day.is-selected.has-workout::after { background: #0a0d12; }
+
+  .monitor-day-detail { margin-top: 12px; }
+  .monitor-day-detail-total { font-size: 0.88rem; margin: 0 0 10px; }
+  .monitor-day-detail-total strong { color: var(--accent); }
+  .monitor-day-pr-banner {
+    background: rgba(255,159,67,0.12); border: 1px solid var(--accent-dim); color: var(--accent);
+    border-radius: 8px; padding: 8px 12px; font-size: 0.78rem; font-weight: 700; margin-bottom: 10px;
+  }
+  .monitor-exercise-card { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
+  .monitor-exercise-head {
+    width: 100%; display: flex; align-items: center; gap: 8px; background: var(--bg); border: none;
+    padding: 10px 12px; cursor: pointer; text-align: left; font-family: inherit; color: var(--text-primary); font-size: 0.86rem;
+  }
+  .monitor-exercise-chevron { display: inline-block; color: var(--text-muted); transition: transform 0.15s ease; }
+  .monitor-exercise-chevron.is-open { transform: rotate(90deg); }
+  .monitor-exercise-name { flex: 1; font-weight: 600; }
+  .monitor-exercise-sets { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  .monitor-exercise-sets th, .monitor-exercise-sets td { padding: 6px 10px; text-align: left; border-top: 1px solid var(--border); color: var(--text-muted); }
+  .monitor-exercise-sets tr.is-complete td { color: var(--text-primary); }
+  .pr-pill {
+    background: rgba(255,159,67,0.18); color: var(--accent); font-size: 0.62rem; font-weight: 700;
+    padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap;
+  }
+
+  /* Assign Weekly Workout -- exercise/set builder (Monitor panel) */
+  .aw-exercise-card { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; background: var(--bg); }
+  .aw-exercise-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .aw-exercise-name { flex: 1; }
+  .aw-sets-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-bottom: 4px; }
+  .aw-sets-table th { text-align: left; color: var(--text-muted); font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em; padding: 0 8px 4px 0; }
+  .aw-sets-table td { padding: 3px 8px 3px 0; }
+  .aw-sets-table td:first-child { color: var(--text-muted); width: 28px; }
+  .aw-set-input { width: 100%; box-sizing: border-box; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; color: var(--text-primary); font-size: 0.82rem; }
   .btn {
     background: var(--accent); color: #1a1200; border: none; border-radius: 8px;
     padding: 10px 18px; font-size: 0.88rem; font-weight: 600; cursor: pointer;
@@ -369,6 +424,23 @@
         <p class="note" id="ownerAssignTargetsNote"></p>
       </div>
 
+      <!-- Owner-side Assign Weekly Workout -- sets/reps/weight per exercise,
+           sent to the client's own Load Session dropdown (see
+           coach_assign_workout in supabase_coach_assigned_workout_migration.sql
+           and applyAssignedWorkout() in app.js). -->
+      <div class="card" id="ownerAssignWorkoutCard" hidden style="margin-top:14px;">
+        <h2>Assign Weekly Workout &mdash; <span id="ownerAssignWorkoutClientId"></span></h2>
+        <p class="note" style="margin-top:0;">Builds a session your client can load from their own Load Session dropdown.</p>
+        <label class="field"><span>Program Name</span><input type="text" id="ownerAwName" placeholder="Week 1 &mdash; Push Day"></label>
+        <div id="ownerAwExercises"></div>
+        <button type="button" class="btn btn-secondary" id="btnOwnerAwAddExercise" style="margin-top:4px;">+ Add Exercise</button>
+        <div class="btn-row">
+          <button type="button" class="btn" id="btnOwnerSendAssignWorkout">Send to Client</button>
+          <button type="button" class="btn btn-secondary" id="btnCloseOwnerAssignWorkout">Cancel</button>
+        </div>
+        <p class="note" id="ownerAssignWorkoutNote"></p>
+      </div>
+
       <!-- Owner-side Monitor, opened by tapping a client pill above -->
       <div class="card" id="ownerMonitorCard" hidden style="margin-top:14px;">
         <div class="top-actions">
@@ -378,6 +450,7 @@
         <div class="btn-row" style="margin:0 0 12px;">
           <button type="button" class="link-btn" id="btnOwnerMonitorRename">Rename</button>
           <button type="button" class="link-btn" id="btnOwnerMonitorAssignTargets">Assign Targets</button>
+          <button type="button" class="link-btn" id="btnOwnerMonitorAssignWorkout">Assign Workout</button>
           <button type="button" class="link-btn" id="btnOwnerMonitorRemove">Remove</button>
         </div>
         <p class="note" id="ownerMonitorStatusLine"></p>
@@ -540,6 +613,24 @@
         <p class="note" id="assignTargetsNote"></p>
       </div>
 
+      <!-- Assign Weekly Workout (per client, opened from the Monitor card
+           below) -- sets/reps/weight per exercise, sent to the client's
+           own Load Session dropdown (see coach_assign_workout in
+           supabase_coach_assigned_workout_migration.sql and
+           applyAssignedWorkout() in app.js). -->
+      <div class="card" id="assignWorkoutCard" hidden>
+        <h2>Assign Weekly Workout &mdash; <span id="assignWorkoutClientId"></span></h2>
+        <p class="note" style="margin-top:0;">Builds a session your client can load from their own Load Session dropdown.</p>
+        <label class="field"><span>Program Name</span><input type="text" id="awName" placeholder="Week 1 &mdash; Push Day"></label>
+        <div id="awExercises"></div>
+        <button type="button" class="btn btn-secondary" id="btnAwAddExercise" style="margin-top:4px;">+ Add Exercise</button>
+        <div class="btn-row">
+          <button type="button" class="btn" id="btnSendAssignWorkout">Send to Client</button>
+          <button type="button" class="btn btn-secondary" id="btnCloseAssignWorkout">Cancel</button>
+        </div>
+        <p class="note" id="assignWorkoutNote"></p>
+      </div>
+
       <!-- Monitor (per client, opened by tapping a pill above) -->
       <div class="card" id="monitorCard" hidden>
         <div class="top-actions">
@@ -549,6 +640,7 @@
         <div class="btn-row" id="monitorClientActions" style="margin:0 0 12px;">
           <button type="button" class="link-btn" id="btnMonitorRename">Rename</button>
           <button type="button" class="link-btn" id="btnMonitorAssignTargets">Assign Targets</button>
+          <button type="button" class="link-btn" id="btnMonitorAssignWorkout">Assign Workout</button>
           <button type="button" class="link-btn" id="btnMonitorRemove">Remove</button>
         </div>
         <p class="note" id="monitorStatusLine"></p>
@@ -579,7 +671,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
    Now" here just means forcing a cache-busted reload instead of quietly
    trusting whatever the browser already has cached, not installing
    anything. */
-const COACH_PORTAL_VERSION = '1.1.0';
+const COACH_PORTAL_VERSION = '1.3.0';
 document.getElementById('versionBadgeText').textContent = COACH_PORTAL_VERSION;
 
 async function fetchLatestCoachPortalVersion() {
@@ -1047,7 +1139,11 @@ function openOwnerMonitorClient(publicId, shareKey) {
   document.getElementById('ownerMonitorContent').innerHTML = '<p class="note">Loading…</p>';
   document.getElementById('ownerMonitorCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
   document.querySelectorAll('#ownerClientList .client-pill').forEach(p => p.classList.toggle('is-active', p.dataset.id === publicId));
-  ownerMonitorState = { publicId, shareKey, loadedDays: 0, logsByDate: {}, targets: {}, lastSyncedAt: null, weightFullJourney: false, volumeFullJourney: false };
+  ownerMonitorState = {
+    publicId, shareKey, loadedDays: 0, logsByDate: {}, targets: {}, lastSyncedAt: null,
+    weightFullJourney: false, volumeFullJourney: false,
+    calendarMonth: null, selectedDate: null, expandedExerciseIndices: null,
+  };
   loadOwnerMonitorData(60);
 }
 document.getElementById('btnCloseOwnerMonitor').addEventListener('click', () => {
@@ -1127,11 +1223,14 @@ function renderOwnerMonitorContent() {
     const e = logsByDate[ds];
     return `<div class="client-row"><span>${escapeHtml(ds)}</span><span style="color:var(--text-muted);font-size:0.78rem;">` +
       `${e.calories != null ? e.calories + ' kcal' : '—'} &middot; ` +
+      `${e.protein != null ? e.protein + 'g protein' : '—'} &middot; ` +
       `${e.steps != null ? e.steps + ' steps' : '—'} &middot; ` +
       `${monitorHasWorkout(e) ? 'Workout' : 'No workout'}` +
       `${e.weightKg != null ? ' &middot; ' + e.weightKg.toFixed(1) + ' kg' : ''}` +
       `</span></div>`;
   }).join('') || '<p class="note">No activity logged in this window.</p>';
+
+  monitorEnsureCalendarDefaults(st, logsByDate);
 
   document.getElementById('ownerMonitorContent').innerHTML = `
     <div class="client-row"><span>Current streak</span><span>${streak} day${streak === 1 ? '' : 's'}</span></div>
@@ -1164,9 +1263,15 @@ function renderOwnerMonitorContent() {
       </div>
     </div>
 
+    <h3 style="margin:14px 0 6px;font-size:0.95rem;">Training Calendar</h3>
+    <p class="note" style="margin-top:0;">Marked days show a completed workout &mdash; tap a date for that day's exercise-by-exercise breakdown.</p>
+    <div class="monitor-calendar" id="ownerMonitorCalendar">${renderMonitorCalendarHtml(st, logsByDate, 'ownerMonitor')}</div>
+    <div class="monitor-day-detail" id="ownerMonitorDayDetail">${renderMonitorDayDetailHtml(st, logsByDate)}</div>
+
     <h3 style="margin:14px 0 6px;font-size:0.95rem;">Recent activity</h3>
     ${activityRows}
   `;
+  monitorWireCalendarEvents(st, 'ownerMonitor', renderOwnerMonitorContent, ensureOwnerMonitorFullRange);
 }
 
 document.getElementById('btnOwnerMonitorRename').addEventListener('click', async () => {
@@ -1219,6 +1324,56 @@ document.getElementById('btnSaveOwnerAssignTargets').addEventListener('click', a
     note.textContent = 'Saved.'; note.className = 'note success';
   } catch (e) {
     note.textContent = 'Could not save: ' + (e.message || e); note.className = 'note error';
+  }
+});
+
+// A fixed array reference, mutated in place (never reassigned) --
+// awWireContainer() below closes over this exact object once at page
+// load, so `ownerAwExercises = [...]` anywhere later would silently
+// detach the wired listeners from whatever the variable then points to.
+const ownerAwExercises = [];
+function openOwnerAssignWorkout(publicId) {
+  document.getElementById('ownerAssignWorkoutCard').hidden = false;
+  document.getElementById('ownerAssignWorkoutClientId').textContent = publicId;
+  document.getElementById('ownerAssignWorkoutCard').dataset.targetId = publicId;
+  document.getElementById('ownerAwName').value = '';
+  document.getElementById('ownerAssignWorkoutNote').textContent = '';
+  ownerAwExercises.length = 0;
+  ownerAwExercises.push({ name: '', sets: [{ reps: null, weightKg: null }] });
+  awRenderExercises(document.getElementById('ownerAwExercises'), ownerAwExercises);
+  document.getElementById('ownerAssignWorkoutCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+awWireContainer(document.getElementById('ownerAwExercises'), ownerAwExercises, () =>
+  awRenderExercises(document.getElementById('ownerAwExercises'), ownerAwExercises));
+
+document.getElementById('btnOwnerMonitorAssignWorkout').addEventListener('click', () => {
+  if (!ownerMonitorState || !ownerMonitorState.publicId) return;
+  openOwnerAssignWorkout(ownerMonitorState.publicId);
+});
+document.getElementById('btnOwnerAwAddExercise').addEventListener('click', () => {
+  ownerAwExercises.push({ name: '', sets: [{ reps: null, weightKg: null }] });
+  awRenderExercises(document.getElementById('ownerAwExercises'), ownerAwExercises);
+});
+document.getElementById('btnCloseOwnerAssignWorkout').addEventListener('click', () => {
+  document.getElementById('ownerAssignWorkoutCard').hidden = true;
+});
+document.getElementById('btnOwnerSendAssignWorkout').addEventListener('click', async () => {
+  const note = document.getElementById('ownerAssignWorkoutNote');
+  const targetId = document.getElementById('ownerAssignWorkoutCard').dataset.targetId;
+  const programName = document.getElementById('ownerAwName').value.trim();
+  const cleaned = awCleanExercises(ownerAwExercises);
+  if (!cleaned.length) { note.textContent = 'Add at least one exercise with at least one set.'; note.className = 'note error'; return; }
+  note.textContent = 'Sending…'; note.className = 'note';
+  try {
+    const { error } = await sb.rpc('admin_assign_client_workout', {
+      p_admin_digital_id: ownerSession.digitalId, p_admin_password: ownerSession.password,
+      p_coach_id: currentCoachDetail.id, p_target_digital_id: targetId,
+      p_program_name: programName || null, p_exercises: cleaned,
+    });
+    if (error) throw error;
+    note.textContent = `Sent to ${targetId}.`; note.className = 'note success';
+  } catch (e) {
+    note.textContent = 'Could not send: ' + (e.message || e); note.className = 'note error';
   }
 });
 
@@ -1345,8 +1500,19 @@ function generateDemoMonitorLogs(seed) {
   const weightDriftPerDay = weightDirection * (0.01 + rand() * 0.05);
   const startSteps = 3500 + rand() * 10000;
   const stepsDriftPerDay = (rand() - 0.35) * 35;
-  let startVolume = 300 + rand() * 7000;
-  const volumeDriftPerGymDay = (rand() - 0.2) * 20;
+
+  // Named exercise pool (rather than one generic "Session" entry) so the
+  // Training Calendar's per-exercise breakdown and PR detection have
+  // something real to show in the preview -- each exercise gets its own
+  // slow weight drift (timesUsed-based, mostly upward) so PRs land on
+  // different exercises on different days instead of all firing at once.
+  const EXERCISE_POOL = [
+    { name: 'Bench Press', baseWeightKg: 35 + rand() * 40, driftPerUse: (rand() - 0.1) * 1.6, timesUsed: 0 },
+    { name: 'Squat', baseWeightKg: 45 + rand() * 55, driftPerUse: (rand() - 0.1) * 1.8, timesUsed: 0 },
+    { name: 'Deadlift', baseWeightKg: 55 + rand() * 65, driftPerUse: (rand() - 0.1) * 2.0, timesUsed: 0 },
+    { name: 'Overhead Press', baseWeightKg: 20 + rand() * 25, driftPerUse: (rand() - 0.1) * 1.0, timesUsed: 0 },
+    { name: 'Barbell Row', baseWeightKg: 30 + rand() * 35, driftPerUse: (rand() - 0.1) * 1.4, timesUsed: 0 },
+  ];
 
   const logsByDate = {};
   const today = new Date();
@@ -1370,15 +1536,27 @@ function generateDemoMonitorLogs(seed) {
     };
     if (isGymDay) {
       gymDayCount++;
-      const setCompleted = rand() < setCompletionRate;
-      const vol = Math.max(200, startVolume + volumeDriftPerGymDay * gymDayCount);
-      entry.exercises = [{
-        name: 'Session', sets: [
-          { reps: 6 + Math.floor(rand() * 8), weightKg: Math.round(vol / 8), completed: setCompleted },
-          { reps: 6 + Math.floor(rand() * 8), weightKg: Math.round(vol / 8), completed: setCompleted },
-        ],
-      }];
-      entry.workout = setCompleted;
+      // 2-3 distinct exercises per gym day, picked without replacement
+      // from the 5-exercise pool.
+      const pickCount = 2 + Math.floor(rand() * 2);
+      const pool = EXERCISE_POOL.slice();
+      const picked = [];
+      for (let p = 0; p < pickCount && pool.length; p++) {
+        picked.push(pool.splice(Math.floor(rand() * pool.length), 1)[0]);
+      }
+      let anyCompleted = false;
+      entry.exercises = picked.map(exDef => {
+        exDef.timesUsed++;
+        const currentWeight = Math.max(10, exDef.baseWeightKg + exDef.driftPerUse * exDef.timesUsed + (rand() - 0.5) * 4);
+        const numSets = 3;
+        const sets = Array.from({ length: numSets }, () => {
+          const completed = rand() < setCompletionRate;
+          if (completed) anyCompleted = true;
+          return { reps: 5 + Math.floor(rand() * 6), weightKg: Math.round(currentWeight), completed };
+        });
+        return { name: exDef.name, sets };
+      });
+      entry.workout = anyCompleted;
     }
     logsByDate[ds] = entry;
   }
@@ -1763,7 +1941,11 @@ function openMonitorClient(publicId, shareKey) {
   document.getElementById('monitorContent').innerHTML = '<p class="note">Loading…</p>';
   document.getElementById('monitorCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
   document.querySelectorAll('#clientList .client-pill').forEach(p => p.classList.toggle('is-active', p.dataset.id === publicId));
-  monitorState = { publicId, shareKey, loadedDays: 0, logsByDate: {}, targets: {}, lastSyncedAt: null, weightFullJourney: false, volumeFullJourney: false };
+  monitorState = {
+    publicId, shareKey, loadedDays: 0, logsByDate: {}, targets: {}, lastSyncedAt: null,
+    weightFullJourney: false, volumeFullJourney: false,
+    calendarMonth: null, selectedDate: null, expandedExerciseIndices: null,
+  };
   loadMonitorData(60);
 }
 
@@ -1869,6 +2051,269 @@ function svgBarChart(values, color) {
   return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:90px;display:block;">${bars}</svg>`;
 }
 
+/* ---------------------------------------------------------------------
+   Training Calendar + day detail -- shared between the coach's own
+   Monitor (renderMonitorContent) and the owner's Monitor-on-a-coach's-
+   client (renderOwnerMonitorContent), which is why every function here
+   takes (state, logsByDate) as plain arguments instead of reaching for
+   monitorState/ownerMonitorState directly. Each caller supplies its own
+   idPrefix so the two copies never collide on DOM ids.
+--------------------------------------------------------------------- */
+
+// Same Epley-variant 1RM estimate and "beat every earlier day's best" PR
+// rule as app.js's estOneRM()/bestHistoricalOneRM() -- scoped to whatever
+// logsByDate window is currently loaded (60 days by default, or the full
+// journey once a coach has expanded it), same tradeoff the existing
+// weight/volume "Full journey" toggle already makes.
+function estOneRM(weightKg, reps) {
+  if (weightKg == null || reps == null || reps <= 0) return 0;
+  return weightKg * (1 + reps / 30);
+}
+function monitorBestHistoricalOneRM(logsByDate, exerciseName, beforeDateStr) {
+  const target = (exerciseName || '').trim().toLowerCase();
+  let best = 0;
+  Object.keys(logsByDate).forEach(d => {
+    if (d >= beforeDateStr) return;
+    (logsByDate[d].exercises || []).forEach(ex => {
+      if ((ex.name || '').trim().toLowerCase() !== target) return;
+      (ex.sets || []).forEach(s => {
+        if (!s.completed) return;
+        const rm = estOneRM(s.weightKg, s.reps);
+        if (rm > best) best = rm;
+      });
+    });
+  });
+  return best;
+}
+
+// Per-exercise PR flags for one day, in stable exercise order -- computed
+// once per render and reused for both the day's PR count banner and each
+// exercise card's own pill, rather than recomputing historicalBest twice.
+function monitorDayExercisePRs(entry, dateStr, logsByDate) {
+  return (entry.exercises || []).map((ex, exIdx) => {
+    const completedSets = (ex.sets || []).filter(s => s.completed && s.weightKg != null && s.reps != null);
+    const bestOneRM = completedSets.reduce((max, s) => Math.max(max, estOneRM(s.weightKg, s.reps)), 0);
+    const historicalBest = monitorBestHistoricalOneRM(logsByDate, ex.name || 'Exercise', dateStr);
+    const isPR = completedSets.length > 0 && historicalBest > 0 && bestOneRM > historicalBest + 0.01;
+    return { ex, exIdx, isPR };
+  });
+}
+
+function monitorAddMonths(date, delta) {
+  return new Date(date.getFullYear(), date.getMonth() + delta, 1);
+}
+
+// Plain zero-padded "YYYY-MM-DD" from local y/m/d integers -- deliberately
+// NOT `new Date(y, mo, d).toISOString().slice(0, 10)` (what monitorDateStr
+// does elsewhere): that constructs local midnight, and toISOString()
+// converts to UTC, which rolls back to the PREVIOUS calendar day for any
+// positive UTC offset (e.g. a calendar cell visually labeled "6" would
+// resolve to logsByDate key "...-05"). The calendar needs the label and
+// the lookup key to always agree, so this bypasses Date/UTC entirely.
+function monitorLocalYmd(year, monthIndex, day) {
+  return year + '-' + String(monthIndex + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+}
+
+// Defaults calendarMonth/selectedDate to the most recent workout on
+// record (or today, if the client has never logged one) -- only runs
+// once per Monitor session, guarded by calendarMonth being unset, so
+// re-renders after that don't keep snapping back to "most recent."
+function monitorEnsureCalendarDefaults(st, logsByDate) {
+  if (st.calendarMonth) return;
+  const workoutDates = Object.keys(logsByDate).filter(d => monitorHasWorkout(logsByDate[d])).sort();
+  const latest = workoutDates.length ? workoutDates[workoutDates.length - 1] : monitorDateStr(new Date());
+  const latestDate = new Date(latest + 'T00:00:00');
+  st.calendarMonth = new Date(latestDate.getFullYear(), latestDate.getMonth(), 1);
+  if (st.selectedDate == null) st.selectedDate = workoutDates.length ? latest : null;
+  if (!st.expandedExerciseIndices) st.expandedExerciseIndices = new Set();
+}
+
+function renderMonitorCalendarHtml(st, logsByDate, idPrefix) {
+  const month = st.calendarMonth;
+  const year = month.getFullYear(), mo = month.getMonth();
+  const firstWeekday = new Date(year, mo, 1).getDay();
+  const daysInMonth = new Date(year, mo + 1, 0).getDate();
+  const monthLabel = month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const now = new Date();
+  const todayStr = monitorLocalYmd(now.getFullYear(), now.getMonth(), now.getDate());
+  const isAtCurrentMonth = year === now.getFullYear() && mo === now.getMonth();
+  const isAfterCurrentMonth = year > now.getFullYear() || (year === now.getFullYear() && mo > now.getMonth());
+
+  let cells = '';
+  for (let i = 0; i < firstWeekday; i++) cells += '<span class="monitor-cal-day monitor-cal-day--empty"></span>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = monitorLocalYmd(year, mo, d);
+    const hasWorkout = monitorHasWorkout(logsByDate[ds]);
+    const cls = ['monitor-cal-day'];
+    if (hasWorkout) cls.push('has-workout');
+    if (st.selectedDate === ds) cls.push('is-selected');
+    if (ds === todayStr) cls.push('is-today');
+    const disabled = ds > todayStr;
+    cells += `<button type="button" class="${cls.join(' ')}" data-date="${ds}"${disabled ? ' disabled' : ''}>${d}</button>`;
+  }
+
+  return `
+    <div class="monitor-calendar-head">
+      <button type="button" class="link-btn" id="${idPrefix}CalPrev">&larr; Prev</button>
+      <strong>${escapeHtml(monthLabel)}</strong>
+      <button type="button" class="link-btn" id="${idPrefix}CalNext"${(isAtCurrentMonth || isAfterCurrentMonth) ? ' disabled' : ''}>Next &rarr;</button>
+    </div>
+    <div class="monitor-calendar-weekdays"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+    <div class="monitor-calendar-grid">${cells}</div>
+  `;
+}
+
+function renderMonitorDayDetailHtml(st, logsByDate) {
+  const dateStr = st.selectedDate;
+  if (!dateStr) return '<p class="note">Tap a marked date above to see that day&rsquo;s training details.</p>';
+  const entry = logsByDate[dateStr];
+  if (!entry || !monitorHasWorkout(entry)) {
+    return `<p class="note">No workout logged on ${escapeHtml(dateStr)}.</p>`;
+  }
+
+  const totalVolume = monitorDayVolumeKg(entry);
+  const prFlags = monitorDayExercisePRs(entry, dateStr, logsByDate);
+  const prCount = prFlags.filter(f => f.isPR).length;
+
+  const exerciseCards = prFlags.map(({ ex, exIdx, isPR }) => {
+    const expanded = st.expandedExerciseIndices && st.expandedExerciseIndices.has(exIdx);
+    const setsRows = (ex.sets || []).map((s, setIdx) => `
+      <tr class="${s.completed ? 'is-complete' : ''}">
+        <td>${setIdx + 1}</td>
+        <td>${s.reps != null ? s.reps : '&mdash;'}</td>
+        <td>${s.weightKg != null ? s.weightKg + ' kg' : '&mdash;'}</td>
+        <td>${s.completed ? '&#10003;' : ''}</td>
+      </tr>`).join('');
+    return `
+      <div class="monitor-exercise-card">
+        <button type="button" class="monitor-exercise-head" data-ex-idx="${exIdx}">
+          <span class="monitor-exercise-chevron${expanded ? ' is-open' : ''}">&rsaquo;</span>
+          <span class="monitor-exercise-name">${escapeHtml(ex.name || 'Exercise')}</span>
+          ${isPR ? '<span class="pr-pill">&#127942; PR</span>' : ''}
+        </button>
+        <table class="monitor-exercise-sets"${expanded ? '' : ' hidden'}>
+          <thead><tr><th>Set</th><th>Reps</th><th>Weight</th><th></th></tr></thead>
+          <tbody>${setsRows}</tbody>
+        </table>
+      </div>`;
+  }).join('');
+
+  return `
+    <p class="monitor-day-detail-total">${escapeHtml(dateStr)} &mdash; <strong>${Math.round(totalVolume).toLocaleString()} kg</strong> total lifted</p>
+    ${prCount > 0 ? `<div class="monitor-day-pr-banner">&#127942; ${prCount} new PR${prCount > 1 ? 's' : ''} this day</div>` : ''}
+    ${exerciseCards}
+  `;
+}
+
+// Wires the calendar's prev/next/day-tap buttons and each exercise card's
+// expand/collapse toggle -- called once after every innerHTML rebuild
+// (the buttons are recreated each time, so listeners are too). ensureFullRange
+// is passed in since the coach and owner views extend their loaded window
+// via two different RPCs.
+function monitorWireCalendarEvents(st, idPrefix, rerender, ensureFullRange) {
+  const prevBtn = document.getElementById(idPrefix + 'CalPrev');
+  const nextBtn = document.getElementById(idPrefix + 'CalNext');
+  if (prevBtn) prevBtn.addEventListener('click', async () => {
+    st.calendarMonth = monitorAddMonths(st.calendarMonth, -1);
+    await ensureFullRange();
+  });
+  if (nextBtn) nextBtn.addEventListener('click', async () => {
+    st.calendarMonth = monitorAddMonths(st.calendarMonth, 1);
+    rerender();
+  });
+  document.querySelectorAll('#' + idPrefix + 'Calendar .monitor-cal-day[data-date]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      st.selectedDate = btn.dataset.date;
+      st.expandedExerciseIndices = new Set();
+      rerender();
+    });
+  });
+  document.querySelectorAll('#' + idPrefix + 'DayDetail .monitor-exercise-head').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.exIdx);
+      if (!st.expandedExerciseIndices) st.expandedExerciseIndices = new Set();
+      if (st.expandedExerciseIndices.has(idx)) st.expandedExerciseIndices.delete(idx);
+      else st.expandedExerciseIndices.add(idx);
+      rerender();
+    });
+  });
+}
+
+/* ---------------------------------------------------------------------
+   Assign Weekly Workout -- exercise/set builder, shared between the
+   coach's own Monitor and the owner's Monitor-on-a-coach's-client, same
+   split as the Training Calendar helpers above: pure render/wire
+   functions taking an explicit state object so there's only one copy of
+   the actual builder logic.
+--------------------------------------------------------------------- */
+function awRenderExercises(containerEl, exercises) {
+  containerEl.innerHTML = exercises.map((ex, exIdx) => `
+    <div class="aw-exercise-card">
+      <div class="aw-exercise-head">
+        <input type="text" class="aw-exercise-name" data-field="name" data-ex-idx="${exIdx}" placeholder="Exercise name" value="${escapeHtml(ex.name || '')}">
+        <button type="button" class="link-btn" data-action="removeExercise" data-ex-idx="${exIdx}">Remove</button>
+      </div>
+      <table class="aw-sets-table">
+        <thead><tr><th>Set</th><th>Reps</th><th>Weight (kg)</th><th></th></tr></thead>
+        <tbody>
+          ${ex.sets.map((s, setIdx) => `
+            <tr>
+              <td>${setIdx + 1}</td>
+              <td><input type="number" min="0" class="aw-set-input" data-field="reps" data-ex-idx="${exIdx}" data-set-idx="${setIdx}" value="${s.reps != null ? s.reps : ''}"></td>
+              <td><input type="number" min="0" step="0.5" class="aw-set-input" data-field="weightKg" data-ex-idx="${exIdx}" data-set-idx="${setIdx}" value="${s.weightKg != null ? s.weightKg : ''}"></td>
+              <td><button type="button" class="link-btn" data-action="removeSet" data-ex-idx="${exIdx}" data-set-idx="${setIdx}">&times;</button></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+      <button type="button" class="link-btn" data-action="addSet" data-ex-idx="${exIdx}">+ Add Set</button>
+    </div>`).join('') || '<p class="note">No exercises yet &mdash; tap "Add Exercise" below.</p>';
+}
+
+// Delegated listeners attached once per container -- innerHTML rebuilds
+// from awRenderExercises() don't need re-wiring since the container
+// element itself persists (same pattern as enforceFeatureDependencies
+// near the top of this file). Text/number inputs only mutate state, they
+// deliberately do NOT re-render -- doing so on every keystroke would
+// rebuild the DOM mid-type and drop focus/cursor position.
+function awWireContainer(containerEl, exercises, rerender) {
+  containerEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const exIdx = Number(btn.dataset.exIdx);
+    if (btn.dataset.action === 'removeExercise') {
+      exercises.splice(exIdx, 1);
+      rerender();
+    } else if (btn.dataset.action === 'addSet') {
+      exercises[exIdx].sets.push({ reps: null, weightKg: null });
+      rerender();
+    } else if (btn.dataset.action === 'removeSet') {
+      exercises[exIdx].sets.splice(Number(btn.dataset.setIdx), 1);
+      rerender();
+    }
+  });
+  containerEl.addEventListener('input', (e) => {
+    const el = e.target;
+    if (!el.dataset.field) return;
+    const exIdx = Number(el.dataset.exIdx);
+    if (el.dataset.field === 'name') { exercises[exIdx].name = el.value; return; }
+    const v = el.value === '' ? null : Number(el.value);
+    exercises[exIdx].sets[Number(el.dataset.setIdx)][el.dataset.field] = v;
+  });
+}
+
+// Trims blank rows before sending: sets with neither reps nor weight
+// entered are dropped, and exercises left with an empty name or zero
+// remaining sets are dropped entirely, so a coach can leave a half-filled
+// row without it silently reaching the client as a name-less exercise.
+function awCleanExercises(exercises) {
+  return exercises
+    .map(ex => ({
+      name: (ex.name || '').trim(),
+      sets: ex.sets.filter(s => s.reps != null || s.weightKg != null).map(s => ({ reps: s.reps, weightKg: s.weightKg })),
+    }))
+    .filter(ex => ex.name && ex.sets.length);
+}
+
 async function loadMonitorData(days) {
   const content = document.getElementById('monitorContent');
   const statusLine = document.getElementById('monitorStatusLine');
@@ -1914,6 +2359,17 @@ async function ensureMonitorFullRange() {
     await loadMonitorData(MONITOR_FULL_JOURNEY_DAYS);
   } else {
     renderMonitorContent();
+  }
+}
+
+// Same "extend the loaded window on demand" logic as ensureMonitorFullRange
+// above, for the owner's Monitor-on-a-coach's-client -- used when the
+// calendar is paged back further than the initially-loaded 60 days.
+async function ensureOwnerMonitorFullRange() {
+  if (ownerMonitorState.loadedDays < MONITOR_FULL_JOURNEY_DAYS) {
+    await loadOwnerMonitorData(MONITOR_FULL_JOURNEY_DAYS);
+  } else {
+    renderOwnerMonitorContent();
   }
 }
 
@@ -1996,11 +2452,14 @@ function renderMonitorContent() {
     const e = logsByDate[ds];
     return `<div class="client-row"><span>${escapeHtml(ds)}</span><span style="color:var(--text-muted);font-size:0.78rem;">` +
       `${e.calories != null ? e.calories + ' kcal' : '—'} &middot; ` +
+      `${e.protein != null ? e.protein + 'g protein' : '—'} &middot; ` +
       `${e.steps != null ? e.steps + ' steps' : '—'} &middot; ` +
       `${monitorHasWorkout(e) ? 'Workout' : 'No workout'}` +
       `${e.weightKg != null ? ' &middot; ' + e.weightKg.toFixed(1) + ' kg' : ''}` +
       `</span></div>`;
   }).join('') || '<p class="note">No activity logged in this window.</p>';
+
+  monitorEnsureCalendarDefaults(st, logsByDate);
 
   content.innerHTML = `
     <div class="client-row"><span>Current streak</span><span>${streak} day${streak === 1 ? '' : 's'}</span></div>
@@ -2035,6 +2494,11 @@ function renderMonitorContent() {
       </div>
     </div>
 
+    <h3 style="margin:14px 0 6px;font-size:0.95rem;">Training Calendar</h3>
+    <p class="note" style="margin-top:0;">Marked days show a completed workout &mdash; tap a date for that day's exercise-by-exercise breakdown.</p>
+    <div class="monitor-calendar" id="monitorCalendar">${renderMonitorCalendarHtml(st, logsByDate, 'monitor')}</div>
+    <div class="monitor-day-detail" id="monitorDayDetail">${renderMonitorDayDetailHtml(st, logsByDate)}</div>
+
     <h3 style="margin:14px 0 6px;font-size:0.95rem;">Recent activity</h3>
     ${activityRows}
   `;
@@ -2047,6 +2511,7 @@ function renderMonitorContent() {
     st.volumeFullJourney = !st.volumeFullJourney;
     if (st.volumeFullJourney) await ensureMonitorFullRange(); else renderMonitorContent();
   });
+  monitorWireCalendarEvents(st, 'monitor', renderMonitorContent, ensureMonitorFullRange);
 }
 
 function openAssignTargets(publicId) {
@@ -2079,6 +2544,54 @@ document.getElementById('btnSaveAssignTargets').addEventListener('click', async 
     note.textContent = 'Saved.'; note.className = 'note success';
   } catch (e) {
     note.textContent = 'Could not save: ' + (e.message || e); note.className = 'note error';
+  }
+});
+
+// Fixed array reference, mutated in place -- see ownerAwExercises's own
+// comment for why this must never be reassigned.
+const awExercises = [];
+function openAssignWorkout(publicId) {
+  document.getElementById('assignWorkoutCard').hidden = false;
+  document.getElementById('assignWorkoutClientId').textContent = publicId;
+  document.getElementById('assignWorkoutCard').dataset.targetId = publicId;
+  document.getElementById('awName').value = '';
+  document.getElementById('assignWorkoutNote').textContent = '';
+  awExercises.length = 0;
+  awExercises.push({ name: '', sets: [{ reps: null, weightKg: null }] });
+  awRenderExercises(document.getElementById('awExercises'), awExercises);
+  document.getElementById('assignWorkoutCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+awWireContainer(document.getElementById('awExercises'), awExercises, () =>
+  awRenderExercises(document.getElementById('awExercises'), awExercises));
+
+document.getElementById('btnMonitorAssignWorkout').addEventListener('click', () => {
+  if (!monitorState || !monitorState.publicId) return;
+  openAssignWorkout(monitorState.publicId);
+});
+document.getElementById('btnAwAddExercise').addEventListener('click', () => {
+  awExercises.push({ name: '', sets: [{ reps: null, weightKg: null }] });
+  awRenderExercises(document.getElementById('awExercises'), awExercises);
+});
+document.getElementById('btnCloseAssignWorkout').addEventListener('click', () => {
+  document.getElementById('assignWorkoutCard').hidden = true;
+});
+document.getElementById('btnSendAssignWorkout').addEventListener('click', async () => {
+  const note = document.getElementById('assignWorkoutNote');
+  if (demoMode) { note.textContent = 'Preview mode — not sent.'; note.className = 'note'; return; }
+  const targetId = document.getElementById('assignWorkoutCard').dataset.targetId;
+  const programName = document.getElementById('awName').value.trim();
+  const cleaned = awCleanExercises(awExercises);
+  if (!cleaned.length) { note.textContent = 'Add at least one exercise with at least one set.'; note.className = 'note error'; return; }
+  note.textContent = 'Sending…'; note.className = 'note';
+  try {
+    const { error } = await sb.rpc('coach_assign_workout', {
+      p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
+      p_target_digital_id: targetId, p_program_name: programName || null, p_exercises: cleaned,
+    });
+    if (error) throw error;
+    note.textContent = `Sent to ${targetId}.`; note.className = 'note success';
+  } catch (e) {
+    note.textContent = 'Could not send: ' + (e.message || e); note.className = 'note error';
   }
 });
 
