@@ -22,3 +22,10 @@ function copyRecursive(src, dest) {
 
 copyRecursive(path.join(__dirname, 'native-src'), path.join(__dirname, 'android', 'app', 'src', 'main', 'java'));
 copyRecursive(path.join(__dirname, 'native-res'), path.join(__dirname, 'android', 'app', 'src', 'main', 'res'));
+// native-config/google-services.json -- Firebase Cloud Messaging for native
+// push (see android/app/build.gradle's conditional google-services plugin
+// block). Same convention as capacitor-app/apply-native-src.js's own
+// native-config -> android/app copy.
+if (fs.existsSync(path.join(__dirname, 'native-config'))) {
+  copyRecursive(path.join(__dirname, 'native-config'), path.join(__dirname, 'android', 'app'));
+}
