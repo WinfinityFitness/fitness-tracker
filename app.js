@@ -15662,7 +15662,7 @@ async function uploadAssessmentZipForAdmin(blobs) {
   const zipBlob = await zip.generateAsync({ type: 'blob' });
   const shareKey = getOrCreateShareKey();
   const path = `${shareKey}/${Date.now()}.zip`;
-  const { error } = await sb.storage.from('assessment-zips').upload(path, zipBlob, { contentType: 'application/zip' });
+  const { error } = await sb.storage.from('assessment-zips').upload(path, zipBlob, { contentType: 'application/zip', cacheControl: '31536000' });
   if (error) throw error;
   const zipUrl = sb.storage.from('assessment-zips').getPublicUrl(path).data.publicUrl;
   await sb.rpc('submit_assessment_zip', { p_share_key: shareKey, p_zip_url: zipUrl });
@@ -16961,7 +16961,7 @@ async function uploadChatImage(dataUrl, shareKeyOverride, folder) {
   }
   const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
   const path = `${folder ? folder + '/' : ''}${shareKeyOverride || getOrCreateShareKey()}/${Date.now()}.${ext}`;
-  const { error } = await sb.storage.from('chat-images').upload(path, blob, { contentType: blob.type });
+  const { error } = await sb.storage.from('chat-images').upload(path, blob, { contentType: blob.type, cacheControl: '31536000' });
   if (error) throw error;
   return sb.storage.from('chat-images').getPublicUrl(path).data.publicUrl;
 }
