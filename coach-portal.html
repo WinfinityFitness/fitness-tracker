@@ -1151,7 +1151,7 @@ document.querySelectorAll('#ownerMainTabs .main-tab-btn').forEach(btn => {
    Now" here just means forcing a cache-busted reload instead of quietly
    trusting whatever the browser already has cached, not installing
    anything. */
-const COACH_PORTAL_VERSION = '2.3.0';
+const COACH_PORTAL_VERSION = '2.3.1';
 document.getElementById('versionBadgeText').textContent = COACH_PORTAL_VERSION;
 
 async function fetchLatestCoachPortalVersion() {
@@ -1283,6 +1283,7 @@ document.getElementById('btnCoachBack').addEventListener('click', () => {
 // a shared device, not just a missing nicety.
 document.getElementById('btnCoachLogout').addEventListener('click', () => {
   coachSession = null;
+  localStorage.removeItem('wf_coach_session');
   document.getElementById('coachPanel').hidden = true;
   document.getElementById('coachDemoBanner').hidden = true;
   document.getElementById('coachLoginCard').hidden = false;
@@ -2113,6 +2114,21 @@ document.getElementById('linkForgotPassword').addEventListener('click', (e) => {
   note.className = 'note';
 });
 
+// Shared by both a fresh login and restoreCoachSession() below -- the
+// Digital ID/password have already been verified by the caller against
+// verify_coach_login by this point.
+function enterCoachPanel(id, password) {
+  coachSession = { digitalId: id, password };
+  localStorage.setItem('wf_coach_session', JSON.stringify(coachSession));
+  document.getElementById('coachLoginCard').hidden = true;
+  document.getElementById('coachPanel').hidden = false;
+  document.getElementById('introNote').hidden = true;
+  loadCoachOwnFlags();
+  loadCoachClients();
+  loadShowcaseData();
+  reconnectCoachPushIfEnabled();
+}
+
 document.getElementById('btnCoachLogin').addEventListener('click', async () => {
   const id = document.getElementById('coachLoginId').value.trim();
   const password = document.getElementById('coachLoginPassword').value;
@@ -2122,18 +2138,35 @@ document.getElementById('btnCoachLogin').addEventListener('click', async () => {
   try {
     const { error } = await sb.rpc('verify_coach_login', { p_digital_id: id, p_password: password });
     if (error) throw error;
-    coachSession = { digitalId: id, password };
-    document.getElementById('coachLoginCard').hidden = true;
-    document.getElementById('coachPanel').hidden = false;
-    document.getElementById('introNote').hidden = true;
-    loadCoachOwnFlags();
-    loadCoachClients();
-    loadShowcaseData();
-    reconnectCoachPushIfEnabled();
+    enterCoachPanel(id, password);
   } catch (e) {
     note.textContent = 'Incorrect Digital ID or password.'; note.className = 'note error';
   }
 });
+
+// Reloading the page (or the native app's WebView getting recreated after
+// Android reclaims it in the background -- routine on the Coach APK, not
+// a bug in Android) used to always drop back to the login form because
+// coachSession only ever lived in a JS variable. Re-verifying a saved
+// Digital ID/password against the same RPC the login button uses means a
+// coach doesn't have to re-type credentials just because the app got
+// backgrounded; a since-changed/removed password still correctly bounces
+// them to the login form (stale copy is discarded either way).
+async function restoreCoachSession() {
+  const saved = localStorage.getItem('wf_coach_session');
+  if (!saved) return;
+  let parsed;
+  try { parsed = JSON.parse(saved); } catch (e) { localStorage.removeItem('wf_coach_session'); return; }
+  if (!parsed || !parsed.digitalId || !parsed.password) { localStorage.removeItem('wf_coach_session'); return; }
+  try {
+    const { error } = await sb.rpc('verify_coach_login', { p_digital_id: parsed.digitalId, p_password: parsed.password });
+    if (error) throw error;
+    show('viewCoach');
+    enterCoachPanel(parsed.digitalId, parsed.password);
+  } catch (e) {
+    localStorage.removeItem('wf_coach_session');
+  }
+}
 
 async function loadCoachOwnFlags() {
   const el = document.getElementById('coachOwnFlags');
@@ -3672,7 +3705,7 @@ function renderDemoChatMessages(publicId) {
 // screen and login form entirely -- this needs to run after primaryWheel/
 // accentWheel (declared further up) exist, so it's the very last thing
 // the script does.
-if (demoMode) { show('viewCoach'); enterCoachDemo(); }
+if (demoMode) { show('viewCoach'); enterCoachDemo(); } else { restoreCoachSession(); }
 </script>
 </body>
 </html>

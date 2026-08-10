@@ -3,7 +3,7 @@
   "appName": "Winfinity Coach",
   "webDir": "www",
   "server": {
-    "url": "https://coach.winfinityfitness.com",
+    "url": "https://coach.winfinityfitness.com/coach-portal.html",
     "cleartext": false
   }
 }
