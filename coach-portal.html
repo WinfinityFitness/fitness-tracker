@@ -141,17 +141,37 @@
   .consistency-fill { height: 100%; background: linear-gradient(90deg, var(--tier-behind), var(--tier-elite)); border-radius: 4px; }
   @media (max-width: 640px) { .chart-body { flex-direction: column; } .stat-panel { width: 100%; max-width: none; } }
 
+  /* Global sticky header -- logo + brand name on the left (generic
+     "Winfinity Coach" until a coach logs in, then their own saved brand
+     name/logo, see applyCoachHeaderBranding()), theme toggle + version
+     badge on the right. Same structural pattern as the main Fitness
+     Tracker's own .app-header (index.html/style.css), adapted to this
+     page's own orange-accented palette rather than copying FT's cyan. */
+  .app-header {
+    position: sticky; top: 0; z-index: 45; background: var(--panel);
+    border-bottom: 1px solid var(--border); padding: 12px 16px;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .app-header .brand { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .app-header .brand-logo { display: block; border-radius: 6px; flex-shrink: 0; object-fit: cover; }
+  .app-header h1 {
+    font-size: 1rem; margin: 0; font-weight: 800; letter-spacing: 0.03em;
+    color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .app-header .header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .intro-note {
+    text-align: center; color: var(--text-muted); font-size: 0.85rem; margin: 20px 0 4px;
+  }
+
   .version-badge {
-    position: fixed; top: 12px; right: 12px; z-index: 40;
-    background: var(--panel); border: 1px solid var(--border); color: var(--text-muted);
+    background: var(--bg); border: 1px solid var(--border); color: var(--text-muted);
     border-radius: 999px; padding: 5px 11px; font-size: 0.72rem; font-variant-numeric: tabular-nums;
     cursor: pointer; font-family: inherit;
   }
   .version-badge.has-update { color: var(--accent); border-color: var(--accent-dim); }
   .theme-toggle-btn {
-    position: fixed; top: 12px; right: 70px; z-index: 40;
     width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
-    background: var(--panel); border: 1px solid var(--border); color: var(--text-muted);
+    background: var(--bg); border: 1px solid var(--border); color: var(--text-muted);
     border-radius: 50%; cursor: pointer; padding: 0;
   }
   .theme-toggle-btn:hover { color: var(--accent); border-color: var(--accent-dim); }
@@ -317,14 +337,55 @@
     border-radius: 8px; padding: 8px 12px; text-align: center; font-size: 0.72rem; font-weight: 700;
     letter-spacing: 0.03em; text-transform: uppercase; margin-bottom: 14px;
   }
+
+  /* ---------------------------------------------------------------------
+     Desktop layout -- style.css itself is desktop-first for the main
+     Fitness Tracker's wellness shell, collapsing DOWN via max-width
+     queries; this page does the opposite (mobile-first, min-width),
+     matching how the rest of THIS file was already written. Two shapes,
+     decided per tab by what the content actually is:
+       - master-detail (Clients, Chat): a picker list next to whichever
+         single detail panel is open. Grid auto-placement handles the
+         "only one drill-down is ever unhidden at a time" part for free
+         -- a hidden sibling (display:none) doesn't occupy a grid cell at
+         all, so whichever ONE of Assign Targets/Assign Workout/Monitor
+         (or the chat thread) is currently visible just lands in the
+         second column automatically, no JS changes needed.
+       - independent cards (Settings, Owner's Coaches tab): unrelated
+         forms with no picker/detail relationship, so a plain 2-per-row
+         grid instead -- align-items:start keeps each card its own
+         natural height rather than stretching to match its row-mate.
+  --------------------------------------------------------------------- */
+  @media (min-width: 860px) {
+    .wrap { max-width: 1120px; }
+    .landing { max-width: 880px; margin-left: auto; margin-right: auto; }
+
+    #coachPageClients, #coachPageChat {
+      display: grid; grid-template-columns: 300px 1fr; gap: 18px; align-items: start;
+    }
+    #coachPageClients > .card, #coachPageChat > .card { margin-bottom: 0; }
+
+    #coachPageSettings, #ownerPageCoaches {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start;
+    }
+    #coachPageSettings > .card, #ownerPageCoaches > .card { margin-bottom: 0; }
+  }
 </style>
 </head>
 <body>
-<button type="button" class="theme-toggle-btn" id="themeToggleBtn" title="Toggle light/dark mode" aria-label="Toggle light/dark mode">
-  <svg id="themeToggleIconDark" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
-  <svg id="themeToggleIconLight" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" hidden><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-</button>
-<button type="button" class="version-badge" id="versionBadge" title="Check for updates">v<span id="versionBadgeText">1.0.0</span></button>
+<header class="app-header">
+  <div class="brand">
+    <img class="brand-logo" id="brandHeaderLogo" src="icons/icon-192.png" alt="" width="28" height="28">
+    <h1 id="brandHeaderTitle">WINFINITY COACH</h1>
+  </div>
+  <div class="header-right">
+    <button type="button" class="theme-toggle-btn" id="themeToggleBtn" title="Toggle light/dark mode" aria-label="Toggle light/dark mode">
+      <svg id="themeToggleIconDark" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+      <svg id="themeToggleIconLight" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" hidden><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+    </button>
+    <button type="button" class="version-badge" id="versionBadge" title="Check for updates">v<span id="versionBadgeText">1.0.0</span></button>
+  </div>
+</header>
 <div class="update-modal-overlay" id="updateModalOverlay" hidden>
   <div class="update-modal-card">
     <button type="button" class="stat-card-close" id="btnCloseUpdateModal" aria-label="Close">&times;</button>
@@ -337,10 +398,7 @@
   </div>
 </div>
 <div class="wrap">
-  <header class="hero">
-    <h1>Winfinity <span class="accent">Coach Portal</span></h1>
-    <p>Owner tools for onboarding coaches, and coach tools for self-managing branding and clients. <strong style="color:var(--good, #34bd7c);">FREE</strong> for everyone right now.</p>
-  </header>
+  <p class="intro-note" id="introNote">Owner tools for onboarding coaches, and coach tools for self-managing branding and clients. <strong style="color:var(--good, #34bd7c);">FREE</strong> for everyone right now.</p>
 
   <div id="viewLanding" class="landing">
     <button type="button" class="landing-btn" id="btnGoOwner">
@@ -811,6 +869,21 @@ function initCoachTheme() {
 }
 initCoachTheme();
 
+/* --- Header branding -- generic "Winfinity Coach" until a coach logs in
+   (real or demo), then their own saved brand name/logo, mirroring FT's
+   applyCoachBrandName() (app.js) but for THIS app's own header, not the
+   client-facing one. Reset back to generic on btnCoachBack so a coach's
+   branding doesn't linger in the header after they leave their own view
+   (e.g. an owner logging in next on the same device). --- */
+function applyCoachHeaderBranding(name, logoUrl) {
+  document.getElementById('brandHeaderTitle').textContent = (name || 'Winfinity Coach').toUpperCase();
+  const logoEl = document.getElementById('brandHeaderLogo');
+  logoEl.src = logoUrl || 'icons/icon-192.png';
+}
+function resetCoachHeaderBranding() {
+  applyCoachHeaderBranding(null, null);
+}
+
 /* --- Main tab navigation (Status/Clients/Chat/Settings) --- */
 function showCoachTab(name) {
   ['status', 'clients', 'chat', 'settings'].forEach(t => {
@@ -851,7 +924,7 @@ document.querySelectorAll('#ownerMainTabs .main-tab-btn').forEach(btn => {
    Now" here just means forcing a cache-busted reload instead of quietly
    trusting whatever the browser already has cached, not installing
    anything. */
-const COACH_PORTAL_VERSION = '2.0.0';
+const COACH_PORTAL_VERSION = '2.1.0';
 document.getElementById('versionBadgeText').textContent = COACH_PORTAL_VERSION;
 
 async function fetchLatestCoachPortalVersion() {
@@ -965,8 +1038,15 @@ function show(id) {
 }
 document.getElementById('btnGoOwner').addEventListener('click', () => show('viewOwner'));
 document.getElementById('btnGoCoach').addEventListener('click', () => show('viewCoach'));
-document.getElementById('btnOwnerBack').addEventListener('click', () => show('viewLanding'));
-document.getElementById('btnCoachBack').addEventListener('click', () => show('viewLanding'));
+document.getElementById('btnOwnerBack').addEventListener('click', () => {
+  show('viewLanding');
+  document.getElementById('introNote').hidden = false;
+});
+document.getElementById('btnCoachBack').addEventListener('click', () => {
+  show('viewLanding');
+  resetCoachHeaderBranding();
+  document.getElementById('introNote').hidden = false;
+});
 
 // --------------------------------------------------------------------
 // Owner side
@@ -985,6 +1065,7 @@ document.getElementById('btnOwnerLogin').addEventListener('click', async () => {
     ownerSession = { digitalId: id, password };
     document.getElementById('ownerLoginCard').hidden = true;
     document.getElementById('ownerPanel').hidden = false;
+    document.getElementById('introNote').hidden = true;
     loadCoachList();
   } catch (e) {
     note.textContent = 'Incorrect Digital ID or password.'; note.className = 'note error';
@@ -1755,6 +1836,7 @@ function enterCoachDemo() {
   document.getElementById('coachLoginCard').hidden = true;
   document.getElementById('coachPanel').hidden = false;
   document.getElementById('coachDemoBanner').hidden = false;
+  document.getElementById('introNote').hidden = true;
 
   document.getElementById('coachBrandName').value = DEMO_BRAND.name;
   document.getElementById('coachBrandLogo').value = DEMO_BRAND.logoUrl;
@@ -1762,6 +1844,7 @@ function enterCoachDemo() {
   accentWheel.setFromHex(DEMO_BRAND.accent);
   updateBrandPreview();
   document.getElementById('coachSplashCaption').value = DEMO_SPLASH.caption;
+  applyCoachHeaderBranding(DEMO_BRAND.name, DEMO_BRAND.logoUrl);
 
   loadCoachOwnFlags();
   loadCoachClients();
@@ -1787,6 +1870,7 @@ document.getElementById('btnCoachLogin').addEventListener('click', async () => {
     coachSession = { digitalId: id, password };
     document.getElementById('coachLoginCard').hidden = true;
     document.getElementById('coachPanel').hidden = false;
+    document.getElementById('introNote').hidden = true;
     loadCoachOwnFlags();
     loadCoachClients();
     loadShowcaseData();
@@ -2991,6 +3075,7 @@ async function loadShowcaseData() {
     }));
     renderShowcaseTabs();
     renderShowcaseMetric(0);
+    if (data) applyCoachHeaderBranding(data.brandName, data.brandLogoUrl);
   } catch (e) { /* showcase card just stays empty if this fails */ }
 }
 
