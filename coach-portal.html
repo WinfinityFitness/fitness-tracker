@@ -79,6 +79,14 @@
   .color-hex-input {
     width: 100%; box-sizing: border-box; background: var(--bg); border: 1px solid var(--border);
     border-radius: 8px; padding: 7px 9px; color: var(--text-primary); font-size: 0.85rem;
+    /* flex:1 + min-width:0 only matter inside .color-hex-row (a flex
+       container) -- harmless no-ops for ownerBrandPrimary/ownerBrandAccent,
+       which use this same class directly inside a non-flex .field. Without
+       them, the swatch + flex-shrink default squeezed this input down to
+       fit only "#" -- text inputs have a very small min-content width, so
+       a plain width:100% flex-basis isn't enough on its own to win space
+       against that shrink pressure. */
+    flex: 1; min-width: 0;
   }
 
   /* Client Progress Showcase -- same styles as coach-dashboard.html's own
@@ -369,6 +377,73 @@
       display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start;
     }
     #coachPageSettings > .card, #ownerPageCoaches > .card { margin-bottom: 0; }
+
+    /* Left rail takes over navigation from the horizontal pills, which
+       this width has room to retire in favor of icon+label buttons that
+       stay put while scrolling (position:sticky, offset below the
+       header). #coachMainTabs itself is what's hidden -- .main-tab-btn
+       elements still exist and stay wired to showCoachTab() either way,
+       coachTabButtons() below just also includes .side-nav-btn now. */
+    #coachMainTabs { display: none; }
+    .portal-body { display: flex; align-items: flex-start; gap: 22px; }
+    .side-nav {
+      display: flex; flex-direction: column; gap: 3px; width: 168px; flex-shrink: 0;
+      position: sticky; top: 76px;
+      background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 12px 8px;
+    }
+    .portal-main { flex: 1; min-width: 0; }
+  }
+
+  .side-nav-btn {
+    display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 9px;
+    background: none; border: none; color: var(--text-muted); font-size: 0.85rem; font-weight: 600;
+    cursor: pointer; text-decoration: none; font-family: inherit; text-align: left;
+  }
+  .side-nav-btn:hover { background: var(--bg); color: var(--text-primary); }
+  .side-nav-btn.is-active { background: var(--accent); color: #0a0d12; }
+  .side-nav-spacer { flex: 1; min-height: 8px; }
+
+  .page-title-row { margin: 4px 0 16px; }
+  .page-title-row h1 { margin: 0 0 2px; font-size: 1.35rem; font-weight: 800; letter-spacing: 0.01em; }
+  .page-title-row p { margin: 0; color: var(--text-muted); font-size: 0.86rem; }
+
+  .card-title-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .card-title-row svg { color: var(--accent); flex-shrink: 0; }
+  .card-title-row h2 { margin: 0; }
+
+  .needs-attention-card {
+    background: rgba(230,81,106,0.08); border: 1px solid var(--critical); border-radius: 12px;
+    padding: 16px 18px; margin-bottom: 18px;
+  }
+  .needs-attention-card .card-title-row svg { color: var(--critical); }
+  .needs-attention-row {
+    display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid rgba(230,81,106,0.2);
+    cursor: pointer;
+  }
+  .needs-attention-row:first-of-type { border-top: none; }
+  .needs-attention-avatar {
+    width: 30px; height: 30px; border-radius: 50%; background: var(--panel-2); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.78rem; color: var(--text-primary);
+  }
+  .needs-attention-name { flex: 1; font-size: 0.86rem; font-weight: 600; min-width: 0; }
+  .needs-attention-reason { font-size: 0.76rem; color: var(--critical); font-weight: 600; white-space: nowrap; }
+
+  .color-hex-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .color-swatch {
+    width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0; border: 1px solid var(--border);
+  }
+
+  .password-field-row { position: relative; }
+  .password-field-row input { width: 100%; padding-right: 40px; }
+  .password-toggle-btn {
+    position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+    width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+    background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0;
+  }
+  .password-toggle-btn:hover { color: var(--accent); }
+
+  .portal-footer {
+    text-align: center; color: var(--text-muted); font-size: 0.75rem; margin: 32px 0 8px;
   }
 </style>
 </head>
@@ -626,6 +701,9 @@
     <div id="coachPanel" hidden>
       <div id="coachDemoBanner" class="demo-banner" hidden>Preview mode — sample coach account, nothing here is saved</div>
 
+      <!-- Mobile: horizontal pill tabs. Desktop: replaced visually by the
+           side-nav below (same showCoachTab() drives both, see
+           coachTabButtons() querying both bars together). -->
       <nav class="main-tabs" id="coachMainTabs">
         <button type="button" class="main-tab-btn is-active" data-tab="status">Status</button>
         <button type="button" class="main-tab-btn" data-tab="clients">Clients</button>
@@ -633,10 +711,57 @@
         <button type="button" class="main-tab-btn" data-tab="settings">Settings</button>
       </nav>
 
+      <div class="portal-body" id="coachPortalBody">
+        <!-- Desktop-only left rail (CSS hides this on mobile, .main-tabs
+             above takes over there instead). -->
+        <nav class="side-nav" id="coachSideNav">
+          <button type="button" class="side-nav-btn is-active" data-tab="status">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+            <span>Status</span>
+          </button>
+          <button type="button" class="side-nav-btn" data-tab="clients">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span>Clients</span>
+          </button>
+          <button type="button" class="side-nav-btn" data-tab="chat">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span>Chat</span>
+          </button>
+          <button type="button" class="side-nav-btn" data-tab="settings">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span>Settings</span>
+          </button>
+          <div class="side-nav-spacer"></div>
+          <a class="side-nav-btn" href="mailto:support@winfinityfitness.com">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span>Support</span>
+          </a>
+          <button type="button" class="side-nav-btn" id="btnCoachLogout">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <span>Logout</span>
+          </button>
+        </nav>
+
+        <div class="portal-main">
+          <div class="page-title-row">
+            <h1 id="coachPageTitle">Status</h1>
+            <p id="coachPageSubtitle">Live overview of all your clients.</p>
+          </div>
+
       <!-- ---- Status tab: dashboard overview ---- -->
       <div class="coach-page" id="coachPageStatus">
+        <div class="needs-attention-card" id="needsAttentionCard" hidden>
+          <div class="card-title-row">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <h2>Needs Attention</h2>
+          </div>
+          <div id="needsAttentionList"></div>
+        </div>
         <div class="card">
-          <h2 style="margin-bottom:4px;">Client Progress Showcase</h2>
+          <div class="card-title-row">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            <h2 style="margin-bottom:4px;">Client Progress Showcase</h2>
+          </div>
           <p class="note" style="margin-top:0;">Same interaction as the public Progress Showcase, scoped to your own clients only.</p>
           <nav class="tabs" id="showcaseMetricTabs"></nav>
           <div class="filter-row">
@@ -764,7 +889,10 @@
       <!-- ---- Settings tab: branding + account ---- -->
       <div class="coach-page" id="coachPageSettings" hidden>
         <div class="card">
-          <h2>Your Enabled Features</h2>
+          <div class="card-title-row">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="5" width="22" height="14" rx="7"/><circle cx="16" cy="12" r="3"/></svg>
+            <h2>Your Enabled Features</h2>
+          </div>
           <p class="note" style="margin-top:0;">Free for now — pick which of these your clients (and you) get. You can change this anytime.</p>
           <div class="flags" id="coachOwnFlags"></div>
           <button type="button" class="btn" id="btnSaveOwnFeatures">Save Features</button>
@@ -772,7 +900,10 @@
         </div>
 
         <div class="card">
-          <h2>Branding</h2>
+          <div class="card-title-row">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
+            <h2>Branding</h2>
+          </div>
           <label class="field"><span>Brand Name</span><input type="text" id="coachBrandName"></label>
           <label class="field"><span>Logo URL</span><input type="text" id="coachBrandLogo" placeholder="https://..."></label>
           <div class="row2">
@@ -784,8 +915,15 @@
                   <label class="color-brightness-label">Brightness
                     <input type="range" id="brightnessPrimary" min="0" max="100" value="100" class="color-brightness-slider">
                   </label>
-                  <input type="text" id="coachBrandPrimary" placeholder="#ff2d95" class="color-hex-input">
                 </div>
+              </div>
+              <!-- Full width of .field, not squeezed into .color-picker-controls
+                   alongside the wheel -- that column is only ~70px once the
+                   wheel's own fixed 110px (flex-shrink:0) is accounted for,
+                   nowhere near enough for a swatch + a 7-character hex value. -->
+              <div class="color-hex-row">
+                <span class="color-swatch" id="swatchPrimary"></span>
+                <input type="text" id="coachBrandPrimary" placeholder="#ff2d95" class="color-hex-input">
               </div>
             </div>
             <div class="field">
@@ -796,8 +934,11 @@
                   <label class="color-brightness-label">Brightness
                     <input type="range" id="brightnessAccent" min="0" max="100" value="100" class="color-brightness-slider">
                   </label>
-                  <input type="text" id="coachBrandAccent" placeholder="#2dff8f" class="color-hex-input">
                 </div>
+              </div>
+              <div class="color-hex-row">
+                <span class="color-swatch" id="swatchAccent"></span>
+                <input type="text" id="coachBrandAccent" placeholder="#2dff8f" class="color-hex-input">
               </div>
             </div>
           </div>
@@ -815,7 +956,10 @@
         </div>
 
         <div class="card">
-          <h2>Boot Splash Logo</h2>
+          <div class="card-title-row">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+            <h2>Boot Splash Logo</h2>
+          </div>
           <label class="field"><span>Splash Image URL</span><input type="text" id="coachSplashUrl" placeholder="https://..."></label>
           <label class="field"><span>Splash Motto / Brand Text</span><input type="text" id="coachSplashCaption" placeholder="Your own motto or brand tagline"></label>
           <button type="button" class="btn" id="btnSaveSplash">Save Splash</button>
@@ -823,7 +967,10 @@
         </div>
 
         <div class="card">
-          <h2>Notifications</h2>
+          <div class="card-title-row">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <h2>Notifications</h2>
+          </div>
           <p class="note" style="margin-top:0;">Get a push notification (even with this tab closed) when one of your clients finishes a workout.</p>
           <label class="flag-toggle" style="cursor:pointer;">
             <input type="checkbox" id="coachPushToggle"> Push notifications
@@ -832,13 +979,33 @@
         </div>
 
         <div class="card">
-          <h2>Account</h2>
-          <label class="field"><span>Current Password</span><input type="password" id="cpOldPassword" autocomplete="off"></label>
-          <label class="field"><span>New Password</span><input type="password" id="cpNewPassword" autocomplete="off"></label>
+          <div class="card-title-row">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <h2>Account</h2>
+          </div>
+          <label class="field"><span>Current Password</span>
+            <div class="password-field-row">
+              <input type="password" id="cpOldPassword" autocomplete="off">
+              <button type="button" class="password-toggle-btn" data-target="cpOldPassword" aria-label="Show password">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </label>
+          <label class="field"><span>New Password</span>
+            <div class="password-field-row">
+              <input type="password" id="cpNewPassword" autocomplete="off">
+              <button type="button" class="password-toggle-btn" data-target="cpNewPassword" aria-label="Show password">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </label>
           <button type="button" class="btn" id="btnChangePassword">Change Password</button>
           <p class="note" id="changePasswordNote"></p>
         </div>
       </div>
+        </div> <!-- /.portal-main -->
+      </div> <!-- /.portal-body -->
+      <footer class="portal-footer" id="coachPortalFooter"></footer>
     </div>
   </div>
 </div>
@@ -869,6 +1036,23 @@ function initCoachTheme() {
 }
 initCoachTheme();
 
+// Delegated once on document rather than wired per-field -- covers
+// .password-toggle-btn wherever it appears without needing a matching
+// addEventListener at every password field's own markup.
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.password-toggle-btn');
+  if (!btn) return;
+  const input = document.getElementById(btn.dataset.target);
+  if (!input) return;
+  const showing = input.type === 'text';
+  input.type = showing ? 'password' : 'text';
+  btn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+  btn.classList.toggle('is-showing', !showing);
+});
+
+document.getElementById('coachPortalFooter').textContent =
+  `© ${new Date().getFullYear()} Winfinity Fitness Coach Portal.`;
+
 /* --- Header branding -- generic "Winfinity Coach" until a coach logs in
    (real or demo), then their own saved brand name/logo, mirroring FT's
    applyCoachBrandName() (app.js) but for THIS app's own header, not the
@@ -885,18 +1069,35 @@ function resetCoachHeaderBranding() {
 }
 
 /* --- Main tab navigation (Status/Clients/Chat/Settings) --- */
+const COACH_TAB_META = {
+  status: ['Status', 'Live overview of all your clients.'],
+  clients: ['Clients', 'Manage your roster and message clients.'],
+  chat: ['Chat', 'Message your clients directly.'],
+  settings: ['Settings', 'Configure your coach portal and client app experience.'],
+};
+// Both the mobile pill row (#coachMainTabs) and the desktop left rail
+// (#coachSideNav) carry [data-tab] buttons wired to the same
+// showCoachTab() -- CSS just shows whichever one fits the viewport (see
+// the min-width:860px block), so only one is ever visibly clickable at a
+// time, but both stay in sync regardless.
+function coachTabButtons() {
+  return document.querySelectorAll('#coachMainTabs .main-tab-btn, #coachSideNav .side-nav-btn[data-tab]');
+}
 function showCoachTab(name) {
   ['status', 'clients', 'chat', 'settings'].forEach(t => {
     const page = document.getElementById('coachPage' + t.charAt(0).toUpperCase() + t.slice(1));
     if (page) page.hidden = t !== name;
   });
-  document.querySelectorAll('#coachMainTabs .main-tab-btn').forEach(btn => {
-    btn.classList.toggle('is-active', btn.dataset.tab === name);
-  });
+  coachTabButtons().forEach(btn => btn.classList.toggle('is-active', btn.dataset.tab === name));
+  const meta = COACH_TAB_META[name];
+  if (meta) {
+    document.getElementById('coachPageTitle').textContent = meta[0];
+    document.getElementById('coachPageSubtitle').textContent = meta[1];
+  }
   if (name === 'chat') refreshChatClientList();
   else stopChatPolling(); // no point polling a thread the coach can no longer see
 }
-document.querySelectorAll('#coachMainTabs .main-tab-btn').forEach(btn => {
+coachTabButtons().forEach(btn => {
   btn.addEventListener('click', () => showCoachTab(btn.dataset.tab));
 });
 
@@ -924,7 +1125,7 @@ document.querySelectorAll('#ownerMainTabs .main-tab-btn').forEach(btn => {
    Now" here just means forcing a cache-busted reload instead of quietly
    trusting whatever the browser already has cached, not installing
    anything. */
-const COACH_PORTAL_VERSION = '2.1.0';
+const COACH_PORTAL_VERSION = '2.2.0';
 document.getElementById('versionBadgeText').textContent = COACH_PORTAL_VERSION;
 
 async function fetchLatestCoachPortalVersion() {
@@ -1046,6 +1247,25 @@ document.getElementById('btnCoachBack').addEventListener('click', () => {
   show('viewLanding');
   resetCoachHeaderBranding();
   document.getElementById('introNote').hidden = false;
+});
+
+// Distinct from btnCoachBack -- that only changes which top-level VIEW is
+// showing (viewLanding vs viewCoach), it never actually cleared
+// coachSession or re-hid coachPanel/coachLoginCard. Without a real
+// logout, tapping "I'm a Coach" again on the same device silently
+// resumed the previous session with no re-auth at all -- a real gap on
+// a shared device, not just a missing nicety.
+document.getElementById('btnCoachLogout').addEventListener('click', () => {
+  coachSession = null;
+  document.getElementById('coachPanel').hidden = true;
+  document.getElementById('coachDemoBanner').hidden = true;
+  document.getElementById('coachLoginCard').hidden = false;
+  document.getElementById('coachLoginId').value = '';
+  document.getElementById('coachLoginPassword').value = '';
+  stopChatPolling();
+  resetCoachHeaderBranding();
+  document.getElementById('introNote').hidden = false;
+  show('viewLanding');
 });
 
 // --------------------------------------------------------------------
@@ -1739,6 +1959,10 @@ const demoLogsCache = {};
 function demoClientData(client, seed) {
   const rand = seededRandom(seed);
   const isRunner = rand() < 0.65;
+  // Roughly 1 in 4 demo clients reads as stale (>7 days) so the Needs
+  // Attention widget has something real to show in the live preview
+  // instead of always rendering empty.
+  const staleDays = rand() < 0.25 ? Math.round(8 + rand() * 20) : Math.round(rand() * 3);
   return {
     publicId: client.publicId, codeName: client.codeName, avatarDataUrl: null, fitnessMode: client.fitnessMode,
     steps: Math.round(3000 + rand() * 10000),
@@ -1747,6 +1971,7 @@ function demoClientData(client, seed) {
     furthestRunKm: isRunner ? Math.round((2 + rand() * 13) * 10) / 10 : null,
     fastestRunPaceSec: isRunner ? Math.round(220 + rand() * 260) : null,
     conscientiousScore: Math.round(35 + rand() * 60),
+    updatedAt: new Date(Date.now() - staleDays * 86400000).toISOString(),
   };
 }
 
@@ -1952,6 +2177,8 @@ function updateBrandPreview() {
   const badge = document.getElementById('brandPreviewBadge');
   badge.style.background = accent || '#2dff8f';
   badge.style.color = '#1a1200';
+  document.getElementById('swatchPrimary').style.background = primary || '#ff9f43';
+  document.getElementById('swatchAccent').style.background = accent || '#2dff8f';
 }
 ['coachBrandName', 'coachBrandLogo', 'coachBrandPrimary', 'coachBrandAccent'].forEach(id => {
   document.getElementById(id).addEventListener('input', updateBrandPreview);
@@ -3061,6 +3288,7 @@ async function loadShowcaseData() {
     showcaseAllRows = DEMO_CLIENTS.map((c, i) => demoClientData(c, (i + 1) * 104729 + 17));
     renderShowcaseTabs();
     renderShowcaseMetric(0);
+    renderNeedsAttention();
     return;
   }
   try {
@@ -3072,11 +3300,74 @@ async function loadShowcaseData() {
       publicId: r.publicId, codeName: r.codeName, avatarDataUrl: r.avatarDataUrl, fitnessMode: r.fitnessMode,
       steps: r.steps, volumeLifted: r.volumeLifted, volumeUnit: r.volumeUnit, weightProgressPct: r.weightProgressPct,
       furthestRunKm: r.furthestRunKm, fastestRunPaceSec: r.fastestRunPaceSec, conscientiousScore: r.conscientiousScore,
+      updatedAt: r.updatedAt,
     }));
     renderShowcaseTabs();
     renderShowcaseMetric(0);
+    renderNeedsAttention();
     if (data) applyCoachHeaderBranding(data.brandName, data.brandLogoUrl);
   } catch (e) { /* showcase card just stays empty if this fails */ }
+}
+
+/* ---------------------------------------------------------------------
+   Needs Attention -- derived entirely client-side from showcaseAllRows
+   (already fetched for the Progress Showcase above, no extra round
+   trip). Three real, computable signals rather than invented precision
+   like a fabricated "missed N workouts" count that nothing here actually
+   tracks:
+     - No tracking: no synced update in 7+ days (leaderboard.updated_at,
+       which only moves when a client's own web sync actually runs).
+     - Needs attention: conscientiousScore lands in the SAME 'behind' tier
+       showcaseTierFor() already uses for the Progress Showcase bars
+       (<30), so this reuses an existing, already-tuned threshold instead
+       of picking a new one.
+     - Low volume: this week's lift volume well under the group's own
+       average -- "well under" meaning less than 40% of it, and only
+       evaluated against clients who have SOME volume logged (an all-null
+       group has no meaningful average to compare against).
+   Priority order matters: a client with stale data can't meaningfully be
+   judged on compliance/volume, so "No tracking" wins if it applies.
+--------------------------------------------------------------------- */
+function computeNeedsAttention(rows) {
+  const now = Date.now();
+  const withVolume = rows.filter(r => r.volumeLifted != null && r.volumeLifted > 0);
+  const avgVolume = withVolume.length ? withVolume.reduce((s, r) => s + r.volumeLifted, 0) / withVolume.length : 0;
+  const flagged = rows.map(r => {
+    const staleDays = r.updatedAt ? (now - new Date(r.updatedAt).getTime()) / 86400000 : Infinity;
+    let reason = null;
+    if (staleDays > 7) reason = 'No tracking';
+    else if (r.conscientiousScore != null && showcaseTierFor(r.conscientiousScore) === 'behind') reason = 'Needs attention';
+    else if (avgVolume > 0 && r.volumeLifted != null && r.volumeLifted < avgVolume * 0.4) reason = 'Low volume';
+    return reason ? Object.assign({ reason }, r) : null;
+  }).filter(Boolean);
+  // Worst-first: no data at all is a bigger problem than low compliance,
+  // which is bigger than merely low volume.
+  const order = { 'No tracking': 0, 'Needs attention': 1, 'Low volume': 2 };
+  flagged.sort((a, b) => order[a.reason] - order[b.reason]);
+  return flagged;
+}
+
+function renderNeedsAttention() {
+  const card = document.getElementById('needsAttentionCard');
+  const list = document.getElementById('needsAttentionList');
+  const flagged = computeNeedsAttention(showcaseAllRows);
+  if (!flagged.length) { card.hidden = true; return; }
+  card.hidden = false;
+  list.innerHTML = flagged.map(r => {
+    const initial = (r.codeName || r.publicId || '?').trim().charAt(0).toUpperCase();
+    return `
+      <div class="needs-attention-row" data-public-id="${escapeHtml(r.publicId)}">
+        <span class="needs-attention-avatar">${escapeHtml(initial)}</span>
+        <span class="needs-attention-name">${escapeHtml(r.codeName || r.publicId)}</span>
+        <span class="needs-attention-reason">${escapeHtml(r.reason)}</span>
+      </div>`;
+  }).join('');
+  list.querySelectorAll('.needs-attention-row').forEach(row => {
+    row.addEventListener('click', () => {
+      showCoachTab('clients');
+      openMonitorClient(row.dataset.publicId, (coachClientsCache.find(c => c.public_id === row.dataset.publicId) || {}).share_key);
+    });
+  });
 }
 
 function renderShowcaseTabs() {
