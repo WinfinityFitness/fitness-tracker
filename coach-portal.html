@@ -245,6 +245,15 @@
   @media (max-width: 640px) {
     .monitor-charts-grid { grid-template-columns: 1fr; }
   }
+  /* Below the streak/targets/fuel summary: calendar + that day's exercise
+     breakdown on the left, weight/volume charts + recent activity on the
+     right -- keeps the Monitor card from just stacking everything full-width
+     in a single long column once there's room for two. */
+  .monitor-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 14px; align-items: start; }
+  @media (max-width: 859px) {
+    .monitor-two-col { grid-template-columns: 1fr; }
+  }
+  .monitor-two-col .monitor-charts-grid { grid-template-columns: 1fr; margin: 0 0 14px; }
 
   /* Training Calendar + day detail (Monitor panel) -- month grid marking
      workout days, tap a date to see that day's exercise-by-exercise
@@ -416,6 +425,17 @@
     padding: 16px 18px; margin-bottom: 18px;
   }
   .needs-attention-card .card-title-row svg { color: var(--critical); }
+  .needs-attention-toggle {
+    width: 100%; background: none; border: none; padding: 0; margin: 0; cursor: pointer;
+    font-family: inherit; text-align: left;
+  }
+  .needs-attention-count {
+    background: var(--critical); color: #fff; font-size: 0.7rem; font-weight: 700;
+    border-radius: 999px; padding: 1px 8px; margin-left: -2px;
+  }
+  .needs-attention-chevron { margin-left: auto; color: var(--critical); transition: transform 0.15s ease; flex-shrink: 0; }
+  .needs-attention-card.is-open .needs-attention-chevron { transform: rotate(90deg); }
+  .needs-attention-card #needsAttentionList { margin-top: 8px; }
   .needs-attention-row {
     display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid rgba(230,81,106,0.2);
     cursor: pointer;
@@ -750,13 +770,6 @@
 
       <!-- ---- Status tab: dashboard overview ---- -->
       <div class="coach-page" id="coachPageStatus">
-        <div class="needs-attention-card" id="needsAttentionCard" hidden>
-          <div class="card-title-row">
-            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            <h2>Needs Attention</h2>
-          </div>
-          <div id="needsAttentionList"></div>
-        </div>
         <div class="card">
           <div class="card-title-row">
             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
@@ -788,6 +801,19 @@
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- Collapsed by default (see renderNeedsAttention()) -- a click
+             on the header row expands it, same accordion pattern used
+             elsewhere in this file (owner coach-detail's Recent Activity). -->
+        <div class="needs-attention-card" id="needsAttentionCard" hidden>
+          <button type="button" class="card-title-row needs-attention-toggle" id="needsAttentionToggle">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <h2>Needs Attention</h2>
+            <span class="needs-attention-count" id="needsAttentionCount"></span>
+            <svg class="needs-attention-chevron" id="needsAttentionChevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+          <div id="needsAttentionList" hidden></div>
         </div>
       </div>
 
@@ -1125,7 +1151,7 @@ document.querySelectorAll('#ownerMainTabs .main-tab-btn').forEach(btn => {
    Now" here just means forcing a cache-busted reload instead of quietly
    trusting whatever the browser already has cached, not installing
    anything. */
-const COACH_PORTAL_VERSION = '2.2.0';
+const COACH_PORTAL_VERSION = '2.3.0';
 document.getElementById('versionBadgeText').textContent = COACH_PORTAL_VERSION;
 
 async function fetchLatestCoachPortalVersion() {
@@ -1727,30 +1753,34 @@ function renderOwnerMonitorContent() {
     <div class="client-row"><span>Fiber (avg/day)</span><span>${avgFiber != null ? avgFiber + ' g' : '—'}</span></div>
     <div class="client-row"><span>Water (avg/day)</span><span>${avgWater != null ? avgWater + ' mL' : '—'}</span></div>
 
-    <div class="monitor-charts-grid">
-      <div class="card monitor-chart-card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 6px;">
-          <h3 style="margin:0;font-size:0.95rem;">Weight Journey</h3>
-        </div>
-        ${weightChartHtml}
-        ${weightLatest ? `<p class="note" style="margin:6px 0 0;">Latest: ${weightLatest.weightKg.toFixed(1)} kg (${escapeHtml(weightLatest.date)})</p>` : ''}
+    <div class="monitor-two-col">
+      <div>
+        <h3 style="margin:14px 0 6px;font-size:0.95rem;">Training Calendar</h3>
+        <p class="note" style="margin-top:0;">Marked days show a completed workout &mdash; tap a date for that day's exercise-by-exercise breakdown.</p>
+        <div class="monitor-calendar" id="ownerMonitorCalendar">${renderMonitorCalendarHtml(st, logsByDate, 'ownerMonitor')}</div>
+        <div class="monitor-day-detail" id="ownerMonitorDayDetail">${renderMonitorDayDetailHtml(st, logsByDate)}</div>
       </div>
-      <div class="card monitor-chart-card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 6px;">
-          <h3 style="margin:0;font-size:0.95rem;">Total Lift Volume</h3>
+      <div>
+        <div class="monitor-charts-grid">
+          <div class="card monitor-chart-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 6px;">
+              <h3 style="margin:0;font-size:0.95rem;">Weight Journey</h3>
+            </div>
+            ${weightChartHtml}
+            ${weightLatest ? `<p class="note" style="margin:6px 0 0;">Latest: ${weightLatest.weightKg.toFixed(1)} kg (${escapeHtml(weightLatest.date)})</p>` : ''}
+          </div>
+          <div class="card monitor-chart-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 6px;">
+              <h3 style="margin:0;font-size:0.95rem;">Total Lift Volume</h3>
+            </div>
+            ${volumeChartHtml}
+            <p class="note" style="margin:6px 0 0;">${Math.round(volumeTotal).toLocaleString()} kg total (last ${volumeSeries.length} gym days)</p>
+          </div>
         </div>
-        ${volumeChartHtml}
-        <p class="note" style="margin:6px 0 0;">${Math.round(volumeTotal).toLocaleString()} kg total (last ${volumeSeries.length} gym days)</p>
+        <h3 style="margin:14px 0 6px;font-size:0.95rem;">Recent activity</h3>
+        ${activityRows}
       </div>
     </div>
-
-    <h3 style="margin:14px 0 6px;font-size:0.95rem;">Training Calendar</h3>
-    <p class="note" style="margin-top:0;">Marked days show a completed workout &mdash; tap a date for that day's exercise-by-exercise breakdown.</p>
-    <div class="monitor-calendar" id="ownerMonitorCalendar">${renderMonitorCalendarHtml(st, logsByDate, 'ownerMonitor')}</div>
-    <div class="monitor-day-detail" id="ownerMonitorDayDetail">${renderMonitorDayDetailHtml(st, logsByDate)}</div>
-
-    <h3 style="margin:14px 0 6px;font-size:0.95rem;">Recent activity</h3>
-    ${activityRows}
   `;
   monitorWireCalendarEvents(st, 'ownerMonitor', renderOwnerMonitorContent, ensureOwnerMonitorFullRange);
 }
@@ -2967,32 +2997,36 @@ function renderMonitorContent() {
     <div class="client-row"><span>Fiber (avg/day)</span><span>${avgFiber != null ? avgFiber + ' g' : '—'}</span></div>
     <div class="client-row"><span>Water (avg/day)</span><span>${avgWater != null ? avgWater + ' mL' : '—'}</span></div>
 
-    <div class="monitor-charts-grid">
-      <div class="card monitor-chart-card">
-        <div class="section-title-row" style="display:flex;justify-content:space-between;align-items:center;margin:0 0 6px;">
-          <h3 style="margin:0;font-size:0.95rem;">Weight Journey</h3>
-          <button type="button" class="link-btn" id="btnMonitorWeightToggle">${st.weightFullJourney ? 'Show recent' : 'Full journey'}</button>
-        </div>
-        ${weightChartHtml}
-        ${weightLatest ? `<p class="note" style="margin:6px 0 0;">Latest: ${weightLatest.weightKg.toFixed(1)} kg (${escapeHtml(weightLatest.date)})</p>` : ''}
+    <div class="monitor-two-col">
+      <div>
+        <h3 style="margin:14px 0 6px;font-size:0.95rem;">Training Calendar</h3>
+        <p class="note" style="margin-top:0;">Marked days show a completed workout &mdash; tap a date for that day's exercise-by-exercise breakdown.</p>
+        <div class="monitor-calendar" id="monitorCalendar">${renderMonitorCalendarHtml(st, logsByDate, 'monitor')}</div>
+        <div class="monitor-day-detail" id="monitorDayDetail">${renderMonitorDayDetailHtml(st, logsByDate)}</div>
       </div>
-      <div class="card monitor-chart-card">
-        <div class="section-title-row" style="display:flex;justify-content:space-between;align-items:center;margin:0 0 6px;">
-          <h3 style="margin:0;font-size:0.95rem;">Total Lift Volume</h3>
-          <button type="button" class="link-btn" id="btnMonitorVolumeToggle">${st.volumeFullJourney ? 'Show recent' : 'Full journey'}</button>
+      <div>
+        <div class="monitor-charts-grid">
+          <div class="card monitor-chart-card">
+            <div class="section-title-row" style="display:flex;justify-content:space-between;align-items:center;margin:0 0 6px;">
+              <h3 style="margin:0;font-size:0.95rem;">Weight Journey</h3>
+              <button type="button" class="link-btn" id="btnMonitorWeightToggle">${st.weightFullJourney ? 'Show recent' : 'Full journey'}</button>
+            </div>
+            ${weightChartHtml}
+            ${weightLatest ? `<p class="note" style="margin:6px 0 0;">Latest: ${weightLatest.weightKg.toFixed(1)} kg (${escapeHtml(weightLatest.date)})</p>` : ''}
+          </div>
+          <div class="card monitor-chart-card">
+            <div class="section-title-row" style="display:flex;justify-content:space-between;align-items:center;margin:0 0 6px;">
+              <h3 style="margin:0;font-size:0.95rem;">Total Lift Volume</h3>
+              <button type="button" class="link-btn" id="btnMonitorVolumeToggle">${st.volumeFullJourney ? 'Show recent' : 'Full journey'}</button>
+            </div>
+            ${volumeChartHtml}
+            <p class="note" style="margin:6px 0 0;">${Math.round(volumeTotal).toLocaleString()} kg total${st.volumeFullJourney ? '' : ' (last ' + volumeSeries.length + ' gym day' + (volumeSeries.length === 1 ? '' : 's') + ')'}</p>
+          </div>
         </div>
-        ${volumeChartHtml}
-        <p class="note" style="margin:6px 0 0;">${Math.round(volumeTotal).toLocaleString()} kg total${st.volumeFullJourney ? '' : ' (last ' + volumeSeries.length + ' gym day' + (volumeSeries.length === 1 ? '' : 's') + ')'}</p>
+        <h3 style="margin:14px 0 6px;font-size:0.95rem;">Recent activity</h3>
+        ${activityRows}
       </div>
     </div>
-
-    <h3 style="margin:14px 0 6px;font-size:0.95rem;">Training Calendar</h3>
-    <p class="note" style="margin-top:0;">Marked days show a completed workout &mdash; tap a date for that day's exercise-by-exercise breakdown.</p>
-    <div class="monitor-calendar" id="monitorCalendar">${renderMonitorCalendarHtml(st, logsByDate, 'monitor')}</div>
-    <div class="monitor-day-detail" id="monitorDayDetail">${renderMonitorDayDetailHtml(st, logsByDate)}</div>
-
-    <h3 style="margin:14px 0 6px;font-size:0.95rem;">Recent activity</h3>
-    ${activityRows}
   `;
 
   document.getElementById('btnMonitorWeightToggle').addEventListener('click', async () => {
@@ -3350,9 +3384,16 @@ function computeNeedsAttention(rows) {
 function renderNeedsAttention() {
   const card = document.getElementById('needsAttentionCard');
   const list = document.getElementById('needsAttentionList');
+  const count = document.getElementById('needsAttentionCount');
   const flagged = computeNeedsAttention(showcaseAllRows);
   if (!flagged.length) { card.hidden = true; return; }
   card.hidden = false;
+  // Collapsed by default on every render (e.g. after a re-sync) rather than
+  // remembering open/closed across data refreshes -- it's a "heads up"
+  // widget, not a panel a coach leaves parked open.
+  card.classList.remove('is-open');
+  list.hidden = true;
+  count.textContent = flagged.length;
   list.innerHTML = flagged.map(r => {
     const initial = (r.codeName || r.publicId || '?').trim().charAt(0).toUpperCase();
     return `
@@ -3369,6 +3410,13 @@ function renderNeedsAttention() {
     });
   });
 }
+
+document.getElementById('needsAttentionToggle').addEventListener('click', () => {
+  const card = document.getElementById('needsAttentionCard');
+  const list = document.getElementById('needsAttentionList');
+  const open = card.classList.toggle('is-open');
+  list.hidden = !open;
+});
 
 function renderShowcaseTabs() {
   const tabsEl = document.getElementById('showcaseMetricTabs');
