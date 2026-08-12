@@ -45,6 +45,7 @@
     margin: 0; padding: 0; background: var(--bg); color: var(--text-primary);
     transition: background 0.15s ease, color 0.15s ease;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow-x: hidden;
   }
   .wrap { max-width: 880px; margin: 0 auto; padding: 28px 20px 60px; }
   header.hero { text-align: center; margin-bottom: 24px; }
@@ -106,7 +107,18 @@
   .legend-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
   .chart-body { display: flex; align-items: flex-start; gap: 14px; }
   .bars-col { flex: 1 1 auto; min-width: 0; }
-  .bars-scroll { display: flex; align-items: flex-end; gap: 6px; height: 200px; overflow-x: auto; padding: 0 4px 14px; scrollbar-width: thin; }
+  /* Bars and their labels used to be two separate flex rows -- .bars-scroll
+     had its own overflow-x:auto but .bar-labels had none, so with enough
+     clients the labels row just forced .bars-col (and everything above it,
+     all the way up to body) to grow wider instead of scrolling, since
+     nothing in that ancestor chain had overflow-x set. One shared scroll
+     container keeps bars and labels moving together and stops the card
+     (and the page) from ever being pushed wider than the screen. */
+  .bars-scroll-wrap { overflow-x: auto; scrollbar-width: thin; }
+  .bars-scroll-wrap::-webkit-scrollbar { height: 5px; }
+  .bars-scroll-wrap::-webkit-scrollbar-track { background: transparent; }
+  .bars-scroll-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+  .bars-scroll { display: flex; align-items: flex-end; gap: 6px; height: 200px; padding: 0 4px 14px; }
   .showcase-bar {
     flex: 0 0 auto; width: 26px; min-height: 4px; border-radius: 5px 5px 0 0;
     border: none; cursor: pointer; transition: opacity 0.15s, transform 0.1s;
@@ -147,7 +159,15 @@
   .consistency-label { display: flex; justify-content: space-between; font-size: 0.72rem; margin-bottom: 6px; }
   .consistency-track { height: 6px; background: var(--panel-2); border-radius: 4px; overflow: hidden; }
   .consistency-fill { height: 100%; background: linear-gradient(90deg, var(--tier-behind), var(--tier-elite)); border-radius: 4px; }
-  @media (max-width: 640px) { .chart-body { flex-direction: column; } .stat-panel { width: 100%; max-width: none; } }
+  /* flex-direction:column here flips the main/cross axes -- .chart-body's
+     align-items:flex-start (set above, for the row layout) now sizes each
+     child to its own CONTENT width on the cross axis instead of filling
+     it, which is what let .bars-col balloon out to fit all the bars
+     un-clamped regardless of any overflow-x rule on its children (a
+     cross-axis sizing problem, not a scrolling one -- min-width:0 only
+     ever helps on the main axis). align-items:stretch fixes the actual
+     cause; .stat-panel's own width:100% below is now just belt-and-suspenders. */
+  @media (max-width: 640px) { .chart-body { flex-direction: column; align-items: stretch; } .stat-panel { width: 100%; max-width: none; } }
 
   /* Global sticky header -- logo + brand name on the left (generic
      "Winfinity Coach" until a coach logs in, then their own saved brand
@@ -848,8 +868,10 @@
             </div>
             <div class="chart-body">
               <div class="bars-col">
-                <div class="bars-scroll" id="showcaseBarsScroll"></div>
-                <div class="bar-labels" id="showcaseBarLabels"></div>
+                <div class="bars-scroll-wrap">
+                  <div class="bars-scroll" id="showcaseBarsScroll"></div>
+                  <div class="bar-labels" id="showcaseBarLabels"></div>
+                </div>
               </div>
               <div class="stat-panel" id="showcaseStatOverlay" hidden>
                 <div class="stat-card" id="showcaseStatCard"></div>
@@ -1206,7 +1228,7 @@ document.querySelectorAll('#ownerMainTabs .main-tab-btn').forEach(btn => {
    Now" here just means forcing a cache-busted reload instead of quietly
    trusting whatever the browser already has cached, not installing
    anything. */
-const COACH_PORTAL_VERSION = '2.4.0';
+const COACH_PORTAL_VERSION = '2.4.1';
 document.getElementById('versionBadgeText').textContent = COACH_PORTAL_VERSION;
 
 async function fetchLatestCoachPortalVersion() {
