@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.80';
+const APP_VERSION = 'WF_SYS_V.1.7.81';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -4997,7 +4997,9 @@ let wdsChatPollId = null;
 function startWdsChatPolling() {
   stopWdsChatPolling();
   refreshWdsChatRooms();
-  wdsChatPollId = setInterval(() => { refreshWdsChatRooms(); }, 5000);
+  // Safety-net cadence -- chat_messages_live (initLeaderboard) now triggers
+  // this instantly on any new message; used to be 5s as the sole mechanism.
+  wdsChatPollId = setInterval(() => { refreshWdsChatRooms(); }, 45000);
 }
 function stopWdsChatPolling() {
   if (wdsChatPollId) { clearInterval(wdsChatPollId); wdsChatPollId = null; }
@@ -6536,7 +6538,10 @@ function initWdsFeedReactionMenu(list) {
 let wdsFeedPollId = null;
 function startWdsFeedPolling() {
   stopWdsFeedPolling();
-  wdsFeedPollId = setInterval(refreshWdsFeed, 20000);
+  // Widened from 20000 -- see supabase org egress investigation this
+  // session; no realtime table for feed posts yet, so this stays a plain
+  // (slower) poll rather than getting the chat_messages_live treatment.
+  wdsFeedPollId = setInterval(refreshWdsFeed, 45000);
 }
 function stopWdsFeedPolling() {
   if (wdsFeedPollId) { clearInterval(wdsFeedPollId); wdsFeedPollId = null; }
@@ -7361,12 +7366,17 @@ function updateTabDots() {
 
 let nexusPollId = null;
 let nexusFastUntil = 0;
+// New messages arrive near-instantly via the chat_messages_live realtime
+// channel (see initLeaderboard) -- this is just the safety-net cadence for
+// missed/dropped realtime events, so it can stay slow. Used to be
+// 1500/5000ms as the *primary* delivery mechanism, which is what drove
+// the Supabase org's egress over quota (see supabase_chat_realtime_migration.sql).
 function startNexusPolling() {
   stopNexusPolling();
-  const interval = Date.now() < nexusFastUntil ? 1500 : 5000;
+  const interval = Date.now() < nexusFastUntil ? 5000 : 45000;
   nexusPollId = setInterval(() => {
     fetchChatMessages().then(renderChatMessages).catch(() => {});
-    if (interval !== 5000 && Date.now() >= nexusFastUntil) startNexusPolling();
+    if (interval !== 45000 && Date.now() >= nexusFastUntil) startNexusPolling();
   }, interval);
 }
 function stopNexusPolling() {
@@ -20870,6 +20880,21 @@ function initLeaderboard() {
   if (sbConfigured()) {
     updateLeaderboard();
     setInterval(() => { if (sbConfigured()) updateLeaderboard(); }, 3 * 60 * 60 * 1000);
+
+    // Single shared realtime subscription driving Nexus chat, Tavern chat,
+    // and the WDS chat-rooms/badge refresh -- each handler just reuses the
+    // exact fetch+render path its own polling already used, now triggered
+    // by an actual message insert/update instead of a fixed timer. The
+    // *PollId checks reuse each feature's existing "is this panel currently
+    // open" flag, so a global event does no wasted work for a closed panel.
+    // Requires supabase_chat_realtime_migration.sql to have been run once.
+    sb.channel('chat_messages_live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages' }, () => {
+        if (nexusPollId) fetchChatMessages().then(renderChatMessages).catch(() => {});
+        if (tavernPollId) refreshTavernChat();
+        if (wdsChatPollId) refreshWdsChatRooms();
+      })
+      .subscribe();
   }
 
   document.getElementById('btnLbChatSend').addEventListener('click', async () => {
@@ -23004,7 +23029,10 @@ async function refreshTavernChat() {
 function startTavernPolling() {
   stopTavernPolling();
   refreshTavernChat();
-  tavernPollId = setInterval(refreshTavernChat, 5000);
+  // Safety-net cadence only -- chat_messages_live (initLeaderboard) delivers
+  // new messages instantly; this just catches anything a dropped realtime
+  // event missed. Used to be the primary 5s delivery mechanism.
+  tavernPollId = setInterval(refreshTavernChat, 45000);
 }
 function stopTavernPolling() {
   if (tavernPollId) { clearInterval(tavernPollId); tavernPollId = null; }

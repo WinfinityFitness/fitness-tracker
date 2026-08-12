@@ -1228,7 +1228,7 @@ document.querySelectorAll('#ownerMainTabs .main-tab-btn').forEach(btn => {
    Now" here just means forcing a cache-busted reload instead of quietly
    trusting whatever the browser already has cached, not installing
    anything. */
-const COACH_PORTAL_VERSION = '2.4.1';
+const COACH_PORTAL_VERSION = '2.4.2';
 document.getElementById('versionBadgeText').textContent = COACH_PORTAL_VERSION;
 
 async function fetchLatestCoachPortalVersion() {
@@ -3673,12 +3673,14 @@ function stopChatPolling() {
   if (chatState.pollInterval) { clearInterval(chatState.pollInterval); chatState.pollInterval = null; }
 }
 // Polls rather than a realtime subscription -- Coach Portal is a light
-// admin tool with no other realtime infra, and a 4s poll while a thread
-// is actually open is cheap and simple. Stops the moment the thread
-// closes or another tab is opened (see btnCloseChatThread / showCoachTab).
+// admin tool, single-admin usage, so it wasn't the main driver of the
+// Supabase org's egress overage, and it's not worth adding realtime
+// wiring here just for this. Widened from 4s to 15s as a cheap reduction
+// anyway. Stops the moment the thread closes or another tab is opened
+// (see btnCloseChatThread / showCoachTab).
 function startChatPolling() {
   stopChatPolling();
-  chatState.pollInterval = setInterval(loadChatMessages, 4000);
+  chatState.pollInterval = setInterval(loadChatMessages, 15000);
 }
 
 async function openChatThread(publicId) {
