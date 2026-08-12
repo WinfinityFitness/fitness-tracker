@@ -109,3 +109,5 @@ grant execute on function admin_open_coach_client_chat(text, text, uuid, text) t
 -- p_code_name: coach_brand_name, p_message }). No new RPCs needed for
 -- either -- that's the whole point of giving the coach a real share_key
 -- instead of building a parallel messaging system.
+
+notify pgrst, 'reload schema';
