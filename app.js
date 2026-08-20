@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.81';
+const APP_VERSION = 'WF_SYS_V.1.7.82';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -17240,6 +17240,26 @@ function initWebSyncSettings() {
       } catch (e) { showRestToast('Could not disable web sync — try again.'); }
     });
   }
+
+  // Auto-sync: best-effort push whenever the device has connectivity and
+  // web sync is enabled, so a coach's Monitor stays current without the
+  // client remembering to tap "Sync Now". Silent (no toast) -- same
+  // best-effort convention as syncOwnAvatarIfEnabled()/session-completed's
+  // background pushes. Throttled to once per 10 minutes: 'online' can fire
+  // repeatedly in one connected session (wifi handoffs, brief drops), and
+  // each push sends the full profile/logs/reviews snapshot, which costs
+  // real Supabase egress across every client's device doing this.
+  const AUTO_SYNC_MIN_GAP_MS = 10 * 60 * 1000;
+  async function maybeAutoSync() {
+    if (localStorage.getItem('wft_web_sync_enabled') !== '1') return;
+    if (!navigator.onLine) return;
+    const lastAt = Number(localStorage.getItem('wft_web_sync_last_at') || 0);
+    if (Date.now() - lastAt < AUTO_SYNC_MIN_GAP_MS) return;
+    try { await pushWebSyncSnapshot(); renderStatus(); } catch (e) { /* best effort — Sync Now stays the fallback */ }
+  }
+  window.addEventListener('online', maybeAutoSync);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) maybeAutoSync(); });
+  maybeAutoSync(); // covers "already online when the app is opened"
 }
 
 // Wires a "tap card to reveal an explainer hint" interaction — used by the
