@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.82';
+const APP_VERSION = 'WF_SYS_V.1.7.83';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -17245,21 +17245,88 @@ function initWebSyncSettings() {
   // web sync is enabled, so a coach's Monitor stays current without the
   // client remembering to tap "Sync Now". Silent (no toast) -- same
   // best-effort convention as syncOwnAvatarIfEnabled()/session-completed's
-  // background pushes. Throttled to once per 10 minutes: 'online' can fire
-  // repeatedly in one connected session (wifi handoffs, brief drops), and
-  // each push sends the full profile/logs/reviews snapshot, which costs
-  // real Supabase egress across every client's device doing this.
-  const AUTO_SYNC_MIN_GAP_MS = 10 * 60 * 1000;
+  // background pushes.
+  //
+  // Cadence, per the user's spec:
+  //  - Foreground: first sync 15 min after the app is opened/comes back to
+  //    the foreground, then every 15 min after that.
+  //  - Backgrounded (app minimized, screen off, but process still alive):
+  //    first sync after 1h idle, then the gap grows each time -- +2h, +3h,
+  //    etc. -- since a client who's genuinely stepped away for a while
+  //    doesn't need fresh pushes as often. Capped at a 6h gap so a
+  //    long-idle device doesn't drift to once-a-day.
+  //  - Reopening the app resets straight back to the 15-min foreground
+  //    cadence (the escalation only applies within one continuous idle
+  //    stretch).
+  //
+  // Platform limit worth knowing: this is plain JS, so it only runs while
+  // the app's process is actually alive. A backgrounded tab/WebView that
+  // stays resident (most of the time) will hit the schedule above for
+  // real; but if Android fully kills the app (swiped away, memory
+  // pressure, long screen-off), no JS runs at all until it's reopened --
+  // there's no scheduled sync "while closed" without a native background
+  // task, which is a separate, bigger feature. What this DOES guarantee
+  // even in that case: reopening after any gap immediately checks whether
+  // a sync is overdue and catches it up right away.
+  const FG_SYNC_INTERVAL_MS = 15 * 60 * 1000;
+  const BG_TIER_CAP = 5; // tier 5 = (5+1) = 6h, the max background gap
+  let fgSyncTimer = null;
+  let bgSyncTimer = null;
+
+  function requiredSyncGapMs() {
+    if (document.hidden) {
+      const tier = Math.min(Number(localStorage.getItem('wft_web_sync_bg_tier') || 0), BG_TIER_CAP);
+      return (tier + 1) * 60 * 60 * 1000;
+    }
+    return FG_SYNC_INTERVAL_MS;
+  }
+
   async function maybeAutoSync() {
     if (localStorage.getItem('wft_web_sync_enabled') !== '1') return;
     if (!navigator.onLine) return;
     const lastAt = Number(localStorage.getItem('wft_web_sync_last_at') || 0);
-    if (Date.now() - lastAt < AUTO_SYNC_MIN_GAP_MS) return;
-    try { await pushWebSyncSnapshot(); renderStatus(); } catch (e) { /* best effort — Sync Now stays the fallback */ }
+    if (Date.now() - lastAt < requiredSyncGapMs()) return;
+    try {
+      await pushWebSyncSnapshot();
+      renderStatus();
+      if (document.hidden) {
+        const tier = Number(localStorage.getItem('wft_web_sync_bg_tier') || 0);
+        localStorage.setItem('wft_web_sync_bg_tier', String(Math.min(tier + 1, BG_TIER_CAP)));
+      }
+    } catch (e) { /* best effort — Sync Now stays the fallback */ }
   }
+
+  function startForegroundSyncLoop() {
+    if (fgSyncTimer) clearInterval(fgSyncTimer);
+    fgSyncTimer = setInterval(maybeAutoSync, FG_SYNC_INTERVAL_MS);
+  }
+
+  // Chains one setTimeout per tier rather than a flat repeating interval,
+  // since each successive gap is longer than the last (1h, then 2h, 3h...).
+  function scheduleNextBackgroundSync() {
+    if (bgSyncTimer) clearTimeout(bgSyncTimer);
+    const tier = Math.min(Number(localStorage.getItem('wft_web_sync_bg_tier') || 0), BG_TIER_CAP);
+    bgSyncTimer = setTimeout(async () => {
+      if (!document.hidden) return; // resumed already — visibilitychange owns scheduling now
+      await maybeAutoSync();
+      scheduleNextBackgroundSync();
+    }, (tier + 1) * 60 * 60 * 1000);
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      if (fgSyncTimer) { clearInterval(fgSyncTimer); fgSyncTimer = null; }
+      localStorage.setItem('wft_web_sync_bg_tier', '0');
+      scheduleNextBackgroundSync();
+    } else {
+      if (bgSyncTimer) { clearTimeout(bgSyncTimer); bgSyncTimer = null; }
+      localStorage.removeItem('wft_web_sync_bg_tier');
+      maybeAutoSync(); // catch-up in case the background timer above never actually fired
+      startForegroundSyncLoop();
+    }
+  });
   window.addEventListener('online', maybeAutoSync);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) maybeAutoSync(); });
-  maybeAutoSync(); // covers "already online when the app is opened"
+  if (document.hidden) scheduleNextBackgroundSync(); else startForegroundSyncLoop();
 }
 
 // Wires a "tap card to reveal an explainer hint" interaction — used by the
