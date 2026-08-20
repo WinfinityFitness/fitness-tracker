@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.83';
+const APP_VERSION = 'WF_SYS_V.1.7.84';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -6554,14 +6554,33 @@ function stopWdsFeedPolling() {
 if (isDesktopShellSite) setTimeout(initDesktopShell, 0);
 if (isMessengerShellSite) setTimeout(initMessengerShell, 0);
 
+// Reveals the splash logo/caption (see index.html's .splash-content-pending
+// and style.css) once we actually know what they should say -- called
+// exactly once via whichever path gets there first: branding resolved, or
+// SPLASH_REVEAL_SAFETY_MS elapsed without an answer (a slow/failed network
+// shouldn't hold the splash content-less for its whole display window).
+// Idempotent (classList.remove no-ops if already gone) so both paths racing
+// is harmless.
+function revealSplashContent() {
+  const splash = document.getElementById('splashScreen');
+  if (splash) splash.classList.remove('splash-content-pending');
+}
+const SPLASH_REVEAL_SAFETY_MS = 1200;
+
 // Deferred via setTimeout (not called directly) so it runs after the rest of
 // this script finishes its first synchronous pass — sbConfigured() reads the
 // module-level `let sb`, declared much further down, which would otherwise
 // throw (temporal dead zone) if reached this early in the file. Chained
 // (not two independent setTimeouts) so applyCoachBranding's splash-logo
 // override, if any, deterministically wins over the global default instead
-// of racing it on network timing.
-setTimeout(() => { applyCustomSplashLogo().then(applyCoachBranding); }, 0);
+// of racing it on network timing. Only reveal afterward (see
+// revealSplashContent above) — a client attached to a coach should never
+// see the bundled default splash even for a moment before their coach's own
+// replaces it.
+setTimeout(() => {
+  applyCustomSplashLogo().then(applyCoachBranding).then(revealSplashContent).catch(revealSplashContent);
+}, 0);
+setTimeout(revealSplashContent, SPLASH_REVEAL_SAFETY_MS);
 
 function getProfile() {
   if (wdsRemoteData) return wdsRemoteData.profile;

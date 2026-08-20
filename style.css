@@ -188,6 +188,15 @@ body.has-custom-bg { background-color: transparent; }
   transition: opacity 0.4s ease;
 }
 .splash-screen.splash-hide { opacity: 0; pointer-events: none; }
+/* While a coach's own splash logo/caption might still be loading, keep the
+   bundled default logo/caption invisible instead of painting them and
+   swapping a moment later -- a client attached to a coach should only ever
+   see that coach's branding, never a flash of the generic default first.
+   revealSplashContent() (app.js) removes this class once branding has
+   resolved either way (coach-branded or confirmed no-coach). */
+.splash-screen.splash-content-pending .splash-logo,
+.splash-screen.splash-content-pending .splash-caption { opacity: 0; }
+.splash-logo, .splash-caption { transition: opacity 0.25s ease; }
 .splash-logo {
   width: 192px;
   height: 192px;
