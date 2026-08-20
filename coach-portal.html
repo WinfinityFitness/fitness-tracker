@@ -392,7 +392,12 @@
 
   .client-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.86rem; }
   .client-row:last-child { border-bottom: none; }
-  .client-row-days { font-size: 0.72rem; color: var(--text-muted); line-height: 1.6; }
+  .client-row-days {
+    display: grid; grid-template-columns: auto 1fr; column-gap: 14px; row-gap: 5px;
+    font-size: 0.78rem; line-height: 1.4;
+  }
+  .client-row-days span:nth-child(odd) { color: var(--text-muted); }
+  .client-row-days span:nth-child(even) { color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
   .client-row-clickable { cursor: pointer; }
   .client-row-clickable:hover span:first-child { color: var(--accent); }
   .link-btn { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.8rem; padding: 0; }
@@ -562,7 +567,7 @@
   <div class="update-modal-card">
     <button type="button" class="stat-card-close" id="btnCloseDayPopup" aria-label="Close">&times;</button>
     <h2 style="margin:0 0 8px;font-size:1.05rem;" id="dayPopupTitle"></h2>
-    <p class="client-row-days" id="dayPopupBody" style="margin:0;"></p>
+    <div class="client-row-days" id="dayPopupBody" style="margin:0;"></div>
   </div>
 </div>
 <div class="wrap">
@@ -1238,7 +1243,7 @@ document.querySelectorAll('#ownerMainTabs .main-tab-btn').forEach(btn => {
    Now" here just means forcing a cache-busted reload instead of quietly
    trusting whatever the browser already has cached, not installing
    anything. */
-const COACH_PORTAL_VERSION = '2.4.4';
+const COACH_PORTAL_VERSION = '2.4.5';
 document.getElementById('versionBadgeText').textContent = COACH_PORTAL_VERSION;
 
 async function fetchLatestCoachPortalVersion() {
@@ -2701,11 +2706,13 @@ function monitorDayBreakdownLine(weekDates, weekLabels, logsByDate, field, unit)
   return weekDates.map((ds, i) => {
     const e = logsByDate[ds];
     const v = e && e[field] != null ? e[field] + (unit || '') : '—';
-    return `${weekLabels[i]}: ${escapeHtml(String(v))}`;
-  }).join(' &middot; ');
+    return `<span>${escapeHtml(weekLabels[i])}</span><span>${escapeHtml(String(v))}</span>`;
+  }).join('');
 }
 function monitorWorkoutBreakdownLine(weekDates, weekLabels, logsByDate) {
-  return weekDates.map((ds, i) => `${weekLabels[i]}: ${monitorHasWorkout(logsByDate[ds]) ? '✓' : '—'}`).join(' &middot; ');
+  return weekDates.map((ds, i) =>
+    `<span>${escapeHtml(weekLabels[i])}</span><span>${monitorHasWorkout(logsByDate[ds]) ? '✓' : '—'}</span>`
+  ).join('');
 }
 
 // Minimal self-contained SVG charts -- no external dependency, matching
