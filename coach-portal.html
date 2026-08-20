@@ -392,6 +392,7 @@
 
   .client-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.86rem; }
   .client-row:last-child { border-bottom: none; }
+  .client-row-days { font-size: 0.72rem; color: var(--text-muted); padding: 0 0 10px; line-height: 1.5; }
   .link-btn { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.8rem; padding: 0; }
 
   .top-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
@@ -1228,7 +1229,7 @@ document.querySelectorAll('#ownerMainTabs .main-tab-btn').forEach(btn => {
    Now" here just means forcing a cache-busted reload instead of quietly
    trusting whatever the browser already has cached, not installing
    anything. */
-const COACH_PORTAL_VERSION = '2.4.2';
+const COACH_PORTAL_VERSION = '2.4.3';
 document.getElementById('versionBadgeText').textContent = COACH_PORTAL_VERSION;
 
 async function fetchLatestCoachPortalVersion() {
@@ -1793,6 +1794,8 @@ function renderOwnerMonitorContent() {
   const avgCalories = weekAvg('calories'), avgSteps = weekAvg('steps'), avgProtein = weekAvg('protein');
   const avgCarbs = weekAvg('carbs'), avgFat = weekAvg('fat'), avgFiber = weekAvg('fiber'), avgWater = weekAvg('water');
   const workoutsThisWeek = weekDates.filter(ds => monitorHasWorkout(logsByDate[ds])).length;
+  const weekLabels = monitorWeekDayLabels(weekDates);
+  const dayLine = (field, unit) => monitorDayBreakdownLine(weekDates, weekLabels, logsByDate, field, unit);
 
   const allWeightEntries = Object.keys(logsByDate)
     .filter(ds => logsByDate[ds].weightKg != null).sort()
@@ -1826,15 +1829,23 @@ function renderOwnerMonitorContent() {
     <div class="client-row"><span>Current streak</span><span>${streak} day${streak === 1 ? '' : 's'}</span></div>
     <h3 style="margin:14px 0 6px;font-size:0.95rem;">Targets vs. actual (trailing 7 days)</h3>
     <div class="client-row"><span>Calories (avg/day)</span><span>${avgCalories != null ? avgCalories : '—'}${targets.calorieTarget != null ? ' / ' + targets.calorieTarget : ''}</span></div>
+    <div class="client-row-days">${dayLine('calories', '')}</div>
     <div class="client-row"><span>Steps (avg/day)</span><span>${avgSteps != null ? avgSteps : '—'}${targets.stepGoal != null ? ' / ' + targets.stepGoal : ''}</span></div>
+    <div class="client-row-days">${dayLine('steps', '')}</div>
     <div class="client-row"><span>Workouts</span><span>${workoutsThisWeek}${targets.workoutsPerWeek != null ? ' / ' + targets.workoutsPerWeek : ''}</span></div>
+    <div class="client-row-days">${monitorWorkoutBreakdownLine(weekDates, weekLabels, logsByDate)}</div>
 
     <h3 style="margin:14px 0 6px;font-size:0.95rem;">Fuel Status &mdash; weekly average</h3>
     <div class="client-row"><span>Protein (avg/day)</span><span>${avgProtein != null ? avgProtein + ' g' : '—'}</span></div>
+    <div class="client-row-days">${dayLine('protein', 'g')}</div>
     <div class="client-row"><span>Carbs (avg/day)</span><span>${avgCarbs != null ? avgCarbs + ' g' : '—'}</span></div>
+    <div class="client-row-days">${dayLine('carbs', 'g')}</div>
     <div class="client-row"><span>Fat (avg/day)</span><span>${avgFat != null ? avgFat + ' g' : '—'}</span></div>
+    <div class="client-row-days">${dayLine('fat', 'g')}</div>
     <div class="client-row"><span>Fiber (avg/day)</span><span>${avgFiber != null ? avgFiber + ' g' : '—'}</span></div>
+    <div class="client-row-days">${dayLine('fiber', 'g')}</div>
     <div class="client-row"><span>Water (avg/day)</span><span>${avgWater != null ? avgWater + ' mL' : '—'}</span></div>
+    <div class="client-row-days">${dayLine('water', ' mL')}</div>
 
     <div class="monitor-two-col">
       <div>
@@ -2646,6 +2657,23 @@ function monitorDayVolumeKg(entry) {
 
 function monitorDateStr(d) { return d.toISOString().slice(0, 10); }
 
+// Per-day breakdown shown under each trailing-7-day average, so a blank
+// average reads as "no logs this week" rather than looking broken --
+// e.g. an inactive client's last real entry is still visible by date.
+function monitorWeekDayLabels(weekDates) {
+  return weekDates.map(ds => new Date(ds + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' }));
+}
+function monitorDayBreakdownLine(weekDates, weekLabels, logsByDate, field, unit) {
+  return weekDates.map((ds, i) => {
+    const e = logsByDate[ds];
+    const v = e && e[field] != null ? e[field] + (unit || '') : '—';
+    return `${weekLabels[i]}: ${escapeHtml(String(v))}`;
+  }).join(' &middot; ');
+}
+function monitorWorkoutBreakdownLine(weekDates, weekLabels, logsByDate) {
+  return weekDates.map((ds, i) => `${weekLabels[i]}: ${monitorHasWorkout(logsByDate[ds]) ? '✓' : '—'}`).join(' &middot; ');
+}
+
 // Minimal self-contained SVG charts -- no external dependency, matching
 // this project's no-CDN-beyond-supabase-js convention. Same viewBox
 // proportions (280x90) app.js's own volume chart uses, so it reads
@@ -3054,6 +3082,8 @@ function renderMonitorContent() {
   const avgFiber = weekAvg('fiber');
   const avgWater = weekAvg('water');
   const workoutsThisWeek = weekDates.filter(ds => monitorHasWorkout(logsByDate[ds])).length;
+  const weekLabels = monitorWeekDayLabels(weekDates);
+  const dayLine = (field, unit) => monitorDayBreakdownLine(weekDates, weekLabels, logsByDate, field, unit);
 
   // Refeed bonus only applies if TODAY falls in the assigned refeed
   // window -- mirrors getRefeedBonusForDate()'s date-range gate.
@@ -3104,15 +3134,23 @@ function renderMonitorContent() {
     <div class="client-row"><span>Current streak</span><span>${streak} day${streak === 1 ? '' : 's'}</span></div>
     <h3 style="margin:14px 0 6px;font-size:0.95rem;">Targets vs. actual (trailing 7 days)</h3>
     <div class="client-row"><span>Calories (avg/day)</span><span>${avgCalories != null ? avgCalories : '—'}${effectiveCalorieTarget != null ? ' / ' + effectiveCalorieTarget : ''}${inRefeed ? ' (refeed)' : ''}</span></div>
+    <div class="client-row-days">${dayLine('calories', '')}</div>
     <div class="client-row"><span>Steps (avg/day)</span><span>${avgSteps != null ? avgSteps : '—'}${targets.stepGoal != null ? ' / ' + targets.stepGoal : ''}</span></div>
+    <div class="client-row-days">${dayLine('steps', '')}</div>
     <div class="client-row"><span>Workouts</span><span>${workoutsThisWeek}${targets.workoutsPerWeek != null ? ' / ' + targets.workoutsPerWeek : ''}</span></div>
+    <div class="client-row-days">${monitorWorkoutBreakdownLine(weekDates, weekLabels, logsByDate)}</div>
 
     <h3 style="margin:14px 0 6px;font-size:0.95rem;">Fuel Status &mdash; weekly average</h3>
     <div class="client-row"><span>Protein (avg/day)</span><span>${avgProtein != null ? avgProtein + ' g' : '—'}</span></div>
+    <div class="client-row-days">${dayLine('protein', 'g')}</div>
     <div class="client-row"><span>Carbs (avg/day)</span><span>${avgCarbs != null ? avgCarbs + ' g' : '—'}</span></div>
+    <div class="client-row-days">${dayLine('carbs', 'g')}</div>
     <div class="client-row"><span>Fat (avg/day)</span><span>${avgFat != null ? avgFat + ' g' : '—'}</span></div>
+    <div class="client-row-days">${dayLine('fat', 'g')}</div>
     <div class="client-row"><span>Fiber (avg/day)</span><span>${avgFiber != null ? avgFiber + ' g' : '—'}</span></div>
+    <div class="client-row-days">${dayLine('fiber', 'g')}</div>
     <div class="client-row"><span>Water (avg/day)</span><span>${avgWater != null ? avgWater + ' mL' : '—'}</span></div>
+    <div class="client-row-days">${dayLine('water', ' mL')}</div>
 
     <div class="monitor-two-col">
       <div>
