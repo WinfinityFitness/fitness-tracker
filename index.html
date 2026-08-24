@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.84">
+<link rel="stylesheet" href="style.css?v=1.7.85">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -1145,10 +1145,22 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
     <div id="bioMeasurementSection">
     <h2 class="section-title">Body measurement scan</h2>
     <p class="hint">Should ideally be filled once a week, every Sunday morning, fasted.</p>
+
+    <div id="proPhotoGallerySection">
+      <div class="pp-gallery-head">
+        <span class="chart-card-title">Progress Photos</span>
+        <button type="button" class="pp-refresh-btn" id="btnRefreshProPhotos" aria-label="Refresh from Google Drive" title="Refresh from Google Drive">⟳</button>
+      </div>
+      <div class="pp-folder-row" id="ppFolderRow">
+        <p class="hint hint--sm" id="ppEmptyHint">No progress photos yet — tap PRO-PHOTO to add your first one.</p>
+      </div>
+    </div>
+
     <div class="chart-card" style="position:relative;">
       <p class="mod-tag">MOD_BIOSCAN_10</p>
       <div class="measure-guide" id="measureGuide"></div>
       <button type="button" class="measure-entry-btn" id="btnOpenMeasureEntry">User<br>Entry</button>
+      <button type="button" class="measure-entry-btn measure-photo-btn" id="btnOpenProPhoto">Pro<br>Photo</button>
     </div>
 
     <div class="chart-card">
@@ -2822,6 +2834,47 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <button type="button" class="btn btn--primary" id="btnSaveMeasurements">Save measurements</button>
       <p class="save-note" id="measureSaveNote"></p>
     </fieldset>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="proPhotoUploadSheet" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Add Progress Photo</h2>
+      <button class="sheet-close" id="btnCloseProPhotoUpload">✕</button>
+    </div>
+    <fieldset class="field-group field-group--compact">
+      <p class="mod-tag">Mod_pro_photo_01</p>
+      <p class="field-group-heading">Folder</p>
+      <select id="ppFolderSelect" style="width:100%;"></select>
+      <div class="field-row" style="margin-top:10px;align-items:flex-end;">
+        <label class="field" style="flex:1;">
+          <span>Or create a new folder</span>
+          <input type="text" id="ppNewFolderName" placeholder="e.g. Week 1, Front pose">
+        </label>
+        <button type="button" class="btn btn--sm" id="btnCreatePpFolder">Create</button>
+      </div>
+      <div class="btn-row" style="margin-top:18px;">
+        <button type="button" class="btn btn--primary" id="btnPpOpenCamera">📷 Open Camera</button>
+        <button type="button" class="btn btn--sm" id="btnPpOpenGallery">🖼️ Open Gallery</button>
+      </div>
+      <p class="hint hint--sm">Gallery lets you select and upload multiple photos at once.</p>
+      <input type="file" accept="image/*" capture="environment" id="ppCameraInput" hidden>
+      <input type="file" accept="image/*" multiple id="ppGalleryInput" hidden>
+      <p class="save-note" id="ppUploadNote"></p>
+    </fieldset>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="ppFolderViewSheet" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2 id="ppFolderViewTitle">Folder</h2>
+      <button class="sheet-close" id="btnClosePpFolderView">✕</button>
+    </div>
+    <div class="pp-thumb-grid" id="ppThumbGrid"></div>
   </div>
 </div>
 
@@ -4881,11 +4934,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.7.84"></script>
+<script src="config.js?v=1.7.85"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.84"></script>
+<script src="app.js?v=1.7.85"></script>
 </body>
 </html>

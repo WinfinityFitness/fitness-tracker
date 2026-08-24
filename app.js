@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.84';
+const APP_VERSION = 'WF_SYS_V.1.7.85';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -8779,6 +8779,327 @@ function initProgressPhotoCamera() {
     URL.revokeObjectURL(url);
     showRestToast('Progress photo saved.');
   });
+}
+
+/* ---------------------------------------------------------------- */
+/* Progress Photo Gallery -- local-first photo storage grouped into    */
+/* named folders (e.g. "Week 1"), attached to the Measurements card.   */
+/* Photos live as Blobs in a dedicated IndexedDB database -- unlike     */
+/* the reminder-triggered capture above, this one keeps a real in-app  */
+/* library instead of just handing the file back to the OS. Backup to  */
+/* Google Drive is best-effort and reuses the SAME driveAccessToken as */
+/* the JSON-backup feature elsewhere in this file, but deliberately    */
+/* does NOT trigger its own sign-in prompt -- it only uploads/syncs if */
+/* Drive is already connected (Settings > Backup), so this feature     */
+/* stays decoupled from that flow's own reconnect/callback wiring.     */
+/* ---------------------------------------------------------------- */
+const PP_DB_NAME = 'wft-progress-photos';
+const PP_DB_VERSION = 1;
+let ppDbPromise = null;
+function ppOpenDb() {
+  if (ppDbPromise) return ppDbPromise;
+  ppDbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(PP_DB_NAME, PP_DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('folders')) db.createObjectStore('folders', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('photos')) {
+        const store = db.createObjectStore('photos', { keyPath: 'id' });
+        store.createIndex('folderId', 'folderId', { unique: false });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return ppDbPromise;
+}
+function ppGetAll(storeName) {
+  return ppOpenDb().then(db => new Promise((resolve, reject) => {
+    const req = db.transaction(storeName, 'readonly').objectStore(storeName).getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  }));
+}
+function ppGetPhotosByFolder(folderId) {
+  return ppOpenDb().then(db => new Promise((resolve, reject) => {
+    const req = db.transaction('photos', 'readonly').objectStore('photos').index('folderId').getAll(folderId);
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  }));
+}
+function ppPut(storeName, record) {
+  return ppOpenDb().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readwrite');
+    tx.objectStore(storeName).put(record);
+    tx.oncomplete = () => resolve(record);
+    tx.onerror = () => reject(tx.error);
+  }));
+}
+function ppUid() { return 'pp_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8); }
+
+async function ppCreateFolder(name) {
+  const folder = { id: ppUid(), name: name.trim(), createdAt: Date.now(), driveFolderId: null };
+  await ppPut('folders', folder);
+  return folder;
+}
+async function ppAddPhoto(folderId, blob) {
+  const photo = { id: ppUid(), folderId, blob, takenAt: Date.now(), driveFileId: null };
+  await ppPut('photos', photo);
+  return photo;
+}
+
+/* ---- Google Drive: one "Winfinity Progress Photos" root folder,     */
+/* one subfolder per local folder, photos as children of that. Reuses  */
+/* driveAccessToken/isNativeApp from the backup feature above -- if    */
+/* that's not populated (Drive never connected this session), every    */
+/* function below simply isn't called (callers check it first).       */
+async function ppEnsureDriveRootFolder() {
+  let rootId = localStorage.getItem('wft_pp_drive_root_id');
+  if (rootId) return rootId;
+  const q = encodeURIComponent("name='Winfinity Progress Photos' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+  const listRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`, {
+    headers: { Authorization: `Bearer ${driveAccessToken}` },
+  });
+  if (listRes.ok) {
+    const listJson = await listRes.json();
+    if (listJson.files && listJson.files.length) {
+      rootId = listJson.files[0].id;
+      localStorage.setItem('wft_pp_drive_root_id', rootId);
+      return rootId;
+    }
+  }
+  const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${driveAccessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'Winfinity Progress Photos', mimeType: 'application/vnd.google-apps.folder' }),
+  });
+  if (!createRes.ok) throw new Error('drive-root-create-failed');
+  rootId = (await createRes.json()).id;
+  localStorage.setItem('wft_pp_drive_root_id', rootId);
+  return rootId;
+}
+async function ppEnsureDriveFolder(folder) {
+  if (folder.driveFolderId) return folder.driveFolderId;
+  const rootId = await ppEnsureDriveRootFolder();
+  const res = await fetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${driveAccessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: folder.name, mimeType: 'application/vnd.google-apps.folder', parents: [rootId] }),
+  });
+  if (!res.ok) throw new Error('drive-folder-create-failed');
+  folder.driveFolderId = (await res.json()).id;
+  await ppPut('folders', folder);
+  return folder.driveFolderId;
+}
+async function ppUploadPhotoToDrive(photo, folder) {
+  const driveFolderId = await ppEnsureDriveFolder(folder);
+  const boundary = 'wft_pp_boundary_' + Date.now();
+  const metadata = { name: `progress-${photo.id}.jpg`, parents: [driveFolderId] };
+  const metaPart = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: ${photo.blob.type || 'image/jpeg'}\r\n\r\n`;
+  const body = new Blob([metaPart, photo.blob, `\r\n--${boundary}--`]);
+  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${driveAccessToken}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body,
+  });
+  if (!res.ok) throw new Error('drive-photo-upload-failed');
+  photo.driveFileId = (await res.json()).id;
+  await ppPut('photos', photo);
+  return photo;
+}
+async function ppListDriveChildren(parentId, mimeClause) {
+  const q = encodeURIComponent(`'${parentId}' in parents and ${mimeClause} and trashed=false`);
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`, {
+    headers: { Authorization: `Bearer ${driveAccessToken}` },
+  });
+  if (!res.ok) throw new Error('drive-list-failed');
+  return (await res.json()).files || [];
+}
+async function ppDownloadDriveFile(fileId) {
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+    headers: { Authorization: `Bearer ${driveAccessToken}` },
+  });
+  if (!res.ok) throw new Error('drive-download-failed');
+  return res.blob();
+}
+
+async function refreshProPhotosFromDrive() {
+  if (!driveAccessToken) {
+    showRestToast('Connect Google Drive in Settings → Backup first to sync photos.');
+    return;
+  }
+  showRestToast('Syncing with Google Drive…');
+  try {
+    const rootId = await ppEnsureDriveRootFolder();
+    const [localFolders, driveFolders] = await Promise.all([
+      ppGetAll('folders'),
+      ppListDriveChildren(rootId, "mimeType='application/vnd.google-apps.folder'"),
+    ]);
+    for (const df of driveFolders) {
+      let local = localFolders.find(f => f.driveFolderId === df.id || f.name === df.name);
+      if (!local) {
+        local = { id: ppUid(), name: df.name, createdAt: Date.now(), driveFolderId: df.id };
+        await ppPut('folders', local);
+        localFolders.push(local);
+      } else if (!local.driveFolderId) {
+        local.driveFolderId = df.id;
+        await ppPut('folders', local);
+      }
+    }
+    let addedCount = 0;
+    for (const folder of localFolders) {
+      if (!folder.driveFolderId) continue;
+      const [drivePhotos, localPhotos] = await Promise.all([
+        ppListDriveChildren(folder.driveFolderId, "mimeType contains 'image/'"),
+        ppGetPhotosByFolder(folder.id),
+      ]);
+      const knownIds = new Set(localPhotos.map(p => p.driveFileId).filter(Boolean));
+      for (const dp of drivePhotos) {
+        if (knownIds.has(dp.id)) continue;
+        const blob = await ppDownloadDriveFile(dp.id);
+        await ppPut('photos', { id: ppUid(), folderId: folder.id, blob, takenAt: Date.now(), driveFileId: dp.id });
+        addedCount++;
+      }
+    }
+    await renderProPhotoGallery();
+    showRestToast(addedCount ? `Synced — ${addedCount} photo${addedCount === 1 ? '' : 's'} added from Drive.` : 'Already up to date with Google Drive.');
+  } catch (e) {
+    showRestToast('Could not sync with Google Drive — try again.');
+  }
+}
+
+/* ---- UI: folder-tile gallery preview, folder detail (thumb grid),   */
+/* and the upload sheet (create folder / camera / gallery multi-select). */
+/* Object URLs are tracked per-view and revoked when that view is       */
+/* replaced/closed, rather than left to leak for the life of the page. */
+let ppGalleryUrls = [];
+let ppFolderViewUrls = [];
+function ppRevoke(list) { list.forEach(u => URL.revokeObjectURL(u)); list.length = 0; }
+
+async function renderProPhotoGallery() {
+  const row = document.getElementById('ppFolderRow');
+  if (!row) return;
+  ppRevoke(ppGalleryUrls);
+  const folders = await ppGetAll('folders');
+  if (!folders.length) {
+    row.innerHTML = '<p class="hint hint--sm" id="ppEmptyHint">No progress photos yet — tap PRO PHOTO to add your first one.</p>';
+    return;
+  }
+  const tiles = await Promise.all(folders.map(async folder => {
+    const photos = await ppGetPhotosByFolder(folder.id);
+    const cover = photos[photos.length - 1];
+    let coverUrl = '';
+    if (cover) { coverUrl = URL.createObjectURL(cover.blob); ppGalleryUrls.push(coverUrl); }
+    return `<button type="button" class="pp-folder-tile" data-pp-folder="${escapeHtml(folder.id)}">
+      <div class="pp-folder-thumb-wrap">
+        ${coverUrl ? `<img src="${coverUrl}" alt="">` : '<span class="pp-folder-tile-empty">No photos</span>'}
+        <span class="pp-folder-tile-count">${photos.length}</span>
+      </div>
+      <span class="pp-folder-tile-name">${escapeHtml(folder.name)}</span>
+    </button>`;
+  }));
+  row.innerHTML = tiles.join('');
+}
+
+async function openPpFolderView(folderId) {
+  const folders = await ppGetAll('folders');
+  const folder = folders.find(f => f.id === folderId);
+  if (!folder) return;
+  document.getElementById('ppFolderViewTitle').textContent = folder.name;
+  ppRevoke(ppFolderViewUrls);
+  const photos = (await ppGetPhotosByFolder(folderId)).sort((a, b) => b.takenAt - a.takenAt);
+  const grid = document.getElementById('ppThumbGrid');
+  grid.innerHTML = photos.map(p => {
+    const url = URL.createObjectURL(p.blob);
+    ppFolderViewUrls.push(url);
+    return `<img class="pp-thumb-tile" src="${url}" alt="" data-lightbox="${url}">`;
+  }).join('') || '<p class="hint hint--sm">No photos in this folder yet.</p>';
+  document.getElementById('ppFolderViewSheet').hidden = false;
+}
+
+async function ppRefreshFolderSelect(selectId) {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+  const folders = await ppGetAll('folders');
+  const prev = select.value;
+  select.innerHTML = folders.length
+    ? folders.map(f => `<option value="${escapeHtml(f.id)}">${escapeHtml(f.name)}</option>`).join('')
+    : '<option value="">No folders yet — create one below</option>';
+  if (folders.some(f => f.id === prev)) select.value = prev;
+}
+
+async function ppSaveFiles(files, folderId) {
+  if (!files || !files.length) return;
+  const folders = await ppGetAll('folders');
+  const folder = folders.find(f => f.id === folderId);
+  if (!folder) { showRestToast('Pick or create a folder first.'); return; }
+  const fileArr = Array.from(files);
+  for (const file of fileArr) {
+    const photo = await ppAddPhoto(folder.id, file);
+    if (driveAccessToken) {
+      ppUploadPhotoToDrive(photo, folder).catch(() => { /* best effort -- stays local, next Refresh/upload retries */ });
+    }
+  }
+  const n = fileArr.length;
+  const plural = n === 1 ? 'photo' : 'photos';
+  showRestToast(driveAccessToken
+    ? `${n} ${plural} saved to your device — backing up to Google Drive…`
+    : `${n} ${plural} saved to your device.`);
+  await renderProPhotoGallery();
+}
+
+function initProPhotoFeature() {
+  const openBtn = document.getElementById('btnOpenProPhoto');
+  const uploadSheet = document.getElementById('proPhotoUploadSheet');
+  const folderViewSheet = document.getElementById('ppFolderViewSheet');
+  if (!openBtn || !uploadSheet || !folderViewSheet) return;
+
+  openBtn.addEventListener('click', async () => {
+    await ppRefreshFolderSelect('ppFolderSelect');
+    document.getElementById('ppNewFolderName').value = '';
+    uploadSheet.hidden = false;
+  });
+  document.getElementById('btnCloseProPhotoUpload').addEventListener('click', () => { uploadSheet.hidden = true; });
+  bindOverlayBackdropClose(uploadSheet, () => { uploadSheet.hidden = true; });
+
+  document.getElementById('btnCreatePpFolder').addEventListener('click', async () => {
+    const input = document.getElementById('ppNewFolderName');
+    const name = input.value.trim();
+    if (!name) { showRestToast('Enter a folder name first.'); return; }
+    const folder = await ppCreateFolder(name);
+    input.value = '';
+    await ppRefreshFolderSelect('ppFolderSelect');
+    document.getElementById('ppFolderSelect').value = folder.id;
+    showRestToast(`Folder "${name}" created.`);
+  });
+
+  const cameraInput = document.getElementById('ppCameraInput');
+  const galleryInput = document.getElementById('ppGalleryInput');
+  document.getElementById('btnPpOpenCamera').addEventListener('click', () => cameraInput.click());
+  document.getElementById('btnPpOpenGallery').addEventListener('click', () => galleryInput.click());
+  cameraInput.addEventListener('change', async () => {
+    await ppSaveFiles(cameraInput.files, document.getElementById('ppFolderSelect').value);
+    cameraInput.value = '';
+  });
+  galleryInput.addEventListener('change', async () => {
+    await ppSaveFiles(galleryInput.files, document.getElementById('ppFolderSelect').value);
+    galleryInput.value = '';
+  });
+
+  document.getElementById('ppFolderRow').addEventListener('click', e => {
+    const tile = e.target.closest('[data-pp-folder]');
+    if (tile) openPpFolderView(tile.dataset.ppFolder);
+  });
+  document.getElementById('ppThumbGrid').addEventListener('click', e => {
+    const img = e.target.closest('[data-lightbox]');
+    if (img) openChatLightbox(img.dataset.lightbox);
+  });
+  document.getElementById('btnClosePpFolderView').addEventListener('click', () => { folderViewSheet.hidden = true; });
+  bindOverlayBackdropClose(folderViewSheet, () => { folderViewSheet.hidden = true; });
+
+  document.getElementById('btnRefreshProPhotos').addEventListener('click', refreshProPhotosFromDrive);
+
+  renderProPhotoGallery();
 }
 
 function handleDeepLinkUrl(url) {
@@ -23805,6 +24126,7 @@ safeInit(initDeepLinkHandling, 'initDeepLinkHandling');
 safeInit(initShareTargetHandling, 'initShareTargetHandling');
 safeInit(initWidgetActionHandling, 'initWidgetActionHandling');
 safeInit(initProgressPhotoCamera, 'initProgressPhotoCamera');
+safeInit(initProPhotoFeature, 'initProPhotoFeature');
 safeInit(initCardioSelfieComposer, 'initCardioSelfieComposer');
 safeInit(initLeaderboard, 'initLeaderboard');
 safeInit(initAnnouncementWidget, 'initAnnouncementWidget');

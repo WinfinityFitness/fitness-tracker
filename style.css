@@ -2735,6 +2735,38 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   transition: background 0.15s ease;
 }
 .measure-entry-btn:hover { background: rgba(6, 20, 26, 0.72); }
+.measure-photo-btn { left: 8px; right: auto; }
+
+/* ---------------- Progress photo gallery ---------------- */
+.pp-gallery-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.pp-refresh-btn {
+  width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: var(--surface-2); border: 1px solid var(--border-soft); color: var(--cyan);
+  font-size: 1rem; line-height: 1; cursor: pointer;
+}
+.pp-refresh-btn:active { transform: rotate(90deg); transition: transform 0.2s ease; }
+.pp-folder-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 14px; }
+.pp-folder-tile {
+  flex: 0 0 auto; width: 96px; display: flex; flex-direction: column; gap: 4px;
+  background: none; border: none; padding: 0; cursor: pointer; text-align: left; font-family: inherit;
+}
+.pp-folder-thumb-wrap { position: relative; width: 96px; height: 96px; }
+.pp-folder-tile img, .pp-folder-tile-empty {
+  width: 96px; height: 96px; border-radius: var(--card-radius); object-fit: cover;
+  border: 1px solid var(--border); display: block;
+}
+.pp-folder-tile-empty {
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  font-size: 0.7rem; color: var(--text-muted); padding: 8px; background: var(--surface-2);
+}
+.pp-folder-tile-count {
+  position: absolute; bottom: 4px; left: 4px; width: fit-content;
+  background: rgba(0,0,0,0.6); color: #fff; font-size: 0.65rem; font-weight: 700;
+  border-radius: 8px; padding: 1px 6px;
+}
+.pp-folder-tile-name { font-size: 0.78rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pp-thumb-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 4px; }
+.pp-thumb-tile { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; cursor: pointer; display: block; }
 
 /* ---------------- Temporal mission log (calendar) ---------------- */
 .mission-log-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
