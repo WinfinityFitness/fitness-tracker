@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.85';
+const APP_VERSION = 'WF_SYS_V.1.7.86';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -22751,6 +22751,18 @@ function creditWalkSessionsAndQueueRunRide(g) {
       // Forge tab (getPendingForgeSessions) until manually converted.
     });
   });
+  // Walk AP was only ever added to the pool here, never checked against the
+  // leg cost -- the avatar's fractional position (see renderArenaMap) would
+  // ride up to the edge of the current leg and get stuck there since
+  // legIndex never advanced from walking alone. It would only "catch up" in
+  // one jump whenever a later Forge conversion happened to call
+  // advanceTrailmapLegIfReady for the first time, looking like a teleport
+  // instead of the steady walk-by-walk crossing this is meant to be.
+  if (changed) {
+    const p = getProfile();
+    const rank = p && p.fitnessMode;
+    if (advanceTrailmapLegIfReady(rank, t)) changed = true;
+  }
   return changed;
 }
 
