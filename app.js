@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.86';
+const APP_VERSION = 'WF_SYS_V.1.7.87';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -21815,7 +21815,9 @@ function initOnboarding(onComplete) {
 /* ---------------------------------------------------------------- */
 /* Beta lock                                                            */
 /* ---------------------------------------------------------------- */
-const BETA_END_DATE = new Date(2026, 7, 30, 23, 59, 59); // end of day, August 30, 2026
+// Paused for the meantime -- was Aug 30, 2026. Set back to a real date
+// whenever the beta lock should start enforcing again.
+const BETA_END_DATE = new Date(2099, 0, 1);
 
 function initBetaLock() {
   if (Date.now() < BETA_END_DATE.getTime()) return;
