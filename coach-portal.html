@@ -226,6 +226,11 @@
     font-size: 0.88rem; font-weight: 600; cursor: pointer; font-family: inherit;
   }
   .main-tab-btn.is-active { color: #0a0d12; background: var(--accent); border-color: var(--accent); }
+  .tab-badge {
+    display: inline-block; min-width: 16px; padding: 1px 5px; margin-left: 6px;
+    border-radius: 999px; background: var(--critical, #e5484d); color: #fff;
+    font-size: 0.68rem; font-weight: 700; line-height: 1.4; vertical-align: middle;
+  }
 
   /* Coach view's mobile nav is a floating bottom pill bar instead of the
      shared top .main-tabs row -- #coachMainTabs overrides just for this
@@ -602,7 +607,7 @@
       <nav class="main-tabs" id="ownerMainTabs">
         <button type="button" class="main-tab-btn is-active" data-owner-tab="coaches">Coaches</button>
         <button type="button" class="main-tab-btn" data-owner-tab="users">Users</button>
-        <button type="button" class="main-tab-btn" data-owner-tab="inquiries">Inquiries</button>
+        <button type="button" class="main-tab-btn" data-owner-tab="inquiries">Inquiries<span class="tab-badge" id="inquiryTabBadge" hidden>0</span></button>
         <button type="button" class="main-tab-btn" data-owner-tab="results">Client Results</button>
       </nav>
 
@@ -1443,12 +1448,35 @@ function doCoachLogout() {
   show('viewLanding');
 }
 document.getElementById('btnCoachLogout').addEventListener('click', doCoachLogout);
-document.getElementById('btnCoachLogoutMobile').addEventListener('click', doCoachLogout);
+// The header logout icon is shared between the coach and owner flows --
+// only one of the two sessions can be active at a time (the landing
+// screen forces a choice), so dispatch to whichever is actually live.
+document.getElementById('btnCoachLogoutMobile').addEventListener('click', () => {
+  if (ownerSession) doOwnerLogout();
+  else doCoachLogout();
+});
 
 // --------------------------------------------------------------------
 // Owner side
 // --------------------------------------------------------------------
 let ownerSession = null; // { digitalId, password }
+
+// Shared by a fresh login and restoreOwnerSession() below, same shape as
+// enterCoachPanel/restoreCoachSession -- was a plain in-memory variable
+// before, which meant refreshing the page or backing out and back in
+// silently dropped the owner back to the login form for no real reason.
+// Persisting it the same way the coach session already is means the
+// owner only ever has to log in again after tapping Log Out themselves.
+function enterOwnerPanel(id, password) {
+  ownerSession = { digitalId: id, password };
+  localStorage.setItem('wf_owner_session', JSON.stringify(ownerSession));
+  document.getElementById('ownerLoginCard').hidden = true;
+  document.getElementById('ownerPanel').hidden = false;
+  document.getElementById('introNote').hidden = true;
+  document.getElementById('btnCoachLogoutMobile').hidden = false;
+  loadCoachList();
+  fetchInquiryBadgeCount();
+}
 
 document.getElementById('btnOwnerLogin').addEventListener('click', async () => {
   const id = document.getElementById('ownerLoginId').value.trim();
@@ -1459,15 +1487,39 @@ document.getElementById('btnOwnerLogin').addEventListener('click', async () => {
   try {
     const { error } = await sb.rpc('verify_admin_login', { p_digital_id: id, p_password: password });
     if (error) throw error;
-    ownerSession = { digitalId: id, password };
-    document.getElementById('ownerLoginCard').hidden = true;
-    document.getElementById('ownerPanel').hidden = false;
-    document.getElementById('introNote').hidden = true;
-    loadCoachList();
+    enterOwnerPanel(id, password);
   } catch (e) {
     note.textContent = 'Incorrect Digital ID or password.'; note.className = 'note error';
   }
 });
+
+async function restoreOwnerSession() {
+  const saved = localStorage.getItem('wf_owner_session');
+  if (!saved) return;
+  let parsed;
+  try { parsed = JSON.parse(saved); } catch (e) { localStorage.removeItem('wf_owner_session'); return; }
+  if (!parsed || !parsed.digitalId || !parsed.password) { localStorage.removeItem('wf_owner_session'); return; }
+  try {
+    const { error } = await sb.rpc('verify_admin_login', { p_digital_id: parsed.digitalId, p_password: parsed.password });
+    if (error) throw error;
+    show('viewOwner');
+    enterOwnerPanel(parsed.digitalId, parsed.password);
+  } catch (e) {
+    localStorage.removeItem('wf_owner_session');
+  }
+}
+
+function doOwnerLogout() {
+  ownerSession = null;
+  localStorage.removeItem('wf_owner_session');
+  document.getElementById('ownerPanel').hidden = true;
+  document.getElementById('ownerLoginCard').hidden = false;
+  document.getElementById('ownerLoginId').value = '';
+  document.getElementById('ownerLoginPassword').value = '';
+  document.getElementById('btnCoachLogoutMobile').hidden = true;
+  document.getElementById('introNote').hidden = false;
+  show('viewLanding');
+}
 
 const newCoachLinkedToggle = document.getElementById('newCoachLinked');
 newCoachLinkedToggle.addEventListener('change', () => {
@@ -1547,6 +1599,28 @@ async function loadCoachList() {
   }
 }
 
+function refreshInquiryBadge(data) {
+  const badge = document.getElementById('inquiryTabBadge');
+  const unread = (data || []).filter(i => !i.is_read).length;
+  badge.textContent = unread;
+  badge.hidden = unread === 0;
+}
+
+// Lets the badge show up as soon as the owner logs in, without making
+// them open the Inquiries tab first -- loadInquiryList() only runs (and
+// only calls refreshInquiryBadge itself) once that tab is actually opened.
+async function fetchInquiryBadgeCount() {
+  try {
+    const { data, error } = await sb.rpc('admin_list_coaching_inquiries', {
+      p_admin_digital_id: ownerSession.digitalId, p_admin_password: ownerSession.password,
+    });
+    if (error) throw error;
+    refreshInquiryBadge(data);
+  } catch (e) {
+    // Silent -- this is a nice-to-have background refresh, not a user action.
+  }
+}
+
 async function loadInquiryList() {
   const listEl = document.getElementById('inquiryList');
   listEl.innerHTML = '<p class="note">Loading…</p>';
@@ -1555,6 +1629,7 @@ async function loadInquiryList() {
       p_admin_digital_id: ownerSession.digitalId, p_admin_password: ownerSession.password,
     });
     if (error) throw error;
+    refreshInquiryBadge(data);
     if (!data || !data.length) { listEl.innerHTML = '<p class="note">No inquiries yet.</p>'; return; }
     listEl.innerHTML = '';
     data.forEach(inquiry => {
@@ -4039,7 +4114,7 @@ function renderDemoChatMessages(publicId) {
 // screen and login form entirely -- this needs to run after primaryWheel/
 // accentWheel (declared further up) exist, so it's the very last thing
 // the script does.
-if (demoMode) { show('viewCoach'); enterCoachDemo(); } else { restoreCoachSession(); }
+if (demoMode) { show('viewCoach'); enterCoachDemo(); } else { restoreCoachSession(); restoreOwnerSession(); }
 </script>
 </body>
 </html>
