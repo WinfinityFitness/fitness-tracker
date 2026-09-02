@@ -53,7 +53,7 @@ returns table (
 )
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 begin
   perform verify_admin_login(p_admin_digital_id, p_admin_password);
@@ -72,7 +72,7 @@ create or replace function admin_set_coaching_inquiry_read(
 ) returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 begin
   perform verify_admin_login(p_admin_digital_id, p_admin_password);
@@ -88,7 +88,7 @@ create or replace function admin_delete_coaching_inquiry(
 ) returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 begin
   perform verify_admin_login(p_admin_digital_id, p_admin_password);
