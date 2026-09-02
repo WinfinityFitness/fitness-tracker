@@ -602,6 +602,7 @@
       <nav class="main-tabs" id="ownerMainTabs">
         <button type="button" class="main-tab-btn is-active" data-owner-tab="coaches">Coaches</button>
         <button type="button" class="main-tab-btn" data-owner-tab="users">Users</button>
+        <button type="button" class="main-tab-btn" data-owner-tab="inquiries">Inquiries</button>
       </nav>
 
       <div class="owner-page" id="ownerPageCoaches">
@@ -646,6 +647,14 @@
             </div>
           </div>
           <p class="note" id="userLookupNote"></p>
+        </div>
+      </div>
+
+      <div class="owner-page" id="ownerPageInquiries" hidden>
+        <div class="card">
+          <h2>Coaching Inquiries</h2>
+          <p class="note" style="margin-top:0;">Submissions from the "Interested in coaching?" card on winfinityfitness.com.</p>
+          <div id="inquiryList"><p class="note">Loading…</p></div>
         </div>
       </div>
     </div>
@@ -1225,10 +1234,11 @@ coachTabButtons().forEach(btn => {
    Coach view's own Clients tab, so it stays its own focused view rather
    than getting folded into this tab bar. --- */
 function showOwnerTab(name) {
-  ['coaches', 'users'].forEach(t => {
+  ['coaches', 'users', 'inquiries'].forEach(t => {
     const page = document.getElementById('ownerPage' + t.charAt(0).toUpperCase() + t.slice(1));
     if (page) page.hidden = t !== name;
   });
+  if (name === 'inquiries') loadInquiryList();
   document.querySelectorAll('#ownerMainTabs .main-tab-btn').forEach(btn => {
     btn.classList.toggle('is-active', btn.dataset.ownerTab === name);
   });
@@ -1513,6 +1523,65 @@ async function loadCoachList() {
     });
   } catch (e) {
     listEl.innerHTML = '<p class="note error">Could not load coaches: ' + escapeHtml(e.message || String(e)) + '</p>';
+  }
+}
+
+async function loadInquiryList() {
+  const listEl = document.getElementById('inquiryList');
+  listEl.innerHTML = '<p class="note">Loading…</p>';
+  try {
+    const { data, error } = await sb.rpc('admin_list_coaching_inquiries', {
+      p_admin_digital_id: ownerSession.digitalId, p_admin_password: ownerSession.password,
+    });
+    if (error) throw error;
+    if (!data || !data.length) { listEl.innerHTML = '<p class="note">No inquiries yet.</p>'; return; }
+    listEl.innerHTML = '';
+    data.forEach(inquiry => {
+      const row = document.createElement('div');
+      row.className = 'coach-row';
+      row.innerHTML = `
+        <div>
+          <div class="name">${escapeHtml(inquiry.name)} <span class="badge ${inquiry.is_read ? 'off' : 'on'}">${inquiry.is_read ? 'Read' : 'New'}</span></div>
+          <div class="meta">${escapeHtml(inquiry.contact)} &middot; ${new Date(inquiry.submitted_at).toLocaleString()}</div>
+          <p style="margin:8px 0 10px; white-space:pre-wrap;">${escapeHtml(inquiry.message)}</p>
+          <div class="btn-row">
+            <button type="button" class="btn btn-secondary btn-toggle-read" style="width:auto;">${inquiry.is_read ? 'Mark unread' : 'Mark read'}</button>
+            <button type="button" class="btn btn-danger btn-delete-inquiry" style="width:auto;">Delete</button>
+          </div>
+        </div>`;
+      row.querySelector('.btn-toggle-read').addEventListener('click', () => setInquiryRead(inquiry.id, !inquiry.is_read));
+      row.querySelector('.btn-delete-inquiry').addEventListener('click', () => deleteInquiry(inquiry.id));
+      listEl.appendChild(row);
+    });
+  } catch (e) {
+    listEl.innerHTML = '<p class="note error">Could not load inquiries: ' + escapeHtml(e.message || String(e)) + '</p>';
+  }
+}
+
+async function setInquiryRead(id, isRead) {
+  try {
+    const { error } = await sb.rpc('admin_set_coaching_inquiry_read', {
+      p_admin_digital_id: ownerSession.digitalId, p_admin_password: ownerSession.password,
+      p_id: id, p_is_read: isRead,
+    });
+    if (error) throw error;
+    loadInquiryList();
+  } catch (e) {
+    alert('Could not update inquiry: ' + (e.message || e));
+  }
+}
+
+async function deleteInquiry(id) {
+  if (!confirm('Delete this inquiry? This cannot be undone.')) return;
+  try {
+    const { error } = await sb.rpc('admin_delete_coaching_inquiry', {
+      p_admin_digital_id: ownerSession.digitalId, p_admin_password: ownerSession.password,
+      p_id: id,
+    });
+    if (error) throw error;
+    loadInquiryList();
+  } catch (e) {
+    alert('Could not delete inquiry: ' + (e.message || e));
   }
 }
 
