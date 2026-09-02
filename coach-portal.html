@@ -1681,6 +1681,38 @@ async function deleteInquiry(id) {
   }
 }
 
+// Uploaded photos come straight off a phone camera -- often 3-4000px on
+// the long edge and several MB, which is massively more than the slideshow
+// card (roughly 500-800px wide even on a big desktop monitor) ever needs.
+// Downscaling to 1600px + re-encoding as JPEG keeps it sharp at any
+// realistic display size while cutting the file the public page has to
+// download by 80-90%+. Pasted URLs skip this entirely -- there's no file
+// to touch, and re-compressing someone else's hosted image isn't ours to do.
+function resizeImageFile(file, maxDim, quality) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        const scale = maxDim / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      canvas.toBlob((blob) => {
+        if (!blob) { reject(new Error('Could not process that image')); return; }
+        resolve(blob);
+      }, 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('Could not read that image file')); };
+    img.src = objectUrl;
+  });
+}
+
 document.getElementById('btnAddResultsPhoto').addEventListener('click', async () => {
   const note = document.getElementById('resultsPhotoNote');
   const fileInput = document.getElementById('resultsPhotoFile');
@@ -1694,11 +1726,13 @@ document.getElementById('btnAddResultsPhoto').addEventListener('click', async ()
     return;
   }
 
-  note.textContent = 'Adding…'; note.className = 'note';
+  note.textContent = file ? 'Resizing…' : 'Adding…'; note.className = 'note';
   try {
     if (file) {
-      const path = `${Date.now()}-${file.name}`;
-      const { error: uploadError } = await sb.storage.from('client-results-photos').upload(path, file);
+      const resized = await resizeImageFile(file, 1600, 0.85);
+      note.textContent = 'Uploading…';
+      const path = `${Date.now()}-${file.name.replace(/\.[^.]+$/, '')}.jpg`;
+      const { error: uploadError } = await sb.storage.from('client-results-photos').upload(path, resized, { contentType: 'image/jpeg' });
       if (uploadError) throw uploadError;
       const { data: urlData } = sb.storage.from('client-results-photos').getPublicUrl(path);
       imageUrl = urlData.publicUrl;
