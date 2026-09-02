@@ -603,6 +603,7 @@
         <button type="button" class="main-tab-btn is-active" data-owner-tab="coaches">Coaches</button>
         <button type="button" class="main-tab-btn" data-owner-tab="users">Users</button>
         <button type="button" class="main-tab-btn" data-owner-tab="inquiries">Inquiries</button>
+        <button type="button" class="main-tab-btn" data-owner-tab="results">Client Results</button>
       </nav>
 
       <div class="owner-page" id="ownerPageCoaches">
@@ -655,6 +656,25 @@
           <h2>Coaching Inquiries</h2>
           <p class="note" style="margin-top:0;">Submissions from the "Interested in coaching?" card on winfinityfitness.com.</p>
           <div id="inquiryList"><p class="note">Loading…</p></div>
+        </div>
+      </div>
+
+      <div class="owner-page" id="ownerPageResults" hidden>
+        <div class="card">
+          <h2>Add a Client Results Photo</h2>
+          <p class="note" style="margin-top:0;">Shows up live in the "Client Results" slideshow on winfinityfitness.com. Upload a file, or paste a URL to an image hosted elsewhere -- either way lands in the same slideshow.</p>
+          <div class="row2">
+            <label class="field"><span>Upload a photo</span><input type="file" id="resultsPhotoFile" accept="image/*"></label>
+            <label class="field"><span>...or paste an image URL</span><input type="text" id="resultsPhotoUrl" placeholder="https://..."></label>
+          </div>
+          <label class="field"><span>Caption (optional)</span><input type="text" id="resultsPhotoCaption" placeholder="e.g. Jane, 12 weeks in"></label>
+          <button type="button" class="btn" id="btnAddResultsPhoto">Add to Slideshow</button>
+          <p class="note" id="resultsPhotoNote"></p>
+        </div>
+
+        <div class="card">
+          <h2>Current Slideshow Photos</h2>
+          <div id="resultsPhotoList"><p class="note">Loading…</p></div>
         </div>
       </div>
     </div>
@@ -1234,11 +1254,12 @@ coachTabButtons().forEach(btn => {
    Coach view's own Clients tab, so it stays its own focused view rather
    than getting folded into this tab bar. --- */
 function showOwnerTab(name) {
-  ['coaches', 'users', 'inquiries'].forEach(t => {
+  ['coaches', 'users', 'inquiries', 'results'].forEach(t => {
     const page = document.getElementById('ownerPage' + t.charAt(0).toUpperCase() + t.slice(1));
     if (page) page.hidden = t !== name;
   });
   if (name === 'inquiries') loadInquiryList();
+  if (name === 'results') loadResultsPhotoList();
   document.querySelectorAll('#ownerMainTabs .main-tab-btn').forEach(btn => {
     btn.classList.toggle('is-active', btn.dataset.ownerTab === name);
   });
@@ -1582,6 +1603,82 @@ async function deleteInquiry(id) {
     loadInquiryList();
   } catch (e) {
     alert('Could not delete inquiry: ' + (e.message || e));
+  }
+}
+
+document.getElementById('btnAddResultsPhoto').addEventListener('click', async () => {
+  const note = document.getElementById('resultsPhotoNote');
+  const fileInput = document.getElementById('resultsPhotoFile');
+  const urlInput = document.getElementById('resultsPhotoUrl');
+  const captionInput = document.getElementById('resultsPhotoCaption');
+  const file = fileInput.files[0];
+  let imageUrl = urlInput.value.trim();
+
+  if (!file && !imageUrl) {
+    note.textContent = 'Upload a photo or paste an image URL.'; note.className = 'note error';
+    return;
+  }
+
+  note.textContent = 'Adding…'; note.className = 'note';
+  try {
+    if (file) {
+      const path = `${Date.now()}-${file.name}`;
+      const { error: uploadError } = await sb.storage.from('client-results-photos').upload(path, file);
+      if (uploadError) throw uploadError;
+      const { data: urlData } = sb.storage.from('client-results-photos').getPublicUrl(path);
+      imageUrl = urlData.publicUrl;
+    }
+
+    const { error } = await sb.rpc('admin_add_client_result_photo', {
+      p_admin_digital_id: ownerSession.digitalId, p_admin_password: ownerSession.password,
+      p_image_url: imageUrl, p_caption: captionInput.value.trim() || null,
+    });
+    if (error) throw error;
+
+    fileInput.value = ''; urlInput.value = ''; captionInput.value = '';
+    note.textContent = 'Added.'; note.className = 'note success';
+    loadResultsPhotoList();
+  } catch (e) {
+    note.textContent = 'Could not add photo: ' + (e.message || e); note.className = 'note error';
+  }
+});
+
+async function loadResultsPhotoList() {
+  const listEl = document.getElementById('resultsPhotoList');
+  listEl.innerHTML = '<p class="note">Loading…</p>';
+  try {
+    const { data, error } = await sb.rpc('get_client_results_photos');
+    if (error) throw error;
+    if (!data || !data.length) { listEl.innerHTML = '<p class="note">No photos yet.</p>'; return; }
+    listEl.innerHTML = '';
+    data.forEach(photo => {
+      const row = document.createElement('div');
+      row.className = 'coach-row';
+      row.style.display = 'flex'; row.style.alignItems = 'center'; row.style.gap = '12px';
+      row.innerHTML = `
+        <img src="${escapeHtml(photo.image_url)}" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex:none;">
+        <div style="flex:1;min-width:0;">
+          <div class="meta" style="word-break:break-all;">${escapeHtml(photo.caption || photo.image_url)}</div>
+        </div>
+        <button type="button" class="btn btn-danger btn-delete-photo" style="width:auto;flex:none;">Delete</button>`;
+      row.querySelector('.btn-delete-photo').addEventListener('click', () => deleteResultsPhoto(photo.id));
+      listEl.appendChild(row);
+    });
+  } catch (e) {
+    listEl.innerHTML = '<p class="note error">Could not load photos: ' + escapeHtml(e.message || String(e)) + '</p>';
+  }
+}
+
+async function deleteResultsPhoto(id) {
+  if (!confirm('Remove this photo from the slideshow?')) return;
+  try {
+    const { error } = await sb.rpc('admin_delete_client_result_photo', {
+      p_admin_digital_id: ownerSession.digitalId, p_admin_password: ownerSession.password, p_id: id,
+    });
+    if (error) throw error;
+    loadResultsPhotoList();
+  } catch (e) {
+    alert('Could not delete photo: ' + (e.message || e));
   }
 }
 
