@@ -10,6 +10,8 @@
   var captionEl = document.getElementById('wfResultsCaption');
   var dotsEl = document.getElementById('wfResultsDots');
   var emptyEl = document.getElementById('wfResultsEmpty');
+  var prevZone = document.getElementById('wfResultsPrev');
+  var nextZone = document.getElementById('wfResultsNext');
 
   var photos = [];
   var current = 0;
@@ -45,6 +47,9 @@
     if (timer) clearInterval(timer);
     if (photos.length > 1) timer = setInterval(function () { show(current + 1); }, ADVANCE_MS);
   }
+
+  if (prevZone) prevZone.addEventListener('click', function () { show(current - 1); restartTimer(); });
+  if (nextZone) nextZone.addEventListener('click', function () { show(current + 1); restartTimer(); });
 
   sb.rpc('get_client_results_photos').then(function (res) {
     if (res.error || !res.data || !res.data.length) {
