@@ -231,20 +231,15 @@
 
   /* Floating audio controls -- fixed mid-right, matches the page's
      gold/parchment palette rather than a generic media-player look.
-     Music and narration each get their own toggle+slider group, stacked
-     with a hairline divider between them (same split hero-embed.html's
-     widget was given). */
+     Icon-only until tapped: each icon pops its own volume+mute panel out
+     to the left instead of showing a permanently-visible pill (matches
+     the pattern used on the BirthdayEMA invite and hero-embed.html). */
   .music-widget {
     position: fixed; right: 20px; top: 50%; transform: translateY(-50%);
     z-index: 60; display: flex; flex-direction: column; align-items: center;
     gap: 14px;
   }
-  .audio-control-group {
-    display: flex; flex-direction: column; align-items: center; gap: 10px;
-  }
-  .audio-divider {
-    width: 26px; height: 1px; background: var(--hairline);
-  }
+  .audio-control-group { position: relative; display: flex; }
   .music-toggle {
     width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--hairline);
     background: var(--card); color: var(--gold); cursor: pointer;
@@ -258,10 +253,12 @@
   .music-toggle.is-muted { color: var(--ink-faint); }
 
   .music-volume-panel {
+    position: absolute; top: 50%; right: calc(100% + 10px); transform: translateY(-50%);
     background: var(--card); border: 1px solid var(--hairline); border-radius: 12px;
     padding: 12px 8px; box-shadow: 0 10px 24px -12px var(--shadow);
     display: flex; flex-direction: column; align-items: center; gap: 8px;
   }
+  .music-volume-panel[hidden] { display: none; }
   /* Vertical range slider -- rotate a normal horizontal <input type=range>
      rather than fight browser-specific vertical-slider APIs (writing-mode/
      orient aren't reliable cross-browser). */
@@ -272,6 +269,13 @@
   .music-volume-label {
     font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-faint);
   }
+  .audio-mute-btn {
+    width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--hairline);
+    background: var(--card); color: var(--gold); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .audio-mute-btn svg { width: 14px; height: 14px; }
+  .audio-mute-btn.is-muted { color: var(--ink-faint); }
   @media (max-width: 640px) {
     .music-widget { right: 12px; }
     .music-toggle { width: 40px; height: 40px; }
@@ -578,20 +582,19 @@
      anyway, and doing it regardless risks a stuck error state. -->
 <audio id="advNarration" src="audio/adventure-narration.mp3" preload="auto" playsinline></audio>
 <div class="music-widget">
-  <!-- Background music controls. Single icon, swapped via innerHTML
-       rather than two SVGs toggled with [hidden] -- the two-icon version
-       was rendering both at once (the flex-centered button layout
-       doesn't reliably respect [hidden] on an SVG the way a block
-       element expects). Icon is set entirely by JS (updateMusicIcon). -->
+  <!-- Background music: icon-only until tapped, then it pops its own
+       volume+mute panel out to the left (matches the BirthdayEMA /
+       hero-embed.html pattern instead of an always-visible pill). -->
   <div class="audio-control-group">
-    <div class="music-volume-panel" id="musicVolumePanel">
+    <button type="button" class="music-toggle" id="musicToggle" aria-label="Show music volume" aria-expanded="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 8 8 8 13 4 13 20 8 16 4 16 4 8"></polygon><path d="M17 8a5 5 0 0 1 0 8"></path><path d="M19.5 5.5a9 9 0 0 1 0 13"></path></svg>
+    </button>
+    <div class="music-volume-panel" id="musicVolumePanel" hidden>
       <input type="range" id="musicVolumeSlider" min="0" max="100" value="45" aria-label="Music volume">
       <span class="music-volume-label" id="musicVolumeLabel">45%</span>
+      <button type="button" class="audio-mute-btn" id="musicMuteBtn" aria-label="Mute background music" aria-pressed="false"></button>
     </div>
-    <button type="button" class="music-toggle" id="musicToggle" aria-label="Mute background music" aria-pressed="false"></button>
   </div>
-
-  <div class="audio-divider" aria-hidden="true"></div>
 
   <!-- Narration controls -- independent mute + volume from the music
        above, not a shared slider, same split hero-embed.html's widget
@@ -600,11 +603,14 @@
        further down); this only sets muted/volume on whichever state
        that mechanism is already driving. -->
   <div class="audio-control-group">
-    <div class="music-volume-panel" id="narrationVolumePanel">
+    <button type="button" class="music-toggle" id="narrationToggle" aria-label="Show narration volume" aria-expanded="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line><line x1="8.5" y1="22" x2="15.5" y2="22"></line></svg>
+    </button>
+    <div class="music-volume-panel" id="narrationVolumePanel" hidden>
       <input type="range" id="narrationVolumeSlider" min="0" max="100" value="80" aria-label="Narration volume">
       <span class="music-volume-label" id="narrationVolumeLabel">80%</span>
+      <button type="button" class="audio-mute-btn" id="narrationMuteBtn" aria-label="Mute narration" aria-pressed="false"></button>
     </div>
-    <button type="button" class="music-toggle" id="narrationToggle" aria-label="Mute narration" aria-pressed="false"></button>
   </div>
 </div>
 
@@ -680,20 +686,39 @@
     document.head.appendChild(sbScript);
   })();
 
-  // Background music -- floating icon toggles mute, the panel above it
-  // sets volume. Both persist across visits (localStorage), and a muted
-  // returning visitor stays muted rather than being forced to hear music
-  // again on their next load.
+  // Shared by both audio widgets below -- closes whichever panel isn't
+  // the one just opened, and (via the pointerdown listener further down)
+  // closes both when the visitor taps elsewhere on the page.
+  function closeAudioPanels(except) {
+    ['musicVolumePanel', 'narrationVolumePanel'].forEach(function (id) {
+      var el = document.getElementById(id);
+      var toggleEl = document.getElementById(id === 'musicVolumePanel' ? 'musicToggle' : 'narrationToggle');
+      if (el && el !== except) {
+        el.hidden = true;
+        if (toggleEl) toggleEl.setAttribute('aria-expanded', 'false');
+      }
+    });
+  }
+  document.addEventListener('pointerdown', function (e) {
+    if (e.target.closest && e.target.closest('.audio-control-group')) return;
+    closeAudioPanels(null);
+  });
+
+  // Background music -- floating icon opens its own volume+mute panel
+  // (rather than a permanently-visible pill). Both mute state and volume
+  // persist across visits (localStorage), and a muted returning visitor
+  // stays muted rather than being forced to hear music again.
   (function () {
     var audio = document.getElementById('bgMusic');
     var toggle = document.getElementById('musicToggle');
     var panel = document.getElementById('musicVolumePanel');
     var slider = document.getElementById('musicVolumeSlider');
     var label = document.getElementById('musicVolumeLabel');
+    var muteBtn = document.getElementById('musicMuteBtn');
 
     var VOL_KEY = 'wf_adventure_music_volume';
     var MUTED_KEY = 'wf_adventure_music_muted';
-    var ICON_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 8 8 8 13 4 13 20 8 16 4 16 4 8"></polygon><path d="M17 8a5 5 0 0 1 0 8"></path><path d="M19.5 5.5a9 9 0 0 1 0 13"></path></svg>';
+    var ICON_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 8 8 8 13 4 13 20 8 16 4 16 4 8"></polygon><path d="M17 8a5 5 0 0 1 0 8"></path></svg>';
     var ICON_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 8 8 8 13 4 13 20 8 16 4 16 4 8"></polygon><line x1="16" y1="9" x2="21" y2="14"></line><line x1="21" y1="9" x2="16" y2="14"></line></svg>';
 
     var savedVolume = parseInt(localStorage.getItem(VOL_KEY), 10);
@@ -704,14 +729,14 @@
     label.textContent = savedVolume + '%';
     audio.volume = savedVolume / 100;
 
-    // Single icon, swapped whole rather than two SVGs toggled with
-    // [hidden] -- the two-icon version rendered both at once inside this
-    // flex-centered button.
+    // The outer toggle's own glyph stays fixed -- only dims via is-muted
+    // -- the dedicated mute button inside the panel swaps ON/OFF.
     function updateIcon() {
-      toggle.innerHTML = muted ? ICON_OFF : ICON_ON;
       toggle.classList.toggle('is-muted', muted);
-      toggle.setAttribute('aria-pressed', String(muted));
-      toggle.setAttribute('aria-label', muted ? 'Unmute background music' : 'Mute background music');
+      muteBtn.innerHTML = muted ? ICON_OFF : ICON_ON;
+      muteBtn.classList.toggle('is-muted', muted);
+      muteBtn.setAttribute('aria-pressed', String(muted));
+      muteBtn.setAttribute('aria-label', muted ? 'Unmute background music' : 'Mute background music');
     }
 
     function play() {
@@ -727,7 +752,7 @@
     // First user interaction anywhere on the page (not just the widget)
     // satisfies the browser's autoplay-gesture requirement, so music
     // starts as soon as it reasonably can rather than only if someone
-    // happens to click the speaker icon specifically.
+    // happens to open the widget specifically.
     function unlockOnFirstGesture() {
       if (!muted) play();
       document.removeEventListener('click', unlockOnFirstGesture);
@@ -736,7 +761,15 @@
     document.addEventListener('click', unlockOnFirstGesture);
     document.addEventListener('touchstart', unlockOnFirstGesture);
 
-    toggle.addEventListener('click', function () {
+    toggle.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var show = panel.hidden;
+      closeAudioPanels(show ? panel : null);
+      panel.hidden = !show;
+      toggle.setAttribute('aria-expanded', String(show));
+    });
+
+    muteBtn.addEventListener('click', function () {
       muted = !muted;
       localStorage.setItem(MUTED_KEY, muted ? '1' : '0');
       audio.muted = muted;
@@ -767,9 +800,11 @@
   (function () {
     var narration = document.getElementById('advNarration');
     var toggle = document.getElementById('narrationToggle');
+    var panel = document.getElementById('narrationVolumePanel');
     var slider = document.getElementById('narrationVolumeSlider');
     var label = document.getElementById('narrationVolumeLabel');
-    if (!narration || !toggle || !slider || !label) return;
+    var muteBtn = document.getElementById('narrationMuteBtn');
+    if (!narration || !toggle || !panel || !slider || !label || !muteBtn) return;
 
     var VOL_KEY = 'wf_adventure_narration_volume';
     var MUTED_KEY = 'wf_adventure_narration_muted';
@@ -790,14 +825,23 @@
     narration.muted = muted;
 
     function updateIcon() {
-      toggle.innerHTML = muted ? ICON_OFF : ICON_ON;
       toggle.classList.toggle('is-muted', muted);
-      toggle.setAttribute('aria-pressed', String(muted));
-      toggle.setAttribute('aria-label', muted ? 'Unmute narration' : 'Mute narration');
+      muteBtn.innerHTML = muted ? ICON_OFF : ICON_ON;
+      muteBtn.classList.toggle('is-muted', muted);
+      muteBtn.setAttribute('aria-pressed', String(muted));
+      muteBtn.setAttribute('aria-label', muted ? 'Unmute narration' : 'Mute narration');
     }
     updateIcon();
 
-    toggle.addEventListener('click', function () {
+    toggle.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var show = panel.hidden;
+      closeAudioPanels(show ? panel : null);
+      panel.hidden = !show;
+      toggle.setAttribute('aria-expanded', String(show));
+    });
+
+    muteBtn.addEventListener('click', function () {
       muted = !muted;
       localStorage.setItem(MUTED_KEY, muted ? '1' : '0');
       narration.muted = muted;

@@ -3,22 +3,32 @@
 <audio id="wfNarration" src="https://winfinityfitness.github.io/fitness-tracker/audio/ring-verse-narration.mp3" preload="auto" playsinline></audio>
 
 <div class="wf-music-widget" id="wfMusicWidget">
-  <!-- Background Music Controls (Top) -->
+  <!-- Background Music: icon-only until tapped, then it pops its own
+       volume+mute panel out to the side (matches the BirthdayEMA/
+       adventure-guide.html pattern instead of an always-visible pill). -->
   <div class="wf-audio-control-group">
-    <button type="button" class="wf-music-toggle" id="wfMusicToggle" aria-label="Unmute background music" title="Unmute music">
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 9 8 9 12 5 12 19 8 15 4 15"/><line x1="17" y1="8" x2="22" y2="16"/><line x1="22" y1="8" x2="17" y2="16"/></svg>
+    <button type="button" class="wf-music-toggle" id="wfMusicToggle" aria-label="Show music volume" aria-expanded="false" title="Music">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 9 8 9 12 5 12 19 8 15 4 15"/><path d="M17 8a5 5 0 0 1 0 8"/><path d="M20 5a9 9 0 0 1 0 14"/></svg>
     </button>
-    <input type="range" id="wfMusicVolume" class="wf-music-volume" min="0" max="100" value="60" aria-label="Music volume">
+    <div class="wf-audio-panel" id="wfMusicPanel" hidden>
+      <input type="range" id="wfMusicVolume" class="wf-music-volume" min="0" max="100" value="60" aria-label="Music volume">
+      <button type="button" class="wf-audio-mute-btn" id="wfMusicMuteBtn" aria-label="Mute background music" aria-pressed="false">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 9 8 9 12 5 12 19 8 15 4 15"/><path d="M17 8a5 5 0 0 1 0 8"/></svg>
+      </button>
+    </div>
   </div>
 
-  <div class="wf-audio-divider-horizontal" aria-hidden="true"></div>
-
-  <!-- Narration Voice Controls (Bottom) -->
+  <!-- Narration: same icon-tap pattern, independent mute+volume. -->
   <div class="wf-audio-control-group">
-    <button type="button" class="wf-music-toggle" id="wfNarrationToggle" aria-label="Unmute narration" title="Unmute narration">
+    <button type="button" class="wf-music-toggle" id="wfNarrationToggle" aria-label="Show narration volume" aria-expanded="false" title="Narration">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
     </button>
-    <input type="range" id="wfNarrationVolume" class="wf-music-volume" min="0" max="100" value="80" aria-label="Narration volume">
+    <div class="wf-audio-panel" id="wfNarrationPanel" hidden>
+      <input type="range" id="wfNarrationVolume" class="wf-music-volume" min="0" max="100" value="80" aria-label="Narration volume">
+      <button type="button" class="wf-audio-mute-btn" id="wfNarrationMuteBtn" aria-label="Mute narration" aria-pressed="false">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      </button>
+    </div>
   </div>
 </div>
 
@@ -151,33 +161,43 @@
   }
   .wf-hero-cta--ghost:hover::before { background: #271d1b; }
 
-  /* Audio Controls Widget Layout - Vertical Stack */
+  /* Audio Controls Widget Layout - icon-only stack, no pill grouping the
+     two controls together. Each icon pops its own volume+mute panel out
+     to the left when tapped, mirroring the pattern used on the
+     BirthdayEMA invite and adventure-guide.html. */
   .wf-music-widget {
     position: fixed; top: 50%; right: 14px; transform: translateY(-50%);
-    z-index: 999; display: flex; flex-direction: column; align-items: center; gap: 12px;
-    background: rgba(10,13,18,0.88); border: 1px solid rgba(255,159,67,0.35);
-    border-radius: 999px; padding: 14px 10px;
+    z-index: 999; display: flex; flex-direction: column; align-items: center; gap: 14px;
+  }
+  .wf-audio-control-group { position: relative; display: flex; }
+  .wf-music-toggle {
+    width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer;
+    background: rgba(10,13,18,0.85); color: #ff9f43;
+    display: flex; align-items: center; justify-content: center; flex: none;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,159,67,0.4);
+    transition: transform 0.15s ease;
+  }
+  .wf-music-toggle:hover { transform: scale(1.07); }
+  .wf-music-toggle.is-muted { color: rgba(255,159,67,0.45); }
+  .wf-audio-panel {
+    position: absolute; top: 50%; right: calc(100% + 10px); transform: translateY(-50%);
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(10,13,18,0.92); border: 1px solid rgba(255,159,67,0.35);
+    border-radius: 999px; padding: 8px 10px;
     box-shadow: 0 10px 26px rgba(0,0,0,0.4);
     backdrop-filter: blur(6px);
   }
-  .wf-audio-control-group {
-    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  .wf-audio-panel[hidden] { display: none; }
+  .wf-audio-mute-btn {
+    width: 22px; height: 22px; border-radius: 50%; border: none; cursor: pointer;
+    background: rgba(255,255,255,0.08); color: #ff9f43; flex: none;
+    display: flex; align-items: center; justify-content: center;
   }
-  .wf-audio-divider-horizontal {
-    width: 24px; height: 1px; background: rgba(255,159,67,0.3); margin: 2px 0;
-  }
-  .wf-music-toggle {
-    width: 32px; height: 32px; border-radius: 50%; border: none; cursor: pointer;
-    background: #ff9f43; color: #0a0d12;
-    display: flex; align-items: center; justify-content: center; flex: none;
-    transition: background 0.15s ease;
-  }
-  .wf-music-toggle:hover { background: #ffb668; }
-  .wf-music-toggle.is-muted { background: transparent; color: #ff9f43; box-shadow: inset 0 0 0 1.5px #ff9f43; }
+  .wf-audio-mute-btn.is-muted { background: #ff9f43; color: #0a0d12; }
   .wf-music-volume {
-    writing-mode: vertical-lr; direction: rtl; appearance: none; -webkit-appearance: none;
-    width: 5px; height: 68px; background: rgba(255,255,255,0.18); border-radius: 999px;
-    outline: none; cursor: pointer; margin: 0;
+    -webkit-appearance: none; appearance: none;
+    width: 90px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 999px;
+    outline: none; cursor: pointer; margin: 0; accent-color: #ff9f43;
   }
   .wf-music-volume::-webkit-slider-thumb {
     -webkit-appearance: none; appearance: none;
@@ -189,8 +209,7 @@
     border: 2px solid #0a0d12; cursor: pointer;
   }
   @media (max-width: 640px) {
-    .wf-music-widget { right: 8px; padding: 12px 8px; gap: 8px; }
-    .wf-music-volume { height: 54px; }
+    .wf-music-widget { right: 8px; gap: 10px; }
   }
 </style>
 
@@ -198,13 +217,17 @@
 (function () {
   var audio = document.getElementById('wfMusicAudio');
   var toggle = document.getElementById('wfMusicToggle');
+  var panel = document.getElementById('wfMusicPanel');
   var volume = document.getElementById('wfMusicVolume');
+  var muteBtn = document.getElementById('wfMusicMuteBtn');
 
   var narration = document.getElementById('wfNarration');
   var narrToggle = document.getElementById('wfNarrationToggle');
+  var narrPanel = document.getElementById('wfNarrationPanel');
   var narrVolume = document.getElementById('wfNarrationVolume');
+  var narrMuteBtn = document.getElementById('wfNarrationMuteBtn');
 
-  if (!audio || !toggle || !volume || !narration || !narrToggle || !narrVolume) return;
+  if (!audio || !toggle || !panel || !volume || !muteBtn || !narration || !narrToggle || !narrPanel || !narrVolume || !narrMuteBtn) return;
 
   // Local Storage Keys
   var MUSIC_MUTE_KEY = 'wf_hero_music_muted';
@@ -212,11 +235,17 @@
   var NARR_MUTE_KEY = 'wf_hero_narration_muted';
   var NARR_VOL_KEY = 'wf_hero_narration_volume';
 
-  // SVG Icons
-  var ICON_MUSIC_OFF = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 9 8 9 12 5 12 19 8 15 4 15"/><line x1="17" y1="8" x2="22" y2="16"/><line x1="22" y1="8" x2="17" y2="16"/></svg>';
-  var ICON_MUSIC_ON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 9 8 9 12 5 12 19 8 15 4 15"/><path d="M17 8a5 5 0 0 1 0 8"/><path d="M20 5a9 9 0 0 1 0 14"/></svg>';
-  var ICON_NARR_OFF = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
-  var ICON_NARR_ON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
+  // SVG Icons (used only by each panel's dedicated mute button now --
+  // the outer toggle icon stays fixed and just opens/closes the panel)
+  var ICON_MUSIC_OFF = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 9 8 9 12 5 12 19 8 15 4 15"/><line x1="17" y1="8" x2="22" y2="16"/><line x1="22" y1="8" x2="17" y2="16"/></svg>';
+  var ICON_MUSIC_ON = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 9 8 9 12 5 12 19 8 15 4 15"/><path d="M17 8a5 5 0 0 1 0 8"/></svg>';
+  var ICON_NARR_OFF = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
+  var ICON_NARR_ON = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
+
+  function closePanels(except) {
+    if (panel !== except) panel.hidden = true, toggle.setAttribute('aria-expanded', 'false');
+    if (narrPanel !== except) narrPanel.hidden = true, narrToggle.setAttribute('aria-expanded', 'false');
+  }
 
   // --- Background Music Handling ---
   var musicVol = parseInt(localStorage.getItem(MUSIC_VOL_KEY) || '60', 10);
@@ -228,14 +257,23 @@
   function applyMusicState() {
     audio.muted = musicMuted;
     toggle.classList.toggle('is-muted', musicMuted);
+    muteBtn.classList.toggle('is-muted', musicMuted);
     var label = musicMuted ? 'Unmute background music' : 'Mute background music';
-    toggle.setAttribute('aria-label', label);
-    toggle.title = label.replace(' background', '');
-    toggle.innerHTML = musicMuted ? ICON_MUSIC_OFF : ICON_MUSIC_ON;
+    muteBtn.setAttribute('aria-pressed', String(musicMuted));
+    muteBtn.setAttribute('aria-label', label);
+    muteBtn.innerHTML = musicMuted ? ICON_MUSIC_OFF : ICON_MUSIC_ON;
   }
   applyMusicState();
 
-  toggle.addEventListener('click', function () {
+  toggle.addEventListener('click', function (e) {
+    e.stopPropagation();
+    var show = panel.hidden;
+    closePanels(show ? panel : null);
+    panel.hidden = !show;
+    toggle.setAttribute('aria-expanded', String(show));
+  });
+
+  muteBtn.addEventListener('click', function () {
     musicMuted = !musicMuted;
     localStorage.setItem(MUSIC_MUTE_KEY, musicMuted ? '1' : '0');
     applyMusicState();
@@ -246,6 +284,12 @@
     var v = parseInt(volume.value, 10);
     audio.volume = v / 100;
     localStorage.setItem(MUSIC_VOL_KEY, String(v));
+    if (v > 0 && musicMuted) {
+      musicMuted = false;
+      localStorage.setItem(MUSIC_MUTE_KEY, '0');
+      applyMusicState();
+      audio.play().catch(function () {});
+    }
   });
 
   // --- Narration Audio Handling ---
@@ -258,14 +302,23 @@
   function applyNarrState() {
     narration.muted = narrMuted;
     narrToggle.classList.toggle('is-muted', narrMuted);
+    narrMuteBtn.classList.toggle('is-muted', narrMuted);
     var label = narrMuted ? 'Unmute narration' : 'Mute narration';
-    narrToggle.setAttribute('aria-label', label);
-    narrToggle.title = label;
-    narrToggle.innerHTML = narrMuted ? ICON_NARR_OFF : ICON_NARR_ON;
+    narrMuteBtn.setAttribute('aria-pressed', String(narrMuted));
+    narrMuteBtn.setAttribute('aria-label', label);
+    narrMuteBtn.innerHTML = narrMuted ? ICON_NARR_OFF : ICON_NARR_ON;
   }
   applyNarrState();
 
-  narrToggle.addEventListener('click', function () {
+  narrToggle.addEventListener('click', function (e) {
+    e.stopPropagation();
+    var show = narrPanel.hidden;
+    closePanels(show ? narrPanel : null);
+    narrPanel.hidden = !show;
+    narrToggle.setAttribute('aria-expanded', String(show));
+  });
+
+  narrMuteBtn.addEventListener('click', function () {
     narrMuted = !narrMuted;
     localStorage.setItem(NARR_MUTE_KEY, narrMuted ? '1' : '0');
     applyNarrState();
@@ -275,6 +328,22 @@
     var v = parseInt(narrVolume.value, 10);
     narration.volume = v / 100;
     localStorage.setItem(NARR_VOL_KEY, String(v));
+    if (v > 0 && narrMuted) {
+      narrMuted = false;
+      localStorage.setItem(NARR_MUTE_KEY, '0');
+      applyNarrState();
+    }
+  });
+
+  document.addEventListener('pointerdown', function (e) {
+    if (!panel.hidden && !panel.contains(e.target) && !toggle.contains(e.target)) {
+      panel.hidden = true;
+      toggle.setAttribute('aria-expanded', 'false');
+    }
+    if (!narrPanel.hidden && !narrPanel.contains(e.target) && !narrToggle.contains(e.target)) {
+      narrPanel.hidden = true;
+      narrToggle.setAttribute('aria-expanded', 'false');
+    }
   });
 })();
 
