@@ -609,6 +609,7 @@
         <button type="button" class="main-tab-btn" data-owner-tab="users">Users</button>
         <button type="button" class="main-tab-btn" data-owner-tab="inquiries">Inquiries<span class="tab-badge" id="inquiryTabBadge" hidden>0</span></button>
         <button type="button" class="main-tab-btn" data-owner-tab="results">Client Results</button>
+        <button type="button" class="main-tab-btn" data-owner-tab="footerlinks">Footer Links</button>
       </nav>
 
       <div class="owner-page" id="ownerPageCoaches">
@@ -682,6 +683,13 @@
           <div id="resultsPhotoList"><p class="note">Loading…</p></div>
         </div>
       </div>
+
+      <!-- Footer Links: Team/Affiliate/Careers/Contact Us on
+           winfinityfitness.com each open a popup listing whatever's added
+           here for that category (icon + name, linking out). One shared
+           add-form + list per category, rendered by renderFooterLinksAdmin()
+           further down since they're all the same shape. -->
+      <div class="owner-page" id="ownerPageFooterlinks" hidden></div>
     </div>
 
     <!-- Coach detail/edit (owner side) -->
@@ -1259,12 +1267,13 @@ coachTabButtons().forEach(btn => {
    Coach view's own Clients tab, so it stays its own focused view rather
    than getting folded into this tab bar. --- */
 function showOwnerTab(name) {
-  ['coaches', 'users', 'inquiries', 'results'].forEach(t => {
+  ['coaches', 'users', 'inquiries', 'results', 'footerlinks'].forEach(t => {
     const page = document.getElementById('ownerPage' + t.charAt(0).toUpperCase() + t.slice(1));
     if (page) page.hidden = t !== name;
   });
   if (name === 'inquiries') loadInquiryList();
   if (name === 'results') loadResultsPhotoList();
+  if (name === 'footerlinks') renderFooterLinksAdmin();
   document.querySelectorAll('#ownerMainTabs .main-tab-btn').forEach(btn => {
     btn.classList.toggle('is-active', btn.dataset.ownerTab === name);
   });
@@ -1279,7 +1288,7 @@ document.querySelectorAll('#ownerMainTabs .main-tab-btn').forEach(btn => {
    Now" here just means forcing a cache-busted reload instead of quietly
    trusting whatever the browser already has cached, not installing
    anything. */
-const COACH_PORTAL_VERSION = '2.4.5';
+const COACH_PORTAL_VERSION = '2.4.6';
 document.getElementById('versionBadgeText').textContent = COACH_PORTAL_VERSION;
 
 async function fetchLatestCoachPortalVersion() {
@@ -1788,6 +1797,166 @@ async function deleteResultsPhoto(id) {
     loadResultsPhotoList();
   } catch (e) {
     alert('Could not delete photo: ' + (e.message || e));
+  }
+}
+
+/* --- Footer Links (Team/Affiliate/Careers/Contact Us on
+   winfinityfitness.com) -- one shared add-form + list per category since
+   they're all the same shape: name, link URL, an optional logo (upload or
+   pasted URL). editing[category] tracks which row's id the form is
+   currently updating (null = adding a new one). --- */
+const FOOTER_LINK_CATEGORIES = [
+  { key: 'affiliate', label: 'Affiliate' },
+  { key: 'careers', label: 'Careers' },
+  { key: 'team', label: 'Team' },
+  { key: 'contact', label: 'Contact Us' },
+];
+const footerLinkEditing = {};
+
+function renderFooterLinksAdmin() {
+  const wrap = document.getElementById('ownerPageFooterlinks');
+  wrap.innerHTML = FOOTER_LINK_CATEGORIES.map(c => `
+    <div class="card">
+      <h2>${c.label}</h2>
+      <p class="note" style="margin-top:0;">Shown in the "${c.label}" popup on winfinityfitness.com. Upload a logo, or paste an image URL hosted elsewhere -- a logo is optional.</p>
+      <div class="row2">
+        <label class="field"><span>Name</span><input type="text" id="flName-${c.key}" placeholder="e.g. Acme Supplements"></label>
+        <label class="field"><span>Link URL</span><input type="text" id="flUrl-${c.key}" placeholder="https://..."></label>
+      </div>
+      <div class="row2">
+        <label class="field"><span>Upload a logo</span><input type="file" id="flLogoFile-${c.key}" accept="image/*"></label>
+        <label class="field"><span>...or paste a logo URL</span><input type="text" id="flLogoUrl-${c.key}" placeholder="https://..."></label>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button type="button" class="btn" id="flSave-${c.key}" style="flex:1;">Add Link</button>
+        <button type="button" class="btn btn-secondary" id="flCancel-${c.key}" style="flex:none; display:none;">Cancel Edit</button>
+      </div>
+      <p class="note" id="flNote-${c.key}"></p>
+      <div id="flList-${c.key}"><p class="note">Loading…</p></div>
+    </div>
+  `).join('');
+
+  FOOTER_LINK_CATEGORIES.forEach(c => {
+    footerLinkEditing[c.key] = null;
+    document.getElementById(`flSave-${c.key}`).addEventListener('click', () => saveFooterLink(c.key));
+    document.getElementById(`flCancel-${c.key}`).addEventListener('click', () => cancelFooterLinkEdit(c.key));
+    loadFooterLinkList(c.key);
+  });
+}
+
+function cancelFooterLinkEdit(category) {
+  footerLinkEditing[category] = null;
+  document.getElementById(`flName-${category}`).value = '';
+  document.getElementById(`flUrl-${category}`).value = '';
+  document.getElementById(`flLogoFile-${category}`).value = '';
+  document.getElementById(`flLogoUrl-${category}`).value = '';
+  document.getElementById(`flSave-${category}`).textContent = 'Add Link';
+  document.getElementById(`flCancel-${category}`).style.display = 'none';
+  document.getElementById(`flNote-${category}`).textContent = '';
+}
+
+function startFooterLinkEdit(category, item) {
+  footerLinkEditing[category] = item.id;
+  document.getElementById(`flName-${category}`).value = item.name;
+  document.getElementById(`flUrl-${category}`).value = item.url;
+  document.getElementById(`flLogoFile-${category}`).value = '';
+  document.getElementById(`flLogoUrl-${category}`).value = item.logo_url || '';
+  document.getElementById(`flSave-${category}`).textContent = 'Save Changes';
+  document.getElementById(`flCancel-${category}`).style.display = '';
+  document.getElementById(`flName-${category}`).scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function saveFooterLink(category) {
+  const note = document.getElementById(`flNote-${category}`);
+  const nameInput = document.getElementById(`flName-${category}`);
+  const urlInput = document.getElementById(`flUrl-${category}`);
+  const fileInput = document.getElementById(`flLogoFile-${category}`);
+  const logoUrlInput = document.getElementById(`flLogoUrl-${category}`);
+  const name = nameInput.value.trim();
+  const url = urlInput.value.trim();
+  const file = fileInput.files[0];
+  let logoUrl = logoUrlInput.value.trim();
+  const editingId = footerLinkEditing[category];
+
+  if (!name || !url) {
+    note.textContent = 'Name and link URL are both required.'; note.className = 'note error';
+    return;
+  }
+
+  note.textContent = file ? 'Resizing…' : 'Saving…'; note.className = 'note';
+  try {
+    if (file) {
+      const resized = await resizeImageFile(file, 300, 0.85);
+      note.textContent = 'Uploading…';
+      const path = `${category}-${Date.now()}-${file.name.replace(/\.[^.]+$/, '')}.jpg`;
+      const { error: uploadError } = await sb.storage.from('footer-link-logos').upload(path, resized, { contentType: 'image/jpeg' });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = sb.storage.from('footer-link-logos').getPublicUrl(path);
+      logoUrl = urlData.publicUrl;
+    }
+
+    if (editingId) {
+      const { error } = await sb.rpc('admin_update_footer_link', {
+        p_admin_digital_id: ownerSession.digitalId, p_admin_password: ownerSession.password,
+        p_id: editingId, p_name: name, p_url: url, p_logo_url: logoUrl || null,
+      });
+      if (error) throw error;
+      note.textContent = 'Updated.'; note.className = 'note success';
+    } else {
+      const { error } = await sb.rpc('admin_add_footer_link', {
+        p_admin_digital_id: ownerSession.digitalId, p_admin_password: ownerSession.password,
+        p_category: category, p_name: name, p_url: url, p_logo_url: logoUrl || null,
+      });
+      if (error) throw error;
+      note.textContent = 'Added.'; note.className = 'note success';
+    }
+    cancelFooterLinkEdit(category);
+    loadFooterLinkList(category);
+  } catch (e) {
+    note.textContent = 'Could not save: ' + (e.message || e); note.className = 'note error';
+  }
+}
+
+async function loadFooterLinkList(category) {
+  const listEl = document.getElementById(`flList-${category}`);
+  listEl.innerHTML = '<p class="note">Loading…</p>';
+  try {
+    const { data, error } = await sb.rpc('get_footer_links', { p_category: category });
+    if (error) throw error;
+    if (!data || !data.length) { listEl.innerHTML = '<p class="note">No links yet.</p>'; return; }
+    listEl.innerHTML = '';
+    data.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'coach-row';
+      row.style.display = 'flex'; row.style.alignItems = 'center'; row.style.gap = '12px';
+      row.innerHTML = `
+        ${item.logo_url ? `<img src="${escapeHtml(item.logo_url)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:50%;flex:none;background:#fff;">` : `<div style="width:40px;height:40px;flex:none;"></div>`}
+        <div style="flex:1;min-width:0;">
+          <div class="meta" style="font-weight:600;">${escapeHtml(item.name)}</div>
+          <div class="meta" style="word-break:break-all;">${escapeHtml(item.url)}</div>
+        </div>
+        <button type="button" class="btn btn-secondary btn-edit-fl" style="width:auto;flex:none;">Edit</button>
+        <button type="button" class="btn btn-danger btn-delete-fl" style="width:auto;flex:none;">Delete</button>`;
+      row.querySelector('.btn-edit-fl').addEventListener('click', () => startFooterLinkEdit(category, item));
+      row.querySelector('.btn-delete-fl').addEventListener('click', () => deleteFooterLink(category, item.id));
+      listEl.appendChild(row);
+    });
+  } catch (e) {
+    listEl.innerHTML = '<p class="note error">Could not load links: ' + escapeHtml(e.message || String(e)) + '</p>';
+  }
+}
+
+async function deleteFooterLink(category, id) {
+  if (!confirm('Remove this link?')) return;
+  try {
+    const { error } = await sb.rpc('admin_delete_footer_link', {
+      p_admin_digital_id: ownerSession.digitalId, p_admin_password: ownerSession.password, p_id: id,
+    });
+    if (error) throw error;
+    if (footerLinkEditing[category] === id) cancelFooterLinkEdit(category);
+    loadFooterLinkList(category);
+  } catch (e) {
+    alert('Could not delete link: ' + (e.message || e));
   }
 }
 

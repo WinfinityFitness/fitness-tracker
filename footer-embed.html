@@ -6,16 +6,18 @@
      embeds.
 
      Full replica of the in-app footer (FT/Wellness):
-       - Tagline + Webpage/Facebook/Instagram/Affiliate links pull from
-         ad_settings (footer_*), same as the app -- editing "Edit Footer" in
-         the FT admin drawer updates this too, no separate admin panel.
-       - Team/Careers stay non-clickable, matching the app's own footer
-         exactly (they're static placeholders there too, not real links).
+       - Tagline + Webpage/Facebook/Instagram links pull from ad_settings
+         (footer_*), same as the app -- editing "Edit Footer" in the FT
+         admin drawer updates this too, no separate admin panel.
+       - Team, Affiliate, Careers, and Contact Us all open the same shared
+         popup (#wfLinksOverlay), listing admin-managed entries (icon +
+         name, linking out) for that category -- backed by the footer_links
+         table, managed from the Coach Portal's "Footer Links" tab. A
+         category with nothing added yet just shows an empty-state message
+         instead of a dead button.
        - Privacy Policy / Terms and Services link to privacy.html/terms.html
          (verbatim copies of the app's own legal text, hosted standalone so
          they have real shareable URLs a WordPress page can link to).
-       - Contact Us opens a small popup with the same Viber/WhatsApp/
-         Telegram/Email info the app's own Contact Us overlay shows.
        - Donate opens a popup with the same GCash QR the app uses
          (icons/gcash-donate-qr.png, fetched from the live GitHub Pages
          site). Share uses the visitor's own share sheet if available.
@@ -45,9 +47,9 @@
   <div class="wf-footer-columns">
     <div class="wf-footer-col">
       <h3>About</h3>
-      <span class="wf-footer-static">Team</span>
-      <a href="#" id="wfFooterAffiliate" class="wf-footer-static-link">Affiliate</a>
-      <span class="wf-footer-static">Careers</span>
+      <button type="button" class="wf-footer-linkbtn" id="wfFooterTeam">Team</button>
+      <button type="button" class="wf-footer-linkbtn" id="wfFooterAffiliate">Affiliate</button>
+      <button type="button" class="wf-footer-linkbtn" id="wfFooterCareers">Careers</button>
     </div>
     <div class="wf-footer-col">
       <h3>Privacy</h3>
@@ -75,14 +77,15 @@
   </div>
 </div>
 
-<div class="wf-footer-overlay" id="wfContactOverlay" hidden>
+<!-- Shared popup for Team / Affiliate / Careers / Contact Us -- content
+     is re-rendered per category by footer-embed.js's openLinksPopup(),
+     reading from the admin-managed footer_links table. -->
+<div class="wf-footer-overlay" id="wfLinksOverlay" hidden>
   <div class="wf-footer-popup">
     <button type="button" class="wf-footer-popup-close" data-wf-close>&times;</button>
-    <h3>Contact Us</h3>
-    <div class="wf-footer-contact-row"><span>Viber</span><span>0915 370 3821</span></div>
-    <div class="wf-footer-contact-row"><span>WhatsApp</span><span>0915 370 3821</span></div>
-    <div class="wf-footer-contact-row"><span>Telegram</span><span>0915 370 3821</span></div>
-    <div class="wf-footer-contact-row"><span>Email</span><span>winfinityfitness@gmail.com</span></div>
+    <h3 id="wfLinksTitle"></h3>
+    <div id="wfLinksList"></div>
+    <p class="wf-footer-empty" id="wfLinksEmpty" hidden>Nothing here yet -- check back soon.</p>
   </div>
 </div>
 
@@ -130,14 +133,13 @@
     .wf-footer-columns { grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 100%; }
   }
   .wf-footer-col h3 { color: #e8ecf1; font-size: 0.86rem; margin: 0 0 10px; }
-  .wf-footer-col a, .wf-footer-col .wf-footer-static, .wf-footer-col .wf-footer-linkbtn, .wf-footer-col .wf-footer-static-link {
+  .wf-footer-col a, .wf-footer-col .wf-footer-linkbtn {
     display: block; color: #8a97a8; text-decoration: none; font-size: 0.82rem;
-    margin-bottom: 8px; background: none; border: none; padding: 0; text-align: left; cursor: default; font-family: inherit;
+    margin-bottom: 8px; background: none; border: none; padding: 0; text-align: left; font-family: inherit;
   }
-  .wf-footer-col a[href]:not([hidden]), .wf-footer-col .wf-footer-linkbtn, .wf-footer-col .wf-footer-static-link[href]:not([href="#"]) {
-    cursor: pointer;
-  }
-  .wf-footer-col a[href]:not([href="#"]):hover, .wf-footer-col .wf-footer-linkbtn:hover { color: #ff9f43; }
+  .wf-footer-col a[hidden] { display: none; }
+  .wf-footer-col a[href], .wf-footer-col .wf-footer-linkbtn { cursor: pointer; }
+  .wf-footer-col a[href]:hover, .wf-footer-col .wf-footer-linkbtn:hover { color: #ff9f43; }
   .wf-footer-copyright { color: #5c6675; font-size: 0.74rem; margin: 0; }
   .wf-visit-count { color: #ff9f43; font-size: 0.74rem; margin-left: 8px; font-weight: 600; }
 
@@ -154,8 +156,20 @@
   .wf-footer-popup p { color: #8a97a8; font-size: 0.82rem; line-height: 1.5; margin: 0 0 14px; }
   .wf-footer-popup-close { position: absolute; top: 10px; right: 12px; background: none; border: none; color: #8a97a8; font-size: 1.1rem; cursor: pointer; }
   .wf-footer-qr { width: 100%; border-radius: 8px; }
-  .wf-footer-contact-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.82rem; color: #e8ecf1; }
-  .wf-footer-contact-row span:first-child { color: #8a97a8; }
+  .wf-footer-link-item {
+    display: flex; align-items: center; gap: 10px; padding: 9px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06); text-decoration: none;
+    color: #e8ecf1; font-size: 0.85rem;
+  }
+  .wf-footer-link-item:last-child { border-bottom: none; }
+  .wf-footer-link-item img {
+    width: 26px; height: 26px; border-radius: 50%; object-fit: cover;
+    flex-shrink: 0; background: #fff;
+  }
+  .wf-footer-link-item span { flex: 1; }
+  .wf-footer-link-item:hover { color: #ff9f43; }
+  .wf-footer-loading, .wf-footer-empty { color: #8a97a8; font-size: 0.82rem; margin: 0; }
+  #wfLinksList { max-height: 320px; overflow-y: auto; }
 </style>
 
 <!-- The actual logic lives in footer-embed.js (hosted on GitHub Pages,

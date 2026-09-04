@@ -1,6 +1,10 @@
 (function () {
   var SUPABASE_URL = 'https://mzkjboplfalauivwcnni.supabase.co';
   var SUPABASE_ANON_KEY = 'sb_publishable_YwHBnvbBjd8Oj8hgPXb_JA_buurC92v';
+  // Set once supabase-js finishes loading (see sbScript.onload below) --
+  // openLinksPopup checks for it since Team/Affiliate/Careers/Contact Us
+  // can technically be tapped before that finishes.
+  var sb = null;
   var TAGLINES = [
     "The only bad workout is the one that didn't happen.",
     "Don't stop when you're tired. Stop when you're done.",
@@ -37,8 +41,12 @@
   }
 
   function loadFooterSettings(sb) {
+    // footer_affiliate_url (ad_settings) is a separate, single-URL
+    // mechanism that only feeds the in-app (FT/Wellness) footer's
+    // Affiliate link -- this site's own Affiliate button uses the
+    // list-based footer_links popup instead (see openLinksPopup below).
     sb.from('ad_settings')
-      .select('footer_tagline, footer_webpage_url, footer_facebook_url, footer_instagram_url, footer_affiliate_url')
+      .select('footer_tagline, footer_webpage_url, footer_facebook_url, footer_instagram_url')
       .eq('id', 1).maybeSingle()
       .then(function (result) {
         var data = result.data;
@@ -51,7 +59,6 @@
           applyLink('wfFooterWebpage', data.footer_webpage_url);
           applyLink('wfFooterFacebook', data.footer_facebook_url);
           applyLink('wfFooterInstagram', data.footer_instagram_url);
-          applyLink('wfFooterAffiliate', data.footer_affiliate_url);
         }
       })
       .catch(function () { startRotation(); });
@@ -82,7 +89,7 @@
       return;
     }
     try {
-      var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       loadFooterSettings(sb);
       initVisitCounter(sb);
     } catch (e) {
@@ -133,15 +140,59 @@
     });
   }
 
-  // Donate / Contact popups
+  // Donate popup
   function openOverlay(id) { document.getElementById(id).hidden = false; }
   function closeOverlay(el) { el.hidden = true; }
   document.getElementById('wfFooterDonate').addEventListener('click', function () { openOverlay('wfDonateOverlay'); });
-  document.getElementById('wfFooterContact').addEventListener('click', function () { openOverlay('wfContactOverlay'); });
   document.querySelectorAll('.wf-footer-overlay').forEach(function (overlay) {
     overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOverlay(overlay); });
     overlay.querySelector('[data-wf-close]').addEventListener('click', function () { closeOverlay(overlay); });
   });
+
+  // Team / Affiliate / Careers / Contact Us -- all four share one popup,
+  // listing admin-managed entries (icon + name, linking out) for whichever
+  // category was tapped. Entries are managed from the Coach Portal's
+  // "Footer Links" tab (see coach-portal.html + supabase_footer_links_
+  // migration.sql). An empty category shows a plain empty-state message
+  // instead of a dead button.
+  function renderLinksList(rows) {
+    var listEl = document.getElementById('wfLinksList');
+    var emptyEl = document.getElementById('wfLinksEmpty');
+    listEl.innerHTML = '';
+    if (!rows || !rows.length) { emptyEl.hidden = false; return; }
+    emptyEl.hidden = true;
+    rows.forEach(function (row) {
+      var a = document.createElement('a');
+      a.className = 'wf-footer-link-item';
+      a.href = row.url;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      var img = '';
+      if (row.logo_url) img = '<img src="' + row.logo_url + '" alt="">';
+      a.innerHTML = img + '<span></span>';
+      a.querySelector('span').textContent = row.name;
+      listEl.appendChild(a);
+    });
+  }
+  function openLinksPopup(category, title) {
+    var overlay = document.getElementById('wfLinksOverlay');
+    document.getElementById('wfLinksTitle').textContent = title;
+    document.getElementById('wfLinksEmpty').hidden = true;
+    document.getElementById('wfLinksList').innerHTML = '<p class="wf-footer-loading">Loading…</p>';
+    overlay.hidden = false;
+    if (!sb) {
+      document.getElementById('wfLinksList').innerHTML = '';
+      document.getElementById('wfLinksEmpty').hidden = false;
+      return;
+    }
+    sb.rpc('get_footer_links', { p_category: category })
+      .then(function (result) { renderLinksList(result.data); })
+      .catch(function () { renderLinksList([]); });
+  }
+  document.getElementById('wfFooterTeam').addEventListener('click', function () { openLinksPopup('team', 'Team'); });
+  document.getElementById('wfFooterAffiliate').addEventListener('click', function () { openLinksPopup('affiliate', 'Affiliate'); });
+  document.getElementById('wfFooterCareers').addEventListener('click', function () { openLinksPopup('careers', 'Careers'); });
+  document.getElementById('wfFooterContact').addEventListener('click', function () { openLinksPopup('contact', 'Contact Us'); });
 
   // Share -- native share sheet if available, otherwise copy the link
   document.getElementById('wfFooterShare').addEventListener('click', function () {
