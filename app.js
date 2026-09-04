@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.87';
+const APP_VERSION = 'WF_SYS_V.1.7.88';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -17901,7 +17901,13 @@ function layoutAdminDrawerArc() {
     else if (s.abs <= 100) opacity = 1 - (s.abs - 80) / 20;
     else opacity = 0;
     s.el.style.opacity = opacity;
-    s.el.style.pointerEvents = isFocused ? 'auto' : 'none';
+    // Every visible (non-zero-opacity) icon is tappable, not just the
+    // focused/centered one — a plain tap on any icon should act on it
+    // immediately (fixes "tapping Admin Log In does nothing" whenever it
+    // isn't the currently-centered icon). arcJustDragged still suppresses
+    // the click fired at the end of an actual rotate-drag, so spinning past
+    // icons doesn't also select them.
+    s.el.style.pointerEvents = s.abs <= 100 ? 'auto' : 'none';
     s.el.classList.toggle('is-focused', isFocused);
     if (isFocused && label) {
       label.textContent = s.el.title || s.el.getAttribute('aria-label') || '';
