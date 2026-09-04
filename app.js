@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.88';
+const APP_VERSION = 'WF_SYS_V.1.7.89';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -21056,6 +21056,7 @@ function initAnnouncementWidget() {
     document.getElementById('adminDownloadUrlFt').value = (settings && settings.download_url_ft) || '';
     document.getElementById('adminDownloadUrlWellness').value = (settings && settings.download_url_wellness) || '';
     document.getElementById('adminDownloadUrlMessenger').value = (settings && settings.download_url_messenger) || '';
+    document.getElementById('adminDownloadUrlCoach').value = (settings && settings.download_url_coach) || '';
     document.getElementById('adminDownloadLinksOverlay').hidden = false;
   });
 
@@ -21231,6 +21232,7 @@ function initAnnouncementWidget() {
         p_ft_url: document.getElementById('adminDownloadUrlFt').value,
         p_wellness_url: document.getElementById('adminDownloadUrlWellness').value,
         p_messenger_url: document.getElementById('adminDownloadUrlMessenger').value,
+        p_coach_url: document.getElementById('adminDownloadUrlCoach').value,
       });
       if (error) throw error;
       cachedAdSettingsPromise = null;

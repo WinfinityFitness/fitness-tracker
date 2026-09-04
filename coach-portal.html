@@ -826,11 +826,11 @@
       </div>
       <p class="note" id="coachLoginNote"></p>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;flex-wrap:wrap;">
-        <a class="btn btn-secondary" href="https://github.com/WinfinityFitness/fitness-tracker/releases/download/coach-latest-debug/winfinity-coach.apk" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+        <a class="btn btn-secondary" id="linkDownloadCoachApp" href="https://github.com/WinfinityFitness/fitness-tracker/releases/download/coach-latest-debug/winfinity-coach.apk" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
           Coach App
         </a>
-        <a class="btn btn-secondary" href="https://github.com/WinfinityFitness/fitness-tracker/releases/download/ft-latest-debug/winfinity-tracker.apk" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+        <a class="btn btn-secondary" id="linkDownloadFtApp" href="https://github.com/WinfinityFitness/fitness-tracker/releases/download/ft-latest-debug/winfinity-tracker.apk" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
           Fitness App
         </a>
@@ -1195,6 +1195,23 @@ function initCoachTheme() {
   });
 }
 initCoachTheme();
+
+// The Coach App / Fitness App download buttons above default to a hardcoded
+// GitHub Releases URL (kept as a safe fallback in the markup) but prefer
+// whatever the admin has set via FT's admin drawer -> Edit Download Links
+// (same ad_settings row arsenal.html reads from) so a new release doesn't
+// need an HTML edit here every time - just update the link once in FT.
+async function loadCoachDownloadLinks() {
+  try {
+    const { data, error } = await sb.from('ad_settings')
+      .select('download_url_coach, download_url_ft')
+      .eq('id', 1).maybeSingle();
+    if (error) throw error;
+    if (data && data.download_url_coach) document.getElementById('linkDownloadCoachApp').href = data.download_url_coach;
+    if (data && data.download_url_ft) document.getElementById('linkDownloadFtApp').href = data.download_url_ft;
+  } catch (e) { /* keep the hardcoded fallback hrefs already in the markup */ }
+}
+loadCoachDownloadLinks();
 
 // Delegated once on document rather than wired per-field -- covers
 // .password-toggle-btn wherever it appears without needing a matching
