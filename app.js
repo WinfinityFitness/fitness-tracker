@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.89';
+const APP_VERSION = 'WF_SYS_V.1.7.90';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -21898,20 +21898,11 @@ function updateHeaderModeIcon() {
   icon.title = MODE_LABEL[mode] || '';
   icon.hidden = false;
 }
-// Almost everything unlocks at every rank now — only the Food Preps
-// browser stays gated (moved from Warrior to Spartan). Ranks still exist
-// and still matter (Adventure Map bosses/maps are keyed to them), they
-// just don't restrict much of the app anymore.
-const MODE_UNLOCK_FEATURES = {
-  spartan: ['Food Preps browser'],
-};
-// Entry points gated behind a mode — gating just the entry point (rather
-// than every downstream field) is enough, since nothing past it is
-// reachable through normal UI flow when it's blocked. Leaderboard/Nexus
-// sync is deliberately NOT in this list — it's available at every tier.
-const MODE_GATED_ELEMENTS = [
-  { id: 'btnMediaSyncBrowse', required: 'spartan' },
-];
+// Nothing is feature-gated by rank anymore. Ranks still exist and still
+// matter (Adventure Map bosses/maps are keyed to them), they just don't
+// restrict access to any app feature.
+const MODE_UNLOCK_FEATURES = {};
+const MODE_GATED_ELEMENTS = [];
 
 function getFitnessMode() {
   const p = getProfile();
