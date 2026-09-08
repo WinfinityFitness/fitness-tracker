@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.90';
+const APP_VERSION = 'WF_SYS_V.1.7.91';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -18206,11 +18206,19 @@ function initAdminDrawer() {
   let arcDragStartY = 0;
   let arcDragStartRotation = 0;
   let arcJustDragged = false;
+  // setPointerCapture below retargets the click event that follows (to the
+  // capturing pill element itself, same Chromium quirk noted on
+  // profileCoverEl's pointerdown above) — every tap on an icon was silently
+  // no-opping because e.target.closest('.admin-drawer-pill-item') in the
+  // click handler no longer found anything. Recording the real target here,
+  // before capture takes effect, lets the click handler use it instead.
+  let arcPointerDownBtn = null;
   pill.addEventListener('pointerdown', e => {
     arcDragging = true;
     arcDragStartY = e.clientY;
     arcDragStartRotation = adminDrawerArcRotation;
     arcJustDragged = false;
+    arcPointerDownBtn = e.target.closest('.admin-drawer-pill-item');
     pill.setPointerCapture(e.pointerId);
   });
   pill.addEventListener('pointermove', e => {
@@ -18226,7 +18234,7 @@ function initAdminDrawer() {
 
   pill.addEventListener('click', e => {
     if (arcJustDragged) { arcJustDragged = false; return; }
-    const btn = e.target.closest('.admin-drawer-pill-item');
+    const btn = arcPointerDownBtn;
     if (!btn) return;
     // Opens the nested sub-dial centered exactly on this icon's current
     // on-screen position — deliberately does NOT close this pill (see
