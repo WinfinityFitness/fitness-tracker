@@ -6,15 +6,22 @@
      embeds.
 
      Full replica of the in-app footer (FT/Wellness):
-       - Tagline + Webpage/Facebook/Instagram links pull from ad_settings
-         (footer_*), same as the app -- editing "Edit Footer" in the FT
-         admin drawer updates this too, no separate admin panel.
-       - Team, Affiliate, Careers, and Contact Us all open the same shared
-         popup (#wfLinksOverlay), listing admin-managed entries (icon +
-         name, linking out) for that category -- backed by the footer_links
-         table, managed from the Coach Portal's "Footer Links" tab. A
-         category with nothing added yet just shows an empty-state message
-         instead of a dead button.
+       - Tagline still pulls from ad_settings (footer_tagline), same as
+         the app -- editing "Edit Footer" in the FT admin drawer updates
+         this too, no separate admin panel.
+       - Website, Facebook, Instagram, Team, Affiliate, Careers, and
+         Contact Us all open the same shared popup (#wfLinksOverlay),
+         listing admin-managed entries (icon + name, linking out) for that
+         category -- backed by the footer_links table, managed from either
+         the Coach Portal's "Footer Links" tab or FT's own admin drawer (as
+         of 2026-09-09, both write to the same table). A category with
+         nothing added yet just shows an empty-state message instead of a
+         dead button. Website/Facebook/Instagram used to be single fixed
+         ad_settings.footer_webpage_url/footer_facebook_url/footer_
+         instagram_url links -- retired in favor of this same list-based
+         popup so an admin can list more than one URL per category and so
+         this matches the in-app footer exactly instead of drifting out of
+         sync with it (which is what prompted this change).
        - Privacy Policy / Terms and Services link to privacy.html/terms.html
          (verbatim copies of the app's own legal text, hosted standalone so
          they have real shareable URLs a WordPress page can link to).
@@ -59,9 +66,9 @@
     </div>
     <div class="wf-footer-col">
       <h3>Social</h3>
-      <a href="#" id="wfFooterWebpage" hidden>Webpage</a>
-      <a href="#" id="wfFooterFacebook" hidden>Facebook</a>
-      <a href="#" id="wfFooterInstagram" hidden>Instagram</a>
+      <button type="button" class="wf-footer-linkbtn" id="wfFooterWebsite">Website</button>
+      <button type="button" class="wf-footer-linkbtn" id="wfFooterFacebook">Facebook</button>
+      <button type="button" class="wf-footer-linkbtn" id="wfFooterInstagram">Instagram</button>
     </div>
   </div>
 

@@ -31,22 +31,13 @@
     }, 15000);
   }
 
-  function applyLink(id, url) {
-    var el = document.getElementById(id);
-    if (!url) return;
-    el.href = url;
-    el.hidden = false;
-    el.target = '_blank';
-    el.rel = 'noopener';
-  }
-
   function loadFooterSettings(sb) {
-    // footer_affiliate_url (ad_settings) is a separate, single-URL
-    // mechanism that only feeds the in-app (FT/Wellness) footer's
-    // Affiliate link -- this site's own Affiliate button uses the
-    // list-based footer_links popup instead (see openLinksPopup below).
+    // Only the tagline still comes from ad_settings -- Website/Facebook/
+    // Instagram used to be single-URL ad_settings fields fetched here too,
+    // retired in favor of the same list-based footer_links popup Team/
+    // Affiliate/Careers/Contact Us use (see openLinksPopup below).
     sb.from('ad_settings')
-      .select('footer_tagline, footer_webpage_url, footer_facebook_url, footer_instagram_url')
+      .select('footer_tagline')
       .eq('id', 1).maybeSingle()
       .then(function (result) {
         var data = result.data;
@@ -54,11 +45,6 @@
           document.getElementById('wfFooterTagline').textContent = '"' + data.footer_tagline + '"';
         } else {
           startRotation();
-        }
-        if (data) {
-          applyLink('wfFooterWebpage', data.footer_webpage_url);
-          applyLink('wfFooterFacebook', data.footer_facebook_url);
-          applyLink('wfFooterInstagram', data.footer_instagram_url);
         }
       })
       .catch(function () { startRotation(); });
@@ -193,6 +179,9 @@
   document.getElementById('wfFooterAffiliate').addEventListener('click', function () { openLinksPopup('affiliate', 'Affiliate'); });
   document.getElementById('wfFooterCareers').addEventListener('click', function () { openLinksPopup('careers', 'Careers'); });
   document.getElementById('wfFooterContact').addEventListener('click', function () { openLinksPopup('contact', 'Contact Us'); });
+  document.getElementById('wfFooterWebsite').addEventListener('click', function () { openLinksPopup('website', 'Website'); });
+  document.getElementById('wfFooterFacebook').addEventListener('click', function () { openLinksPopup('facebook', 'Facebook'); });
+  document.getElementById('wfFooterInstagram').addEventListener('click', function () { openLinksPopup('instagram', 'Instagram'); });
 
   // Share -- native share sheet if available, otherwise copy the link
   document.getElementById('wfFooterShare').addEventListener('click', function () {

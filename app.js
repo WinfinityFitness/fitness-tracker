@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.93';
+const APP_VERSION = 'WF_SYS_V.1.7.94';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -7496,13 +7496,6 @@ function initPersonalGeminiKeySettings() {
   });
 }
 
-function initContact() {
-  const overlay = document.getElementById('contactOverlay');
-  document.getElementById('btnFooterContact').addEventListener('click', () => { overlay.hidden = false; });
-  document.getElementById('btnCloseContact').addEventListener('click', () => { overlay.hidden = true; });
-  bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
-}
-
 // Admin-managed footer link popups -- Social (replacing the old fixed
 // Webpage/Facebook/Instagram/Affiliate single-URL fields) plus Affiliate/
 // Team/Careers (replacing a single hardcoded Affiliate URL and two
@@ -7520,18 +7513,23 @@ async function fetchFooterLinks(category) {
     return Array.isArray(data) ? data : [];
   } catch (e) { return []; }
 }
-function renderCategoryLinksList(links, category) {
+// mailto:/tel:/viber: deep links (Contact Us's Email/phone entries) don't
+// have a meaningful hostname the way a real http(s) link does -- hostname
+// extraction alone showed "chat" for a viber:// link and blank for
+// mailto:, so those three schemes get their actual address/number
+// pulled out instead.
+function linkDisplayValue(url) {
+  try {
+    const u = new URL(url);
+    if (u.protocol === 'mailto:' || u.protocol === 'tel:') return decodeURIComponent(u.pathname);
+    if (u.protocol === 'viber:') return decodeURIComponent(u.searchParams.get('number') || url);
+    return u.hostname.replace(/^www\./, '');
+  } catch (e) { return url; }
+}
+function renderCategoryLinksList(links) {
   const list = document.getElementById('categoryLinksList');
-  // The Facebook/Instagram hide toggle (footerSocialLinksVisible) only
-  // ever applied to the old Social links -- keep it scoped to that
-  // category so it doesn't accidentally filter same-named entries an
-  // admin might add under Affiliate/Team/Careers.
-  const shown = category === 'social'
-    ? links.filter(l => footerSocialLinksVisible || !/facebook|instagram/i.test(l.name || ''))
-    : links;
-  list.innerHTML = shown.map(l => {
-    let display = l.url;
-    try { display = new URL(l.url).hostname.replace(/^www\./, ''); } catch (e) {}
+  list.innerHTML = links.map(l => {
+    const display = linkDisplayValue(l.url);
     return `<a class="contact-row" href="${escapeHtml(l.url)}" target="_blank" rel="noopener noreferrer"><span class="contact-label">${escapeHtml(l.name)}</span><span class="contact-value">${escapeHtml(display)}</span></a>`;
   }).join('') || '<p class="hint hint--sm">No links added yet.</p>';
 }
@@ -7541,17 +7539,23 @@ function initCategoryLinkPopups() {
     document.getElementById('categoryLinksTitle').textContent = title;
     overlay.hidden = false;
     document.getElementById('categoryLinksList').innerHTML = '<p class="hint hint--sm">Loading…</p>';
-    renderCategoryLinksList(await fetchFooterLinks(category), category);
+    renderCategoryLinksList(await fetchFooterLinks(category));
   };
   [
-    ['btnFooterSocial', 'social', 'Social'],
-    ['btnWdsFooterSocial', 'social', 'Social'],
+    ['btnFooterWebsite', 'website', 'Website'],
+    ['btnWdsFooterWebsite', 'website', 'Website'],
+    ['btnFooterFacebook', 'facebook', 'Facebook'],
+    ['btnWdsFooterFacebook', 'facebook', 'Facebook'],
+    ['btnFooterInstagram', 'instagram', 'Instagram'],
+    ['btnWdsFooterInstagram', 'instagram', 'Instagram'],
     ['btnFooterAffiliate', 'affiliate', 'Affiliate'],
     ['btnWdsFooterAffiliate', 'affiliate', 'Affiliate'],
     ['btnFooterTeam', 'team', 'Team'],
     ['btnWdsFooterTeam', 'team', 'Team'],
     ['btnFooterCareers', 'careers', 'Careers'],
     ['btnWdsFooterCareers', 'careers', 'Careers'],
+    ['btnFooterContact', 'contact', 'Contact Us'],
+    ['btnWdsFooterContact', 'contact', 'Contact Us'],
   ].forEach(([btnId, category, title]) => {
     const btn = document.getElementById(btnId);
     if (btn) btn.addEventListener('click', openHandler(category, title));
@@ -7854,29 +7858,28 @@ function initWdsFooter() {
   if (privacyBtn) privacyBtn.addEventListener('click', () => { document.getElementById('privacyOverlay').hidden = false; });
   const termsBtn = document.getElementById('btnWdsFooterTerms');
   if (termsBtn) termsBtn.addEventListener('click', () => { document.getElementById('termsOverlay').hidden = false; });
-  const contactBtn = document.getElementById('btnWdsFooterContact');
-  if (contactBtn) contactBtn.addEventListener('click', () => { document.getElementById('contactOverlay').hidden = false; });
+  // btnWdsFooterContact is wired in initCategoryLinkPopups now, alongside
+  // its FT counterpart -- both share the same dynamic Contact Us popup.
 
   initFooterTaglineDisplay();
 }
 
-// Facebook/Instagram footer links are visible by default for everyone, same
-// as before — an admin can selectively HIDE (or re-show) them for one
-// specific Digital ID via an Assign Targets push, a discreet per-user
+// Facebook/Instagram footer buttons are visible by default for everyone,
+// same as before — an admin can selectively HIDE (or re-show) them for
+// one specific Digital ID via an Assign Targets push, a discreet per-user
 // override riding along on the same coach-assignment refresh channel,
 // applied the moment that user pulls it (see
 // refreshCoachAssignmentFromServer), whether or not they save the visible
-// targets afterward.
-// Was: hides the fixed Facebook/Instagram footer <a> elements directly.
-// Since those are now entries inside the dynamic Social Links popup (see
-// supabase_footer_social_links_migration.sql) rather than fixed DOM nodes,
-// this just records the flag; renderCategoryLinksList filters by name
-// (case-insensitive "facebook"/"instagram") against it at popup-open time
-// instead. fbId/igId params are unused now but kept so the existing call
-// sites below don't need touching.
-let footerSocialLinksVisible = true;
-function applyFooterSocialLinksVisibility(visible, fbId, igId) {
-  footerSocialLinksVisible = visible && !isCleanShareVariant();
+// targets afterward. Hides both the FT and wellness copies of each
+// button directly since they're real distinct elements again now that
+// Facebook/Instagram are their own footer_links categories rather than
+// name-matched entries inside a shared Social list.
+function applyFooterSocialLinksVisibility(visible) {
+  const show = visible && !isCleanShareVariant();
+  ['btnFooterFacebook', 'btnFooterInstagram', 'btnWdsFooterFacebook', 'btnWdsFooterInstagram'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.hidden = !show;
+  });
 }
 
 function initFooterSocialLinks() {
@@ -15868,7 +15871,6 @@ async function refreshCoachAssignmentFromServer() {
       if (data.show_social_links !== null && data.show_social_links !== undefined) {
         profile.footerSocialLinksVisible = data.show_social_links;
         applyFooterSocialLinksVisibility(profile.footerSocialLinksVisible);
-        applyFooterSocialLinksVisibility(profile.footerSocialLinksVisible, 'wdsFooterFacebookLink', 'wdsFooterInstagramLink');
       }
       targetsNote = 'Refreshed — assignment updated ' + fmtDate(parseISO(data.updated_at.slice(0, 10))) + '.';
     }
@@ -21094,9 +21096,6 @@ function initAnnouncementWidget() {
     noteEl.textContent = '';
     const settings = await fetchAdSettings();
     document.getElementById('adminFooterTagline').value = (settings && settings.footer_tagline) || '';
-    const links = await fetchFooterLinks('social');
-    pendingFooterSocialLinks = links.map(l => ({ name: l.name, url: l.url }));
-    renderFooterSocialEditorList();
     document.getElementById('adminFooterOverlay').hidden = false;
   });
   document.getElementById('btnDrawerOpenDownloadLinks').addEventListener('click', async () => {
@@ -21143,14 +21142,9 @@ function initAnnouncementWidget() {
     });
   }
 
-  let pendingFooterSocialLinks = [];
-  function renderFooterSocialEditorList() {
-    renderLinkEditorRows(document.getElementById('adminFooterSocialList'), pendingFooterSocialLinks, renderFooterSocialEditorList);
-  }
-
-  // Affiliate/Team/Careers each reuse this one sheet, distinguished only
-  // by currentCategoryLinksCategory -- see btnDrawerOpenAffiliateLinks/
-  // TeamLinks/CareersLinks below.
+  // Website/Facebook/Instagram/Affiliate/Team/Careers each reuse this one
+  // sheet, distinguished only by currentCategoryLinksCategory -- see the
+  // btnDrawerOpen*Links handlers below.
   let pendingCategoryLinks = [];
   let currentCategoryLinksCategory = '';
   function renderCategoryLinksEditorList() {
@@ -21165,9 +21159,13 @@ function initAnnouncementWidget() {
     renderCategoryLinksEditorList();
     document.getElementById('adminCategoryLinksOverlay').hidden = false;
   }
+  document.getElementById('btnDrawerOpenWebsiteLinks').addEventListener('click', () => openCategoryLinksEditor('website', 'Edit Website Links'));
+  document.getElementById('btnDrawerOpenFacebookLinks').addEventListener('click', () => openCategoryLinksEditor('facebook', 'Edit Facebook Links'));
+  document.getElementById('btnDrawerOpenInstagramLinks').addEventListener('click', () => openCategoryLinksEditor('instagram', 'Edit Instagram Links'));
   document.getElementById('btnDrawerOpenAffiliateLinks').addEventListener('click', () => openCategoryLinksEditor('affiliate', 'Edit Affiliate Links'));
   document.getElementById('btnDrawerOpenTeamLinks').addEventListener('click', () => openCategoryLinksEditor('team', 'Edit Team'));
   document.getElementById('btnDrawerOpenCareersLinks').addEventListener('click', () => openCategoryLinksEditor('careers', 'Edit Careers'));
+  document.getElementById('btnDrawerOpenContactLinks').addEventListener('click', () => openCategoryLinksEditor('contact', 'Edit Contact Links'));
 
   document.getElementById('btnAdminCategoryLinksAdd').addEventListener('click', () => {
     pendingCategoryLinks.push({ name: '', url: '' });
@@ -21331,21 +21329,11 @@ function initAnnouncementWidget() {
   document.getElementById('btnCloseAdminFooter').addEventListener('click', () => { footerOverlay.hidden = true; });
   footerOverlay.addEventListener('click', e => { if (e.target === footerOverlay) footerOverlay.hidden = true; });
 
-  document.getElementById('btnAdminFooterSocialAdd').addEventListener('click', () => {
-    pendingFooterSocialLinks.push({ name: '', url: '' });
-    renderFooterSocialEditorList();
-    const rows = document.querySelectorAll('#adminFooterSocialList .social-link-name-input');
-    if (rows.length) rows[rows.length - 1].focus();
-  });
-
   document.getElementById('btnAdminFooterSubmit').addEventListener('click', async () => {
     const noteEl = document.getElementById('adminFooterNote');
     if (!isAdminLoggedIn()) { noteEl.textContent = 'Not logged in.'; return; }
     noteEl.textContent = 'Saving…';
     try {
-      const links = pendingFooterSocialLinks
-        .map(l => ({ name: l.name.trim(), url: l.url.trim() }))
-        .filter(l => l.name && l.url);
       const { error } = await sb.rpc('admin_set_footer_settings', {
         p_digital_id: adminSession.digitalId,
         p_password: adminSession.password,
@@ -21356,13 +21344,6 @@ function initAnnouncementWidget() {
         p_affiliate_url: '',
       });
       if (error) throw error;
-      const { error: linksError } = await sb.rpc('admin_set_footer_links', {
-        p_admin_digital_id: adminSession.digitalId,
-        p_admin_password: adminSession.password,
-        p_category: 'social',
-        p_links: links,
-      });
-      if (linksError) throw linksError;
       cachedAdSettingsPromise = null;
       footerOverlay.hidden = true;
       showRestToast('Footer updated. Reload FT/wellness/Messenger to see it live.');
@@ -24240,7 +24221,6 @@ safeInit(initPrepMealManager, 'initPrepMealManager');
 safeInit(initPrepMealEditor, 'initPrepMealEditor');
 safeInit(() => initClickToRevealHint('adjustedBmiTile', 'adjustedBmiHint'), 'initAdjustedBmiHint');
 safeInit(() => initClickToRevealHint('stepsCaloriesTitle', 'stepsCaloriesHint'), 'initStepsCaloriesHint');
-safeInit(initContact, 'initContact');
 safeInit(initCategoryLinkPopups, 'initCategoryLinkPopups');
 safeInit(initFooterShare, 'initFooterShare');
 safeInit(initFooterTagline, 'initFooterTagline');

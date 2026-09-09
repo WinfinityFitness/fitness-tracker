@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.93">
+<link rel="stylesheet" href="style.css?v=1.7.94">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -204,9 +204,13 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         <button type="button" class="announcement-menu-item" id="btnAdminAssignTargets" hidden>Assign Targets</button>
         <button type="button" class="announcement-menu-item" id="btnDrawerOpenMediaSync">Media Sync Calibration</button>
         <button type="button" class="announcement-menu-item" id="btnDrawerOpenFooterSettings">Edit Footer</button>
+        <button type="button" class="announcement-menu-item" id="btnDrawerOpenWebsiteLinks">Edit Website Links</button>
+        <button type="button" class="announcement-menu-item" id="btnDrawerOpenFacebookLinks">Edit Facebook Links</button>
+        <button type="button" class="announcement-menu-item" id="btnDrawerOpenInstagramLinks">Edit Instagram Links</button>
         <button type="button" class="announcement-menu-item" id="btnDrawerOpenAffiliateLinks">Edit Affiliate Links</button>
         <button type="button" class="announcement-menu-item" id="btnDrawerOpenTeamLinks">Edit Team</button>
         <button type="button" class="announcement-menu-item" id="btnDrawerOpenCareersLinks">Edit Careers</button>
+        <button type="button" class="announcement-menu-item" id="btnDrawerOpenContactLinks">Edit Contact Links</button>
         <button type="button" class="announcement-menu-item" id="btnDrawerOpenDownloadLinks">Edit Download Links</button>
       </div>
       <p class="field-group-heading" style="font-size:0.8rem;margin-top:14px;">Quick Log buttons in everyone's dial</p>
@@ -1529,7 +1533,9 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         </div>
         <div class="footer-col">
           <h4>Social</h4>
-          <button type="button" class="footer-link-btn" id="btnFooterSocial">Social Links</button>
+          <button type="button" class="footer-link-btn" id="btnFooterWebsite">Website</button>
+          <button type="button" class="footer-link-btn" id="btnFooterFacebook">Facebook</button>
+          <button type="button" class="footer-link-btn" id="btnFooterInstagram">Instagram</button>
         </div>
       </div>
       <p class="footer-copyright" id="footerCopyright">&copy; 2026 Winfinity Fitness. All rights reserved.</p>
@@ -2312,26 +2318,13 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
-<!-- ============ CONTACT US ============ -->
-<div class="sheet-overlay" id="contactOverlay" hidden>
-  <div class="sheet">
-    <div class="sheet-handle"></div>
-    <div class="sheet-head">
-      <h2>Contact Us</h2>
-      <button class="sheet-close" id="btnCloseContact">✕</button>
-    </div>
-    <div class="contact-list">
-      <div class="contact-row"><span class="contact-label">Viber</span><span class="contact-value">0915 370 3821</span></div>
-      <div class="contact-row"><span class="contact-label">WhatsApp</span><span class="contact-value">0915 370 3821</span></div>
-      <div class="contact-row"><span class="contact-label">Telegram</span><span class="contact-value">0915 370 3821</span></div>
-      <div class="contact-row"><span class="contact-label">Email</span><span class="contact-value">winfinityfitness@gmail.com</span></div>
-    </div>
-  </div>
-</div>
-
-<!-- Shared public popup for Social/Affiliate/Team/Careers -- title and
-     list are populated per-category by whichever footer button opened it
-     (see openCategoryLinksPopup in app.js). -->
+<!-- Shared public popup for Website/Facebook/Instagram/Affiliate/Team/
+     Careers/Contact Us -- title and list are populated per-category by
+     whichever footer button opened it (see initCategoryLinkPopups in
+     app.js). Contact Us used to be its own static hardcoded sheet here;
+     it's now just another footer_links category, matching the public
+     website's footer-embed.html (which already read Contact Us from this
+     same table) so the two stop showing different info. -->
 <div class="sheet-overlay" id="categoryLinksOverlay" hidden>
   <div class="sheet">
     <div class="sheet-handle"></div>
@@ -3024,16 +3017,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <h2>Edit Footer</h2>
       <button class="sheet-close" id="btnCloseAdminFooter">✕</button>
     </div>
-    <p class="hint hint--sm">Blank a field and Save to reset it back to this app's default. Synced across FT, wellness, and Messenger.</p>
+    <p class="hint hint--sm">Blank and Save to reset back to the default rotating taglines. Synced across FT, wellness, and Messenger.</p>
     <label class="field">
       <span>Tagline</span>
       <input type="text" id="adminFooterTagline" placeholder="Leave blank for the default rotating taglines" autocomplete="off">
     </label>
-    <div class="field">
-      <span>Social Links</span>
-      <div id="adminFooterSocialList" class="social-link-editor-list"></div>
-      <button type="button" class="link-btn" id="btnAdminFooterSocialAdd">+ Add Link</button>
-    </div>
     <button type="button" class="btn btn--primary" id="btnAdminFooterSubmit" style="width:100%;margin-top:10px;">Save</button>
     <p class="save-note" id="adminFooterNote"></p>
   </div>
@@ -4374,7 +4362,9 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
             </div>
             <div class="footer-col">
               <h4>Social</h4>
-              <button type="button" class="footer-link-btn" id="btnWdsFooterSocial">Social Links</button>
+              <button type="button" class="footer-link-btn" id="btnWdsFooterWebsite">Website</button>
+              <button type="button" class="footer-link-btn" id="btnWdsFooterFacebook">Facebook</button>
+              <button type="button" class="footer-link-btn" id="btnWdsFooterInstagram">Instagram</button>
             </div>
           </div>
           <p class="footer-copyright" id="wdsFooterCopyright">&copy; 2026 Winfinity Fitness. All rights reserved.</p>
@@ -4961,11 +4951,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.7.93"></script>
+<script src="config.js?v=1.7.94"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.93"></script>
+<script src="app.js?v=1.7.94"></script>
 </body>
 </html>
