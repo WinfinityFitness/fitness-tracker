@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.92">
+<link rel="stylesheet" href="style.css?v=1.7.93">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -204,6 +204,9 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         <button type="button" class="announcement-menu-item" id="btnAdminAssignTargets" hidden>Assign Targets</button>
         <button type="button" class="announcement-menu-item" id="btnDrawerOpenMediaSync">Media Sync Calibration</button>
         <button type="button" class="announcement-menu-item" id="btnDrawerOpenFooterSettings">Edit Footer</button>
+        <button type="button" class="announcement-menu-item" id="btnDrawerOpenAffiliateLinks">Edit Affiliate Links</button>
+        <button type="button" class="announcement-menu-item" id="btnDrawerOpenTeamLinks">Edit Team</button>
+        <button type="button" class="announcement-menu-item" id="btnDrawerOpenCareersLinks">Edit Careers</button>
         <button type="button" class="announcement-menu-item" id="btnDrawerOpenDownloadLinks">Edit Download Links</button>
       </div>
       <p class="field-group-heading" style="font-size:0.8rem;margin-top:14px;">Quick Log buttons in everyone's dial</p>
@@ -1514,8 +1517,9 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <div class="footer-links">
         <div class="footer-col">
           <h4>About</h4>
-          <span class="footer-link-static">Team</span>
-          <span class="footer-link-static">Careers</span>
+          <button type="button" class="footer-link-btn" id="btnFooterTeam">Team</button>
+          <button type="button" class="footer-link-btn" id="btnFooterCareers">Careers</button>
+          <button type="button" class="footer-link-btn" id="btnFooterAffiliate">Affiliate</button>
         </div>
         <div class="footer-col">
           <h4>Privacy</h4>
@@ -2325,14 +2329,17 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
-<div class="sheet-overlay" id="socialLinksOverlay" hidden>
+<!-- Shared public popup for Social/Affiliate/Team/Careers -- title and
+     list are populated per-category by whichever footer button opened it
+     (see openCategoryLinksPopup in app.js). -->
+<div class="sheet-overlay" id="categoryLinksOverlay" hidden>
   <div class="sheet">
     <div class="sheet-handle"></div>
     <div class="sheet-head">
-      <h2>Social</h2>
-      <button class="sheet-close" id="btnCloseSocialLinks">✕</button>
+      <h2 id="categoryLinksTitle">Links</h2>
+      <button class="sheet-close" id="btnCloseCategoryLinks">✕</button>
     </div>
-    <div class="contact-list" id="socialLinksList"></div>
+    <div class="contact-list" id="categoryLinksList"></div>
   </div>
 </div>
 
@@ -3029,6 +3036,27 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
     </div>
     <button type="button" class="btn btn--primary" id="btnAdminFooterSubmit" style="width:100%;margin-top:10px;">Save</button>
     <p class="save-note" id="adminFooterNote"></p>
+  </div>
+</div>
+
+<!-- Shared editor for Affiliate/Team/Careers -- same {name, url} + Add Link
+     shape as Social Links above, just re-titled and re-targeted at a
+     different footer_links category per which drawer button opened it
+     (see currentCategoryLinksCategory in app.js). One sheet instead of
+     three near-identical copies. -->
+<div class="sheet-overlay" id="adminCategoryLinksOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2 id="adminCategoryLinksTitle">Edit Links</h2>
+      <button class="sheet-close" id="btnCloseAdminCategoryLinks">✕</button>
+    </div>
+    <div class="field">
+      <div id="adminCategoryLinksList" class="social-link-editor-list"></div>
+      <button type="button" class="link-btn" id="btnAdminCategoryLinksAdd">+ Add Link</button>
+    </div>
+    <button type="button" class="btn btn--primary" id="btnAdminCategoryLinksSubmit" style="width:100%;margin-top:10px;">Save</button>
+    <p class="save-note" id="adminCategoryLinksNote"></p>
   </div>
 </div>
 
@@ -4334,8 +4362,9 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
           <div class="footer-links">
             <div class="footer-col">
               <h4>About</h4>
-              <span class="footer-link-static">Team</span>
-              <span class="footer-link-static">Careers</span>
+              <button type="button" class="footer-link-btn" id="btnWdsFooterTeam">Team</button>
+              <button type="button" class="footer-link-btn" id="btnWdsFooterCareers">Careers</button>
+              <button type="button" class="footer-link-btn" id="btnWdsFooterAffiliate">Affiliate</button>
             </div>
             <div class="footer-col">
               <h4>Privacy</h4>
@@ -4932,11 +4961,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.7.92"></script>
+<script src="config.js?v=1.7.93"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.92"></script>
+<script src="app.js?v=1.7.93"></script>
 </body>
 </html>
