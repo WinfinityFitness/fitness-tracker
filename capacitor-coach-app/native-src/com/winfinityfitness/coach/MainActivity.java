@@ -1,4 +1,4 @@
-package io.github.winfinityfitness.coach;
+package com.winfinityfitness.coach;
 
 import com.getcapacitor.BridgeActivity;
 
