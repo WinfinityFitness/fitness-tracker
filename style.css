@@ -3005,6 +3005,8 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
+a.contact-row { text-decoration: none; transition: border-color 0.15s ease; }
+a.contact-row:hover { border-color: var(--cyan); }
 .contact-value {
   font-family: var(--font-mono);
   font-weight: 700;
@@ -3989,6 +3991,23 @@ tr.is-complete .ex-set-prev { color: var(--text-secondary); }
   border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 0.82rem;
 }
 .key-row-masked { flex: 1; color: var(--text-muted); font-family: var(--font-mono); letter-spacing: 0.02em; }
+
+.social-link-editor-list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.social-link-editor-row {
+  display: flex; align-items: center; gap: 6px; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px;
+}
+.social-link-editor-row input {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  padding: 7px 8px; font-size: 0.82rem; color: var(--text-primary); min-width: 0;
+}
+.social-link-editor-row input.social-link-name-input { flex: 0 0 30%; }
+.social-link-editor-row input.social-link-url-input { flex: 1; }
+.social-link-editor-row .social-link-remove-btn {
+  flex: none; background: none; border: none; color: var(--text-muted);
+  font-size: 1.1rem; line-height: 1; cursor: pointer; padding: 4px 6px;
+}
+.social-link-editor-row .social-link-remove-btn:hover { color: var(--danger, #e05555); }
 
 /* ================================================================== */
 /* SKIN: Shinobi Core — brutalist / manga-panel reskin.                */

@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.91">
+<link rel="stylesheet" href="style.css?v=1.7.92">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -1515,7 +1515,6 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         <div class="footer-col">
           <h4>About</h4>
           <span class="footer-link-static">Team</span>
-          <a class="footer-link" href="http://www.facebook.com/aldruz3dsign" target="_blank" rel="noopener noreferrer" id="footerAffiliateLink">Affiliate</a>
           <span class="footer-link-static">Careers</span>
         </div>
         <div class="footer-col">
@@ -1526,9 +1525,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         </div>
         <div class="footer-col">
           <h4>Social</h4>
-          <a class="footer-link" href="https://winfinityfitness.com" target="_blank" rel="noopener noreferrer" id="footerWebpageLink">Webpage</a>
-          <a class="footer-link" href="https://www.facebook.com/winfinityfit/" target="_blank" rel="noopener noreferrer" id="footerFacebookLink">Facebook</a>
-          <a class="footer-link" href="https://www.instagram.com/windalchamp/" target="_blank" rel="noopener noreferrer" id="footerInstagramLink">Instagram</a>
+          <button type="button" class="footer-link-btn" id="btnFooterSocial">Social Links</button>
         </div>
       </div>
       <p class="footer-copyright" id="footerCopyright">&copy; 2026 Winfinity Fitness. All rights reserved.</p>
@@ -2328,6 +2325,17 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
+<div class="sheet-overlay" id="socialLinksOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Social</h2>
+      <button class="sheet-close" id="btnCloseSocialLinks">✕</button>
+    </div>
+    <div class="contact-list" id="socialLinksList"></div>
+  </div>
+</div>
+
 <div class="sheet-overlay" id="privacyOverlay" hidden>
   <div class="sheet">
     <div class="sheet-handle"></div>
@@ -3014,22 +3022,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <span>Tagline</span>
       <input type="text" id="adminFooterTagline" placeholder="Leave blank for the default rotating taglines" autocomplete="off">
     </label>
-    <label class="field">
-      <span>Webpage URL</span>
-      <input type="url" id="adminFooterWebpageUrl" placeholder="https://..." autocomplete="off">
-    </label>
-    <label class="field">
-      <span>Facebook URL</span>
-      <input type="url" id="adminFooterFacebookUrl" placeholder="https://..." autocomplete="off">
-    </label>
-    <label class="field">
-      <span>Instagram URL</span>
-      <input type="url" id="adminFooterInstagramUrl" placeholder="https://..." autocomplete="off">
-    </label>
-    <label class="field">
-      <span>Affiliate URL</span>
-      <input type="url" id="adminFooterAffiliateUrl" placeholder="https://..." autocomplete="off">
-    </label>
+    <div class="field">
+      <span>Social Links</span>
+      <div id="adminFooterSocialList" class="social-link-editor-list"></div>
+      <button type="button" class="link-btn" id="btnAdminFooterSocialAdd">+ Add Link</button>
+    </div>
     <button type="button" class="btn btn--primary" id="btnAdminFooterSubmit" style="width:100%;margin-top:10px;">Save</button>
     <p class="save-note" id="adminFooterNote"></p>
   </div>
@@ -4338,7 +4335,6 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
             <div class="footer-col">
               <h4>About</h4>
               <span class="footer-link-static">Team</span>
-              <a class="footer-link" href="http://www.facebook.com/aldruz3dsign" target="_blank" rel="noopener noreferrer" id="wdsFooterAffiliateLink">Affiliate</a>
               <span class="footer-link-static">Careers</span>
             </div>
             <div class="footer-col">
@@ -4349,9 +4345,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
             </div>
             <div class="footer-col">
               <h4>Social</h4>
-              <a class="footer-link" href="https://winfinityfitness.com" target="_blank" rel="noopener noreferrer" id="wdsFooterWebpageLink">Webpage</a>
-              <a class="footer-link" href="https://www.facebook.com/winfinityfit/" target="_blank" rel="noopener noreferrer" id="wdsFooterFacebookLink">Facebook</a>
-              <a class="footer-link" href="https://www.instagram.com/windalchamp/" target="_blank" rel="noopener noreferrer" id="wdsFooterInstagramLink">Instagram</a>
+              <button type="button" class="footer-link-btn" id="btnWdsFooterSocial">Social Links</button>
             </div>
           </div>
           <p class="footer-copyright" id="wdsFooterCopyright">&copy; 2026 Winfinity Fitness. All rights reserved.</p>
@@ -4938,11 +4932,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.7.91"></script>
+<script src="config.js?v=1.7.92"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.91"></script>
+<script src="app.js?v=1.7.92"></script>
 </body>
 </html>
