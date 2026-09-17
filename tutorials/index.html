@@ -289,16 +289,21 @@
     padding-bottom:2px; -webkit-overflow-scrolling:touch; scrollbar-width:thin;
   }
   /* Caption/step text was sized for a 320px desktop card; stretched across
-     a near-full-width phone it read too small to comfortably read at
-     arm's length, so bump it toward normal mobile-settings body-text size. */
-  html.is-touch .caption-strip{padding:16px 18px 18px; min-height:auto;}
-  html.is-touch .caption-strip .step-tag{font-size:12.5px;}
-  html.is-touch .caption-strip .step-title{font-size:18px;}
-  html.is-touch .caption-strip .step-desc{font-size:14.5px; line-height:1.5;}
+     a near-full-width phone it still read like shrunk-down desktop copy,
+     not text at the same visual scale as the app UI inside the emulator
+     itself. Roughly 1.5x the previous mobile sizes across the board. */
+  html.is-touch .caption-strip{padding:18px 20px 20px; min-height:auto;}
+  html.is-touch .caption-strip .step-tag{font-size:14.5px;}
+  html.is-touch .caption-strip .step-title{font-size:23px; line-height:1.35;}
+  html.is-touch .caption-strip .step-desc{font-size:17.5px; line-height:1.5;}
   html.is-touch .step-nav button{
-    min-width:34px; height:34px; font-size:13.5px; border-radius:9px;
+    min-width:44px; height:42px; font-size:17px; border-radius:11px;
   }
-  html.is-touch .time{font-size:13px;}
+  html.is-touch .time{font-size:16px;}
+  html.is-touch header.page p{font-size:17px; line-height:1.6;}
+  html.is-touch .tut-header p{font-size:16.5px; line-height:1.6;}
+  html.is-touch .eyebrow{font-size:13.5px;}
+  html.is-touch footer.note{font-size:15.5px;}
 </style>
 
 <script>
