@@ -273,11 +273,12 @@
   /* On real phones, use almost the full physical screen width for the
      phone-frame mockup itself (not just the column it sits in) so the
      recording reads like an actual device rather than a small preview.
-     Slightly negative margin claws back the body's side gutter. */
-  html.is-touch body{padding-inline:10px;}
+     Trim the body gutter to a sliver so 96vw genuinely reads as ~96% of
+     the physical display, not 96% of an already-inset column. */
+  html.is-touch body{padding-inline:2vw;}
   html.is-touch .phone,
   html.is-touch .controls{
-    width:min(480px, 100vw - 20px);
+    width:96vw;
   }
   /* Step strip stays a single scrollable row no matter how many steps a
      tutorial has (up to 14) — never wraps to a second/third row, which
@@ -287,6 +288,17 @@
     flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start;
     padding-bottom:2px; -webkit-overflow-scrolling:touch; scrollbar-width:thin;
   }
+  /* Caption/step text was sized for a 320px desktop card; stretched across
+     a near-full-width phone it read too small to comfortably read at
+     arm's length, so bump it toward normal mobile-settings body-text size. */
+  html.is-touch .caption-strip{padding:16px 18px 18px; min-height:auto;}
+  html.is-touch .caption-strip .step-tag{font-size:12.5px;}
+  html.is-touch .caption-strip .step-title{font-size:18px;}
+  html.is-touch .caption-strip .step-desc{font-size:14.5px; line-height:1.5;}
+  html.is-touch .step-nav button{
+    min-width:34px; height:34px; font-size:13.5px; border-radius:9px;
+  }
+  html.is-touch .time{font-size:13px;}
 </style>
 
 <script>
