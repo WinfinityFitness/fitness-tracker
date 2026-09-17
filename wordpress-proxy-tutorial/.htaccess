@@ -1,0 +1,7 @@
+# Routes every request for this subdomain through index.php, which fetches
+# and re-serves the matching path from fitness-tracker/tutorials/ on GitHub
+# Pages — see index.php for why.
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [L]
