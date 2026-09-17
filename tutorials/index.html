@@ -271,7 +271,7 @@
   <!-- ===================== TUTORIAL 1 ===================== -->
   <section class="tutorial" data-video="01_playstore_install_and_signup.mp4">
     <div class="tut-header">
-      <div class="eyebrow"><span class="dot"></span> Tutorial 1 of 5</div>
+      <div class="eyebrow"><span class="dot"></span> Tutorial 1 of 6</div>
       <h2>Installing from Google Play &amp; first-time setup</h2>
       <p>Opening the site, tapping through to the Play Store, installing, and completing first-time setup as a brand-new user.</p>
     </div>
@@ -312,7 +312,7 @@
   <!-- ===================== TUTORIAL 2 ===================== -->
   <section class="tutorial" data-video="02_settings_measurements_photo.mp4">
     <div class="tut-header">
-      <div class="eyebrow"><span class="dot"></span> Tutorial 2 of 5</div>
+      <div class="eyebrow"><span class="dot"></span> Tutorial 2 of 6</div>
       <h2>Notifications, web sync, API key &amp; your first check-in</h2>
       <p>Turning on push notifications and reminders, enabling the web dashboard sync, adding an optional API key, then logging your first body measurements and progress photo.</p>
     </div>
@@ -353,7 +353,7 @@
   <!-- ===================== TUTORIAL 3 ===================== -->
   <section class="tutorial" data-video="03_quicklog_start_end_weekend.mp4">
     <div class="tut-header">
-      <div class="eyebrow"><span class="dot"></span> Tutorial 3 of 5</div>
+      <div class="eyebrow"><span class="dot"></span> Tutorial 3 of 6</div>
       <h2>Quick Log: Start Day, End Day &amp; Weekend Log</h2>
       <p>The three daily/weekly check-ins on the Status tab — morning weigh-in, evening review, and the Sunday weekly wrap-up.</p>
     </div>
@@ -394,7 +394,7 @@
   <!-- ===================== TUTORIAL 4 ===================== -->
   <section class="tutorial" data-video="04_training_tab_session.mp4">
     <div class="tut-header">
-      <div class="eyebrow"><span class="dot"></span> Tutorial 4 of 5</div>
+      <div class="eyebrow"><span class="dot"></span> Tutorial 4 of 6</div>
       <h2>Training Tab: building and running a session</h2>
       <p>Adding a full exercise list, logging sets with weight and reps, the rest timer, saving it as a reusable template, and finishing to see your session summary.</p>
     </div>
@@ -435,7 +435,7 @@
   <!-- ===================== TUTORIAL 5 ===================== -->
   <section class="tutorial" data-video="05_outdoor_activity_tracker.mp4">
     <div class="tut-header">
-      <div class="eyebrow"><span class="dot"></span> Tutorial 5 of 5</div>
+      <div class="eyebrow"><span class="dot"></span> Tutorial 5 of 6</div>
       <h2>Outdoor Activity Tracker: GPS walks, runs &amp; rides</h2>
       <p>Live GPS tracking for outdoor sessions — pick an activity, watch your stats update in real time, save it to a real map, and find it again in your history.</p>
     </div>
@@ -470,6 +470,47 @@
     </div>
     <footer class="note">
       <b>Real GPS, not a demo mode:</b> this uses your phone's actual location the whole time — there's no manual "enter your duration" fallback, so keep the app open and screen on while tracking, or the location watch pauses. Sample walk shown: ~0.15km over 1:37, Manila streets. The map tiles show "API key required" here only because this test account has no Carto basemap key configured — your own key (or the free default) would show full street tiles instead of the placeholder grid.
+    </footer>
+  </section>
+
+  <!-- ===================== TUTORIAL 6 ===================== -->
+  <section class="tutorial" data-video="06_fuel_tab_food_logging.mp4">
+    <div class="tut-header">
+      <div class="eyebrow"><span class="dot"></span> Tutorial 6 of 6</div>
+      <h2>Fuel Tab: logging food every way the app supports</h2>
+      <p>Searching a real food database, letting AI estimate a home-cooked dish, scanning a barcode, uploading a plate photo, and the pure-manual entry path — plus overriding a whole day's totals if you already track elsewhere.</p>
+    </div>
+    <div class="stage">
+      <div class="phone-col">
+        <div class="phone">
+          <div class="screen">
+            <video class="vid" playsinline preload="metadata">
+              <source src="06_fuel_tab_food_logging.mp4" type="video/mp4">
+            </video>
+            <div class="tap-marker"><div class="ring"></div><div class="core"></div></div>
+            <button class="play-overlay" aria-label="Play video">
+              <span class="btn"><svg viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></span>
+            </button>
+          </div>
+          <div class="caption-strip">
+            <div class="step-tag">Step 1 / 10</div>
+            <div class="step-title">Open Dietary Algorithm → Add food</div>
+            <div class="step-desc">Breakfast, Lunch, Dinner, Snacks — each has its own "+ Add food" button.</div>
+          </div>
+        </div>
+        <div class="controls">
+          <div class="scrubber"><div class="track"><div class="fill"></div></div></div>
+          <div class="ctrl-row">
+            <button class="play-btn" aria-label="Play/Pause"><svg class="play-icon" viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></button>
+            <span class="time">0:00 / 0:00</span>
+          </div>
+          <div class="step-nav"></div>
+        </div>
+      </div>
+      <ol class="steps"></ol>
+    </div>
+    <footer class="note">
+      <b>AI estimates work out of the box — no key required.</b> Both "Estimate with AI" and "Estimate from Photo" run on Winfinity's shared free pool by default; you only need your own Gemini API key (Menu → Settings, see Tutorial 2) to get your own quota instead of sharing the pool. Every AI estimate comes back flagged "low accuracy, review before saving" for a reason — treat it as a starting point, not gospel. One real gotcha caught on camera: tapping too close to a search result re-selects it and resets your unit/serving changes — the actual "Add to diary" button is the one below the warning box, not the one right under the result list.
     </footer>
   </section>
 </div>
@@ -559,6 +600,21 @@
         {t:46, title:"Tap Stop & save", desc:"Logs the session and unlocks the map, share, and history views below."},
         {t:52, title:"Your route on a real map", desc:"Start and end pins with the full path between them — this is a real street map, not a placeholder."},
         {t:62, title:"Share it, or find it in Activity History", desc:"Share activity / Share to My Day post it; every past session stays listed below, newest first."}
+      ]
+    },
+    {
+      selector: '[data-video="06_fuel_tab_food_logging.mp4"]',
+      steps: [
+        {t:0,   title:"Open Dietary Algorithm → Add food", desc:"Breakfast, Lunch, Dinner, Snacks each get their own “+ Add food” button."},
+        {t:5,   title:"Search foods — type a name", desc:"A real food database, with brand-name results and calories per 100g.", m:{x:50,y:48.5}},
+        {t:10,  title:"Pick a result, confirm the serving", desc:"Confirm Serving shows the recalculated kcal/protein/carbs/fat for your amount."},
+        {t:16,  title:"Change the unit", desc:"g, oz, ml, cup, bowl, piece, stick, pack — switching units re-scales the numbers (not the quantity itself, so double-check it).", m:{x:72.7,y:74.1}},
+        {t:40,  title:"Tap Add to diary", desc:"One real gotcha: tapping too close to the result above re-selects it and resets your changes — the real button sits below the warning box."},
+        {t:58,  title:"Not finding it? Type a name, tap Estimate with AI", desc:"Works immediately on Winfinity's shared pool — no personal API key needed to try it."},
+        {t:68,  title:"Review the AI estimate, then Add to diary", desc:"Always flagged “low accuracy, review before saving” — treat it as a starting point."},
+        {t:111, title:"Scan barcode", desc:"Opens a live camera view pointed at the product's barcode — same permission prompt as any web camera feature.", m:{x:50,y:41}},
+        {t:138, title:"Or skip the database entirely — enter by hand", desc:"Serving size, unit, calories, protein, carbs, fat — every field editable, no lookup required."},
+        {t:176, title:"Dietary Manual Input — override a whole day", desc:"For MyFitnessPal etc. users: paste in a day's totals and it replaces what Dietary Algorithm calculated, ring and all."}
       ]
     }
   ];
