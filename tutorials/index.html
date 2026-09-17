@@ -271,7 +271,7 @@
   <!-- ===================== TUTORIAL 1 ===================== -->
   <section class="tutorial" data-video="01_playstore_install_and_signup.mp4">
     <div class="tut-header">
-      <div class="eyebrow"><span class="dot"></span> Tutorial 1 of 4</div>
+      <div class="eyebrow"><span class="dot"></span> Tutorial 1 of 5</div>
       <h2>Installing from Google Play &amp; first-time setup</h2>
       <p>Opening the site, tapping through to the Play Store, installing, and completing first-time setup as a brand-new user.</p>
     </div>
@@ -312,7 +312,7 @@
   <!-- ===================== TUTORIAL 2 ===================== -->
   <section class="tutorial" data-video="02_settings_measurements_photo.mp4">
     <div class="tut-header">
-      <div class="eyebrow"><span class="dot"></span> Tutorial 2 of 4</div>
+      <div class="eyebrow"><span class="dot"></span> Tutorial 2 of 5</div>
       <h2>Notifications, web sync, API key &amp; your first check-in</h2>
       <p>Turning on push notifications and reminders, enabling the web dashboard sync, adding an optional API key, then logging your first body measurements and progress photo.</p>
     </div>
@@ -353,7 +353,7 @@
   <!-- ===================== TUTORIAL 3 ===================== -->
   <section class="tutorial" data-video="03_quicklog_start_end_weekend.mp4">
     <div class="tut-header">
-      <div class="eyebrow"><span class="dot"></span> Tutorial 3 of 4</div>
+      <div class="eyebrow"><span class="dot"></span> Tutorial 3 of 5</div>
       <h2>Quick Log: Start Day, End Day &amp; Weekend Log</h2>
       <p>The three daily/weekly check-ins on the Status tab — morning weigh-in, evening review, and the Sunday weekly wrap-up.</p>
     </div>
@@ -394,7 +394,7 @@
   <!-- ===================== TUTORIAL 4 ===================== -->
   <section class="tutorial" data-video="04_training_tab_session.mp4">
     <div class="tut-header">
-      <div class="eyebrow"><span class="dot"></span> Tutorial 4 of 4</div>
+      <div class="eyebrow"><span class="dot"></span> Tutorial 4 of 5</div>
       <h2>Training Tab: building and running a session</h2>
       <p>Adding a full exercise list, logging sets with weight and reps, the rest timer, saving it as a reusable template, and finishing to see your session summary.</p>
     </div>
@@ -429,6 +429,47 @@
     </div>
     <footer class="note">
       <b>One moment is shown as a still, not live video:</b> the emulator recorder had the same in-page scrolling limitation here — the Bench Press and Lat Pulldown set/weight/timer step freezes on a screenshot instead of animating. Everything else, including all five remaining exercises, is the real recording. Sample session "Push Day A": 7 exercises, 7 sets, 2,070kg volume. Sharing the finished summary works the same way as any share sheet on your phone — to Messages, WhatsApp, Instagram Stories, or wherever — it isn't shown here since it just hands off to your phone's own share screen.
+    </footer>
+  </section>
+
+  <!-- ===================== TUTORIAL 5 ===================== -->
+  <section class="tutorial" data-video="05_outdoor_activity_tracker.mp4">
+    <div class="tut-header">
+      <div class="eyebrow"><span class="dot"></span> Tutorial 5 of 5</div>
+      <h2>Outdoor Activity Tracker: GPS walks, runs &amp; rides</h2>
+      <p>Live GPS tracking for outdoor sessions — pick an activity, watch your stats update in real time, save it to a real map, and find it again in your history.</p>
+    </div>
+    <div class="stage">
+      <div class="phone-col">
+        <div class="phone">
+          <div class="screen">
+            <video class="vid" playsinline preload="metadata">
+              <source src="05_outdoor_activity_tracker.mp4" type="video/mp4">
+            </video>
+            <div class="tap-marker"><div class="ring"></div><div class="core"></div></div>
+            <button class="play-overlay" aria-label="Play video">
+              <span class="btn"><svg viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></span>
+            </button>
+          </div>
+          <div class="caption-strip">
+            <div class="step-tag">Step 1 / 9</div>
+            <div class="step-title">Open the Outdoor Activity Tracker</div>
+            <div class="step-desc">Lower on the Training tab — a GPS card separate from the exercise queue above it.</div>
+          </div>
+        </div>
+        <div class="controls">
+          <div class="scrubber"><div class="track"><div class="fill"></div></div></div>
+          <div class="ctrl-row">
+            <button class="play-btn" aria-label="Play/Pause"><svg class="play-icon" viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></button>
+            <span class="time">0:00 / 0:00</span>
+          </div>
+          <div class="step-nav"></div>
+        </div>
+      </div>
+      <ol class="steps"></ol>
+    </div>
+    <footer class="note">
+      <b>Real GPS, not a demo mode:</b> this uses your phone's actual location the whole time — there's no manual "enter your duration" fallback, so keep the app open and screen on while tracking, or the location watch pauses. Sample walk shown: ~0.15km over 1:37, Manila streets. The map tiles show "API key required" here only because this test account has no Carto basemap key configured — your own key (or the free default) would show full street tiles instead of the placeholder grid.
     </footer>
   </section>
 </div>
@@ -504,6 +545,20 @@
         {t:240, title:"Scroll down and tap Finish", desc:"Wraps up today's session.", m:{x:9.2,y:52.6}},
         {t:245, title:"Workout Summary", desc:"Exercises, sets, total volume, and your top set on every single lift — that's where a new PR would show."},
         {t:253, title:"Share it (optional)", desc:"Hands off to your phone's own share sheet — Messages, WhatsApp, Instagram Stories, wherever you'd post a workout."}
+      ]
+    },
+    {
+      selector: '[data-video="05_outdoor_activity_tracker.mp4"]',
+      steps: [
+        {t:0,  title:"Open the Outdoor Activity Tracker", desc:"Lower on the Training tab, below the exercise queue and Personal Records."},
+        {t:4,  title:"Pick Walk, Run, or Ride", desc:"Sets which speed/pace ranges make sense for the stats below.", m:{x:50,y:29.7}},
+        {t:9,  title:"Scroll down to Start tracking", desc:"Past the (currently empty) live map preview."},
+        {t:13, title:"Tap Start tracking — GPS locks on", desc:"A green “GPS locked — tracking” confirms your location has a fix."},
+        {t:18, title:"Live stats update in real time", desc:"Duration, distance, avg/max speed, pace, and estimated steps — all driven by your actual movement."},
+        {t:32, title:"Watch your route draw as you move", desc:"A live line traces your path while the session is running."},
+        {t:46, title:"Tap Stop & save", desc:"Logs the session and unlocks the map, share, and history views below."},
+        {t:52, title:"Your route on a real map", desc:"Start and end pins with the full path between them — this is a real street map, not a placeholder."},
+        {t:62, title:"Share it, or find it in Activity History", desc:"Share activity / Share to My Day post it; every past session stays listed below, newest first."}
       ]
     }
   ];
