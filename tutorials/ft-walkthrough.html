@@ -1,0 +1,1001 @@
+<title>Winfinity Fitness Tracker Walkthrough</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    color-scheme: dark;
+    --bg: #0a0d12;
+    --panel: #12161f;
+    --panel-2: #171c28;
+    --line: #232a38;
+    --cream: #f2ead9;
+    --cream-dim: #cdc1a2;
+    --ink: #2a2013;
+    --gold: #e2a13d;
+    --gold-2: #f6c96a;
+    --text: #eae6dc;
+    --muted: #8d95a5;
+    --glow: rgba(226,161,61,.35);
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --display: 'Sora', system-ui, sans-serif;
+    --body: 'Manrope', system-ui, sans-serif;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    background:
+      radial-gradient(1100px 600px at 12% -10%, rgba(226,161,61,.10), transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, rgba(120,150,220,.08), transparent 55%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--body);
+    padding-inline:20px;
+    padding-block: 28px 60px;
+  }
+
+  a{color:inherit;}
+
+  .wrap{max-width:1180px; margin-inline:auto;}
+  .back-link{
+    display:inline-flex; align-items:center; gap:6px;
+    font-family:var(--mono); font-size:12px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--gold-2); text-decoration:none; margin-bottom:18px;
+  }
+  .back-link:hover{ text-decoration:underline; }
+
+  header.page{
+    display:flex; flex-direction:column; gap:10px;
+    margin-bottom:40px;
+    padding-bottom:28px;
+    border-bottom:1px solid var(--line);
+  }
+  h1{
+    font-family:var(--display); font-weight:800; letter-spacing:-.01em;
+    font-size:clamp(28px,4vw,42px); margin:0; text-wrap:balance; color:var(--cream);
+  }
+  header.page p{
+    margin:0; max-width:62ch; color:var(--muted); font-size:15.5px; line-height:1.6;
+  }
+
+  .eyebrow{
+    font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--gold-2); display:flex; align-items:center; gap:8px;
+  }
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--gold); box-shadow:0 0 0 3px rgba(226,161,61,.18);}
+
+  section.tutorial{ margin-bottom:56px; scroll-margin-top:24px; }
+  section.tutorial + section.tutorial{
+    padding-top:44px;
+    border-top:1px solid var(--line);
+  }
+  .tut-header{ display:flex; flex-direction:column; gap:8px; margin-bottom:26px; }
+  .tut-header h2{
+    font-family:var(--display); font-weight:700; letter-spacing:-.005em;
+    font-size:clamp(21px,2.6vw,27px); margin:0; text-wrap:balance; color:var(--cream);
+  }
+  .tut-header p{ margin:0; max-width:62ch; color:var(--muted); font-size:14.5px; line-height:1.6; }
+
+  .stage{
+    display:grid;
+    grid-template-columns: 340px 1fr;
+    gap:34px;
+    align-items:start;
+  }
+  /* True touch devices (phones/tablets) get the compact layout regardless of
+     reported viewport width, which is unreliable in some mobile webviews.
+     A resized desktop browser window still uses a mouse, so it correctly
+     keeps the two-column card layout no matter how narrow the window is. */
+  @media (pointer:coarse){
+    .stage{grid-template-columns:1fr; justify-content:center;}
+    .steps{display:none;}
+    .step-nav{display:flex;}
+  }
+
+  /* ---------- Phone frame ---------- */
+  .phone-col{
+    position:sticky; top:20px;
+    display:flex; flex-direction:column; align-items:center; gap:16px;
+  }
+  @media (pointer:coarse){ .phone-col{position:static;} }
+
+  .phone{
+    position:relative;
+    width:320px; max-width:100%;
+    display:flex; flex-direction:column;
+    background:#000;
+    border-radius:34px;
+    padding:8px;
+    box-shadow:
+      0 0 0 2px #2c3242,
+      0 0 0 9px #0d1015,
+      0 30px 60px -20px rgba(0,0,0,.7),
+      0 0 80px -10px var(--glow);
+  }
+  .phone::before{
+    content:"";
+    position:absolute; top:16px; left:50%; translate:-50% 0;
+    width:76px; height:15px; background:#05070a; border-radius:10px; z-index:5;
+  }
+  .screen{
+    position:relative; width:100%; aspect-ratio:9/16; overflow:hidden;
+    background:#000;
+    border-radius:26px 26px 0 0;
+    flex-shrink:0;
+  }
+  .screen video{
+    width:100%; height:100%; object-fit:cover; display:block;
+  }
+
+  .tap-marker{
+    position:absolute; width:34px; height:34px; margin:-17px 0 0 -17px;
+    pointer-events:none; opacity:0; transition:opacity .25s ease;
+    z-index:4;
+  }
+  .tap-marker.show{opacity:1;}
+  .tap-marker .ring{
+    position:absolute; inset:0; border-radius:50%;
+    border:2px solid var(--gold-2);
+    animation: ping 1.4s cubic-bezier(.2,.7,.3,1) infinite;
+  }
+  .tap-marker .core{
+    position:absolute; inset:11px; border-radius:50%;
+    background:var(--gold-2);
+    box-shadow:0 0 12px 2px var(--glow);
+  }
+  @keyframes ping{
+    0%{ transform:scale(.5); opacity:.9; }
+    75%{ transform:scale(1.9); opacity:0; }
+    100%{ transform:scale(1.9); opacity:0; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .tap-marker .ring{animation:none; opacity:.6;}
+  }
+
+  .caption-strip{
+    flex-shrink:0;
+    border-radius:0 0 26px 26px;
+    padding:13px 16px 15px;
+    background: linear-gradient(180deg, #1a1108, #0c0a08 70%);
+    border-top:1px solid rgba(226,161,61,.25);
+    display:flex; flex-direction:column; gap:5px;
+    min-height:96px;
+  }
+  .caption-strip .step-tag{
+    font-family:var(--mono); font-size:10px; letter-spacing:.1em; color:var(--gold-2); text-transform:uppercase;
+  }
+  .caption-strip .step-title{
+    font-family:var(--display); font-weight:700; font-size:14.5px; color:#fff; line-height:1.3;
+  }
+  .caption-strip .step-desc{
+    font-size:11.5px; line-height:1.45; color:#c9c4b8;
+  }
+
+  .play-overlay{
+    position:absolute; inset:0; z-index:7;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(6,8,12,.35);
+    cursor:pointer; border:none; padding:0;
+  }
+  .play-overlay[data-hidden="true"]{display:none;}
+  .play-overlay .btn{
+    width:58px; height:58px; border-radius:50%;
+    background:var(--gold);
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 8px 30px -6px var(--glow);
+  }
+  .play-overlay .btn svg{width:22px;height:22px; fill:#20140a; margin-left:3px;}
+
+  /* controls under phone */
+  .controls{
+    width:320px; max-width:100%; display:flex; flex-direction:column; gap:10px;
+  }
+  .scrubber{
+    position:relative; height:22px; display:flex; align-items:center; cursor:pointer;
+  }
+  .scrubber .track{
+    position:relative; width:100%; height:4px; border-radius:3px; background:var(--line); overflow:visible;
+  }
+  .scrubber .fill{
+    position:absolute; left:0; top:0; height:100%; border-radius:3px;
+    background:linear-gradient(90deg, var(--gold), var(--gold-2));
+  }
+  .scrubber .tick{
+    position:absolute; top:50%; translate:-50% -50%;
+    width:3px; height:9px; border-radius:2px; background:rgba(255,255,255,.35);
+  }
+  .ctrl-row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .ctrl-row button{
+    all:unset; cursor:pointer; width:34px; height:34px; border-radius:50%;
+    background:var(--panel-2); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .ctrl-row button svg{width:14px;height:14px; fill:var(--cream);}
+  .time{font-family:var(--mono); font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums;}
+
+  /* Compact step jump-buttons — touch devices only (see .stage media query) */
+  .step-nav{
+    display:none; flex-wrap:wrap; gap:6px; justify-content:center;
+  }
+  .step-nav button{
+    all:unset; cursor:pointer; box-sizing:border-box;
+    min-width:28px; height:28px; padding-inline:2px; border-radius:8px;
+    background:var(--panel-2); border:1px solid var(--line);
+    color:var(--muted); font-family:var(--mono); font-size:11px;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+  .step-nav button.active{
+    background:var(--gold-2); border-color:transparent; color:#20140a; font-weight:600;
+  }
+
+  /* ---------- Step list ---------- */
+  .steps{
+    display:flex; flex-direction:column; gap:8px;
+    list-style:none; padding:0; margin:0;
+  }
+  .step-item{
+    display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:start;
+    padding:14px 16px; border-radius:14px;
+    background:var(--panel); border:1px solid var(--line);
+    cursor:pointer; transition:background .18s ease, border-color .18s ease;
+    text-align:left; width:100%; color:inherit; font:inherit;
+  }
+  .step-item:hover{border-color:#334;}
+  .step-item.active{
+    background:linear-gradient(180deg, rgba(226,161,61,.14), rgba(226,161,61,.05));
+    border-color:rgba(226,161,61,.55);
+  }
+  .step-num{
+    font-family:var(--mono); font-size:12px; color:var(--muted);
+    width:26px; height:26px; border-radius:8px; background:var(--panel-2);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .step-item.active .step-num{ color:#20140a; background:var(--gold-2); }
+  .step-body h3{
+    margin:0 0 3px; font-family:var(--display); font-weight:700; font-size:15px; color:var(--cream);
+  }
+  .step-item.active .step-body h3{color:#fff;}
+  .step-body p{margin:0; font-size:12.8px; color:var(--muted); line-height:1.5;}
+  .step-time{
+    font-family:var(--mono); font-size:11px; color:var(--muted); white-space:nowrap; padding-top:3px;
+  }
+
+  footer.note{
+    margin-top:8px; padding-top:18px; border-top:1px solid var(--line);
+    font-size:12.5px; color:var(--muted); line-height:1.6; max-width:70ch;
+  }
+  footer.note b{color:var(--cream-dim);}
+
+  /* Touch-device layout, driven by the .is-touch class below rather than
+     CSS media queries alone — some in-app/webview browsers don't reliably
+     report the `pointer: coarse` media feature even on a real touchscreen,
+     so JS cross-checks navigator.maxTouchPoints / ontouchstart as well. */
+  html.is-touch .stage{grid-template-columns:1fr; justify-content:center;}
+  html.is-touch .steps{display:none;}
+  html.is-touch .step-nav{display:flex;}
+  html.is-touch .phone-col{position:static;}
+
+  /* On real phones, use almost the full physical screen width for the
+     phone-frame mockup itself (not just the column it sits in) so the
+     recording reads like an actual device rather than a small preview.
+     Trim the body gutter to a sliver so 96vw genuinely reads as ~96% of
+     the physical display, not 96% of an already-inset column. */
+  html.is-touch body{padding-inline:2vw;}
+  html.is-touch .phone,
+  html.is-touch .controls{
+    width:96vw;
+  }
+  /* Step strip stays a single scrollable row no matter how many steps a
+     tutorial has (up to 14) — never wraps to a second/third row, which
+     used to push the phone frame down and made "minimized" not actually
+     minimized. */
+  html.is-touch .step-nav{
+    flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start;
+    padding-bottom:2px; -webkit-overflow-scrolling:touch; scrollbar-width:thin;
+  }
+  /* Caption/step text was sized for a 320px desktop card; stretched across
+     a near-full-width phone it still read like shrunk-down desktop copy,
+     not text at the same visual scale as the app UI inside the emulator
+     itself. Roughly 1.5x the previous mobile sizes across the board. */
+  html.is-touch .caption-strip{padding:18px 20px 20px; min-height:auto;}
+  html.is-touch .caption-strip .step-tag{font-size:14.5px;}
+  html.is-touch .caption-strip .step-title{font-size:39px; line-height:1.3;}
+  html.is-touch .caption-strip .step-desc{font-size:35px; line-height:1.4;}
+  html.is-touch .step-nav button{
+    min-width:44px; height:42px; font-size:17px; border-radius:11px;
+  }
+  html.is-touch .time{font-size:16px;}
+  html.is-touch h1{font-size:38px;}
+  html.is-touch header.page p{font-size:34px; line-height:1.4;}
+  html.is-touch .tut-header h2{font-size:37px;}
+  html.is-touch .tut-header p{font-size:33px; line-height:1.4;}
+  html.is-touch .eyebrow{font-size:13.5px;}
+  html.is-touch footer.note{font-size:31px; line-height:1.4;}
+</style>
+
+<script>
+  (function(){
+    var isTouch = (navigator.maxTouchPoints > 0) || ('ontouchstart' in window) || window.matchMedia('(pointer: coarse)').matches;
+    if (isTouch) document.documentElement.classList.add('is-touch');
+  })();
+</script>
+
+<div class="wrap">
+  <a href="index.html" class="back-link">&larr; All walkthroughs</a>
+  <header class="page">
+    <div class="eyebrow"><span class="dot"></span> Getting Started</div>
+    <h1>Winfinity Fitness Tracker — Setup Walkthroughs</h1>
+    <p>Real recorded run-throughs of the app, start to finish. Each phone shows the actual screen recording with step-by-step captions and a pointer at the exact button being tapped — click any step on the right to jump straight to it.</p>
+  </header>
+
+  <!-- ===================== TUTORIAL 1 ===================== -->
+  <section class="tutorial" id="tutorial-1" data-video="01_playstore_install_and_signup.mp4">
+    <div class="tut-header">
+      <div class="eyebrow"><span class="dot"></span> Tutorial 1 of 9</div>
+      <h2>Installing from Google Play &amp; first-time setup</h2>
+      <p>Opening the site, tapping through to the Play Store, installing, and completing first-time setup as a brand-new user.</p>
+    </div>
+    <div class="stage">
+      <div class="phone-col">
+        <div class="phone">
+          <div class="screen">
+            <video class="vid" playsinline preload="metadata">
+              <source src="01_playstore_install_and_signup.mp4" type="video/mp4">
+            </video>
+            <div class="tap-marker"><div class="ring"></div><div class="core"></div></div>
+            <button class="play-overlay" aria-label="Play video">
+              <span class="btn"><svg viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></span>
+            </button>
+          </div>
+          <div class="caption-strip">
+            <div class="step-tag">Step 1 / 13</div>
+            <div class="step-title">Open Chrome</div>
+            <div class="step-desc">Tap into the browser from the homescreen or app drawer.</div>
+          </div>
+        </div>
+        <div class="controls">
+          <div class="scrubber"><div class="track"><div class="fill"></div></div></div>
+          <div class="ctrl-row">
+            <button class="play-btn" aria-label="Play/Pause"><svg class="play-icon" viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></button>
+            <span class="time">0:00 / 0:00</span>
+          </div>
+          <div class="step-nav"></div>
+        </div>
+      </div>
+      <ol class="steps"></ol>
+    </div>
+    <footer class="note">
+      <b>Recorded on:</b> BlueStacks Android emulator, fresh Google account, Winfinity Fitness Tracker (FT) — live on Google Play. Sample values used during setup: Alex_Rivera, 28, 178&nbsp;cm / 75&nbsp;kg, light activity, cutting goal 75&rarr;65&nbsp;kg.
+    </footer>
+  </section>
+
+  <!-- ===================== TUTORIAL 2 ===================== -->
+  <section class="tutorial" id="tutorial-2" data-video="02_settings_measurements_photo.mp4">
+    <div class="tut-header">
+      <div class="eyebrow"><span class="dot"></span> Tutorial 2 of 9</div>
+      <h2>Notifications, web sync, API key &amp; your first check-in</h2>
+      <p>Turning on push notifications and reminders, enabling the web dashboard sync, adding an optional API key, then logging your first body measurements and progress photo.</p>
+    </div>
+    <div class="stage">
+      <div class="phone-col">
+        <div class="phone">
+          <div class="screen">
+            <video class="vid" playsinline preload="metadata">
+              <source src="02_settings_measurements_photo.mp4" type="video/mp4">
+            </video>
+            <div class="tap-marker"><div class="ring"></div><div class="core"></div></div>
+            <button class="play-overlay" aria-label="Play video">
+              <span class="btn"><svg viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></span>
+            </button>
+          </div>
+          <div class="caption-strip">
+            <div class="step-tag">Step 1 / 11</div>
+            <div class="step-title">Open Menu → Settings</div>
+            <div class="step-desc">Everything in this tutorial lives on one screen: Menu tab, then Settings.</div>
+          </div>
+        </div>
+        <div class="controls">
+          <div class="scrubber"><div class="track"><div class="fill"></div></div></div>
+          <div class="ctrl-row">
+            <button class="play-btn" aria-label="Play/Pause"><svg class="play-icon" viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></button>
+            <span class="time">0:00 / 0:00</span>
+          </div>
+          <div class="step-nav"></div>
+        </div>
+      </div>
+      <ol class="steps"></ol>
+    </div>
+    <footer class="note">
+      <b>Two moments are shown as stills, not live video:</b> the Web Sync PIN screen and the API key paste — the emulator recorder didn't reliably capture in-page scrolling, so those two steps freeze on the confirming screenshot instead of animating. Everything else is the real recording. Sample measurements: chest 97.5cm, shoulder 112cm, biceps 34/33.8cm.
+    </footer>
+  </section>
+
+  <!-- ===================== TUTORIAL 3 ===================== -->
+  <section class="tutorial" id="tutorial-3" data-video="03_quicklog_start_end_weekend.mp4">
+    <div class="tut-header">
+      <div class="eyebrow"><span class="dot"></span> Tutorial 3 of 9</div>
+      <h2>Quick Log: Start Day, End Day &amp; Weekend Log</h2>
+      <p>The three daily/weekly check-ins on the Status tab — morning weigh-in, evening review, and the Sunday weekly wrap-up.</p>
+    </div>
+    <div class="stage">
+      <div class="phone-col">
+        <div class="phone">
+          <div class="screen">
+            <video class="vid" playsinline preload="metadata">
+              <source src="03_quicklog_start_end_weekend.mp4" type="video/mp4">
+            </video>
+            <div class="tap-marker"><div class="ring"></div><div class="core"></div></div>
+            <button class="play-overlay" aria-label="Play video">
+              <span class="btn"><svg viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></span>
+            </button>
+          </div>
+          <div class="caption-strip">
+            <div class="step-tag">Step 1 / 12</div>
+            <div class="step-title">Open Start Day Log</div>
+            <div class="step-desc">Tap the card on the Status tab's Quick Log section.</div>
+          </div>
+        </div>
+        <div class="controls">
+          <div class="scrubber"><div class="track"><div class="fill"></div></div></div>
+          <div class="ctrl-row">
+            <button class="play-btn" aria-label="Play/Pause"><svg class="play-icon" viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></button>
+            <span class="time">0:00 / 0:00</span>
+          </div>
+          <div class="step-nav"></div>
+        </div>
+      </div>
+      <ol class="steps"></ol>
+    </div>
+    <footer class="note">
+      <b>All three logs save instantly</b> — no navigating away first. End Day Log's checklist near the bottom fills itself in from whatever you've already logged that day, so it's a good gut-check before saving. Sample entries: 74.6kg / sleep 4 / 8,200 steps / fatigue 3, stress 2, hunger 4.
+    </footer>
+  </section>
+
+  <!-- ===================== TUTORIAL 4 ===================== -->
+  <section class="tutorial" id="tutorial-4" data-video="04_training_tab_session.mp4">
+    <div class="tut-header">
+      <div class="eyebrow"><span class="dot"></span> Tutorial 4 of 9</div>
+      <h2>Training Tab: building and running a session</h2>
+      <p>Adding a full exercise list, logging sets with weight and reps, the rest timer, saving it as a reusable template, and finishing to see your session summary.</p>
+    </div>
+    <div class="stage">
+      <div class="phone-col">
+        <div class="phone">
+          <div class="screen">
+            <video class="vid" playsinline preload="metadata">
+              <source src="04_training_tab_session.mp4" type="video/mp4">
+            </video>
+            <div class="tap-marker"><div class="ring"></div><div class="core"></div></div>
+            <button class="play-overlay" aria-label="Play video">
+              <span class="btn"><svg viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></span>
+            </button>
+          </div>
+          <div class="caption-strip">
+            <div class="step-tag">Step 1 / 14</div>
+            <div class="step-title">Type an exercise name</div>
+            <div class="step-desc">Start typing under NEW_PROTOCOL_SEQUENCE — matching exercises suggest themselves as you go.</div>
+          </div>
+        </div>
+        <div class="controls">
+          <div class="scrubber"><div class="track"><div class="fill"></div></div></div>
+          <div class="ctrl-row">
+            <button class="play-btn" aria-label="Play/Pause"><svg class="play-icon" viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></button>
+            <span class="time">0:00 / 0:00</span>
+          </div>
+          <div class="step-nav"></div>
+        </div>
+      </div>
+      <ol class="steps"></ol>
+    </div>
+    <footer class="note">
+      <b>One moment is shown as a still, not live video:</b> the emulator recorder had the same in-page scrolling limitation here — the Bench Press and Lat Pulldown set/weight/timer step freezes on a screenshot instead of animating. Everything else, including all five remaining exercises, is the real recording. Sample session "Push Day A": 7 exercises, 7 sets, 2,070kg volume. Sharing the finished summary works the same way as any share sheet on your phone — to Messages, WhatsApp, Instagram Stories, or wherever — it isn't shown here since it just hands off to your phone's own share screen.
+    </footer>
+  </section>
+
+  <!-- ===================== TUTORIAL 5 ===================== -->
+  <section class="tutorial" id="tutorial-5" data-video="05_outdoor_activity_tracker.mp4">
+    <div class="tut-header">
+      <div class="eyebrow"><span class="dot"></span> Tutorial 5 of 9</div>
+      <h2>Outdoor Activity Tracker: GPS walks, runs &amp; rides</h2>
+      <p>Live GPS tracking for outdoor sessions — pick an activity, watch your stats update in real time, save it to a real map, and find it again in your history.</p>
+    </div>
+    <div class="stage">
+      <div class="phone-col">
+        <div class="phone">
+          <div class="screen">
+            <video class="vid" playsinline preload="metadata">
+              <source src="05_outdoor_activity_tracker.mp4" type="video/mp4">
+            </video>
+            <div class="tap-marker"><div class="ring"></div><div class="core"></div></div>
+            <button class="play-overlay" aria-label="Play video">
+              <span class="btn"><svg viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></span>
+            </button>
+          </div>
+          <div class="caption-strip">
+            <div class="step-tag">Step 1 / 9</div>
+            <div class="step-title">Open the Outdoor Activity Tracker</div>
+            <div class="step-desc">Lower on the Training tab — a GPS card separate from the exercise queue above it.</div>
+          </div>
+        </div>
+        <div class="controls">
+          <div class="scrubber"><div class="track"><div class="fill"></div></div></div>
+          <div class="ctrl-row">
+            <button class="play-btn" aria-label="Play/Pause"><svg class="play-icon" viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></button>
+            <span class="time">0:00 / 0:00</span>
+          </div>
+          <div class="step-nav"></div>
+        </div>
+      </div>
+      <ol class="steps"></ol>
+    </div>
+    <footer class="note">
+      <b>Real GPS, not a demo mode:</b> this uses your phone's actual location the whole time — there's no manual "enter your duration" fallback, so keep the app open and screen on while tracking, or the location watch pauses. Sample walk shown: ~0.15km over 1:37, Manila streets. The map tiles show "API key required" here only because this test account has no Carto basemap key configured — your own key (or the free default) would show full street tiles instead of the placeholder grid.
+    </footer>
+  </section>
+
+  <!-- ===================== TUTORIAL 6 ===================== -->
+  <section class="tutorial" id="tutorial-6" data-video="06_fuel_tab_food_logging.mp4">
+    <div class="tut-header">
+      <div class="eyebrow"><span class="dot"></span> Tutorial 6 of 9</div>
+      <h2>Fuel Tab: logging food every way the app supports</h2>
+      <p>Searching a real food database, letting AI estimate a home-cooked dish, scanning a barcode, uploading a plate photo, and the pure-manual entry path — plus overriding a whole day's totals if you already track elsewhere.</p>
+    </div>
+    <div class="stage">
+      <div class="phone-col">
+        <div class="phone">
+          <div class="screen">
+            <video class="vid" playsinline preload="metadata">
+              <source src="06_fuel_tab_food_logging.mp4" type="video/mp4">
+            </video>
+            <div class="tap-marker"><div class="ring"></div><div class="core"></div></div>
+            <button class="play-overlay" aria-label="Play video">
+              <span class="btn"><svg viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></span>
+            </button>
+          </div>
+          <div class="caption-strip">
+            <div class="step-tag">Step 1 / 10</div>
+            <div class="step-title">Open Dietary Algorithm → Add food</div>
+            <div class="step-desc">Breakfast, Lunch, Dinner, Snacks — each has its own "+ Add food" button.</div>
+          </div>
+        </div>
+        <div class="controls">
+          <div class="scrubber"><div class="track"><div class="fill"></div></div></div>
+          <div class="ctrl-row">
+            <button class="play-btn" aria-label="Play/Pause"><svg class="play-icon" viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></button>
+            <span class="time">0:00 / 0:00</span>
+          </div>
+          <div class="step-nav"></div>
+        </div>
+      </div>
+      <ol class="steps"></ol>
+    </div>
+    <footer class="note">
+      <b>AI estimates work out of the box — no key required.</b> Both "Estimate with AI" and "Estimate from Photo" run on Winfinity's shared free pool by default; you only need your own Gemini API key (Menu → Settings, see Tutorial 2) to get your own quota instead of sharing the pool. Every AI estimate comes back flagged "low accuracy, review before saving" for a reason — treat it as a starting point, not gospel. One real gotcha caught on camera: tapping too close to a search result re-selects it and resets your unit/serving changes — the actual "Add to diary" button is the one below the warning box, not the one right under the result list.
+    </footer>
+  </section>
+
+  <!-- ===================== TUTORIAL 7 ===================== -->
+  <section class="tutorial" id="tutorial-7" data-video="07_bio_tab_features.mp4">
+    <div class="tut-header">
+      <div class="eyebrow"><span class="dot"></span> Tutorial 7 of 9</div>
+      <h2>Bio Tab: your profile, daily log & body measurements</h2>
+      <p>Jumping between days with the Temporal Entity Log, editing your core profile, logging today's stress/fatigue/hunger, weekly progress photos, the AI-assisted body scan visual, and manual skinfold caliper entry for body fat %.</p>
+    </div>
+    <div class="stage">
+      <div class="phone-col">
+        <div class="phone">
+          <div class="screen">
+            <video class="vid" playsinline preload="metadata">
+              <source src="07_bio_tab_features.mp4" type="video/mp4">
+            </video>
+            <div class="tap-marker"><div class="ring"></div><div class="core"></div></div>
+            <button class="play-overlay" aria-label="Play video">
+              <span class="btn"><svg viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></span>
+            </button>
+          </div>
+          <div class="caption-strip">
+            <div class="step-tag">Step 1 / 11</div>
+            <div class="step-title">Your Biometric Analytics hub</div>
+            <div class="step-desc">The Bio tab is where your profile, daily wellness log, and body measurements all live.</div>
+          </div>
+        </div>
+        <div class="controls">
+          <div class="scrubber"><div class="track"><div class="fill"></div></div></div>
+          <div class="ctrl-row">
+            <button class="play-btn" aria-label="Play/Pause"><svg class="play-icon" viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></button>
+            <span class="time">0:00 / 0:00</span>
+          </div>
+          <div class="step-nav"></div>
+        </div>
+      </div>
+      <ol class="steps"></ol>
+    </div>
+    <footer class="note">
+      <b>Two moments are shown as a still frame, not live video:</b> tapping into the Progress Photos gallery and switching to a body-scan visual didn't record cleanly on this rig, so those two beats are a held screenshot rather than motion — everything else is a real recording. The body-scan image and its "PRO PHOTO / USER ENTRY" buttons are a stylized visual, not an actual 3D scan — tap USER ENTRY to log real caliper numbers instead. Body fat % here comes from the Jackson-Pollock 7-site skinfold formula, which needs physical skinfold calipers to measure — it's an estimate, not a medical reading.
+    </footer>
+  </section>
+
+  <!-- ===================== TUTORIAL 8 ===================== -->
+  <section class="tutorial" id="tutorial-8" data-video="08_coach_assessment.mp4">
+    <div class="tut-header">
+      <div class="eyebrow"><span class="dot"></span> Tutorial 8 of 9</div>
+      <h2>Sending a Request Assessment to your coach</h2>
+      <p>From the Bio tab's Coach assignment card: choosing what data to include, sharing it, and where the generated report images actually land on your phone — because they're saved locally even if you cancel the share sheet.</p>
+    </div>
+    <div class="stage">
+      <div class="phone-col">
+        <div class="phone">
+          <div class="screen">
+            <video class="vid" playsinline preload="metadata">
+              <source src="08_coach_assessment.mp4" type="video/mp4">
+            </video>
+            <div class="tap-marker"><div class="ring"></div><div class="core"></div></div>
+            <button class="play-overlay" aria-label="Play video">
+              <span class="btn"><svg viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></span>
+            </button>
+          </div>
+          <div class="caption-strip">
+            <div class="step-tag">Step 1 / 8</div>
+            <div class="step-title">Ask your coach for a check-in</div>
+            <div class="step-desc">Bio tab → Coach assignment → Request Assessment.</div>
+          </div>
+        </div>
+        <div class="controls">
+          <div class="scrubber"><div class="track"><div class="fill"></div></div></div>
+          <div class="ctrl-row">
+            <button class="play-btn" aria-label="Play/Pause"><svg class="play-icon" viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></button>
+            <span class="time">0:00 / 0:00</span>
+          </div>
+          <div class="step-nav"></div>
+        </div>
+      </div>
+      <ol class="steps"></ol>
+    </div>
+    <footer class="note">
+      <b>Each checked category saves as its own image</b> — nine separate PNGs for the default selection, all dropped into your phone's regular Downloads folder, named for what's in them (e.g. "bodyfat-log.png", "weight-journey.png"). Chrome will ask permission once to "download multiple files" — allow it, or only the first image saves. Cancelling the share sheet afterward does NOT delete them; they stay in Downloads for you to attach manually, or just resend the request later once your coach account is connected. Opening the actual file-manager/gallery app from your homescreen is shown as a still frame here rather than live video, since navigating that OS-level app switch didn't record reliably on this rig.
+    </footer>
+  </section>
+
+  <!-- ===================== TUTORIAL 9 ===================== -->
+  <section class="tutorial" id="tutorial-9" data-video="09_themes_and_backgrounds.mp4">
+    <div class="tut-header">
+      <div class="eyebrow"><span class="dot"></span> Tutorial 9 of 9</div>
+      <h2>Light/Dark mode, themes &amp; custom backgrounds</h2>
+      <p>Menu → Settings → Appearance: flipping light/dark, switching between Digital and Minimalist mode, trying a couple of the 8 built-in themes, and uploading your own photo as the app's background with position, blur, dim and transparency controls.</p>
+    </div>
+    <div class="stage">
+      <div class="phone-col">
+        <div class="phone">
+          <div class="screen">
+            <video class="vid" playsinline preload="metadata">
+              <source src="09_themes_and_backgrounds.mp4" type="video/mp4">
+            </video>
+            <div class="tap-marker"><div class="ring"></div><div class="core"></div></div>
+            <button class="play-overlay" aria-label="Play video">
+              <span class="btn"><svg viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></span>
+            </button>
+          </div>
+          <div class="caption-strip">
+            <div class="step-tag">Step 1 / 14</div>
+            <div class="step-title">Appearance settings</div>
+            <div class="step-desc">Menu → Settings → Appearance: the light/dark switch, Digital/Minimalist mode, and the theme picker all live here.</div>
+          </div>
+        </div>
+        <div class="controls">
+          <div class="scrubber"><div class="track"><div class="fill"></div></div></div>
+          <div class="ctrl-row">
+            <button class="play-btn" aria-label="Play/Pause"><svg class="play-icon" viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></button>
+            <span class="time">0:00 / 0:00</span>
+          </div>
+          <div class="step-nav"></div>
+        </div>
+      </div>
+      <ol class="steps"></ol>
+    </div>
+    <footer class="note">
+      <b>Minimalist mode hides the Custom Background section entirely</b> — it strips every theme down to just its color palette with no glow/gradient effects and no photo background, by design. Switch to Digital mode first if you don't see the options shown here. A custom background photo is auto-resized on upload so it won't eat your storage, and the Widget Box Fill / Widget Opacity sliders (separate from the photo's own Blur/Dim/Transparency) work even with no photo set — they just fade your cards to let the plain theme color show through instead.
+    </footer>
+  </section>
+</div>
+
+<script>
+(function(){
+  const TUTORIALS = [
+    {
+      selector: '[data-video="01_playstore_install_and_signup.mp4"]',
+      steps: [
+        {t:0,   title:"Open Chrome", desc:"Tap into the browser from the homescreen or app drawer."},
+        {t:10,  title:"Go to winfinityfitness.com", desc:"Type the URL and hit enter — the site loads straight to the hero page."},
+        {t:22,  title:"Tap “Get it on Google Play”", desc:"The badge near the bottom of the homepage links straight to the Play Store listing.", m:{x:50,y:71.6}},
+        {t:26,  title:"Install the app", desc:"It’s a small app — install finishes in a couple of seconds.", m:{x:15.5,y:31.8}},
+        {t:30,  title:"Open it from your homescreen", desc:"Once installed, the Winfinity icon sits on your homescreen like any other app."},
+        {t:32,  title:"First-launch prompts", desc:"Dismiss the “Running in Chrome” notice, allow location (used for weather), and close the sponsored ad.", m:{x:83.6,y:28.3}},
+        {t:48,  title:"Set up your profile", desc:"Name, age, height, weight, activity level, and your weight goals — every field stays editable later from Bio."},
+        {t:116, title:"Tap “Initialize Profile Sync”", desc:"Locks in your profile and pre-loads 7 days of sample data so the graphs and rings aren’t empty on day one.", m:{x:50,y:88}},
+        {t:120, title:"Sample-data heads-up", desc:"A popup explains the demo data. Clear it anytime later from Menu → Settings.", m:{x:50,y:75.9}},
+        {t:128, title:"Support popup (optional)", desc:"A one-time ask to review Winfinity on Facebook — perfectly fine to skip with Continue.", m:{x:50,y:63}},
+        {t:136, title:"Pick your tier — start at Novice", desc:"Novice keeps the screen simple at first; more unlocks as you log consistently for a week.", m:{x:50,y:42.2}},
+        {t:144, title:"Agree to Privacy & Terms", desc:"Check the box, then tap Agree & Continue.", m:{x:25.5,y:59.4}},
+        {t:157, title:"You’re in!", desc:"Straight onto the dashboard, ready to log your first day."}
+      ]
+    },
+    {
+      selector: '[data-video="02_settings_measurements_photo.mp4"]',
+      steps: [
+        {t:0,   title:"Open Menu → Settings", desc:"Everything in this tutorial lives on one screen: Menu tab, then Settings.", m:{x:88.9,y:92.7}},
+        {t:9,   title:"Turn on push notifications", desc:"Alerts you when a coach reviews your log or when the app has something to tell you.", m:{x:67.1,y:40}},
+        {t:18,  title:"Turn on hydration reminders", desc:"Fires while the app is open, on a schedule you set below.", m:{x:62.1,y:50}},
+        {t:27,  title:"Set the schedule, check Progress Photo reminders", desc:"Wake-up/bedtime and meal times, plus a weekly nudge to log measurements and a photo. Tap Save.", m:{x:17.7,y:87.7}},
+        {t:45,  title:"Turn on Web Dashboard Sync", desc:"Set a Sync PIN, then use it with your Digital ID to sign in at wellness.winfinityfitness.com.", still:true},
+        {t:49,  title:"Optional: add your own Gemini API key", desc:"AI food/photo scans already work on the shared free pool — only add a key to use your own quota.", still:true},
+        {t:53,  title:"Open Bio → Progress Photos → User Entry", desc:"The Measurement Log Entry sheet opens for this week's check-in.", m:{x:90.5,y:80.6}},
+        {t:60,  title:"Log this week's measurements", desc:"Chest, shoulder, biceps, waist at three points, thighs, calves — in centimeters.", },
+        {t:88,  title:"Save — you're back on Bio", desc:"The entry is logged; the sheet closes automatically."},
+        {t:96,  title:"Tap PRO PHOTO, create a folder, upload", desc:"Name a folder like “Week 1, Front pose”, then pull a photo in from your gallery.", m:{x:9.4,y:80.6}},
+        {t:105, title:"Photos stay grouped by folder", desc:"Add a new folder each week so before/afters are easy to compare later.", still:true}
+      ]
+    },
+    {
+      selector: '[data-video="03_quicklog_start_end_weekend.mp4"]',
+      steps: [
+        {t:0,   title:"Open Start Day Log", desc:"Tap the card on the Status tab's Quick Log section.", m:{x:20,y:50.6}},
+        {t:10,  title:"Enter this morning's weight", desc:"Defaults to your last logged value — edit it to today's number.", m:{x:50,y:73.8}},
+        {t:16,  title:"Rate sleep quality, log water", desc:"Drag the slider, check the box if you've already had a glass.", m:{x:5.4,y:85.9}},
+        {t:23,  title:"Confirm & Save", desc:"A green “Saved.” confirms it, and a Share button appears.", m:{x:50,y:91.4}},
+        {t:30,  title:"Open End Day Log", desc:"The evening review — steps, workout, mood sliders, and a reflection.", m:{x:50,y:50.6}},
+        {t:35,  title:"Log steps, mark workout, rate the day", desc:"Fatigue, Stress and Hunger sliders — Calories/Protein pull in automatically from Fuel Log.", m:{x:50,y:33.8}},
+        {t:48,  title:"Reflect: today's struggle & the fix", desc:"Two free-text boxes — what got in the way, and what you'll try differently.", m:{x:50,y:77.9}},
+        {t:68,  title:"Check the auto-checklist, then Save", desc:"Shows what's already logged today at a glance before you confirm.", m:{x:50,y:91.4}},
+        {t:78,  title:"Open Weekend Log", desc:"The Sunday wrap-up — one review per week, not per day.", m:{x:79.8,y:50.6}},
+        {t:85,  title:"Check off Photo/Measurement, write your week", desc:"Adjustments made, wins, and improvements — three short reflections.", m:{x:50,y:41.8}},
+        {t:98,  title:"Pick 1-2 focus areas for next week", desc:"A short checklist keeps next week's goal specific instead of vague.", m:{x:7.8,y:69.9}},
+        {t:108, title:"Confirm & Save — week logged", desc:"Wraps the week and timestamps the review.", m:{x:50,y:91.4}}
+      ]
+    },
+    {
+      selector: '[data-video="04_training_tab_session.mp4"]',
+      steps: [
+        {t:0,   title:"Type an exercise name", desc:"Start typing under NEW_PROTOCOL_SEQUENCE — matching exercises suggest themselves as you go.", m:{x:50,y:46}},
+        {t:8,   title:"Tap Synchronize new exercise", desc:"Adds it to today's queue with an empty first set ready to fill in.", m:{x:50,y:51}},
+        {t:15,  title:"Add the next one — Lat Pulldown", desc:"Same field, same button, every time. The queue stacks up as you go."},
+        {t:45,  title:"Keep going — Incline Bench Press, Barbell Rows", desc:"No limit on how many exercises go into one session."},
+        {t:100, title:"...Lateral Raise, Bicep Curl, Tricep Extension", desc:"Seven exercises queued up for this Push Day."},
+        {t:150, title:"Fill in reps, weight — and the KG/LB toggle", desc:"Load switches units instantly; reps is your target for that set.", still:true},
+        {t:152, title:"Check the set off — the rest timer starts", desc:"Counts down before your next set or exercise, and pings you when it's done.", still:true},
+        {t:155, title:"Same pattern for every exercise", desc:"Reps, weight, check — Incline Bench Press picks up right where Lat Pulldown left off."},
+        {t:180, title:"Barbell Rows, Lateral Raise, Bicep Curl, Tricep Extension", desc:"Each one gets its own set, weight, and rest timer running in parallel."},
+        {t:220, title:"Save the whole session as a template", desc:"Name it once — “Push Day A” — and every exercise, set count, and order comes with it.", m:{x:17.7,y:72.1}},
+        {t:233, title:"It's saved and ready to reload", desc:"Shows up in “Load a saved session” any day you want to run this exact workout again."},
+        {t:240, title:"Scroll down and tap Finish", desc:"Wraps up today's session.", m:{x:9.2,y:52.6}},
+        {t:245, title:"Workout Summary", desc:"Exercises, sets, total volume, and your top set on every single lift — that's where a new PR would show."},
+        {t:253, title:"Share it (optional)", desc:"Hands off to your phone's own share sheet — Messages, WhatsApp, Instagram Stories, wherever you'd post a workout."}
+      ]
+    },
+    {
+      selector: '[data-video="05_outdoor_activity_tracker.mp4"]',
+      steps: [
+        {t:0,  title:"Open the Outdoor Activity Tracker", desc:"Lower on the Training tab, below the exercise queue and Personal Records."},
+        {t:4,  title:"Pick Walk, Run, or Ride", desc:"Sets which speed/pace ranges make sense for the stats below.", m:{x:50,y:29.7}},
+        {t:9,  title:"Scroll down to Start tracking", desc:"Past the (currently empty) live map preview."},
+        {t:13, title:"Tap Start tracking — GPS locks on", desc:"A green “GPS locked — tracking” confirms your location has a fix."},
+        {t:18, title:"Live stats update in real time", desc:"Duration, distance, avg/max speed, pace, and estimated steps — all driven by your actual movement."},
+        {t:32, title:"Watch your route draw as you move", desc:"A live line traces your path while the session is running."},
+        {t:46, title:"Tap Stop & save", desc:"Logs the session and unlocks the map, share, and history views below."},
+        {t:52, title:"Your route on a real map", desc:"Start and end pins with the full path between them — this is a real street map, not a placeholder."},
+        {t:62, title:"Share it, or find it in Activity History", desc:"Share activity / Share to My Day post it; every past session stays listed below, newest first."}
+      ]
+    },
+    {
+      selector: '[data-video="06_fuel_tab_food_logging.mp4"]',
+      steps: [
+        {t:0,   title:"Open Dietary Algorithm → Add food", desc:"Breakfast, Lunch, Dinner, Snacks each get their own “+ Add food” button."},
+        {t:5,   title:"Search foods — type a name", desc:"A real food database, with brand-name results and calories per 100g.", m:{x:50,y:48.5}},
+        {t:10,  title:"Pick a result, confirm the serving", desc:"Confirm Serving shows the recalculated kcal/protein/carbs/fat for your amount."},
+        {t:16,  title:"Change the unit", desc:"g, oz, ml, cup, bowl, piece, stick, pack — switching units re-scales the numbers (not the quantity itself, so double-check it).", m:{x:72.7,y:74.1}},
+        {t:40,  title:"Tap Add to diary", desc:"One real gotcha: tapping too close to the result above re-selects it and resets your changes — the real button sits below the warning box."},
+        {t:58,  title:"Not finding it? Type a name, tap Estimate with AI", desc:"Works immediately on Winfinity's shared pool — no personal API key needed to try it."},
+        {t:68,  title:"Review the AI estimate, then Add to diary", desc:"Always flagged “low accuracy, review before saving” — treat it as a starting point."},
+        {t:111, title:"Scan barcode", desc:"Opens a live camera view pointed at the product's barcode — same permission prompt as any web camera feature.", m:{x:50,y:41}},
+        {t:138, title:"Or skip the database entirely — enter by hand", desc:"Serving size, unit, calories, protein, carbs, fat — every field editable, no lookup required."},
+        {t:176, title:"Dietary Manual Input — override a whole day", desc:"For MyFitnessPal etc. users: paste in a day's totals and it replaces what Dietary Algorithm calculated, ring and all."}
+      ]
+    },
+    {
+      selector: '[data-video="07_bio_tab_features.mp4"]',
+      steps: [
+        {t:0,    title:"Your Biometric Analytics hub", desc:"Profile, daily wellness log, and body measurements all live on this one tab."},
+        {t:1.8,  title:"Temporal Entity Log — jump to any day", desc:"A full calendar of every day you've logged, dots mark the ones with data.", m:{x:50,y:29.9}},
+        {t:3.6,  title:"Tap a date to view or edit it", desc:"Selecting a past day loads that day's Stress/Fatigue/Hunger sliders instead of today's."},
+        {t:6.3,  title:"Entity Identity — your core profile", desc:"Name, age, sex, height, weight, activity level and goals — the numbers every calculation in the app is built on."},
+        {t:8.5,  title:"Scroll for hydration, steps & habits", desc:"Daily hydration goal, step target, and up to 5 custom habit protocols you define yourself."},
+        {t:11.0, title:"Log today's stress, fatigue & hunger", desc:"Three quick sliders — drag to update either number."},
+        {t:12.6, title:"Tap Initialize sync to save", desc:"Confirms today's biometric log."},
+        {t:13.9, title:"Weekly progress photos", desc:"Group photos into dated folders like “Week 1, Front pose” to compare over time."},
+        {t:16.9, title:"AI-assisted body scan visual", desc:"A stylized reference image, not an actual 3D scan — PRO PHOTO / USER ENTRY are the two ways to log real numbers.", m:{x:9.4,y:90.6}},
+        {t:19.9, title:"Body fat % & water retention", desc:"Two calculated rings, both driven by the skinfold measurements you enter below."},
+        {t:22.3, title:"Manual caliper measurements", desc:"Jackson-Pollock 7-site method — chest, abdomen, thigh, triceps, suprailiac, subscapular, midaxillary, in millimeters.", m:{x:21,y:90.4}}
+      ]
+    },
+    {
+      selector: '[data-video="08_coach_assessment.mp4"]',
+      steps: [
+        {t:0,   title:"Ask your coach for a check-in", desc:"Bio tab → Coach assignment → Request Assessment.", m:{x:50,y:28.6}},
+        {t:2.0, title:"Choose what to include", desc:"Nine categories, all checked by default — accomplishment log, measurements, body fat, weight journey, performance, workouts, outdoor activity, fuel status and targets."},
+        {t:4.2, title:"Tap Share", desc:"Hands off to your phone's normal share sheet, same as any other app."},
+        {t:6.0, title:"Chrome asks to allow multiple downloads", desc:"Each checked category generates its own image — tap Allow to let all of them save.", m:{x:85,y:55.2}},
+        {t:8.0, title:"Nine images saved to your device", desc:"They land in your regular Downloads folder, even if you back out of the share sheet without picking an app."},
+        {t:10.0,title:"Find them in your gallery or file manager", desc:"Each PNG is named for what's inside it — “bodyfat-log.png”, “weight-journey.png”, and so on.", still:true},
+        {t:13.2,title:"Open one — it's a full report card", desc:"Entity Weight Journey shown here: a 7-day chart, full-history chart, and goal progress bar, branded and ready to send as-is."}
+      ]
+    },
+    {
+      selector: '[data-video="09_themes_and_backgrounds.mp4"]',
+      steps: [
+        {t:0,    title:"Appearance settings", desc:"Menu → Settings → Appearance: the light/dark switch, Digital/Minimalist mode, and the theme picker all live here."},
+        {t:1.5,  title:"Flip light and dark", desc:"Every theme below supports both — the sun/moon switch works independently of which one you've picked.", m:{x:53.4,y:27.2}},
+        {t:4.0,  title:"Digital mode unlocks Custom Background", desc:"Minimalist strips every theme to a flat color palette and hides this section entirely — switch to Digital to get it back.", m:{x:26.5,y:34.8}},
+        {t:7.0,  title:"Tap Theme to see all 8 options", desc:"Winfinity Default, Default Core, Shinobi Core, Grand Core, Sovereign Core, Hashira Core, Nezuko Digital, Steampunk Core.", m:{x:50,y:41.6}},
+        {t:9.3,  title:"Try one — Grand Core", desc:"A completely different palette and shape language from the same toggle, no page reload needed."},
+        {t:12.5, title:"Switch back to Steampunk Core", desc:"Reopen the same dropdown any time — nothing about your data changes when you switch themes."},
+        {t:15.8, title:"Tap Choose Image", desc:"Opens your phone's normal photo picker, same as any upload field in the app.", m:{x:15,y:88.3}},
+        {t:18.5, title:"Browse finds every album", desc:"Recent Chrome downloads show first — tap Browse for the full picker with Downloads, Gallery, and more."},
+        {t:20.7, title:"Gallery groups photos by folder", desc:"Scroll to whichever album holds the photo you want to use."},
+        {t:22.7, title:"Open the folder, tap the photo", desc:"This example uses a custom steampunk logo graphic pushed into DCIM."},
+        {t:25.8, title:"Background image set", desc:"A dominant-color tint shows immediately behind the Settings sheet, even before you touch a single slider."},
+        {t:30.5, title:"Position, Blur, Dim, Transparency", desc:"Fill/Fit/Center/Tile/Crop for how the photo sits, plus three sliders to tune it — drag, then tap Apply to commit.", m:{x:50,y:64.3}},
+        {t:36.0, title:"Close Settings — it's already live", desc:"The photo shows through right away; no separate save step.", m:{x:93.8,y:19.9}},
+        {t:39.3, title:"Full reveal on the Status tab", desc:"The background sits behind every card app-wide, with the Widget Fill/Opacity sliders controlling how much shows through."}
+      ]
+    }
+  ];
+
+  const ICON_PLAY = '<path d="M6 4l15 8-15 8z"/>';
+  const ICON_PAUSE = '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>';
+
+  function fmt(s){
+    s = Math.max(0, Math.floor(s||0));
+    const m = Math.floor(s/60), r = s%60;
+    return m + ':' + String(r).padStart(2,'0');
+  }
+
+  function initTutorial(section, STEPS){
+    const vid = section.querySelector('.vid');
+    const marker = section.querySelector('.tap-marker');
+    const capTag = section.querySelector('.step-tag');
+    const capTitle = section.querySelector('.step-title');
+    const capDesc = section.querySelector('.step-desc');
+    const playOverlay = section.querySelector('.play-overlay');
+    const playBtn = section.querySelector('.play-btn');
+    const playIcon = section.querySelector('.play-icon');
+    const track = section.querySelector('.track');
+    const fill = section.querySelector('.fill');
+    const scrubber = section.querySelector('.scrubber');
+    const timeLabel = section.querySelector('.time');
+    const stepList = section.querySelector('.steps');
+    const stepNav = section.querySelector('.step-nav');
+
+    function jumpToStep(step){
+      try{ vid.currentTime = step.t + 0.05; }catch(e){}
+      vid.play().catch(()=>{});
+    }
+
+    STEPS.forEach((step, i) => {
+      const li = document.createElement('li');
+      li.className = 'step-item';
+      li.innerHTML =
+        '<span class="step-num">'+ (i+1) +'</span>' +
+        '<span class="step-body"><h3></h3><p></p></span>' +
+        '<span class="step-time"></span>';
+      li.querySelector('h3').textContent = step.title;
+      li.querySelector('p').textContent = step.desc;
+      li.querySelector('.step-time').textContent = fmt(step.t);
+      li.addEventListener('click', () => jumpToStep(step));
+      stepList.appendChild(li);
+
+      const navBtn = document.createElement('button');
+      navBtn.type = 'button';
+      navBtn.textContent = i + 1;
+      navBtn.setAttribute('aria-label', 'Step ' + (i+1) + ': ' + step.title);
+      navBtn.addEventListener('click', () => jumpToStep(step));
+      stepNav.appendChild(navBtn);
+    });
+
+    function buildTicks(){
+      const dur = vid.duration || 160;
+      track.querySelectorAll('.tick').forEach(t=>t.remove());
+      STEPS.forEach(step=>{
+        const tick = document.createElement('div');
+        tick.className = 'tick';
+        tick.style.left = (step.t/dur*100) + '%';
+        track.appendChild(tick);
+      });
+    }
+
+    function activeIndex(t){
+      let idx = 0;
+      for(let i=0;i<STEPS.length;i++){ if(t >= STEPS[i].t) idx = i; }
+      return idx;
+    }
+
+    function render(){
+      const t = vid.currentTime || 0;
+      const dur = vid.duration || 160;
+      const idx = activeIndex(t);
+      const step = STEPS[idx];
+
+      fill.style.width = (t/dur*100) + '%';
+      timeLabel.textContent = fmt(t) + ' / ' + fmt(dur);
+
+      capTag.textContent = 'Step ' + (idx+1) + ' / ' + STEPS.length + (step.still ? ' · still' : '');
+      capTitle.textContent = step.title;
+      capDesc.textContent = step.desc;
+
+      if(step.m){
+        marker.style.left = step.m.x + '%';
+        marker.style.top = step.m.y + '%';
+        marker.classList.add('show');
+      } else {
+        marker.classList.remove('show');
+      }
+
+      [...stepList.children].forEach((li,i)=>{
+        li.classList.toggle('active', i===idx);
+      });
+      [...stepNav.children].forEach((btn,i)=>{
+        btn.classList.toggle('active', i===idx);
+      });
+      const stepsVisible = getComputedStyle(stepList).display !== 'none';
+      const activeLi = stepList.children[idx];
+      if(stepsVisible && activeLi){
+        const rect = activeLi.getBoundingClientRect();
+        if(rect.top < 0 || rect.bottom > window.innerHeight){
+          activeLi.scrollIntoView({block:'nearest', behavior:'smooth'});
+        }
+      }
+    }
+
+    vid.addEventListener('loadedmetadata', buildTicks);
+    vid.addEventListener('timeupdate', render);
+    vid.addEventListener('play', ()=>{
+      playOverlay.dataset.hidden = 'true';
+      playIcon.innerHTML = ICON_PAUSE;
+    });
+    vid.addEventListener('pause', ()=>{
+      playOverlay.dataset.hidden = (vid.currentTime>0 && vid.currentTime<vid.duration) ? 'true':'false';
+      playIcon.innerHTML = ICON_PLAY;
+    });
+    vid.addEventListener('ended', ()=>{
+      playOverlay.dataset.hidden = 'false';
+      playIcon.innerHTML = ICON_PLAY;
+    });
+
+    function togglePlay(){
+      if(vid.paused){ vid.play().catch(()=>{}); } else { vid.pause(); }
+    }
+    playOverlay.addEventListener('click', togglePlay);
+    playBtn.addEventListener('click', togglePlay);
+
+    function seekFromEvent(e){
+      const rect = track.getBoundingClientRect();
+      const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+      const pct = Math.min(1, Math.max(0, x/rect.width));
+      vid.currentTime = pct * (vid.duration||160);
+    }
+    let dragging = false;
+    scrubber.addEventListener('mousedown', e=>{ dragging=true; seekFromEvent(e); });
+    window.addEventListener('mousemove', e=>{ if(dragging) seekFromEvent(e); });
+    window.addEventListener('mouseup', ()=>{ dragging=false; });
+    scrubber.addEventListener('touchstart', e=>{ dragging=true; seekFromEvent(e); }, {passive:true});
+    scrubber.addEventListener('touchmove', e=>{ if(dragging) seekFromEvent(e); }, {passive:true});
+    scrubber.addEventListener('touchend', ()=>{ dragging=false; });
+
+    render();
+  }
+
+  TUTORIALS.forEach(cfg => {
+    const section = document.querySelector(cfg.selector);
+    if(section) initTutorial(section, cfg.steps);
+  });
+})();
+</script>
