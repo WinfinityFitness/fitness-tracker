@@ -94,6 +94,19 @@
   .tutorial-nav-btn span { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.01em; }
   .tutorial-nav-btn:hover:not(.is-disabled) { background: rgba(255,159,67,0.1); }
   .tutorial-nav-btn.is-disabled { color: var(--text-muted); opacity: 0.4; cursor: default; }
+
+  /* Full-length video walkthrough (the 9-tutorial recorded walkthrough
+     page), distinct from the per-tab tutorial-nav buttons above -- this
+     opens the standalone page directly rather than posting wfOpenTutorial,
+     since it's a full page of its own, not an in-page overlay fragment. */
+  .app-video-walkthrough-btn {
+    display: block; text-align: center; text-decoration: none;
+    border: 1px solid var(--accent); color: var(--accent); background: none;
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+    padding: 10px 14px; border-radius: 8px; margin-top: 10px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .app-video-walkthrough-btn:hover { background: var(--accent); color: var(--bg); }
 </style>
 </head>
 <body>
@@ -147,6 +160,8 @@
           <span>Menu</span>
         </button>
       </div>
+
+      <a class="app-video-walkthrough-btn" href="https://wftutorial.winfinityfitness.com" target="_blank" rel="noopener">Video Walkthrough</a>
     </div>
 
     <div class="app-card">
