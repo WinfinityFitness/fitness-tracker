@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.95';
+const APP_VERSION = 'WF_SYS_V.1.7.96';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -12269,6 +12269,41 @@ const WORKOUT_PRESETS = [
         _pex('Leg Extensions', 3, 12, '12–15 reps', 75),
         _pex('Lying Leg Curls', 3, 12, '12–15 reps', 75),
         _pex('Hanging Knee Raises', 3, 12, '12–15 reps', 60),
+      ]},
+    ],
+  },
+  {
+    id: 'glute-back-4',
+    label: 'Glute & Back Focus — 4 Days/Week (Upper/Lower Split)',
+    days: [
+      { name: 'Day 1 — Lower Body A (Glute & Hamstring Priority)', exercises: [
+        _pex('Barbell Hip Thrusts', 4, 8, '8–10 reps', 100, 'Pause 1 sec at the top of every rep'),
+        _pex('Romanian Deadlifts (Dumbbells or Barbell)', 3, 8, '8–10 reps', 100, 'Slight arch in lower back, push hips straight back'),
+        _pex('Bulgarian Split Squats (Torso Leaned Forward)', 3, 10, '10 reps per leg', 90, 'Leaning forward shifts load onto glutes over quads'),
+        _pex('Seated or Lying Leg Curls', 3, 12, '12–15 reps', 75),
+        _pex('Cable Pull-Throughs', 3, 15, '15 reps', 60),
+      ]},
+      { name: 'Day 2 — Upper Body A (Back & Posture Focus)', exercises: [
+        _pex('Lat Pulldowns (Wide or Neutral Grip)', 3, 8, '8–10 reps', 100, 'Pull elbows down and back, chest up'),
+        _pex('Chest-Supported Rows (Machine or Incline Bench)', 3, 10, '10–12 reps', 90),
+        _pex('Single-Arm Cable Lat Pulldowns', 3, 12, '12 reps per arm', 75),
+        _pex('Dumbbell Lateral Raises', 4, 12, '12–15 reps', 60),
+        _pex('Face Pulls', 3, 15, '15 reps', 60),
+        _pex('Dumbbell Bicep Curls', 3, 12, '12 reps', 60),
+      ]},
+      { name: 'Day 3 — Lower Body B (Glute Isolation & Shape)', exercises: [
+        _pex('Barbell Back Squats or Goblet Squats', 3, 8, '8–10 reps', 120, 'Depth to parallel'),
+        _pex('Cable Kickbacks or Smith Machine Glute Bridges', 3, 12, '12 reps per leg', 75),
+        _pex('Seated Cable Abductor Machine', 3, 15, '15–20 reps', 60, 'Slight forward lean maximizes glute medius involvement'),
+        _pex('Leg Press (High, Wide Foot Placement)', 3, 10, '10–12 reps', 90, 'High/wide stance biases glutes and hamstrings over quads'),
+        _pex('Standing Calf Raises', 4, 12, '12–15 reps', 60),
+      ]},
+      { name: 'Day 4 — Upper Body B (Back Thickness & Core)', exercises: [
+        _pex('Assisted Pull-Ups or Heavy Neutral-Grip Lat Pulldowns', 3, 8, '8–10 reps', 100),
+        _pex('Seated Cable Rows (Close Grip)', 3, 10, '10–12 reps', 90, 'Squeeze shoulder blades together at the back'),
+        _pex('Straight-Arm Cable Pulldowns', 3, 12, '12–15 reps', 60, 'Isolates the lats'),
+        _pex('Dumbbell Overhead Shoulder Press', 3, 10, '10–12 reps', 90),
+        _pex('Plank to Dead Bug Superset', 3, 45, '45 sec plank + 10 dead bugs', 45, 'Superset: hold plank, then dead bugs'),
       ]},
     ],
   },
