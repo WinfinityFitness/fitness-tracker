@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.94';
+const APP_VERSION = 'WF_SYS_V.1.7.95';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -11980,6 +11980,7 @@ function initTraining() {
   renderTrainingStats();
   ensureExTimerTicking();
   initSessionTemplates();
+  initPresetPrograms();
   initExerciseNameAutocomplete();
   checkTrainingIdle();
   setInterval(checkTrainingIdle, 60000);
@@ -12085,6 +12086,266 @@ function initVolumeTrendToggle() {
     }
   });
   document.getElementById('btnShareVolumeTrend').addEventListener('click', shareVolumeJourney);
+}
+
+/* ---- Preset workout programs ----
+   Built-in Strength / Hypertrophy / Hybrid / Endurance programs the user
+   can drop straight into a training day. Reps input on an exercise card is
+   a plain number (see renderExerciseCards), so each preset exercise picks
+   the low end of its intended rep range as the starting number and puts
+   the full prescription (range, per-limb note, superset pairing, etc.) in
+   that exercise's own notes field, which IS free text and shown on the
+   card. Loading a preset just seeds currentExercises the same way loading
+   a saved session template does -- the existing "Save as new session"
+   button below is how a user turns a loaded preset into their own
+   reloadable template for next week, so no separate preset-storage layer
+   is needed. */
+function _pex(name, sets, reps, repsLabel, restSec, note) {
+  return { name, sets, reps, repsLabel, restSec, note: note || '' };
+}
+
+const WORKOUT_PRESETS = [
+  {
+    id: 'strength-3',
+    label: 'Strength — 3 Days/Week (Full Body)',
+    days: [
+      { name: 'Day 1 — Squat Emphasis', exercises: [
+        _pex('Barbell Back Squat', 4, 4, '4–6 reps', 240),
+        _pex('Barbell Bench Press', 3, 6, '6–8 reps', 150),
+        _pex('Barbell Bent-Over Row', 3, 6, '6–8 reps', 120),
+        _pex('Standing Calf Raises', 3, 10, '10–12 reps', 60),
+        _pex('Hanging Leg Raises', 3, 10, '10–12 reps', 60),
+      ]},
+      { name: 'Day 2 — Bench Emphasis', exercises: [
+        _pex('Barbell Bench Press', 4, 4, '4–6 reps', 180),
+        _pex('Conventional Deadlift', 2, 3, '3–5 reps', 240, 'Moderate — secondary lift today'),
+        _pex('Standing Overhead Press', 3, 5, '5–7 reps', 120),
+        _pex('Lat Pulldowns or Weighted Chin-Ups', 3, 6, '6–8 reps', 120),
+        _pex('Weighted Planks', 3, 45, '45 sec hold', 60, 'Hold for time, not reps'),
+      ]},
+      { name: 'Day 3 — Deadlift Emphasis', exercises: [
+        _pex('Conventional Deadlift', 3, 3, '3–5 reps', 240),
+        _pex('Front Squat or Goblet Squat', 3, 6, '6–8 reps', 150),
+        _pex('Weighted Pull-Ups', 3, 6, '6–8 reps', 120),
+        _pex('Bulgarian Split Squats', 3, 8, '8 reps per leg', 90),
+        _pex('Barbell Bicep Curls', 3, 8, '8–10 reps', 90),
+      ]},
+    ],
+  },
+  {
+    id: 'strength-4',
+    label: 'Strength — 4 Days/Week (Upper/Lower Split)',
+    days: [
+      { name: 'Day 1 — Upper Body A', exercises: [
+        _pex('Barbell Bench Press', 4, 4, '4–6 reps', 180),
+        _pex('Barbell Bent-Over Row', 4, 6, '6–8 reps', 120),
+        _pex('Standing Overhead Press', 3, 5, '5–7 reps', 120),
+        _pex('Weighted Pull-Ups', 3, 6, '6–8 reps', 120),
+        _pex('Barbell Bicep Curls', 3, 8, '8–10 reps', 90),
+      ]},
+      { name: 'Day 2 — Lower Body A', exercises: [
+        _pex('Barbell Back Squat', 4, 4, '4–6 reps', 240),
+        _pex('Romanian Deadlift (RDL)', 3, 6, '6–8 reps', 120),
+        _pex('Leg Press', 3, 8, '8–10 reps', 120),
+        _pex('Standing Calf Raises', 4, 8, '8–12 reps', 60),
+        _pex('Weighted Planks', 3, 45, '45 sec hold', 60, 'Hold for time, not reps'),
+      ]},
+      { name: 'Day 3 — Upper Body B', exercises: [
+        _pex('Standing Overhead Press', 4, 4, '4–6 reps', 180),
+        _pex('Lat Pulldowns or Weighted Chin-Ups', 4, 6, '6–8 reps', 120),
+        _pex('Incline Dumbbell Bench Press', 3, 6, '6–8 reps', 120),
+        _pex('Face Pulls', 3, 12, '12–15 reps', 60),
+        _pex('Tricep Skull Crushers', 3, 8, '8–10 reps', 90),
+      ]},
+      { name: 'Day 4 — Lower Body B', exercises: [
+        _pex('Conventional Deadlift', 3, 3, '3–5 reps', 240),
+        _pex('Front Squat or Goblet Squat', 3, 6, '6–8 reps', 150),
+        _pex('Bulgarian Split Squats', 3, 8, '8 reps per leg', 90),
+        _pex('Seated Leg Curls', 3, 8, '8–10 reps', 90),
+        _pex('Hanging Leg Raises', 3, 10, '10–12 reps', 60),
+      ]},
+    ],
+  },
+  {
+    id: 'hypertrophy-3',
+    label: 'Hypertrophy — 3 Days/Week (Push/Pull/Legs)',
+    days: [
+      { name: 'Day 1 — Push (Chest, Shoulders, Triceps)', exercises: [
+        _pex('Incline Dumbbell Press', 3, 8, '8–10 reps', 100),
+        _pex('Flat Machine Chest Press', 3, 10, '10–12 reps', 90),
+        _pex('Cable Lateral Raises', 4, 12, '12–15 reps', 60),
+        _pex('Overhead Cable Tricep Extension', 3, 10, '10–12 reps', 75),
+        _pex('Tricep Pushdowns', 3, 12, '12–15 reps', 60),
+      ]},
+      { name: 'Day 2 — Pull (Back, Rear Delts, Biceps)', exercises: [
+        _pex('Chest-Supported Row', 3, 8, '8–10 reps', 100),
+        _pex('Straight-Arm Pulldown', 3, 12, '12–15 reps', 75),
+        _pex('Face Pulls', 4, 15, '15 reps', 60),
+        _pex('Incline Dumbbell Bicep Curls', 3, 10, '10–12 reps', 60),
+        _pex('Hammer Curls', 3, 12, '12–15 reps', 60),
+      ]},
+      { name: 'Day 3 — Legs (Quads, Glutes, Calves)', exercises: [
+        _pex('Bulgarian Split Squats', 3, 10, '10 reps per leg', 90),
+        _pex('Leg Extensions', 3, 12, '12–15 reps', 75),
+        _pex('Barbell Hip Thrusts', 3, 10, '10–12 reps', 90),
+        _pex('Seated Calf Raise', 4, 15, '15–20 reps', 60),
+        _pex('Weighted Abdominal Crunch', 3, 15, '15 reps', 45),
+      ]},
+    ],
+  },
+  {
+    id: 'hypertrophy-5',
+    label: 'Hypertrophy — 5 Days/Week (Upper/Lower/Push/Pull/Legs)',
+    days: [
+      { name: 'Day 1 — Upper Body', exercises: [
+        _pex('Flat Barbell Bench Press', 3, 8, '8–10 reps', 100),
+        _pex('Bent-Over Barbell Row', 3, 8, '8–10 reps', 100),
+        _pex('Seated Dumbbell Shoulder Press', 3, 10, '10–12 reps', 90),
+        _pex('Lat Pulldown', 3, 10, '10–12 reps', 90),
+        _pex('Dumbbell Lateral Raises', 4, 12, '12–15 reps', 60),
+        _pex('Cable Curls', 3, 12, '12 reps', 60, 'Superset ↔ Overhead Tricep Extensions'),
+        _pex('Overhead Tricep Extensions', 3, 12, '12 reps', 60, 'Superset ↔ Cable Curls'),
+      ]},
+      { name: 'Day 2 — Lower Body', exercises: [
+        _pex('Barbell Back Squat', 3, 6, '6–8 reps', 120),
+        _pex('Romanian Deadlift', 3, 8, '8–10 reps', 100),
+        _pex('Leg Press', 3, 10, '10–12 reps', 90),
+        _pex('Seated Leg Curl', 3, 12, '12–15 reps', 75),
+        _pex('Standing Calf Raise', 4, 12, '12–15 reps', 60),
+      ]},
+      { name: 'Day 3 — Push (Chest, Shoulders, Triceps)', exercises: [
+        _pex('Incline Dumbbell Press', 3, 8, '8–10 reps', 100),
+        _pex('Flat Machine Chest Press', 3, 10, '10–12 reps', 90),
+        _pex('Cable Lateral Raises', 4, 12, '12–15 reps', 60),
+        _pex('Overhead Cable Tricep Extension', 3, 10, '10–12 reps', 75),
+        _pex('Tricep Pushdowns', 3, 12, '12–15 reps', 60),
+      ]},
+      { name: 'Day 4 — Pull (Back, Rear Delts, Biceps)', exercises: [
+        _pex('Chest-Supported Row', 3, 8, '8–10 reps', 100),
+        _pex('Straight-Arm Pulldown', 3, 12, '12–15 reps', 75),
+        _pex('Face Pulls', 4, 15, '15 reps', 60),
+        _pex('Incline Dumbbell Bicep Curls', 3, 10, '10–12 reps', 60),
+        _pex('Hammer Curls', 3, 12, '12–15 reps', 60),
+      ]},
+      { name: 'Day 5 — Legs (Quads, Glutes, Calves)', exercises: [
+        _pex('Bulgarian Split Squats', 3, 10, '10 reps per leg', 90),
+        _pex('Leg Extensions', 3, 12, '12–15 reps', 75),
+        _pex('Barbell Hip Thrusts', 3, 10, '10–12 reps', 90),
+        _pex('Seated Calf Raise', 4, 15, '15–20 reps', 60),
+        _pex('Weighted Abdominal Crunch', 3, 15, '15 reps', 45),
+      ]},
+    ],
+  },
+  {
+    id: 'hybrid-4',
+    label: 'Strength + Hypertrophy Hybrid — 4 Days/Week',
+    days: [
+      { name: 'Day 1 — Upper Power/Hypertrophy', exercises: [
+        _pex('Barbell Bench Press', 3, 5, '5 reps', 180, 'Strength focus'),
+        _pex('Pendlay Row', 3, 5, '5 reps', 150, 'Strength focus'),
+        _pex('Incline Dumbbell Press', 3, 8, '8–10 reps', 100, 'Hypertrophy focus'),
+        _pex('Lat Pulldown', 3, 10, '10–12 reps', 90, 'Hypertrophy focus'),
+        _pex('Lateral Raises', 3, 12, '12–15 reps', 60),
+        _pex('Cable Curls', 3, 12, '12–15 reps', 60),
+      ]},
+      { name: 'Day 2 — Lower Power/Hypertrophy', exercises: [
+        _pex('Barbell Back Squat', 3, 5, '5 reps', 180, 'Strength focus'),
+        _pex('Romanian Deadlift', 3, 6, '6–8 reps', 120, 'Strength/Hypertrophy'),
+        _pex('Leg Press', 3, 10, '10–12 reps', 90, 'Hypertrophy focus'),
+        _pex('Seated Leg Curls', 3, 12, '12–15 reps', 75, 'Hypertrophy focus'),
+        _pex('Standing Calf Raises', 4, 10, '10–12 reps', 60),
+      ]},
+      { name: 'Day 3 — Upper Hypertrophy/Density', exercises: [
+        _pex('Standing Overhead Press', 3, 6, '6–8 reps', 120),
+        _pex('Weighted Pull-Ups', 3, 6, '6–8 reps', 120),
+        _pex('Dumbbell Bench Press', 3, 10, '10–12 reps', 90),
+        _pex('Seated Cable Row', 3, 10, '10–12 reps', 90),
+        _pex('Tricep Pushdowns', 3, 12, '12–15 reps', 60),
+        _pex('EZ Bar Curls', 3, 12, '12–15 reps', 60),
+      ]},
+      { name: 'Day 4 — Lower Hypertrophy/Density', exercises: [
+        _pex('Sumo or Conventional Deadlift', 3, 5, '5 reps', 180, 'Moderate heavy'),
+        _pex('Bulgarian Split Squats', 3, 10, '10 reps per leg', 90),
+        _pex('Leg Extensions', 3, 12, '12–15 reps', 75),
+        _pex('Lying Leg Curls', 3, 12, '12–15 reps', 75),
+        _pex('Hanging Knee Raises', 3, 12, '12–15 reps', 60),
+      ]},
+    ],
+  },
+  {
+    id: 'endurance-3',
+    label: 'Endurance — 3 Days/Week (Full-Body Circuit)',
+    days: [
+      { name: 'Day 1 — Full-Body Endurance A', exercises: [
+        _pex('Goblet Squats', 3, 15, '15–20 reps', 60),
+        _pex('Push-Ups to Failure', 3, 20, 'Max reps to failure', 45),
+        _pex('Dumbbell Walking Lunges', 3, 12, '12 steps per leg', 60),
+        _pex('Dumbbell Single-Arm Row', 3, 15, '15 reps per arm', 45),
+        _pex('Plank to Push-Up', 3, 45, '45 sec continuous', 45, 'Hold/move for time, not reps'),
+      ]},
+      { name: 'Day 2 — Full-Body Endurance B', exercises: [
+        _pex('Dumbbell Romanian Deadlifts', 3, 15, '15–20 reps', 60),
+        _pex('Seated Cable Rows', 3, 15, '15 reps', 45),
+        _pex('Dumbbell Push Press', 3, 12, '12–15 reps', 60),
+        _pex('Bodyweight Step-Ups', 3, 20, '20 reps per leg', 45),
+        _pex('Bicycle Crunches', 3, 20, '20 reps per side', 30),
+      ]},
+      { name: 'Day 3 — Full-Body Endurance C (Metabolic Conditioning)', exercises: [
+        _pex('Kettlebell Swings', 4, 20, '20 reps', 45),
+        _pex('Lat Pulldown', 3, 15, '15 reps', 45),
+        _pex('Incline Push-Ups', 3, 20, '20 reps', 45),
+        _pex('Bodyweight Air Squats', 3, 30, '30 reps', 45),
+        _pex("Farmer's Carries (Heavy Dumbbells)", 3, 40, '40-meter walk', 60, 'Distance per set, not reps'),
+      ]},
+    ],
+  },
+];
+
+function loadPresetDayIntoSession(day) {
+  if (currentExercises.length && !confirm('This replaces the exercises currently logged for this date. Continue?')) return;
+  currentExercises = day.exercises.map(ex => {
+    const notesParts = [`Target: ${ex.repsLabel}`];
+    if (ex.note) notesParts.push(ex.note);
+    return {
+      name: ex.name,
+      restSeconds: ex.restSec,
+      notes: notesParts.join(' · '),
+      unit: getTrainUnit(),
+      sets: Array.from({ length: ex.sets }, () => ({ reps: ex.reps, weightKg: null, completed: false })),
+    };
+  });
+  persistExercises();
+  setSessionFinished(document.getElementById('trainDate').value, false);
+  renderExerciseCards();
+  renderTrainingStats();
+  const note = document.getElementById('sessionTemplateNote');
+  note.textContent = `Loaded "${day.name}". Tip: use "Save as new session" below to reload it again next week.`;
+  setTimeout(() => { note.textContent = ''; }, 4500);
+}
+
+function renderPresetDayOptions() {
+  const programSel = document.getElementById('presetProgramSelect');
+  const daySel = document.getElementById('presetDaySelect');
+  const program = WORKOUT_PRESETS.find(p => p.id === programSel.value);
+  daySel.innerHTML = '<option value="">— Select a day —</option>' +
+    (program ? program.days.map((d, i) => `<option value="${i}">${escapeHtml(d.name)}</option>`).join('') : '');
+  daySel.disabled = !program;
+}
+
+function initPresetPrograms() {
+  const programSel = document.getElementById('presetProgramSelect');
+  if (!programSel) return;
+  programSel.innerHTML = '<option value="">— Choose a program —</option>' +
+    WORKOUT_PRESETS.map(p => `<option value="${p.id}">${escapeHtml(p.label)}</option>`).join('');
+  renderPresetDayOptions();
+  programSel.addEventListener('change', renderPresetDayOptions);
+
+  document.getElementById('btnLoadPreset').addEventListener('click', () => {
+    const program = WORKOUT_PRESETS.find(p => p.id === programSel.value);
+    const daySel = document.getElementById('presetDaySelect');
+    if (!program || daySel.value === '') { alert('Choose a program and a day to load.'); return; }
+    loadPresetDayIntoSession(program.days[Number(daySel.value)]);
+  });
 }
 
 /* ---- Session templates ---- */

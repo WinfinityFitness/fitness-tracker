@@ -783,6 +783,20 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
     <div id="quickTrainingLogAnchor" hidden></div>
     <div id="quickTrainingLogBlock">
     <fieldset class="field-group field-group--compact">
+      <legend>Preset programs</legend>
+      <label class="field">
+        <span>Choose a program</span>
+        <select id="presetProgramSelect"><option value="">— Choose a program —</option></select>
+      </label>
+      <label class="field" style="margin-top:8px;">
+        <span>Choose a day</span>
+        <select id="presetDaySelect" disabled><option value="">— Select a day —</option></select>
+      </label>
+      <button type="button" class="btn btn--primary" id="btnLoadPreset">Load preset into this date</button>
+      <p class="save-note">Loads sets/reps/rest for that day. Save it below as a session once loaded to reload the same sets again next week.</p>
+    </fieldset>
+
+    <fieldset class="field-group field-group--compact">
       <legend>Session templates</legend>
       <label class="field">
         <span>Load a saved session</span>
