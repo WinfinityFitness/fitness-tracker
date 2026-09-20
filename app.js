@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.96';
+const APP_VERSION = 'WF_SYS_V.1.7.97';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -12331,6 +12331,20 @@ const WORKOUT_PRESETS = [
         _pex('Incline Push-Ups', 3, 20, '20 reps', 45),
         _pex('Bodyweight Air Squats', 3, 30, '30 reps', 45),
         _pex("Farmer's Carries (Heavy Dumbbells)", 3, 40, '40-meter walk', 60, 'Distance per set, not reps'),
+      ]},
+    ],
+  },
+  {
+    id: 'home-bands-3',
+    label: 'At-Home Band Circuit — 3 Days/Week (No Equipment)',
+    days: [
+      { name: 'Full-Body Band Circuit (repeat this session all 3 days)', exercises: [
+        _pex('Resistance Band Squats', 3, 15, '15 reps', 60, 'Circuit style: one round of all 6 moves, rest 45–60 sec between exercises, repeat for 3 total rounds'),
+        _pex('Band-Resisted Push-Ups', 3, 10, '10–12 reps', 60),
+        _pex('Standing Resistance Band Rows', 3, 15, '15 reps', 60),
+        _pex('Kneeling Ab Rollouts', 3, 8, '8–12 reps', 60),
+        _pex('Band Pull-Aparts', 3, 20, '20 reps', 60),
+        _pex('Banded Glute Bridges', 3, 20, '20 reps', 60),
       ]},
     ],
   },
