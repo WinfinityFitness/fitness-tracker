@@ -37,15 +37,21 @@
   .playstore-badge { display: inline-block; margin-bottom: 2cm; line-height: 0; }
   .playstore-badge img { height: 92px; width: auto; display: block; }
 
+  /* Same slanted "ghost" button shape as the Fitness Adventure CTA in
+     hero-embed.html (solid-accent box + inset bg-color overlay, since a
+     plain border doesn't follow a clip-path polygon cleanly). */
   .walkthrough-btn {
     display: inline-block; margin-bottom: 2cm;
-    background: transparent; color: var(--accent);
-    border: 1.5px solid var(--accent); border-radius: 999px;
-    padding: 10px 22px; font-size: 0.82rem; font-weight: 700;
-    letter-spacing: 0.06em; text-decoration: none;
-    transition: background 0.15s, color 0.15s;
+    background: var(--accent); color: var(--accent); text-decoration: none;
+    font-weight: 700; font-size: 0.85rem; letter-spacing: 0.03em; text-transform: uppercase;
+    padding: 14px 32px; clip-path: polygon(4% 0, 100% 0, 96% 100%, 0 100%);
+    box-sizing: border-box; min-width: 230px; text-align: center; position: relative;
   }
-  .walkthrough-btn:hover { background: var(--accent); color: #0a0d12; }
+  .walkthrough-btn::before {
+    content: ''; position: absolute; inset: 1.5px; z-index: -1;
+    background: var(--bg); clip-path: polygon(4% 0, 100% 0, 96% 100%, 0 100%);
+  }
+  .walkthrough-btn:hover::before { background: #271d1b; }
 
   .tabs {
     display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
