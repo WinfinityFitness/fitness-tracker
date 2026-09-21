@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.98';
+const APP_VERSION = 'WF_SYS_V.1.7.99';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -19986,7 +19986,20 @@ function initMediaSyncWidget() {
 /* 100, macros scale with grams. Regular users can browse but only an   */
 /* admin (password-gated) can add/edit/delete via the editor overlay.   */
 /* ---------------------------------------------------------------- */
-const PREP_MEAL_CATEGORY_LABELS = { breakfast: 'Breakfast', full_meal: 'Full Meal', snack: 'Snack', no_cook: 'No-Cook' };
+const PREP_MEAL_CATEGORY_LABELS = { breakfast: 'Breakfast', full_meal: 'Full Meal', snack: 'Snack', easy_cook: 'Easy Cook', no_cook: 'No-Cook' };
+// These two categories are whole-day plans (Meal A/B/C...), not single
+// reference-100g dishes, so they show a total-kcal badge and support the
+// sort control instead of the usual "X kcal/100g" scaling badge.
+function isMultiMealCategory(category) { return category === 'easy_cook' || category === 'no_cook'; }
+function prepMealCalBadgeText(m) {
+  if (isMultiMealCategory(m.category)) {
+    const total = Array.isArray(m.meal_breakdown) && m.meal_breakdown.length
+      ? m.meal_breakdown.reduce((sum, mb) => sum + (Number(mb.calories) || 0), 0)
+      : Math.round(m.cal_per_100g || 0);
+    return Math.round(total) + ' kcal';
+  }
+  return Math.round(m.cal_per_100g || 0) + ' kcal/100g';
+}
 // Generated inline (no network dependency, works offline) as the thumbnail
 // for any prep_meals row without an admin-set image_url — a plate/utensils
 // icon in the app's own dark/cyan palette rather than a broken-image icon.
@@ -20089,7 +20102,7 @@ function renderFoodPrepsList() {
   // everything so nothing awaiting review is invisible to them.
   let activeMeals = prepMealsCache.filter(m => m.active && m.category === prepMealSelectedCategory &&
     (m.approved !== false || isAdminLoggedIn() || (m.author_type === 'user' && !!myShareKey && m.author_share_key === myShareKey)));
-  if (prepMealSelectedCategory === 'no_cook') activeMeals = sortPrepMeals(activeMeals);
+  if (isMultiMealCategory(prepMealSelectedCategory)) activeMeals = sortPrepMeals(activeMeals);
   const visibleMeals = foodPrepsExpanded ? activeMeals : activeMeals.slice(0, FOOD_PREPS_PREVIEW_COUNT);
 
   expandBtn.hidden = activeMeals.length <= FOOD_PREPS_PREVIEW_COUNT;
@@ -20126,10 +20139,10 @@ function renderFoodPrepsList() {
         </div>
         <div class="prep-meal-ingredients">${escapeHtml(firstIngredientLine)}</div>
       </div>
-      <span class="prep-meal-cal-badge">${Math.round(m.cal_per_100g || 0)} kcal/100g</span>`;
+      <span class="prep-meal-cal-badge">${prepMealCalBadgeText(m)}</span>`;
     row.addEventListener('click', () => {
       selectFoodPrepMeal(m);
-      if (m.category === 'no_cook' && Array.isArray(m.meal_breakdown) && m.meal_breakdown.length) openMealBreakdownModal(m);
+      if (isMultiMealCategory(m.category) && Array.isArray(m.meal_breakdown) && m.meal_breakdown.length) openMealBreakdownModal(m);
     });
     list.appendChild(row);
   });
@@ -20223,9 +20236,13 @@ function selectFoodPrepMeal(meal) {
 function openMealBreakdownModal(meal) {
   document.getElementById('mealBreakdownTitle').textContent = meal.name;
   const list = document.getElementById('mealBreakdownList');
-  list.innerHTML = meal.meal_breakdown.map(mb => `
+  const admin = isAdminLoggedIn();
+  list.innerHTML = meal.meal_breakdown.map((mb, i) => `
     <div class="meal-breakdown-card">
       <div class="meal-breakdown-card-head">
+        <span class="meal-breakdown-thumb${admin ? ' is-editable' : ''}" data-meal-index="${i}"${admin ? ' title="Click to set this meal\'s image (Admin)"' : ''}>
+          <img src="${escapeHtml(mb.image_url || PREP_MEAL_DEFAULT_IMAGE)}" alt="">
+        </span>
         <span class="meal-breakdown-label">${escapeHtml(mb.label)}</span>
         <span class="meal-breakdown-cal">${Math.round(mb.calories || 0)} kcal</span>
       </div>
@@ -20238,7 +20255,30 @@ function openMealBreakdownModal(meal) {
         <span>Sodium <strong>${Math.round(mb.sodium || 0)}mg</strong></span>
       </div>
     </div>`).join('');
+  if (admin) {
+    list.querySelectorAll('.meal-breakdown-thumb.is-editable').forEach(thumb => {
+      thumb.addEventListener('click', () => setMealBreakdownImage(meal, Number(thumb.dataset.mealIndex)));
+    });
+  }
   document.getElementById('mealBreakdownOverlay').hidden = false;
+}
+
+// Admin-only: attaches an image to one meal inside a plan's breakdown.
+// Same "paste a URL" convention as every other admin image field in this
+// app (prep meal cover images, splash image, etc.) -- no real file upload
+// exists anywhere in Food Preps.
+async function setMealBreakdownImage(meal, index) {
+  const mb = meal.meal_breakdown[index];
+  const url = prompt('Image URL for ' + mb.label, mb.image_url || '');
+  if (url === null) return;
+  const trimmed = url.trim();
+  const { error } = await sb.rpc('admin_set_meal_breakdown_image', {
+    p_digital_id: adminSession.digitalId, p_password: adminSession.password,
+    p_id: meal.id, p_meal_index: index, p_image_url: trimmed,
+  });
+  if (error) { alert('Failed to save image: ' + error.message); return; }
+  mb.image_url = trimmed || null;
+  openMealBreakdownModal(meal);
 }
 
 function closeMealBreakdownModal() {
@@ -20327,7 +20367,7 @@ function initFoodPrepsOverlay() {
       foodPrepsExpanded = false;
       foodPrepsDetailMeal = null;
       document.querySelectorAll('#foodPrepsCategoryTabs .prep-meal-category-tab').forEach(t => t.classList.toggle('is-selected', t === tab));
-      document.getElementById('foodPrepsSortRow').hidden = prepMealSelectedCategory !== 'no_cook';
+      document.getElementById('foodPrepsSortRow').hidden = !isMultiMealCategory(prepMealSelectedCategory);
       renderFoodPrepsList();
     });
   });

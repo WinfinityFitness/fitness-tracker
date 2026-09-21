@@ -3610,8 +3610,14 @@ a.contact-row:hover { border-color: var(--cyan); }
 .meal-breakdown-sheet { max-width: 420px; width: 100%; margin: 0 auto; }
 .meal-breakdown-card { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
 .meal-breakdown-card:last-child { margin-bottom: 0; }
-.meal-breakdown-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
-.meal-breakdown-label { font-weight: 700; font-size: 0.86rem; color: var(--cyan); }
+.meal-breakdown-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.meal-breakdown-thumb {
+  flex: none; width: 34px; height: 34px; border-radius: 7px; overflow: hidden;
+  background: var(--surface-1, #10161a); border: 1px solid var(--border-soft);
+}
+.meal-breakdown-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.meal-breakdown-thumb.is-editable { cursor: pointer; border-color: var(--cyan); }
+.meal-breakdown-label { flex: 1; font-weight: 700; font-size: 0.86rem; color: var(--cyan); }
 .meal-breakdown-cal { font-family: var(--font-mono); font-weight: 700; font-size: 0.8rem; color: var(--text-primary); }
 .meal-breakdown-ingredients { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.5; margin: 0 0 8px; }
 .meal-breakdown-macros { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 0.72rem; color: var(--text-muted); }
