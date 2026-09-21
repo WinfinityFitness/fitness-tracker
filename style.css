@@ -3596,6 +3596,27 @@ a.contact-row:hover { border-color: var(--cyan); }
 }
 .prep-meal-category-tab.is-selected { border-color: var(--cyan); color: var(--cyan); background: var(--surface-3, var(--surface-2)); }
 
+.prep-meal-sort-row { display: flex; align-items: center; gap: 8px; margin: -4px 0 12px; font-size: 0.78rem; color: var(--text-muted); }
+.prep-meal-sort-row select {
+  flex: 1; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 6px;
+  padding: 6px 8px; color: var(--text-primary); font-size: 0.78rem; font-family: var(--font-mono);
+}
+
+/* Floating (centered, not bottom-sheet) modal variant — used for the
+   No-Cook meal-breakdown popup, a short-lived "glance" window rather than
+   a full navigation sheet. */
+.sheet-overlay--center { align-items: center; justify-content: center; padding: 16px; }
+.sheet-overlay--center .sheet { border-radius: 14px; border: 1px solid var(--border-soft); max-height: 80vh; overflow-y: auto; }
+.meal-breakdown-sheet { max-width: 420px; width: 100%; margin: 0 auto; }
+.meal-breakdown-card { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+.meal-breakdown-card:last-child { margin-bottom: 0; }
+.meal-breakdown-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.meal-breakdown-label { font-weight: 700; font-size: 0.86rem; color: var(--cyan); }
+.meal-breakdown-cal { font-family: var(--font-mono); font-weight: 700; font-size: 0.8rem; color: var(--text-primary); }
+.meal-breakdown-ingredients { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.5; margin: 0 0 8px; }
+.meal-breakdown-macros { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 0.72rem; color: var(--text-muted); }
+.meal-breakdown-macros strong { color: var(--text-primary); font-family: var(--font-mono); }
+
 .prep-meal-row {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 10px 0; border-bottom: 1px solid var(--border-soft);

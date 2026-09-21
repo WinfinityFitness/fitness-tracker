@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.7.97';
+const APP_VERSION = 'WF_SYS_V.1.7.98';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -19986,7 +19986,7 @@ function initMediaSyncWidget() {
 /* 100, macros scale with grams. Regular users can browse but only an   */
 /* admin (password-gated) can add/edit/delete via the editor overlay.   */
 /* ---------------------------------------------------------------- */
-const PREP_MEAL_CATEGORY_LABELS = { breakfast: 'Breakfast', full_meal: 'Full Meal', snack: 'Snack' };
+const PREP_MEAL_CATEGORY_LABELS = { breakfast: 'Breakfast', full_meal: 'Full Meal', snack: 'Snack', no_cook: 'No-Cook' };
 // Generated inline (no network dependency, works offline) as the thumbnail
 // for any prep_meals row without an admin-set image_url — a plate/utensils
 // icon in the app's own dark/cyan palette rather than a broken-image icon.
@@ -20004,6 +20004,21 @@ let prepMealSelectedCategory = 'breakfast';
 let foodPrepsDetailMeal = null;
 let foodPrepsExpanded = false;
 const FOOD_PREPS_PREVIEW_COUNT = 3;
+// Only the No-Cook tab exposes sorting (it's the one category that grew to
+// 48 entries in one go) — name A-Z/Z-A or by calorie density, high or low.
+let prepMealSortMode = 'name-asc';
+function sortPrepMeals(meals) {
+  const sorted = [...meals];
+  sorted.sort((a, b) => {
+    switch (prepMealSortMode) {
+      case 'name-desc': return b.name.localeCompare(a.name);
+      case 'cal-desc': return (b.cal_per_100g || 0) - (a.cal_per_100g || 0);
+      case 'cal-asc': return (a.cal_per_100g || 0) - (b.cal_per_100g || 0);
+      default: return a.name.localeCompare(b.name); // 'name-asc'
+    }
+  });
+  return sorted;
+}
 
 // Admin-set image framing (zoom + focal point) is display-only — the app
 // can't re-host a cropped copy of a remote image, so the "crop" is applied
@@ -20072,8 +20087,9 @@ function renderFoodPrepsList() {
   // Unapproved submissions stay hidden from the public list, but their own
   // author sees them immediately (badged "Pending") — and admins see
   // everything so nothing awaiting review is invisible to them.
-  const activeMeals = prepMealsCache.filter(m => m.active && m.category === prepMealSelectedCategory &&
+  let activeMeals = prepMealsCache.filter(m => m.active && m.category === prepMealSelectedCategory &&
     (m.approved !== false || isAdminLoggedIn() || (m.author_type === 'user' && !!myShareKey && m.author_share_key === myShareKey)));
+  if (prepMealSelectedCategory === 'no_cook') activeMeals = sortPrepMeals(activeMeals);
   const visibleMeals = foodPrepsExpanded ? activeMeals : activeMeals.slice(0, FOOD_PREPS_PREVIEW_COUNT);
 
   expandBtn.hidden = activeMeals.length <= FOOD_PREPS_PREVIEW_COUNT;
@@ -20111,7 +20127,10 @@ function renderFoodPrepsList() {
         <div class="prep-meal-ingredients">${escapeHtml(firstIngredientLine)}</div>
       </div>
       <span class="prep-meal-cal-badge">${Math.round(m.cal_per_100g || 0)} kcal/100g</span>`;
-    row.addEventListener('click', () => selectFoodPrepMeal(m));
+    row.addEventListener('click', () => {
+      selectFoodPrepMeal(m);
+      if (m.category === 'no_cook' && Array.isArray(m.meal_breakdown) && m.meal_breakdown.length) openMealBreakdownModal(m);
+    });
     list.appendChild(row);
   });
 }
@@ -20194,6 +20213,45 @@ function selectFoodPrepMeal(meal) {
   renderFoodPrepsDetail();
 }
 
+// Floating popup for "No-Cook" tab entries only — those rows pack a whole
+// day's Meal A/B/C... into one ingredients blob, so this breaks each meal
+// back out with its own ingredients + macros (see meal_breakdown, filled
+// in by supabase_lazylifter_meal_breakdown_migration.sql: an estimated
+// split of the day's already-stored totals, proportional to each meal's
+// size — the four/five meals always sum back to the day total shown in
+// the panel behind this popup).
+function openMealBreakdownModal(meal) {
+  document.getElementById('mealBreakdownTitle').textContent = meal.name;
+  const list = document.getElementById('mealBreakdownList');
+  list.innerHTML = meal.meal_breakdown.map(mb => `
+    <div class="meal-breakdown-card">
+      <div class="meal-breakdown-card-head">
+        <span class="meal-breakdown-label">${escapeHtml(mb.label)}</span>
+        <span class="meal-breakdown-cal">${Math.round(mb.calories || 0)} kcal</span>
+      </div>
+      <p class="meal-breakdown-ingredients">${escapeHtml(mb.ingredients || '')}</p>
+      <div class="meal-breakdown-macros">
+        <span>Protein <strong>${Math.round(mb.protein || 0)}g</strong></span>
+        <span>Carbs <strong>${Math.round(mb.carbs || 0)}g</strong></span>
+        <span>Fat <strong>${Math.round(mb.fat || 0)}g</strong></span>
+        <span>Fiber <strong>${Math.round(mb.fiber || 0)}g</strong></span>
+        <span>Sodium <strong>${Math.round(mb.sodium || 0)}mg</strong></span>
+      </div>
+    </div>`).join('');
+  document.getElementById('mealBreakdownOverlay').hidden = false;
+}
+
+function closeMealBreakdownModal() {
+  document.getElementById('mealBreakdownOverlay').hidden = true;
+}
+
+function initMealBreakdownModal() {
+  const overlay = document.getElementById('mealBreakdownOverlay');
+  if (!overlay) return;
+  document.getElementById('btnCloseMealBreakdown').addEventListener('click', closeMealBreakdownModal);
+  bindOverlayBackdropClose(overlay, closeMealBreakdownModal);
+}
+
 async function openFoodPrepsOverlay() {
   prepMealsCache = await fetchPrepMeals();
   foodPrepsExpanded = false;
@@ -20269,8 +20327,13 @@ function initFoodPrepsOverlay() {
       foodPrepsExpanded = false;
       foodPrepsDetailMeal = null;
       document.querySelectorAll('#foodPrepsCategoryTabs .prep-meal-category-tab').forEach(t => t.classList.toggle('is-selected', t === tab));
+      document.getElementById('foodPrepsSortRow').hidden = prepMealSelectedCategory !== 'no_cook';
       renderFoodPrepsList();
     });
+  });
+  document.getElementById('foodPrepsSortSelect').addEventListener('change', e => {
+    prepMealSortMode = e.target.value;
+    renderFoodPrepsList();
   });
   document.getElementById('btnFoodPrepsExpand').addEventListener('click', () => {
     foodPrepsExpanded = !foodPrepsExpanded;
@@ -24526,6 +24589,7 @@ safeInit(initSplashLogoManager, 'initSplashLogoManager');
 safeInit(initSyncLogsShare, 'initSyncLogsShare');
 safeInit(initMediaSyncWidget, 'initMediaSyncWidget');
 safeInit(initFoodPrepsOverlay, 'initFoodPrepsOverlay');
+safeInit(initMealBreakdownModal, 'initMealBreakdownModal');
 safeInit(initCoachGroupPage, 'initCoachGroupPage');
 safeInit(initPrepMealManager, 'initPrepMealManager');
 safeInit(initPrepMealEditor, 'initPrepMealEditor');
