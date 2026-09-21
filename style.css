@@ -3602,26 +3602,14 @@ a.contact-row:hover { border-color: var(--cyan); }
   padding: 6px 8px; color: var(--text-primary); font-size: 0.78rem; font-family: var(--font-mono);
 }
 
-/* Floating (centered, not bottom-sheet) modal variant — used for the
-   No-Cook meal-breakdown popup, a short-lived "glance" window rather than
-   a full navigation sheet. */
-.sheet-overlay--center { align-items: center; justify-content: center; padding: 16px; }
-.sheet-overlay--center .sheet { border-radius: 14px; border: 1px solid var(--border-soft); max-height: 80vh; overflow-y: auto; }
-.meal-breakdown-sheet { max-width: 420px; width: 100%; margin: 0 auto; }
-.meal-breakdown-card { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
-.meal-breakdown-card:last-child { margin-bottom: 0; }
-.meal-breakdown-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.meal-breakdown-thumb {
-  flex: none; width: 34px; height: 34px; border-radius: 7px; overflow: hidden;
-  background: var(--surface-1, #10161a); border: 1px solid var(--border-soft);
+.prep-meal-image-upload-row { display: flex; align-items: stretch; gap: 8px; margin: -6px 0 10px; }
+.prep-meal-image-upload-row .btn { flex: 1; font-size: 0.8rem; padding: 9px 8px; }
+.prep-meal-paste-target {
+  flex: 1; display: flex; align-items: center; justify-content: center; text-align: center;
+  background: var(--surface-2); border: 1px dashed var(--border-soft); border-radius: 8px;
+  padding: 9px 8px; font-size: 0.72rem; color: var(--text-muted); cursor: text;
 }
-.meal-breakdown-thumb img { width: 100%; height: 100%; object-fit: cover; }
-.meal-breakdown-thumb.is-editable { cursor: pointer; border-color: var(--cyan); }
-.meal-breakdown-label { flex: 1; font-weight: 700; font-size: 0.86rem; color: var(--cyan); }
-.meal-breakdown-cal { font-family: var(--font-mono); font-weight: 700; font-size: 0.8rem; color: var(--text-primary); }
-.meal-breakdown-ingredients { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.5; margin: 0 0 8px; }
-.meal-breakdown-macros { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 0.72rem; color: var(--text-muted); }
-.meal-breakdown-macros strong { color: var(--text-primary); font-family: var(--font-mono); }
+.prep-meal-paste-target:focus { outline: none; border-color: var(--cyan); color: var(--cyan); }
 
 .prep-meal-row {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;

@@ -3398,11 +3398,10 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <button type="button" class="prep-meal-category-tab is-selected" data-category="breakfast">Breakfast</button>
       <button type="button" class="prep-meal-category-tab" data-category="full_meal">Full Meal</button>
       <button type="button" class="prep-meal-category-tab" data-category="snack">Snacks</button>
-      <button type="button" class="prep-meal-category-tab" data-category="easy_cook">Easy Cook</button>
-      <button type="button" class="prep-meal-category-tab" data-category="no_cook">No-Cook</button>
+      <button type="button" class="prep-meal-category-tab" data-category="resto_instant">Resto/Instant</button>
     </div>
 
-    <div class="prep-meal-sort-row" id="foodPrepsSortRow" hidden>
+    <div class="prep-meal-sort-row" id="foodPrepsSortRow">
       <span>Sort by</span>
       <select id="foodPrepsSortSelect">
         <option value="name-asc">Name (A–Z)</option>
@@ -3453,19 +3452,6 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <ol class="prep-meal-detail-list" id="foodPrepsDetailProcedure"></ol>
       <button type="button" class="btn glass-emboss" id="btnFoodPrepsAdminEdit" hidden style="width:100%;margin-top:14px;">Edit this meal (Admin)</button>
     </div>
-  </div>
-</div>
-
-<!-- Floating popup for "No-Cook" tab meals: tapping one of those day-plans
-     (which pack Meal A/B/C... into one entry) opens this to show each
-     meal's own ingredients + estimated macros/micros separately. -->
-<div class="sheet-overlay sheet-overlay--center sheet-overlay--stacked" id="mealBreakdownOverlay" hidden>
-  <div class="sheet meal-breakdown-sheet">
-    <div class="sheet-head">
-      <h2 id="mealBreakdownTitle">Meal Breakdown</h2>
-      <button class="sheet-close" id="btnCloseMealBreakdown">✕</button>
-    </div>
-    <div id="mealBreakdownList"></div>
   </div>
 </div>
 
@@ -3579,8 +3565,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         <option value="breakfast">Breakfast</option>
         <option value="full_meal" selected>Full Meal (Lunch/Dinner)</option>
         <option value="snack">Snack</option>
-        <option value="easy_cook">Easy Cook</option>
-        <option value="no_cook">No-Cook</option>
+        <option value="resto_instant">Resto/Instant</option>
       </select>
     </label>
     <label class="field">
@@ -3634,6 +3619,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <span>Image URL <span class="hint hint--sm" style="display:inline;margin:0;">(admin only — also auto-added to the Food Prep Options slideshow)</span></span>
       <input type="text" id="prepMealFormImageUrl" placeholder="https://...">
     </label>
+    <div class="prep-meal-image-upload-row" id="prepMealFormImageUploadRow">
+      <input type="file" id="prepMealImageFileInput" accept="image/*" hidden>
+      <button type="button" class="btn glass-emboss" id="btnPrepMealChooseImage">📁 Choose from gallery</button>
+      <div class="prep-meal-paste-target" id="prepMealPasteTarget" tabindex="0">📋 Click here, then Ctrl+V to paste an image</div>
+    </div>
     <div id="prepMealImageCropSection" hidden>
       <p class="field-group-heading" style="font-size:0.8rem;">Image framing</p>
       <div class="prep-meal-crop-frame" id="prepMealCropFrame">
