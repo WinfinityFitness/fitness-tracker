@@ -11,6 +11,7 @@
     --line: #232a38;
     --cream: #f2ead9;
     --cream-dim: #cdc1a2;
+    --ink: #2a2013;
     --gold: #e2a13d;
     --gold-2: #f6c96a;
     --text: #eae6dc;
@@ -64,7 +65,7 @@
   }
   .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--gold); box-shadow:0 0 0 3px rgba(226,161,61,.18);}
 
-  section.tutorial{ margin-bottom:56px; }
+  section.tutorial{ margin-bottom:56px; scroll-margin-top:24px; }
   .tut-header{ display:flex; flex-direction:column; gap:8px; margin-bottom:26px; }
   .tut-header h2{
     font-family:var(--display); font-weight:700; letter-spacing:-.005em;
@@ -78,12 +79,17 @@
     gap:34px;
     align-items:start;
   }
+  /* True touch devices (phones/tablets) get the compact layout regardless of
+     reported viewport width, which is unreliable in some mobile webviews.
+     A resized desktop browser window still uses a mouse, so it correctly
+     keeps the two-column card layout no matter how narrow the window is. */
   @media (pointer:coarse){
     .stage{grid-template-columns:1fr; justify-content:center;}
     .steps{display:none;}
     .step-nav{display:flex;}
   }
 
+  /* ---------- Phone frame ---------- */
   .phone-col{
     position:sticky; top:20px;
     display:flex; flex-direction:column; align-items:center; gap:16px;
@@ -114,8 +120,33 @@
     border-radius:26px 26px 0 0;
     flex-shrink:0;
   }
-  .screen img{
+  .screen video{
     width:100%; height:100%; object-fit:cover; display:block;
+  }
+
+  .tap-marker{
+    position:absolute; width:34px; height:34px; margin:-17px 0 0 -17px;
+    pointer-events:none; opacity:0; transition:opacity .25s ease;
+    z-index:4;
+  }
+  .tap-marker.show{opacity:1;}
+  .tap-marker .ring{
+    position:absolute; inset:0; border-radius:50%;
+    border:2px solid var(--gold-2);
+    animation: ping 1.4s cubic-bezier(.2,.7,.3,1) infinite;
+  }
+  .tap-marker .core{
+    position:absolute; inset:11px; border-radius:50%;
+    background:var(--gold-2);
+    box-shadow:0 0 12px 2px var(--glow);
+  }
+  @keyframes ping{
+    0%{ transform:scale(.5); opacity:.9; }
+    75%{ transform:scale(1.9); opacity:0; }
+    100%{ transform:scale(1.9); opacity:0; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .tap-marker .ring{animation:none; opacity:.6;}
   }
 
   .caption-strip{
@@ -137,11 +168,27 @@
     font-size:11.5px; line-height:1.45; color:#c9c4b8;
   }
 
+  .play-overlay{
+    position:absolute; inset:0; z-index:7;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(6,8,12,.35);
+    cursor:pointer; border:none; padding:0;
+  }
+  .play-overlay[data-hidden="true"]{display:none;}
+  .play-overlay .btn{
+    width:58px; height:58px; border-radius:50%;
+    background:var(--gold);
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 8px 30px -6px var(--glow);
+  }
+  .play-overlay .btn svg{width:22px;height:22px; fill:#20140a; margin-left:3px;}
+
+  /* controls under phone */
   .controls{
     width:320px; max-width:100%; display:flex; flex-direction:column; gap:10px;
   }
   .scrubber{
-    position:relative; height:22px; display:flex; align-items:center;
+    position:relative; height:22px; display:flex; align-items:center; cursor:pointer;
   }
   .scrubber .track{
     position:relative; width:100%; height:4px; border-radius:3px; background:var(--line); overflow:visible;
@@ -149,19 +196,21 @@
   .scrubber .fill{
     position:absolute; left:0; top:0; height:100%; border-radius:3px;
     background:linear-gradient(90deg, var(--gold), var(--gold-2));
-    transition:width .2s ease;
+  }
+  .scrubber .tick{
+    position:absolute; top:50%; translate:-50% -50%;
+    width:3px; height:9px; border-radius:2px; background:rgba(255,255,255,.35);
   }
   .ctrl-row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
   .ctrl-row button{
-    all:unset; cursor:pointer; height:34px; padding:0 14px; border-radius:17px;
+    all:unset; cursor:pointer; width:34px; height:34px; border-radius:50%;
     background:var(--panel-2); border:1px solid var(--line);
-    display:flex; align-items:center; justify-content:center; gap:6px;
-    font-family:var(--mono); font-size:11.5px; color:var(--cream);
+    display:flex; align-items:center; justify-content:center;
   }
-  .ctrl-row button:disabled{ opacity:.35; cursor:default; }
-  .ctrl-row button svg{width:12px;height:12px; fill:var(--cream);}
-  .step-count{font-family:var(--mono); font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums;}
+  .ctrl-row button svg{width:14px;height:14px; fill:var(--cream);}
+  .time{font-family:var(--mono); font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums;}
 
+  /* Compact step jump-buttons — touch devices only (see .stage media query) */
   .step-nav{
     display:none; flex-wrap:wrap; gap:6px; justify-content:center;
   }
@@ -177,12 +226,13 @@
     background:var(--gold-2); border-color:transparent; color:#20140a; font-weight:600;
   }
 
+  /* ---------- Step list ---------- */
   .steps{
     display:flex; flex-direction:column; gap:8px;
     list-style:none; padding:0; margin:0;
   }
   .step-item{
-    display:grid; grid-template-columns:auto 1fr; gap:12px; align-items:start;
+    display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:start;
     padding:14px 16px; border-radius:14px;
     background:var(--panel); border:1px solid var(--line);
     cursor:pointer; transition:background .18s ease, border-color .18s ease;
@@ -204,6 +254,9 @@
   }
   .step-item.active .step-body h3{color:#fff;}
   .step-body p{margin:0; font-size:12.8px; color:var(--muted); line-height:1.5;}
+  .step-time{
+    font-family:var(--mono); font-size:11px; color:var(--muted); white-space:nowrap; padding-top:3px;
+  }
 
   footer.note{
     margin-top:8px; padding-top:18px; border-top:1px solid var(--line);
@@ -211,10 +264,15 @@
   }
   footer.note b{color:var(--cream-dim);}
 
+  /* Touch-device layout, driven by the .is-touch class below rather than
+     CSS media queries alone — some in-app/webview browsers don't reliably
+     report the `pointer: coarse` media feature even on a real touchscreen,
+     so JS cross-checks navigator.maxTouchPoints / ontouchstart as well. */
   html.is-touch .stage{grid-template-columns:1fr; justify-content:center;}
   html.is-touch .steps{display:none;}
   html.is-touch .step-nav{display:flex;}
   html.is-touch .phone-col{position:static;}
+
   html.is-touch body{padding-inline:2vw;}
   html.is-touch .phone,
   html.is-touch .controls{
@@ -231,8 +289,7 @@
   html.is-touch .step-nav button{
     min-width:44px; height:42px; font-size:17px; border-radius:11px;
   }
-  html.is-touch .ctrl-row button{ height:52px; font-size:17px; padding:0 20px; }
-  html.is-touch .step-count{font-size:16px;}
+  html.is-touch .time{font-size:16px;}
   html.is-touch h1{font-size:38px;}
   html.is-touch header.page p{font-size:34px; line-height:1.4;}
   html.is-touch .tut-header h2{font-size:37px;}
@@ -253,20 +310,27 @@
   <header class="page">
     <div class="eyebrow"><span class="dot"></span> Getting Started</div>
     <h1>Winfinity Nexus — Digital ID, Sync PIN &amp; Sign-In</h1>
-    <p>Real screenshots from the app and the live dashboard, step by step — how to find your Digital ID, turn on Web Dashboard Sync with a PIN, and use both to sign in to Winfinity Nexus on desktop.</p>
+    <p>A real recorded run-through, start to finish: finding your Digital ID in the app, turning on Web Dashboard Sync with a PIN, and using both to sign in to Winfinity Nexus on desktop. Click any step on the right to jump straight to it.</p>
   </header>
 
-  <section class="tutorial" id="tutorial-1">
+  <!-- ===================== TUTORIAL ===================== -->
+  <section class="tutorial" id="tutorial-1" data-video="nexus_01_signin.mp4">
     <div class="tut-header">
-      <div class="eyebrow"><span class="dot"></span> Tutorial · 12 steps</div>
+      <div class="eyebrow"><span class="dot"></span> Tutorial 1 of 1</div>
       <h2>From Digital ID to a signed-in dashboard</h2>
-      <p>Everything happens in two places: the Fitness Tracker app's own Menu → Settings, then wellness.winfinityfitness.com in any browser. Click any step on the right to jump straight to it.</p>
+      <p>Everything happens in two places: the Fitness Tracker app's own Menu → Settings, then wellness.winfinityfitness.com in any browser.</p>
     </div>
     <div class="stage">
       <div class="phone-col">
         <div class="phone">
           <div class="screen">
-            <img class="frame-img" src="nexus-signin/01-digital-id.jpg" alt="">
+            <video class="vid" playsinline preload="metadata">
+              <source src="nexus_01_signin.mp4" type="video/mp4">
+            </video>
+            <div class="tap-marker"><div class="ring"></div><div class="core"></div></div>
+            <button class="play-overlay" aria-label="Play video">
+              <span class="btn"><svg viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></span>
+            </button>
           </div>
           <div class="caption-strip">
             <div class="step-tag">Step 1 / 12</div>
@@ -277,9 +341,8 @@
         <div class="controls">
           <div class="scrubber"><div class="track"><div class="fill"></div></div></div>
           <div class="ctrl-row">
-            <button class="prev-btn" aria-label="Previous step">&larr; Back</button>
-            <span class="step-count">1 / 12</span>
-            <button class="next-btn" aria-label="Next step">Next &rarr;</button>
+            <button class="play-btn" aria-label="Play/Pause"><svg class="play-icon" viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></button>
+            <span class="time">0:00 / 0:00</span>
           </div>
           <div class="step-nav"></div>
         </div>
@@ -287,7 +350,7 @@
       <ol class="steps"></ol>
     </div>
     <footer class="note">
-      <b>This account already had sync configured from an earlier session</b> — step 5 disables it on purpose so the OFF → ON → PIN → Sync flow is fully visible, exactly like a brand-new setup. If your own account has never synced before, you'll land straight on step 6's PIN screen instead of needing to disable anything first. Digital ID and Sync PIN shown here (WF-GDTUBY / a 9-character PIN) are this test account's own — yours will be different.
+      <b>Recorded live from the real app and the real wellness.winfinityfitness.com</b> on this test account — Digital ID WF-GDTUBY, Sync PIN set fresh on camera. This account already had sync configured from an earlier session, so step 5 disables it on purpose to show the OFF → ON → PIN → Sync flow in full, exactly like a brand-new setup. If your own account has never synced before, you'll land straight on step 6's PIN screen instead of needing to disable anything first.
     </footer>
   </section>
 </div>
@@ -295,97 +358,164 @@
 <script>
 (function(){
   const STEPS = [
-    {img:"nexus-signin/01-digital-id.jpg", title:"Find your Digital ID", desc:"Status tab → System Check-in card. Every account gets a permanent Digital ID like WF-GDTUBY — this is what identifies you on the web dashboard."},
-    {img:"nexus-signin/02-copied.jpg", title:"Copy it with one tap", desc:"Tap the small copy icon next to DIGITAL_ID — a “Digital ID copied!” banner confirms it's on your clipboard."},
-    {img:"nexus-signin/03-settings.jpg", title:"Open Menu → Settings", desc:"The Web Dashboard Sync controls live in Settings, opened from the bottom Menu tab → SETTINGS."},
-    {img:"nexus-signin/04-web-sync-section.jpg", title:"Scroll to Web Dashboard Sync", desc:"Below Hydration Reminders, near the bottom of Settings."},
-    {img:"nexus-signin/05-sync-off.jpg", title:"Disable Web Sync (to show the full flow)", desc:"“Web sync disabled — your Digital ID can no longer sign in on the web until you set a new PIN.” The toggle greys out. Your already-synced history isn't deleted."},
-    {img:"nexus-signin/06-sync-on-empty.jpg", title:"Flip “Enable web sync” back on", desc:"With no PIN currently active, it skips straight to asking for a brand-new Sync PIN instead of an old one to confirm first."},
-    {img:"nexus-signin/07-pin-typed.jpg", title:"Type a Sync PIN", desc:"At least 6 characters — you'll type this alongside your Digital ID on the web dashboard. Pick something memorable; it isn't tied to this device."},
-    {img:"nexus-signin/08-enabled-toast.jpg", title:"Tap “Set PIN & Enable Sync”", desc:"“Web sync enabled — tap Sync Now to upload your data.” The PIN is saved, but nothing has uploaded yet."},
-    {img:"nexus-signin/09-synced-toast.jpg", title:"Tap “Sync Now”", desc:"Uploads your full local history — training, nutrition, sleep, measurements — to the dashboard. “Synced to Web Dashboard” confirms it, and Last synced updates immediately."},
-    {img:"nexus-signin/10-nexus-empty.jpg", title:"Open wellness.winfinityfitness.com", desc:"The Winfinity Nexus sign-in gate. Same Digital ID + Sync PIN you just set in the app — there's nothing separate to create."},
-    {img:"nexus-signin/11-nexus-filled.jpg", title:"Enter your Digital ID and Sync PIN", desc:"Exactly what you copied and typed in the app a moment ago."},
-    {img:"nexus-signin/12-logged-in.jpg", title:"Tap “Enter Command Center” — you're in", desc:"The full dashboard: Your Day stories, the community feed, and your real synced data, viewable from any browser."}
+    {t:0,    title:"Find your Digital ID", desc:"Status tab → System Check-in card. Every account gets a permanent Digital ID like WF-GDTUBY — this is what identifies you on the web dashboard."},
+    {t:27.7, title:"Copy it with one tap", desc:"Tap the small copy icon next to DIGITAL_ID — a “Digital ID copied!” banner confirms it's on your clipboard.", m:{x:89.3,y:27.3}},
+    {t:35.5, title:"Open Menu → Settings", desc:"The Web Dashboard Sync controls live in Settings, opened from the bottom Menu tab.", m:{x:89.1,y:95.2}},
+    {t:37.3, title:"Tap SETTINGS", desc:"Opens the full Settings sheet — everything for this walkthrough lives below Hydration Reminders.", m:{x:50,y:29.6}},
+    {t:55,   title:"Scroll to Web Dashboard Sync", desc:"Below Hydration Reminders, near the bottom of Settings."},
+    {t:86,   title:"Disable Web Sync (to show the full flow)", desc:"“Web sync disabled — your Digital ID can no longer sign in on the web until you set a new PIN.” The toggle greys out. Your already-synced history isn't deleted.", m:{x:16.6,y:88.0}},
+    {t:99,   title:"Flip “Enable web sync” back on", desc:"With no PIN currently active, it skips straight to asking for a brand-new Sync PIN instead of an old one to confirm first.", m:{x:61.8,y:60.0}},
+    {t:136,  title:"Type a Sync PIN", desc:"At least 6 characters — you'll type this alongside your Digital ID on the web dashboard. Pick something memorable; it isn't tied to this device.", m:{x:50,y:68.1}},
+    {t:150,  title:"Tap “Set PIN & Enable Sync”", desc:"“Web sync enabled — tap Sync Now to upload your data.” The PIN is saved, but nothing has uploaded yet.", m:{x:19.3,y:71.9}},
+    {t:163,  title:"Tap “Sync Now”", desc:"Uploads your full local history — training, nutrition, sleep, measurements — to the dashboard. “Synced to Web Dashboard” confirms it, and Last synced updates immediately.", m:{x:50,y:82.7}},
+    {t:172,  title:"Open wellness.winfinityfitness.com", desc:"The Winfinity Nexus sign-in gate. Same Digital ID + Sync PIN you just set in the app — there's nothing separate to create."},
+    {t:186,  title:"Enter your Digital ID and Sync PIN, then tap Enter Command Center", desc:"Exactly what you copied and typed in the app a moment ago — this logs you straight into the full dashboard: Your Day stories, the community feed, and your real synced data.", m:{x:50,y:61.0}}
   ];
 
-  const section = document.getElementById('tutorial-1');
-  const img = section.querySelector('.frame-img');
-  const capTag = section.querySelector('.step-tag');
-  const capTitle = section.querySelector('.step-title');
-  const capDesc = section.querySelector('.step-desc');
-  const fill = section.querySelector('.fill');
-  const track = section.querySelector('.track');
-  const stepCount = section.querySelector('.step-count');
-  const stepList = section.querySelector('.steps');
-  const stepNav = section.querySelector('.step-nav');
-  const prevBtn = section.querySelector('.prev-btn');
-  const nextBtn = section.querySelector('.next-btn');
+  const ICON_PLAY = '<path d="M6 4l15 8-15 8z"/>';
+  const ICON_PAUSE = '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>';
 
-  let idx = 0;
-
-  STEPS.forEach((step, i) => {
-    const li = document.createElement('li');
-    li.className = 'step-item';
-    li.innerHTML =
-      '<span class="step-num">'+ (i+1) +'</span>' +
-      '<span class="step-body"><h3></h3><p></p></span>';
-    li.querySelector('h3').textContent = step.title;
-    li.querySelector('p').textContent = step.desc;
-    li.addEventListener('click', () => goTo(i));
-    stepList.appendChild(li);
-
-    const navBtn = document.createElement('button');
-    navBtn.type = 'button';
-    navBtn.textContent = i + 1;
-    navBtn.setAttribute('aria-label', 'Step ' + (i+1) + ': ' + step.title);
-    navBtn.addEventListener('click', () => goTo(i));
-    stepNav.appendChild(navBtn);
-  });
-
-  function render(){
-    const step = STEPS[idx];
-    img.src = step.img;
-    capTag.textContent = 'Step ' + (idx+1) + ' / ' + STEPS.length;
-    capTitle.textContent = step.title;
-    capDesc.textContent = step.desc;
-    stepCount.textContent = (idx+1) + ' / ' + STEPS.length;
-    fill.style.width = ((idx) / (STEPS.length - 1) * 100) + '%';
-    prevBtn.disabled = idx === 0;
-    nextBtn.disabled = idx === STEPS.length - 1;
-
-    [...stepList.children].forEach((li,i)=>{ li.classList.toggle('active', i===idx); });
-    [...stepNav.children].forEach((btn,i)=>{ btn.classList.toggle('active', i===idx); });
-
-    const stepsVisible = getComputedStyle(stepList).display !== 'none';
-    const activeLi = stepList.children[idx];
-    if(stepsVisible && activeLi){
-      const rect = activeLi.getBoundingClientRect();
-      if(rect.top < 0 || rect.bottom > window.innerHeight){
-        activeLi.scrollIntoView({block:'nearest', behavior:'smooth'});
-      }
-    }
-    const activeNavBtn = stepNav.children[idx];
-    if (activeNavBtn) activeNavBtn.scrollIntoView({inline:'center', behavior:'smooth', block:'nearest'});
+  function fmt(s){
+    s = Math.max(0, Math.floor(s||0));
+    const m = Math.floor(s/60), r = s%60;
+    return m + ':' + String(r).padStart(2,'0');
   }
 
-  function goTo(i){
-    idx = Math.min(STEPS.length - 1, Math.max(0, i));
+  function initTutorial(section, STEPS){
+    const vid = section.querySelector('.vid');
+    const marker = section.querySelector('.tap-marker');
+    const capTag = section.querySelector('.step-tag');
+    const capTitle = section.querySelector('.step-title');
+    const capDesc = section.querySelector('.step-desc');
+    const playOverlay = section.querySelector('.play-overlay');
+    const playBtn = section.querySelector('.play-btn');
+    const playIcon = section.querySelector('.play-icon');
+    const track = section.querySelector('.track');
+    const fill = section.querySelector('.fill');
+    const scrubber = section.querySelector('.scrubber');
+    const timeLabel = section.querySelector('.time');
+    const stepList = section.querySelector('.steps');
+    const stepNav = section.querySelector('.step-nav');
+
+    function jumpToStep(step){
+      try{ vid.currentTime = step.t + 0.05; }catch(e){}
+      vid.play().catch(()=>{});
+    }
+
+    STEPS.forEach((step, i) => {
+      const li = document.createElement('li');
+      li.className = 'step-item';
+      li.innerHTML =
+        '<span class="step-num">'+ (i+1) +'</span>' +
+        '<span class="step-body"><h3></h3><p></p></span>' +
+        '<span class="step-time"></span>';
+      li.querySelector('h3').textContent = step.title;
+      li.querySelector('p').textContent = step.desc;
+      li.querySelector('.step-time').textContent = fmt(step.t);
+      li.addEventListener('click', () => jumpToStep(step));
+      stepList.appendChild(li);
+
+      const navBtn = document.createElement('button');
+      navBtn.type = 'button';
+      navBtn.textContent = i + 1;
+      navBtn.setAttribute('aria-label', 'Step ' + (i+1) + ': ' + step.title);
+      navBtn.addEventListener('click', () => jumpToStep(step));
+      stepNav.appendChild(navBtn);
+    });
+
+    function buildTicks(){
+      const dur = vid.duration || 207;
+      track.querySelectorAll('.tick').forEach(t=>t.remove());
+      STEPS.forEach(step=>{
+        const tick = document.createElement('div');
+        tick.className = 'tick';
+        tick.style.left = (step.t/dur*100) + '%';
+        track.appendChild(tick);
+      });
+    }
+
+    function activeIndex(t){
+      let idx = 0;
+      for(let i=0;i<STEPS.length;i++){ if(t >= STEPS[i].t) idx = i; }
+      return idx;
+    }
+
+    function render(){
+      const t = vid.currentTime || 0;
+      const dur = vid.duration || 207;
+      const idx = activeIndex(t);
+      const step = STEPS[idx];
+
+      fill.style.width = (t/dur*100) + '%';
+      timeLabel.textContent = fmt(t) + ' / ' + fmt(dur);
+
+      capTag.textContent = 'Step ' + (idx+1) + ' / ' + STEPS.length;
+      capTitle.textContent = step.title;
+      capDesc.textContent = step.desc;
+
+      if(step.m){
+        marker.style.left = step.m.x + '%';
+        marker.style.top = step.m.y + '%';
+        marker.classList.add('show');
+      } else {
+        marker.classList.remove('show');
+      }
+
+      [...stepList.children].forEach((li,i)=>{
+        li.classList.toggle('active', i===idx);
+      });
+      [...stepNav.children].forEach((btn,i)=>{
+        btn.classList.toggle('active', i===idx);
+      });
+      const stepsVisible = getComputedStyle(stepList).display !== 'none';
+      const activeLi = stepList.children[idx];
+      if(stepsVisible && activeLi){
+        const rect = activeLi.getBoundingClientRect();
+        if(rect.top < 0 || rect.bottom > window.innerHeight){
+          activeLi.scrollIntoView({block:'nearest', behavior:'smooth'});
+        }
+      }
+    }
+
+    vid.addEventListener('loadedmetadata', buildTicks);
+    vid.addEventListener('timeupdate', render);
+    vid.addEventListener('play', ()=>{
+      playOverlay.dataset.hidden = 'true';
+      playIcon.innerHTML = ICON_PAUSE;
+    });
+    vid.addEventListener('pause', ()=>{
+      playOverlay.dataset.hidden = (vid.currentTime>0 && vid.currentTime<vid.duration) ? 'true':'false';
+      playIcon.innerHTML = ICON_PLAY;
+    });
+    vid.addEventListener('ended', ()=>{
+      playOverlay.dataset.hidden = 'false';
+      playIcon.innerHTML = ICON_PLAY;
+    });
+
+    function togglePlay(){
+      if(vid.paused){ vid.play().catch(()=>{}); } else { vid.pause(); }
+    }
+    playOverlay.addEventListener('click', togglePlay);
+    playBtn.addEventListener('click', togglePlay);
+
+    function seekFromEvent(e){
+      const rect = track.getBoundingClientRect();
+      const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+      const pct = Math.min(1, Math.max(0, x/rect.width));
+      vid.currentTime = pct * (vid.duration||207);
+    }
+    let dragging = false;
+    scrubber.addEventListener('mousedown', e=>{ dragging=true; seekFromEvent(e); });
+    window.addEventListener('mousemove', e=>{ if(dragging) seekFromEvent(e); });
+    window.addEventListener('mouseup', ()=>{ dragging=false; });
+    scrubber.addEventListener('touchstart', e=>{ dragging=true; seekFromEvent(e); }, {passive:true});
+    scrubber.addEventListener('touchmove', e=>{ if(dragging) seekFromEvent(e); }, {passive:true});
+    scrubber.addEventListener('touchend', ()=>{ dragging=false; });
+
     render();
   }
 
-  prevBtn.addEventListener('click', () => goTo(idx - 1));
-  nextBtn.addEventListener('click', () => goTo(idx + 1));
-  track.addEventListener('click', e => {
-    const rect = track.getBoundingClientRect();
-    const pct = (e.clientX - rect.left) / rect.width;
-    goTo(Math.round(pct * (STEPS.length - 1)));
-  });
-  document.addEventListener('keydown', e => {
-    if (e.key === 'ArrowRight') goTo(idx + 1);
-    if (e.key === 'ArrowLeft') goTo(idx - 1);
-  });
-
-  render();
+  const section = document.getElementById('tutorial-1');
+  initTutorial(section, STEPS);
 })();
 </script>
