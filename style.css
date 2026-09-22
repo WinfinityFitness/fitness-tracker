@@ -6317,20 +6317,28 @@ html.wf-desktop-shell body { overflow-x: auto; }
 .wds-story-link-attach { padding: 0 14px; position: relative; z-index: 2; }
 .wds-story-link-attach .wds-link-preview-card { margin-top: 0; }
 
+/* Locked to 9:16 (matches the 720x1280 canvas wdsFlattenStoryToDataUrl
+   actually exports) so this editor is a true scaled-down mirror of the
+   real full-screen My Day frame — align-self:center overrides the column's
+   default stretch so the aspect-ratio (not the container width) drives
+   sizing, capped by max-width so it never overflows on narrow screens. */
 .wds-story-create-canvas {
   flex: 1; position: relative; border-radius: 14px; overflow: hidden; background: var(--surface-2);
   border: 1px solid var(--border-soft); display: flex; align-items: center; justify-content: center;
+  aspect-ratio: 9 / 16; align-self: center; width: auto; max-width: 100%;
 }
 .wds-story-create-canvas .empty-note { padding: 0 24px; text-align: center; position: relative; z-index: 0; }
 
-/* Photo layer — pannable/zoomable: the image sits centered at 1x scale
-   (covering the canvas like object-fit:cover) then gets extra
-   translate+scale on top from drag/zoom-slider input, applied in
-   wdsApplyPhotoTransform (app.js). */
+/* Photo layer — pannable/zoomable: the image starts fully visible,
+   letterboxed like object-fit:contain (never cropped on insert), then
+   drag/pinch/zoom-slider input applies extra translate+scale on top, via
+   wdsApplyPhotoTransform (app.js). baseScale in wdsFlattenStoryToDataUrl
+   uses the matching Math.min("contain") fit so the exported story matches
+   this preview 1:1. */
 .wds-story-photo-layer { position: absolute; inset: 0; overflow: hidden; touch-action: none; cursor: grab; z-index: 0; }
 .wds-story-photo-layer:active { cursor: grabbing; }
 .wds-story-photo-layer img {
-  position: absolute; top: 50%; left: 50%; width: 100%; height: 100%; object-fit: cover;
+  position: absolute; top: 50%; left: 50%; width: 100%; height: 100%; object-fit: contain;
   transform: translate(-50%, -50%); pointer-events: none;
 }
 .wds-story-blend-layer { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: overlay; opacity: 0.55; z-index: 1; }

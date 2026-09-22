@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.00';
+const APP_VERSION = 'WF_SYS_V.1.8.01';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -795,26 +795,65 @@ function initDesktopShell() {
     wdsStoryPhotoTransform.scale = parseFloat(storyPhotoZoomSlider.value) || 1;
     wdsApplyPhotoTransform();
   });
-  // Pans the photo; deselects any active text layer first so a drag
-  // starting over the image doesn't also drag whatever text was selected.
+  // Pans the photo with one finger/pointer, or pinch-zooms + pans with two.
+  // A shared pointer map plus a baseline re-snapshotted every time the
+  // pointer count changes (finger down or up) lets a second finger landing
+  // mid-pan smoothly hand off into pinch mode, and lifting one finger during
+  // a pinch smoothly hand back to panning, with no jump either way since
+  // both modes read live pointer positions rather than values frozen once
+  // at the very first pointerdown.
+  const storyPhotoPointers = new Map();
+  let storyPhotoGestureStart = null;
+  const wdsStoryPhotoGestureSnapshot = () => {
+    const canvas = document.getElementById('wdsStoryCreateCanvas');
+    const pts = [...storyPhotoPointers.values()];
+    if (!pts.length) { storyPhotoGestureStart = null; return; }
+    storyPhotoGestureStart = {
+      rect: canvas.getBoundingClientRect(),
+      transform: { x: wdsStoryPhotoTransform.x, y: wdsStoryPhotoTransform.y, scale: wdsStoryPhotoTransform.scale },
+      mid: pts.length >= 2 ? { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 } : pts[0],
+      dist: pts.length >= 2 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0,
+    };
+  };
+  // Deselects any active text layer first so a drag/pinch starting over the
+  // image doesn't also drag whatever text was selected.
   storyPhotoLayer.addEventListener('pointerdown', e => {
     wdsDeselectStoryText();
     storyPhotoLayer.setPointerCapture(e.pointerId);
-    const canvas = document.getElementById('wdsStoryCreateCanvas');
-    const rect = canvas.getBoundingClientRect();
-    const startX = e.clientX, startY = e.clientY;
-    const startTx = wdsStoryPhotoTransform.x, startTy = wdsStoryPhotoTransform.y;
-    const maxOff = (wdsStoryPhotoTransform.scale - 1) / 2 + 0.15;
-    const onMove = ev => {
-      wdsStoryPhotoTransform.x = Math.min(maxOff, Math.max(-maxOff, startTx + (ev.clientX - startX) / rect.width));
-      wdsStoryPhotoTransform.y = Math.min(maxOff, Math.max(-maxOff, startTy + (ev.clientY - startY) / rect.height));
-      wdsApplyPhotoTransform();
-    };
-    const onUp = () => storyPhotoLayer.removeEventListener('pointermove', onMove);
-    storyPhotoLayer.addEventListener('pointermove', onMove);
-    storyPhotoLayer.addEventListener('pointerup', onUp, { once: true });
-    storyPhotoLayer.addEventListener('pointercancel', onUp, { once: true });
+    storyPhotoPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    wdsStoryPhotoGestureSnapshot();
   });
+  storyPhotoLayer.addEventListener('pointermove', e => {
+    if (!storyPhotoPointers.has(e.pointerId) || !storyPhotoGestureStart) return;
+    storyPhotoPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const start = storyPhotoGestureStart;
+    const rect = start.rect;
+    const pts = [...storyPhotoPointers.values()];
+    if (pts.length >= 2) {
+      const mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      const minScale = parseFloat(storyPhotoZoomSlider.min) || 1;
+      const maxScale = parseFloat(storyPhotoZoomSlider.max) || 3;
+      const nextScale = Math.min(maxScale, Math.max(minScale, start.transform.scale * (dist / (start.dist || dist))));
+      wdsStoryPhotoTransform.scale = nextScale;
+      const maxOff = (nextScale - 1) / 2 + 0.15;
+      wdsStoryPhotoTransform.x = Math.min(maxOff, Math.max(-maxOff, start.transform.x + (mid.x - start.mid.x) / rect.width));
+      wdsStoryPhotoTransform.y = Math.min(maxOff, Math.max(-maxOff, start.transform.y + (mid.y - start.mid.y) / rect.height));
+      storyPhotoZoomSlider.value = String(nextScale);
+    } else {
+      const p = pts[0];
+      const maxOff = (wdsStoryPhotoTransform.scale - 1) / 2 + 0.15;
+      wdsStoryPhotoTransform.x = Math.min(maxOff, Math.max(-maxOff, start.transform.x + (p.x - start.mid.x) / rect.width));
+      wdsStoryPhotoTransform.y = Math.min(maxOff, Math.max(-maxOff, start.transform.y + (p.y - start.mid.y) / rect.height));
+    }
+    wdsApplyPhotoTransform();
+  });
+  const wdsStoryPhotoPointerEnd = e => {
+    storyPhotoPointers.delete(e.pointerId);
+    wdsStoryPhotoGestureSnapshot();
+  };
+  storyPhotoLayer.addEventListener('pointerup', wdsStoryPhotoPointerEnd);
+  storyPhotoLayer.addEventListener('pointercancel', wdsStoryPhotoPointerEnd);
   // Tapping empty canvas (not a text layer, the photo, or a control)
   // deselects whichever text layer was active, hiding its handles/toolbar.
   document.getElementById('wdsStoryCreateCanvas').addEventListener('pointerdown', e => {
@@ -3027,7 +3066,11 @@ async function wdsFlattenStoryToDataUrl() {
 
   if (wdsPendingStoryImageDataUrl) {
     const img = await wdsLoadImageEl(wdsPendingStoryImageDataUrl);
-    const baseScale = Math.max(W / img.width, H / img.height);
+    // Math.min ("contain") so an untouched insert exports the whole photo
+    // uncropped, matching the editor preview's default object-fit:contain —
+    // scale/x/y from pinch-zoom/drag then apply on top of this base exactly
+    // as they do in wdsApplyPhotoTransform.
+    const baseScale = Math.min(W / img.width, H / img.height);
     const scale = baseScale * wdsStoryPhotoTransform.scale;
     const drawW = img.width * scale, drawH = img.height * scale;
     const cx = W / 2 + wdsStoryPhotoTransform.x * W;
