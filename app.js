@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.02';
+const APP_VERSION = 'WF_SYS_V.1.8.03';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -20985,17 +20985,17 @@ function updateRoomActionButtons(roomId) {
 function renderChatRoomOptions() {
   const select = document.getElementById('chatRoomSelect');
   select.innerHTML = '<option value="">🌐 Public Chat</option>';
-  // "Message my coach" — only shown before that DM room actually exists yet
-  // (client hasn't started it, and the coach hasn't either). Once a real
-  // room exists it shows up below through the normal chatRoomMeta loop like
-  // any other DM, so this placeholder option disappears on its own instead
-  // of ever duplicating it.
-  const coachName = coachFeatureFlags && coachFeatureFlags.has_coach ? coachFeatureFlags.brand_name : null;
-  const alreadyHasCoachDm = coachName && Object.values(chatRoomMeta).some(m => m.isDm && m.name === coachName);
-  if (coachName && !alreadyHasCoachDm) {
+  // "Coach Win" — a fixed shortcut, always visible right alongside Public
+  // Chat (not gated behind already being one of Coach Win's assigned
+  // clients — anyone can start this DM). Only hidden once that DM room
+  // actually exists, at which point it shows up below through the normal
+  // chatRoomMeta loop like any other DM, so this placeholder never
+  // duplicates it.
+  const alreadyHasCoachDm = Object.values(chatRoomMeta).some(m => m.isDm && m.name === COACH_SHORTCUT_NAME);
+  if (!alreadyHasCoachDm) {
     const opt = document.createElement('option');
     opt.value = '__coach__';
-    opt.textContent = `💬 ${coachName}`;
+    opt.textContent = `💬 ${COACH_SHORTCUT_NAME}`;
     select.appendChild(opt);
   }
   Object.entries(chatRoomMeta)
@@ -21987,19 +21987,25 @@ function initLeaderboard() {
 let pendingInviteIds = [];
 let pendingInviteToGroupIds = [];
 
-// Opens (finding-or-creating, via client_open_coach_chat) the DM with this
-// device's own attached coach, then hands off to the exact same code path
+// Fixed brand name for the always-visible "Coach Win" shortcut in the Nexus
+// chat dropdown (renderChatRoomOptions/openCoachDmFromSelect below) — not
+// tied to coach_clients attachment, unlike the per-user coach branding
+// elsewhere in this file (coachFeatureFlags).
+const COACH_SHORTCUT_NAME = 'Coach Win';
+
+// Opens (finding-or-creating, via open_chat_with_named_coach) the DM with
+// Coach Win specifically, then hands off to the exact same code path
 // selecting any other real room already uses — from here on it behaves
 // like a completely normal DM, nothing coach-specific about it.
 async function openCoachDmFromSelect(select) {
   select.disabled = true;
   try {
     const shareKey = localStorage.getItem('wft_lb_share_key') || getOrCreateShareKey();
-    const { data, error } = await sb.rpc('client_open_coach_chat', {
-      p_share_key: shareKey, p_code_name: effectiveLeaderboardName(),
+    const { data, error } = await sb.rpc('open_chat_with_named_coach', {
+      p_share_key: shareKey, p_code_name: effectiveLeaderboardName(), p_coach_brand_name: COACH_SHORTCUT_NAME,
     });
     const row = Array.isArray(data) ? data[0] : data;
-    if (error || !row || !row.room_id) throw (error || new Error('Could not open chat with your coach.'));
+    if (error || !row || !row.room_id) throw (error || new Error('Could not open chat with Coach Win.'));
     await refreshChatRooms();
     currentChatRoomId = row.room_id;
     localStorage.setItem('wft_chat_room', currentChatRoomId);
@@ -22009,7 +22015,7 @@ async function openCoachDmFromSelect(select) {
     const messages = await fetchChatMessages();
     renderChatMessages(messages);
   } catch (e) {
-    showRestToast('Could not open chat with your coach: ' + (e.message || 'check your connection'));
+    showRestToast(`Could not open chat with ${COACH_SHORTCUT_NAME}: ` + (e.message || 'check your connection'));
     select.value = currentChatRoomId || '';
   } finally {
     select.disabled = false;

@@ -1,21 +1,18 @@
--- Lets a regular client open (find-or-create) a DM with their OWN attached
--- coach, without needing the coach's credentials -- the coach-initiated
--- side of this already existed (coach_open_client_chat, see
--- supabase_coach_nexus_chat_migration.sql), this is the missing client-
--- initiated mirror of it. Reuses the same start_dm_by_share_key primitive
--- every other DM (including coach-initiated ones) is built on, so once the
--- room exists it's a completely normal DM room -- same chat_messages rows,
--- same send_chat_message RPC, nothing coach-specific about it from here on.
+-- Lets ANY client open (find-or-create) a DM with a named coach by brand
+-- name, with no coach_clients attachment required -- this is the "Coach
+-- Win" quick-message shortcut in the Nexus chat dropdown, meant to be as
+-- universally reachable as Public Chat itself, not gated behind already
+-- being one of that coach's assigned clients.
 --
--- p_share_key/p_code_name are the calling client's own identity (same
--- values already used for every other anon-permissive call in this app --
--- getOrCreateShareKey()/effectiveLeaderboardName() client-side). No
--- password: this only needs to know WHICH coach this share_key is
--- currently attached to (coach_clients), which is public-ish info the
--- client already effectively knows (get_my_coach_features exposes the same
--- coach's brand name to this client already).
-create or replace function client_open_coach_chat(
-  p_share_key uuid, p_code_name text
+-- Superseded design note: an earlier version of this migration
+-- (client_open_coach_chat) required an active coach_clients row, mirroring
+-- the existing coach-initiated flow (coach_open_client_chat). Replaced by
+-- this brand-name lookup per explicit direction -- the shortcut should
+-- behave like Public Chat: always visible, no attachment prerequisite.
+drop function if exists client_open_coach_chat(uuid, text);
+
+create or replace function open_chat_with_named_coach(
+  p_share_key uuid, p_code_name text, p_coach_brand_name text
 ) returns table(room_id uuid, coach_brand_name text)
 language plpgsql
 security definer
@@ -25,14 +22,13 @@ declare
   v_brand_name text;
   v_room_id uuid;
 begin
-  select c.chat_share_key, c.brand_name into v_coach_chat_key, v_brand_name
-  from coach_clients cc
-  join coaches c on c.id = cc.coach_id
-  where cc.share_key = p_share_key and cc.status = 'active' and c.active
+  select chat_share_key, brand_name into v_coach_chat_key, v_brand_name
+  from coaches
+  where brand_name = p_coach_brand_name and active
   limit 1;
 
   if v_coach_chat_key is null then
-    raise exception 'No coach attached to this account.';
+    raise exception 'No active coach found with that name.';
   end if;
 
   v_room_id := start_dm_by_share_key(p_share_key, p_code_name, v_coach_chat_key, v_brand_name);
@@ -40,6 +36,6 @@ begin
   return query select v_room_id, v_brand_name;
 end;
 $$;
-grant execute on function client_open_coach_chat(uuid, text) to anon;
+grant execute on function open_chat_with_named_coach(uuid, text, text) to anon;
 
 notify pgrst, 'reload schema';
