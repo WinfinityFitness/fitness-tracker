@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.01';
+const APP_VERSION = 'WF_SYS_V.1.8.02';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -20985,6 +20985,19 @@ function updateRoomActionButtons(roomId) {
 function renderChatRoomOptions() {
   const select = document.getElementById('chatRoomSelect');
   select.innerHTML = '<option value="">🌐 Public Chat</option>';
+  // "Message my coach" — only shown before that DM room actually exists yet
+  // (client hasn't started it, and the coach hasn't either). Once a real
+  // room exists it shows up below through the normal chatRoomMeta loop like
+  // any other DM, so this placeholder option disappears on its own instead
+  // of ever duplicating it.
+  const coachName = coachFeatureFlags && coachFeatureFlags.has_coach ? coachFeatureFlags.brand_name : null;
+  const alreadyHasCoachDm = coachName && Object.values(chatRoomMeta).some(m => m.isDm && m.name === coachName);
+  if (coachName && !alreadyHasCoachDm) {
+    const opt = document.createElement('option');
+    opt.value = '__coach__';
+    opt.textContent = `💬 ${coachName}`;
+    select.appendChild(opt);
+  }
   Object.entries(chatRoomMeta)
     .sort((a, b) => a[1].name.localeCompare(b[1].name))
     .forEach(([id, meta]) => {
@@ -21974,9 +21987,39 @@ function initLeaderboard() {
 let pendingInviteIds = [];
 let pendingInviteToGroupIds = [];
 
+// Opens (finding-or-creating, via client_open_coach_chat) the DM with this
+// device's own attached coach, then hands off to the exact same code path
+// selecting any other real room already uses — from here on it behaves
+// like a completely normal DM, nothing coach-specific about it.
+async function openCoachDmFromSelect(select) {
+  select.disabled = true;
+  try {
+    const shareKey = localStorage.getItem('wft_lb_share_key') || getOrCreateShareKey();
+    const { data, error } = await sb.rpc('client_open_coach_chat', {
+      p_share_key: shareKey, p_code_name: effectiveLeaderboardName(),
+    });
+    const row = Array.isArray(data) ? data[0] : data;
+    if (error || !row || !row.room_id) throw (error || new Error('Could not open chat with your coach.'));
+    await refreshChatRooms();
+    currentChatRoomId = row.room_id;
+    localStorage.setItem('wft_chat_room', currentChatRoomId);
+    renderChatRoomOptions();
+    select.value = currentChatRoomId;
+    updateRoomActionButtons(currentChatRoomId);
+    const messages = await fetchChatMessages();
+    renderChatMessages(messages);
+  } catch (e) {
+    showRestToast('Could not open chat with your coach: ' + (e.message || 'check your connection'));
+    select.value = currentChatRoomId || '';
+  } finally {
+    select.disabled = false;
+  }
+}
+
 function initGroupChat() {
   const select = document.getElementById('chatRoomSelect');
   select.addEventListener('change', async () => {
+    if (select.value === '__coach__') { await openCoachDmFromSelect(select); return; }
     currentChatRoomId = select.value || null;
     if (currentChatRoomId) {
       localStorage.setItem('wft_chat_room', currentChatRoomId);
