@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.04';
+const APP_VERSION = 'WF_SYS_V.1.8.05';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -14446,17 +14446,17 @@ function initAddFoodPanel() {
   const photoSpinner = document.getElementById('aiPhotoSpinner');
   const photoInput = document.getElementById('aiPhotoInput');
   const photoPreview = document.getElementById('aiPhotoPreview');
-  photoBtn.addEventListener('click', () => photoInput.click());
-  photoInput.addEventListener('change', async () => {
-    const file = photoInput.files[0];
-    photoInput.value = '';
-    if (!file) return;
+
+  // Shared by the plain file-picker photo AND the live Portion Guide camera
+  // capture below — same AI call, same review-list population, regardless
+  // of where the image blob came from.
+  async function processFoodPhotoBlob(blob) {
     const statusEl = document.getElementById('aiPhotoStatus');
     statusEl.textContent = 'Reading photo…';
     photoBtn.disabled = true;
     photoSpinner.hidden = false;
     try {
-      const { dataUrl } = await resizeAndCompressImage(file);
+      const { dataUrl } = await resizeAndCompressImage(blob);
       photoPreview.src = dataUrl;
       photoPreview.hidden = false;
       statusEl.textContent = 'Estimating from photo…';
@@ -14492,6 +14492,115 @@ function initAddFoodPanel() {
       photoBtn.disabled = false;
       photoSpinner.hidden = true;
     }
+  }
+
+  photoBtn.addEventListener('click', () => photoInput.click());
+  photoInput.addEventListener('change', async () => {
+    const file = photoInput.files[0];
+    photoInput.value = '';
+    if (!file) return;
+    await processFoodPhotoBlob(file);
+  });
+
+  // ---------------------------------------------------------------------
+  // Portion Guide Photo — a live camera view with a percentage-divided pie
+  // circle overlaid in the center (default 50% Veg/Salad, 25% Carbs, 25%
+  // Protein, editable beforehand), so a user can line their plate up
+  // against a target portion split while framing the shot. The overlay is
+  // a separate SVG layer on top of the <video>, not drawn into the actual
+  // captured frame — capture grabs only the video's own pixels, so the
+  // guide lines never end up in the photo the AI actually analyzes.
+  // ---------------------------------------------------------------------
+  let portionGuideStream = null;
+
+  function polarPoint(cx, cy, r, angleDeg) {
+    const rad = (angleDeg - 90) * Math.PI / 180; // -90 so 0% starts at 12 o'clock
+    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+  }
+
+  // Renders the guide as two overlapping strokes per line (a wide black
+  // pass behind, a narrower bright-cyan pass in front) so it reads clearly
+  // against food of any color and in bright or dim, glare-y or shadowed
+  // camera conditions — the same "outlined line" trick used for on-screen
+  // captions/AR markers, rather than relying on any single color choice.
+  function renderPortionGuideSvg() {
+    const svg = document.getElementById('portionGuideSvg');
+    if (!svg) return;
+    const veg = parseFloat(document.getElementById('portionPctVeg').value) || 0;
+    const carbs = parseFloat(document.getElementById('portionPctCarbs').value) || 0;
+    const protein = parseFloat(document.getElementById('portionPctProtein').value) || 0;
+    const total = veg + carbs + protein;
+    const norm = total > 0 ? 100 / total : 0; // normalize so slices always fill the circle even if the three inputs don't add to exactly 100
+    const slices = [
+      { label: `VEG ${round0(veg)}%`, pct: veg * norm },
+      { label: `CARBS ${round0(carbs)}%`, pct: carbs * norm },
+      { label: `PROTEIN ${round0(protein)}%`, pct: protein * norm },
+    ].filter((s) => s.pct > 0.01);
+
+    const cx = 150, cy = 200, r = 130;
+    const OUTLINE = '#000000', GUIDE = '#00E5FF';
+    let angle = 0;
+    const dividerSegs = [];
+    const labels = [];
+    slices.forEach((slice) => {
+      const startAngle = angle;
+      const endAngle = angle + (slice.pct / 100) * 360;
+      const midAngle = (startAngle + endAngle) / 2;
+      const start = polarPoint(cx, cy, r, startAngle);
+      dividerSegs.push(`M ${cx} ${cy} L ${start.x.toFixed(1)} ${start.y.toFixed(1)}`);
+      const labelPos = polarPoint(cx, cy, r * 0.6, midAngle);
+      labels.push({ x: labelPos.x.toFixed(1), y: labelPos.y.toFixed(1), text: slice.label });
+      angle = endAngle;
+    });
+    const dividerPath = dividerSegs.join(' ');
+
+    svg.innerHTML = `
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${OUTLINE}" stroke-width="7"/>
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${GUIDE}" stroke-width="3"/>
+      <path d="${dividerPath}" fill="none" stroke="${OUTLINE}" stroke-width="7"/>
+      <path d="${dividerPath}" fill="none" stroke="${GUIDE}" stroke-width="3"/>
+      ${labels.map((l) => `<text x="${l.x}" y="${l.y}" text-anchor="middle" dominant-baseline="middle" font-size="15" font-weight="700" fill="${GUIDE}" stroke="${OUTLINE}" stroke-width="3" paint-order="stroke" font-family="inherit">${escapeHtml(l.text)}</text>`).join('')}
+    `;
+  }
+
+  async function startPortionGuideCamera() {
+    const overlay = document.getElementById('portionGuideCameraOverlay');
+    const video = document.getElementById('portionGuideVideo');
+    const status = document.getElementById('portionGuideCameraStatus');
+    overlay.hidden = false;
+    renderPortionGuideSvg();
+    status.textContent = 'Line up your plate inside the circle, then capture.';
+    try {
+      portionGuideStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      video.srcObject = portionGuideStream;
+      await video.play();
+    } catch (e) {
+      status.textContent = 'Camera access denied or unavailable.';
+    }
+  }
+
+  function stopPortionGuideCamera() {
+    document.getElementById('portionGuideCameraOverlay').hidden = true;
+    if (portionGuideStream) { portionGuideStream.getTracks().forEach((t) => t.stop()); portionGuideStream = null; }
+  }
+
+  document.getElementById('btnPortionGuidePhoto').addEventListener('click', startPortionGuideCamera);
+  document.getElementById('btnClosePortionGuideCamera').addEventListener('click', stopPortionGuideCamera);
+  ['portionPctVeg', 'portionPctCarbs', 'portionPctProtein'].forEach((id) => {
+    document.getElementById(id).addEventListener('input', renderPortionGuideSvg);
+  });
+  document.getElementById('btnCapturePortionGuide').addEventListener('click', async () => {
+    const video = document.getElementById('portionGuideVideo');
+    if (!video.videoWidth) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    // Only the <video>'s own pixels get drawn here — the SVG guide is a
+    // separate sibling element on top, never part of this canvas.
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+    stopPortionGuideCamera();
+    if (blob) await processFoodPhotoBlob(blob);
   });
 
   document.getElementById('btnAddAiPhotoItems').addEventListener('click', () => {

@@ -2708,6 +2708,25 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <input type="file" accept="image/*" capture="environment" id="aiPhotoInput" hidden>
       <img class="ai-photo-preview" id="aiPhotoPreview" alt="" hidden>
       <p class="hint" id="aiPhotoStatus"></p>
+
+      <p class="hint hint--sm">Or use the Portion Guide camera — a percentage-divided circle overlay to help line up your plate before shooting:</p>
+      <div class="field-row">
+        <label class="field">
+          <span>Veg/Salad %</span>
+          <input type="number" id="portionPctVeg" value="50" min="0" max="100">
+        </label>
+        <label class="field">
+          <span>Carbs %</span>
+          <input type="number" id="portionPctCarbs" value="25" min="0" max="100">
+        </label>
+        <label class="field">
+          <span>Protein %</span>
+          <input type="number" id="portionPctProtein" value="25" min="0" max="100">
+        </label>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn btn--sm" id="btnPortionGuidePhoto">🍽️ Portion Guide Photo</button>
+      </div>
       <div class="ai-photo-items-review" id="aiPhotoItemsReview" hidden>
         <p class="hint hint--accent" id="aiPhotoItemsHint"></p>
         <div id="aiPhotoItemsList"></div>
@@ -2756,6 +2775,22 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         <button type="button" class="btn btn--primary" id="btnAddCustomFood">Add to diary</button>
       </div>
     </fieldset>
+  </div>
+</div>
+
+<div class="sheet-overlay sheet-overlay--stacked" id="portionGuideCameraOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Portion Guide Photo</h2>
+      <button class="sheet-close" id="btnClosePortionGuideCamera">✕</button>
+    </div>
+    <p class="hint" id="portionGuideCameraStatus">Line up your plate inside the circle, then capture.</p>
+    <div class="portion-guide-video-wrap">
+      <video id="portionGuideVideo" class="barcode-video" playsinline muted></video>
+      <svg id="portionGuideSvg" class="portion-guide-svg" viewBox="0 0 300 400"></svg>
+    </div>
+    <button type="button" class="btn btn--primary" id="btnCapturePortionGuide" style="margin-top:10px;">📸 Capture</button>
   </div>
 </div>
 
