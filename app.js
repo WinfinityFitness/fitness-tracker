@@ -13865,7 +13865,12 @@ function openAddFoodPanel() {
 
 // Deployed under the name "smooth-service" (Supabase's dashboard "Via
 // Editor" quick-create flow auto-assigns a random slug and it's easy to
-// miss renaming it before deploying — happened twice). The function's
+// miss renaming it before deploying — happened twice). Lives in the
+// "winfinity-leaderboard" Supabase project (mzkjboplfalauivwcnni — see
+// config.js's SUPABASE_URL), NOT the separate "WinfinityFitness's Project"
+// (xvjnmstkbxyfosxpquqr) — that other project happens to have its own
+// unrelated function also named "estimate-food", which looks like a match
+// by name alone but isn't the one this app actually calls. The function's
 // actual code/behavior is the food-nutrition estimator described in
 // supabase/functions/estimate-food-nutrition/index.js; only the deployed
 // name diverges from the source folder name.
