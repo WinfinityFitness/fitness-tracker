@@ -210,10 +210,11 @@ Normalize all nutrition values to per 100 grams — the label may show per-servi
     parts.push({ inlineData: { mimeType: labelImageMimeType || 'image/jpeg', data: labelImageBase64 } });
   } else if (hasImage) {
     parts.push({
-      text: `Identify the food shown in this photo and estimate its nutrition facts per 100 grams.
-Respond with ONLY a JSON object, no markdown, no explanation, in exactly this shape:
-{"name": string, "calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "sodium": number}
-All nutrition values are per 100g. calories in kcal, protein/carbs/fat/fiber in grams, sodium in milligrams. If multiple foods are visible, estimate for the combined plate as a whole. If unsure, give your best reasonable estimate — never refuse.`,
+      text: `Identify EACH separate food component visible on the plate in this photo — do not combine them into one estimate. List every distinct item separately (e.g. the meat, each vegetable or side, a sauce, a slice of fruit) rather than describing the plate as a whole.
+For each component, estimate its actual weight in grams based on how much of it is visible in the photo (not a fixed serving size), and give its nutrition facts for THAT estimated amount — the real quantity shown, not per 100g.
+Respond with ONLY a JSON array, no markdown, no explanation, in exactly this shape:
+[{"name": string, "grams": number, "calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "sodium": number, "potassium": number, "vitaminA": number, "vitaminC": number, "iron": number}]
+"grams" is your estimated weight of that one component, in grams. calories in kcal. protein/carbs/fat/fiber in grams. sodium/potassium in milligrams. vitaminA in micrograms RAE. vitaminC in milligrams. iron in milligrams. If a value is negligible, use 0 rather than omitting the field. If unsure about any component, give your best reasonable estimate — never refuse, and always list at least one item.`,
     });
     parts.push({ inlineData: { mimeType: imageMimeType || 'image/jpeg', data: imageBase64 } });
   } else {
@@ -295,8 +296,33 @@ All values are per 100g. calories in kcal, protein/carbs/fat/fiber in grams, sod
     });
   }
 
+  // Plate photo path returns one entry per detected food component (real
+  // estimated grams + micros for that component), not a single combined
+  // per-100g estimate like the other paths below. `parsed` is a JSON array
+  // here per the hasImage prompt above; tolerate a bare object too in case
+  // the model ever collapses to a single item despite the prompt.
+  if (hasImage) {
+    const items = Array.isArray(parsed) ? parsed : [parsed];
+    return jsonResponse({
+      items: items.map((it) => ({
+        name: it?.name || null,
+        grams: Number(it?.grams) || 0,
+        calories: Number(it?.calories) || 0,
+        protein: Number(it?.protein) || 0,
+        carbs: Number(it?.carbs) || 0,
+        fat: Number(it?.fat) || 0,
+        fiber: Number(it?.fiber) || 0,
+        sodium: Number(it?.sodium) || 0,
+        potassium: Number(it?.potassium) || 0,
+        vitaminA: Number(it?.vitaminA) || 0,
+        vitaminC: Number(it?.vitaminC) || 0,
+        iron: Number(it?.iron) || 0,
+      })),
+    });
+  }
+
   return jsonResponse({
-    name: (hasImage || hasBarcodePair) ? (parsed.name || null) : undefined,
+    name: hasBarcodePair ? (parsed.name || null) : undefined,
     code: hasBarcodePair ? (parsed.code ? String(parsed.code).replace(/[^0-9]/g, '') : null) : undefined,
     calories: Number(parsed.calories) || 0,
     protein: Number(parsed.protein) || 0,

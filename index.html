@@ -2708,46 +2708,53 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <input type="file" accept="image/*" capture="environment" id="aiPhotoInput" hidden>
       <img class="ai-photo-preview" id="aiPhotoPreview" alt="" hidden>
       <p class="hint" id="aiPhotoStatus"></p>
-      <p class="hint hint--sm">For the most accurate result, weigh the food on a scale first, then enter that exact weight below — the AI can only guess portion size from a photo.</p>
-      <div class="field-row">
-        <label class="field">
-          <span>Serving size</span>
-          <input type="number" id="customFoodGrams" placeholder="e.g. 250" value="100">
-        </label>
-        <label class="field">
-          <span>Unit</span>
-          <select id="customFoodUnit">
-            <option value="g">g</option>
-            <option value="oz">oz</option>
-            <option value="ml">ml</option>
-            <option value="cup">cup</option>
-            <option value="bowl">bowl</option>
-            <option value="piece">piece</option>
-            <option value="stick">stick</option>
-            <option value="pack">pack</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>Calories</span>
-          <input type="number" id="customFoodCalories" placeholder="e.g. 350">
-        </label>
+      <div class="ai-photo-items-review" id="aiPhotoItemsReview" hidden>
+        <p class="hint hint--accent" id="aiPhotoItemsHint"></p>
+        <div id="aiPhotoItemsList"></div>
+        <button type="button" class="btn btn--primary" id="btnAddAiPhotoItems">Add Selected to Diary</button>
       </div>
-      <p class="hint hint--warning" id="customFoodUnitWarning" hidden>⚠️ Approximate conversion — weigh in grams for exact accuracy.</p>
-      <div class="field-row">
-        <label class="field">
-          <span>Protein (g)</span>
-          <input type="number" id="customFoodProtein" placeholder="0">
-        </label>
-        <label class="field">
-          <span>Carbs (g)</span>
-          <input type="number" id="customFoodCarbs" placeholder="0">
-        </label>
-        <label class="field">
-          <span>Fat (g)</span>
-          <input type="number" id="customFoodFat" placeholder="0">
-        </label>
+      <div id="customFoodManualSection">
+        <p class="hint hint--sm">For the most accurate result, weigh the food on a scale first, then enter that exact weight below — the AI can only guess portion size from a photo.</p>
+        <div class="field-row">
+          <label class="field">
+            <span>Serving size</span>
+            <input type="number" id="customFoodGrams" placeholder="e.g. 250" value="100">
+          </label>
+          <label class="field">
+            <span>Unit</span>
+            <select id="customFoodUnit">
+              <option value="g">g</option>
+              <option value="oz">oz</option>
+              <option value="ml">ml</option>
+              <option value="cup">cup</option>
+              <option value="bowl">bowl</option>
+              <option value="piece">piece</option>
+              <option value="stick">stick</option>
+              <option value="pack">pack</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Calories</span>
+            <input type="number" id="customFoodCalories" placeholder="e.g. 350">
+          </label>
+        </div>
+        <p class="hint hint--warning" id="customFoodUnitWarning" hidden>⚠️ Approximate conversion — weigh in grams for exact accuracy.</p>
+        <div class="field-row">
+          <label class="field">
+            <span>Protein (g)</span>
+            <input type="number" id="customFoodProtein" placeholder="0">
+          </label>
+          <label class="field">
+            <span>Carbs (g)</span>
+            <input type="number" id="customFoodCarbs" placeholder="0">
+          </label>
+          <label class="field">
+            <span>Fat (g)</span>
+            <input type="number" id="customFoodFat" placeholder="0">
+          </label>
+        </div>
+        <button type="button" class="btn btn--primary" id="btnAddCustomFood">Add to diary</button>
       </div>
-      <button type="button" class="btn btn--primary" id="btnAddCustomFood">Add to diary</button>
     </fieldset>
   </div>
 </div>

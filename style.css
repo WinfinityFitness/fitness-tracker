@@ -3840,6 +3840,39 @@ a.contact-row:hover { border-color: var(--cyan); }
 .meal-edit-chain-btn.is-locked { color: var(--warning); }
 .meal-edit-chain-btn.is-locked .chain-link-line { stroke-dasharray: 1.6 1.6; }
 
+/* AI photo estimate — one plate photo, multiple detected food components,
+   each independently editable before any of them are added to the diary. */
+.ai-photo-items-review { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.ai-photo-item-row { display: flex; gap: 8px; padding: 10px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--border-soft); }
+.ai-photo-item-check { flex: none; margin-top: 5px; width: 17px; height: 17px; accent-color: var(--cyan); }
+.ai-photo-item-fields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.ai-photo-item-name {
+  background: var(--surface-1);
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 5px 7px;
+  width: 100%;
+}
+.ai-photo-item-grams-row { display: flex; align-items: center; gap: 6px; }
+.ai-photo-item-grams {
+  width: 68px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.8rem;
+  padding: 4px 6px;
+}
+.ai-photo-item-grams-row span { font-size: 0.72rem; color: var(--text-muted); }
+.ai-photo-item-macros { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-primary); }
+.ai-photo-item-micros { font-family: var(--font-mono); font-size: 0.63rem; color: var(--text-muted); }
+.ai-photo-item-row.is-excluded { opacity: 0.45; }
+
 /* Frosted-glass / embossed-thin surface — used where neon line icons need a
    subtle, translucent seat rather than a flat solid block. No backdrop-filter
    (was blur(7px)): dozens of these render at once across the app, and live

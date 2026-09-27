@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.03';
+const APP_VERSION = 'WF_SYS_V.1.8.04';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -13397,7 +13397,7 @@ function getMealsForDate(date) {
 }
 
 function computeMealsNutritionTotals(meals) {
-  const totals = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sodium: 0 };
+  const totals = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sodium: 0, potassium: 0, vitaminA: 0, vitaminC: 0, iron: 0 };
   MEAL_TYPES.forEach(mt => {
     (meals[mt] || []).forEach(item => {
       totals.calories += item.calories || 0;
@@ -13406,6 +13406,10 @@ function computeMealsNutritionTotals(meals) {
       totals.fat += item.fat || 0;
       totals.fiber += item.fiber || 0;
       totals.sodium += item.sodium || 0;
+      totals.potassium += item.potassium || 0;
+      totals.vitaminA += item.vitaminA || 0;
+      totals.vitaminC += item.vitaminC || 0;
+      totals.iron += item.iron || 0;
     });
   });
   return totals;
@@ -13424,6 +13428,10 @@ function saveMealsForDate(date, meals) {
     fat: round0(totals.fat),
     fiber: round0(totals.fiber),
     sodium: round0(totals.sodium),
+    potassium: round0(totals.potassium),
+    vitaminA: round0(totals.vitaminA),
+    vitaminC: round0(totals.vitaminC),
+    iron: Math.round(totals.iron * 10) / 10,
   });
 }
 
@@ -13578,6 +13586,12 @@ let foodSearchDebounceId = null;
 // Only set by the AI estimate; a from-scratch manual entry (no AI click)
 // leaves this null, so grams/unit changes don't touch hand-typed values.
 let customFoodAiPer100g = null;
+
+// One entry per food component the AI photo estimate detected on the plate
+// (name, current grams, and a per-100g nutrition baseline it was derived
+// from) — lets each row's grams be edited independently and rescale just
+// that row, instead of the old single-combined-estimate behavior.
+let aiPhotoItems = [];
 
 // Directly overrides the day's flat nutrition totals (the same fields
 // Daily Fuel Status reads), bypassing the Dietary Algorithm/meals entirely —
@@ -13844,6 +13858,8 @@ function openAddFoodPanel() {
   document.getElementById('aiPhotoPreview').src = '';
   customFoodAiPer100g = null;
   pendingBarcodeCode = null;
+  aiPhotoItems = [];
+  renderAiPhotoItemsReview();
   document.getElementById('addFoodOverlay').hidden = false;
 }
 
@@ -14263,6 +14279,87 @@ function addFoodItemToDiary(item) {
   showRestToast(`Added "${item.name}" to ${currentAddFoodMeal}.`);
 }
 
+// Same as addFoodItemToDiary but for the AI photo estimate's multiple
+// detected components at once — one save/render/toast instead of one per
+// item, so the overlay doesn't flicker and the toast names a real count.
+function addAiPhotoItemsToDiary(items) {
+  if (!items.length) return;
+  const date = document.getElementById('nutDate').value;
+  const meals = getMealsForDate(date);
+  items.forEach((item) => meals[currentAddFoodMeal].push(item));
+  saveMealsForDate(date, meals);
+  document.getElementById('addFoodOverlay').hidden = true;
+  renderFoodDiary(date);
+  refreshFuelViewsForDate(date);
+  showRestToast(items.length === 1 ? `Added "${items[0].name}" to ${currentAddFoodMeal}.` : `Added ${items.length} items to ${currentAddFoodMeal}.`);
+}
+
+// {calories, protein, ...} for one item's CURRENT grams, scaled from its
+// per-100g baseline.
+function computeAiPhotoItemValues(it) {
+  const scale = it.grams / 100;
+  return {
+    c: round0(it.per100g.calories * scale), p: round0(it.per100g.protein * scale), cb: round0(it.per100g.carbs * scale), f: round0(it.per100g.fat * scale),
+    fiber: round0(it.per100g.fiber * scale), sodium: round0(it.per100g.sodium * scale), potassium: round0(it.per100g.potassium * scale),
+    vitA: round0(it.per100g.vitaminA * scale), vitC: round0(it.per100g.vitaminC * scale), iron: Math.round(it.per100g.iron * scale * 10) / 10,
+  };
+}
+
+// Renders the editable list of food components the AI photo estimate
+// detected. Each row's grams input rescales just that row's own macros/
+// micros from its per-100g baseline — editing one component never touches
+// the others, matching how they were estimated independently in the first
+// place. The grams/name inputs update their own row's text in place rather
+// than re-rendering the whole list, so typing doesn't lose focus mid-edit.
+function renderAiPhotoItemsReview() {
+  const wrap = document.getElementById('aiPhotoItemsReview');
+  const list = document.getElementById('aiPhotoItemsList');
+  const manualSection = document.getElementById('customFoodManualSection');
+  if (!aiPhotoItems.length) {
+    wrap.hidden = true;
+    manualSection.hidden = false;
+    return;
+  }
+  wrap.hidden = false;
+  manualSection.hidden = true;
+  document.getElementById('aiPhotoItemsHint').textContent =
+    `⚠️ Detected ${aiPhotoItems.length} separate item${aiPhotoItems.length === 1 ? '' : 's'} — check the estimated weight for each and adjust if needed before adding.`;
+
+  list.innerHTML = aiPhotoItems.map((it, i) => {
+    const v = computeAiPhotoItemValues(it);
+    return `
+      <div class="ai-photo-item-row${it.selected ? '' : ' is-excluded'}" data-idx="${i}">
+        <input type="checkbox" class="ai-photo-item-check" ${it.selected ? 'checked' : ''}>
+        <div class="ai-photo-item-fields">
+          <input type="text" class="ai-photo-item-name" value="${escapeHtml(it.name)}">
+          <div class="ai-photo-item-grams-row">
+            <input type="number" class="ai-photo-item-grams" value="${it.grams}" min="0"><span>g</span>
+          </div>
+          <div class="ai-photo-item-macros">${v.c} kcal · ${v.p}g protein · ${v.cb}g carbs · ${v.f}g fat</div>
+          <div class="ai-photo-item-micros">Fiber ${v.fiber}g · Sodium ${v.sodium}mg · Potassium ${v.potassium}mg · Vit A ${v.vitA}mcg · Vit C ${v.vitC}mg · Iron ${v.iron}mg</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  list.querySelectorAll('.ai-photo-item-row').forEach((row) => {
+    const idx = parseInt(row.dataset.idx, 10);
+    row.querySelector('.ai-photo-item-check').addEventListener('change', (e) => {
+      aiPhotoItems[idx].selected = e.target.checked;
+      row.classList.toggle('is-excluded', !e.target.checked);
+    });
+    row.querySelector('.ai-photo-item-name').addEventListener('input', (e) => {
+      aiPhotoItems[idx].name = e.target.value;
+    });
+    row.querySelector('.ai-photo-item-grams').addEventListener('input', (e) => {
+      const it = aiPhotoItems[idx];
+      it.grams = parseFloat(e.target.value) || 0;
+      const v = computeAiPhotoItemValues(it);
+      row.querySelector('.ai-photo-item-macros').textContent = `${v.c} kcal · ${v.p}g protein · ${v.cb}g carbs · ${v.f}g fat`;
+      row.querySelector('.ai-photo-item-micros').textContent = `Fiber ${v.fiber}g · Sodium ${v.sodium}mg · Potassium ${v.potassium}mg · Vit A ${v.vitA}mcg · Vit C ${v.vitC}mg · Iron ${v.iron}mg`;
+    });
+  });
+}
+
 // Rescales the custom-food calorie/macro inputs from the last AI estimate's
 // per-100g baseline whenever serving size or unit changes — only active
 // after an AI estimate has actually been fetched (customFoodAiPer100g set);
@@ -14362,19 +14459,54 @@ function initAddFoodPanel() {
       // inlineData.data wants just the bytes after the comma.
       const rawBase64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
       const est = await estimateFoodNutritionFromPhoto(rawBase64, 'image/jpeg');
-      if (est.name) document.getElementById('customFoodName').value = est.name;
-      customFoodAiPer100g = { calories: est.calories || 0, protein: est.protein || 0, carbs: est.carbs || 0, fat: est.fat || 0 };
-      document.getElementById('customFoodGrams').value = 100;
-      document.getElementById('customFoodUnit').value = 'g';
-      document.getElementById('customFoodUnitWarning').hidden = true;
-      recomputeCustomFoodFromAi();
-      statusEl.textContent = '⚠️ AI photo estimate for 100g — low accuracy, review before saving. Weigh the actual food and adjust the serving size below for a real result.';
+      const rawItems = Array.isArray(est.items) ? est.items : [];
+      // Server gives real estimated grams + values for that exact amount
+      // (not per-100g) — derive a per-100g baseline from it so the review
+      // list's own grams input can rescale each row independently.
+      aiPhotoItems = rawItems.map((it) => {
+        const grams = Number(it.grams) > 0 ? Number(it.grams) : 100;
+        const factor = 100 / grams;
+        return {
+          name: it.name || 'Food item',
+          grams,
+          selected: true,
+          per100g: {
+            calories: (it.calories || 0) * factor, protein: (it.protein || 0) * factor, carbs: (it.carbs || 0) * factor, fat: (it.fat || 0) * factor,
+            fiber: (it.fiber || 0) * factor, sodium: (it.sodium || 0) * factor, potassium: (it.potassium || 0) * factor,
+            vitaminA: (it.vitaminA || 0) * factor, vitaminC: (it.vitaminC || 0) * factor, iron: (it.iron || 0) * factor,
+          },
+        };
+      });
+      renderAiPhotoItemsReview();
+      statusEl.textContent = aiPhotoItems.length
+        ? '⚠️ AI estimate — review each item\'s weight below (tap to correct it) before adding to your diary.'
+        : 'Could not identify any food in that photo — try again or add manually below.';
     } catch (e) {
       statusEl.textContent = e.message || 'AI photo estimate unavailable — check your connection or add manually.';
     } finally {
       photoBtn.disabled = false;
       photoSpinner.hidden = true;
     }
+  });
+
+  document.getElementById('btnAddAiPhotoItems').addEventListener('click', () => {
+    const chosen = aiPhotoItems.filter((it) => it.selected).map((it) => {
+      const v = computeAiPhotoItemValues(it);
+      return {
+        name: it.name.trim() || 'Food item',
+        grams: it.grams, qty: it.grams, unit: 'g',
+        calories: v.c, protein: v.p, carbs: v.cb, fat: v.f,
+        fiber: v.fiber, sodium: v.sodium, potassium: v.potassium,
+        vitaminA: v.vitA, vitaminC: v.vitC, iron: v.iron,
+        source: 'ai-photo',
+      };
+    });
+    if (!chosen.length) { alert('Select at least one item to add.'); return; }
+    addAiPhotoItemsToDiary(chosen);
+    aiPhotoItems = [];
+    renderAiPhotoItemsReview();
+    photoPreview.hidden = true;
+    document.getElementById('aiPhotoStatus').textContent = '';
   });
 
   document.getElementById('btnAddSelectedFood').addEventListener('click', () => {
