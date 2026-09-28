@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.08';
+const APP_VERSION = 'WF_SYS_V.1.8.09';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -14361,7 +14361,11 @@ function renderAiPhotoItemsReview() {
       <div class="ai-photo-item-row${it.selected ? '' : ' is-excluded'}" data-idx="${i}">
         <input type="checkbox" class="ai-photo-item-check" ${it.selected ? 'checked' : ''}>
         <div class="ai-photo-item-fields">
-          <input type="text" class="ai-photo-item-name" value="${escapeHtml(it.name)}">
+          <div class="ai-photo-item-name-row">
+            <input type="text" class="ai-photo-item-name" value="${escapeHtml(it.name)}">
+            <button type="button" class="ai-photo-item-reestimate-btn" title="AI got the food wrong? Fix the name, then tap this to re-estimate its nutrition.">↻ Re-estimate</button>
+          </div>
+          <p class="ai-photo-item-reestimate-status"></p>
           <div class="ai-photo-item-grams-row">
             <input type="number" class="ai-photo-item-grams" value="${it.grams}" min="0"><span>g</span>
           </div>
@@ -14370,6 +14374,12 @@ function renderAiPhotoItemsReview() {
         </div>
       </div>`;
   }).join('');
+
+  function refreshRowNumbers(row, it) {
+    const v = computeAiPhotoItemValues(it);
+    row.querySelector('.ai-photo-item-macros').textContent = `${v.c} kcal · ${v.p}g protein · ${v.cb}g carbs · ${v.f}g fat`;
+    row.querySelector('.ai-photo-item-micros').textContent = `Fiber ${v.fiber}g · Sodium ${v.sodium}mg · Potassium ${v.potassium}mg · Vit A ${v.vitA}mcg · Vit C ${v.vitC}mg · Iron ${v.iron}mg`;
+  }
 
   list.querySelectorAll('.ai-photo-item-row').forEach((row) => {
     const idx = parseInt(row.dataset.idx, 10);
@@ -14383,9 +14393,35 @@ function renderAiPhotoItemsReview() {
     row.querySelector('.ai-photo-item-grams').addEventListener('input', (e) => {
       const it = aiPhotoItems[idx];
       it.grams = parseFloat(e.target.value) || 0;
-      const v = computeAiPhotoItemValues(it);
-      row.querySelector('.ai-photo-item-macros').textContent = `${v.c} kcal · ${v.p}g protein · ${v.cb}g carbs · ${v.f}g fat`;
-      row.querySelector('.ai-photo-item-micros').textContent = `Fiber ${v.fiber}g · Sodium ${v.sodium}mg · Potassium ${v.potassium}mg · Vit A ${v.vitA}mcg · Vit C ${v.vitC}mg · Iron ${v.iron}mg`;
+      refreshRowNumbers(row, it);
+    });
+    // The AI misidentified this component — user corrects the name, then
+    // this re-queries nutrition for that corrected name (same text-based
+    // estimate the "Estimate AI" tab uses) and replaces just this item's
+    // per-100g baseline, keeping the photo's own weight estimate as-is.
+    row.querySelector('.ai-photo-item-reestimate-btn').addEventListener('click', async () => {
+      const it = aiPhotoItems[idx];
+      const name = it.name.trim();
+      const statusEl = row.querySelector('.ai-photo-item-reestimate-status');
+      if (!name) { statusEl.textContent = 'Type a corrected food name first.'; return; }
+      const btn = row.querySelector('.ai-photo-item-reestimate-btn');
+      btn.disabled = true;
+      statusEl.textContent = 'Re-estimating…';
+      try {
+        const est = await estimateFoodNutritionWithAI(name);
+        it.name = name;
+        it.per100g = {
+          calories: est.calories || 0, protein: est.protein || 0, carbs: est.carbs || 0, fat: est.fat || 0,
+          fiber: est.fiber || 0, sodium: est.sodium || 0, potassium: est.potassium || 0,
+          vitaminA: est.vitaminA || 0, vitaminC: est.vitaminC || 0, iron: est.iron || 0,
+        };
+        refreshRowNumbers(row, it);
+        statusEl.textContent = '✓ Updated with corrected nutrition.';
+      } catch (e) {
+        statusEl.textContent = e.message || 'Re-estimate failed — try again.';
+      } finally {
+        btn.disabled = false;
+      }
     });
   });
 }

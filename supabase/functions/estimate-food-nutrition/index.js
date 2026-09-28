@@ -221,8 +221,8 @@ Respond with ONLY a JSON array, no markdown, no explanation, in exactly this sha
     parts.push({
       text: `Estimate the nutrition facts per 100 grams for this food: "${foodName}"${servingDescription ? ` (${servingDescription})` : ''}.
 Respond with ONLY a JSON object, no markdown, no explanation, in exactly this shape:
-{"calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "sodium": number}
-All values are per 100g. calories in kcal, protein/carbs/fat/fiber in grams, sodium in milligrams. If unsure, give your best reasonable estimate for a typical serving — never refuse.`,
+{"calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "sodium": number, "potassium": number, "vitaminA": number, "vitaminC": number, "iron": number}
+All values are per 100g. calories in kcal. protein/carbs/fat/fiber in grams. sodium/potassium in milligrams. vitaminA in micrograms RAE. vitaminC in milligrams. iron in milligrams. If unsure, give your best reasonable estimate for a typical serving — never refuse.`,
     });
   }
 
@@ -330,5 +330,12 @@ All values are per 100g. calories in kcal, protein/carbs/fat/fiber in grams, sod
     fat: Number(parsed.fat) || 0,
     fiber: Number(parsed.fiber) || 0,
     sodium: Number(parsed.sodium) || 0,
+    // Only the plain text-name path's prompt actually asks for these —
+    // the barcode-label path's own prompt above doesn't, so these just
+    // come back 0 for that path (same as before this field existed).
+    potassium: Number(parsed.potassium) || 0,
+    vitaminA: Number(parsed.vitaminA) || 0,
+    vitaminC: Number(parsed.vitaminC) || 0,
+    iron: Number(parsed.iron) || 0,
   });
 });
