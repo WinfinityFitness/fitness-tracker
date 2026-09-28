@@ -1065,7 +1065,7 @@ button.mission-log-day:hover { border-color: var(--cyan); }
   line-height: 1.15;
   cursor: pointer;
 }
-.add-food-tab-icon { font-size: 1.2rem; line-height: 1; }
+.add-food-tab-icon { flex-shrink: 0; }
 .add-food-tab.is-active { border-color: var(--cyan); color: var(--cyan); box-shadow: inset 0 0 0 1px var(--cyan); }
 .add-food-panel { margin-top: 12px; }
 .add-food-bottom-btn { margin-top: 4px; }
