@@ -2650,57 +2650,116 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <button class="sheet-close" id="btnCloseAddFood">✕</button>
     </div>
 
-    <div class="btn-row">
-      <button type="button" class="btn btn--primary" id="btnScanBarcode">📷 Scan barcode</button>
+    <div class="add-food-tabs" id="addFoodTabs">
+      <button type="button" class="add-food-tab" data-tab="barcode" id="addFoodTabBarcode">
+        <span class="add-food-tab-icon">📷</span><span class="add-food-tab-label">Scan Barcode</span>
+      </button>
+      <button type="button" class="add-food-tab" data-tab="search" id="addFoodTabSearch">
+        <span class="add-food-tab-icon">🔎</span><span class="add-food-tab-label">Search Food</span>
+      </button>
+      <button type="button" class="add-food-tab" data-tab="ai" id="addFoodTabAi">
+        <span class="add-food-tab-icon">✨</span><span class="add-food-tab-label">Estimate AI</span>
+      </button>
+      <button type="button" class="add-food-tab" data-tab="photo" id="addFoodTabPhoto">
+        <span class="add-food-tab-icon">🍽️</span><span class="add-food-tab-label">Estimate Photo</span>
+      </button>
     </div>
 
-    <label class="field" style="margin-top:12px;">
-      <span>Search foods</span>
-      <input type="text" id="foodSearchInput" placeholder="e.g. chicken breast, banana, rice" autocomplete="off">
-    </label>
-    <p class="hint" id="foodSearchStatus"></p>
-    <div id="foodSearchResults" class="food-search-results"></div>
-
-    <div class="selected-food-card" id="selectedFoodCard" hidden>
-      <p class="mod-tag">Confirm serving</p>
-      <p class="selected-food-name" id="selectedFoodName"></p>
-      <div class="field-row">
-        <label class="field">
-          <span>Serving size</span>
-          <input type="number" id="selectedFoodGrams" value="100">
-        </label>
-        <label class="field">
-          <span>Unit</span>
-          <select id="selectedFoodUnit">
-            <option value="g">g</option>
-            <option value="oz">oz</option>
-            <option value="ml">ml</option>
-            <option value="cup">cup</option>
-            <option value="bowl">bowl</option>
-            <option value="piece">piece</option>
-            <option value="stick">stick</option>
-            <option value="pack">pack</option>
-          </select>
-        </label>
-      </div>
-      <p class="hint hint--warning" id="selectedFoodUnitWarning" hidden>⚠️ Approximate conversion — weigh in grams for exact accuracy.</p>
-      <p class="hint hint--warning" id="selectedFoodAiWarning" hidden>✨ AI estimate — review before saving, may not be accurate.</p>
-      <p class="selected-food-preview" id="selectedFoodPreview"></p>
-      <button type="button" class="btn btn--primary" id="btnAddSelectedFood">Add to diary</button>
-    </div>
-
-    <div class="field-group-heading" style="margin-top:16px;">Not finding it?</div>
-    <p class="hint hint--accent" id="customFoodTeachNote" hidden>📷 Barcode not in our database yet — fill this in and we'll remember it for the next scan (by anyone).</p>
-    <fieldset class="field-group" id="customFoodForm">
+    <div class="add-food-panel" id="addFoodPanelSearch">
       <label class="field">
-        <span>Food name</span>
-        <input type="text" id="customFoodName" placeholder="e.g. Lola's adobo">
+        <span>Search foods</span>
+        <input type="text" id="foodSearchInput" placeholder="e.g. chicken breast, banana, rice" autocomplete="off">
       </label>
-      <div class="btn-row">
-        <button type="button" class="btn btn--sm" id="btnEstimateAiNutrition">✨ Estimate with AI</button>
-        <span class="ai-spinner" id="aiEstimateSpinner" hidden></span>
+      <p class="hint" id="foodSearchStatus"></p>
+      <div id="foodSearchResults" class="food-search-results"></div>
+
+      <div class="selected-food-card" id="selectedFoodCard" hidden>
+        <p class="mod-tag">Confirm serving</p>
+        <p class="selected-food-name" id="selectedFoodName"></p>
+        <div class="field-row">
+          <label class="field">
+            <span>Serving size</span>
+            <input type="number" id="selectedFoodGrams" value="100">
+          </label>
+          <label class="field">
+            <span>Unit</span>
+            <select id="selectedFoodUnit">
+              <option value="g">g</option>
+              <option value="oz">oz</option>
+              <option value="ml">ml</option>
+              <option value="cup">cup</option>
+              <option value="bowl">bowl</option>
+              <option value="piece">piece</option>
+              <option value="stick">stick</option>
+              <option value="pack">pack</option>
+            </select>
+          </label>
+        </div>
+        <p class="hint hint--warning" id="selectedFoodUnitWarning" hidden>⚠️ Approximate conversion — weigh in grams for exact accuracy.</p>
+        <p class="hint hint--warning" id="selectedFoodAiWarning" hidden>✨ AI estimate — review before saving, may not be accurate.</p>
+        <p class="selected-food-preview" id="selectedFoodPreview"></p>
+        <button type="button" class="btn btn--primary add-food-bottom-btn" id="btnAddSelectedFood">Add to diary</button>
       </div>
-      <p class="hint" id="aiEstimateStatus"></p>
+    </div>
+
+    <div class="add-food-panel" id="addFoodPanelAi" hidden>
+      <p class="hint hint--accent" id="customFoodTeachNote" hidden>📷 Barcode not in our database yet — fill this in and we'll remember it for the next scan (by anyone).</p>
+      <fieldset class="field-group" id="customFoodForm">
+        <label class="field">
+          <span>Food name</span>
+          <input type="text" id="customFoodName" placeholder="e.g. Lola's adobo">
+        </label>
+        <div class="btn-row">
+          <button type="button" class="btn btn--sm" id="btnEstimateAiNutrition">✨ Estimate with AI</button>
+          <span class="ai-spinner" id="aiEstimateSpinner" hidden></span>
+        </div>
+        <p class="hint" id="aiEstimateStatus"></p>
+        <div id="customFoodManualSection">
+          <p class="hint hint--sm">Or fill these in yourself — weigh the food on a scale first for the most accurate result.</p>
+          <div class="field-row">
+            <label class="field">
+              <span>Serving size</span>
+              <input type="number" id="customFoodGrams" placeholder="e.g. 250" value="100">
+            </label>
+            <label class="field">
+              <span>Unit</span>
+              <select id="customFoodUnit">
+                <option value="g">g</option>
+                <option value="oz">oz</option>
+                <option value="ml">ml</option>
+                <option value="cup">cup</option>
+                <option value="bowl">bowl</option>
+                <option value="piece">piece</option>
+                <option value="stick">stick</option>
+                <option value="pack">pack</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Calories</span>
+              <input type="number" id="customFoodCalories" placeholder="e.g. 350">
+            </label>
+          </div>
+          <p class="hint hint--warning" id="customFoodUnitWarning" hidden>⚠️ Approximate conversion — weigh in grams for exact accuracy.</p>
+          <div class="field-row">
+            <label class="field">
+              <span>Protein (g)</span>
+              <input type="number" id="customFoodProtein" placeholder="0">
+            </label>
+            <label class="field">
+              <span>Carbs (g)</span>
+              <input type="number" id="customFoodCarbs" placeholder="0">
+            </label>
+            <label class="field">
+              <span>Fat (g)</span>
+              <input type="number" id="customFoodFat" placeholder="0">
+            </label>
+          </div>
+          <button type="button" class="btn btn--primary add-food-bottom-btn" id="btnAddCustomFood">Add to diary</button>
+        </div>
+      </fieldset>
+    </div>
+
+    <div class="add-food-panel" id="addFoodPanelPhoto" hidden>
       <div class="btn-row">
         <button type="button" class="btn btn--sm" id="btnEstimateAiPhoto">📷 Estimate from Photo</button>
         <span class="ai-spinner" id="aiPhotoSpinner" hidden></span>
@@ -2730,51 +2789,9 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <div class="ai-photo-items-review" id="aiPhotoItemsReview" hidden>
         <p class="hint hint--accent" id="aiPhotoItemsHint"></p>
         <div id="aiPhotoItemsList"></div>
-        <button type="button" class="btn btn--primary" id="btnAddAiPhotoItems">Add Selected to Diary</button>
+        <button type="button" class="btn btn--primary add-food-bottom-btn" id="btnAddAiPhotoItems">Add Selected to Diary</button>
       </div>
-      <div id="customFoodManualSection">
-        <p class="hint hint--sm">For the most accurate result, weigh the food on a scale first, then enter that exact weight below — the AI can only guess portion size from a photo.</p>
-        <div class="field-row">
-          <label class="field">
-            <span>Serving size</span>
-            <input type="number" id="customFoodGrams" placeholder="e.g. 250" value="100">
-          </label>
-          <label class="field">
-            <span>Unit</span>
-            <select id="customFoodUnit">
-              <option value="g">g</option>
-              <option value="oz">oz</option>
-              <option value="ml">ml</option>
-              <option value="cup">cup</option>
-              <option value="bowl">bowl</option>
-              <option value="piece">piece</option>
-              <option value="stick">stick</option>
-              <option value="pack">pack</option>
-            </select>
-          </label>
-          <label class="field">
-            <span>Calories</span>
-            <input type="number" id="customFoodCalories" placeholder="e.g. 350">
-          </label>
-        </div>
-        <p class="hint hint--warning" id="customFoodUnitWarning" hidden>⚠️ Approximate conversion — weigh in grams for exact accuracy.</p>
-        <div class="field-row">
-          <label class="field">
-            <span>Protein (g)</span>
-            <input type="number" id="customFoodProtein" placeholder="0">
-          </label>
-          <label class="field">
-            <span>Carbs (g)</span>
-            <input type="number" id="customFoodCarbs" placeholder="0">
-          </label>
-          <label class="field">
-            <span>Fat (g)</span>
-            <input type="number" id="customFoodFat" placeholder="0">
-          </label>
-        </div>
-        <button type="button" class="btn btn--primary" id="btnAddCustomFood">Add to diary</button>
-      </div>
-    </fieldset>
+    </div>
   </div>
 </div>
 

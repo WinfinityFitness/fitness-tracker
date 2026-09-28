@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.05';
+const APP_VERSION = 'WF_SYS_V.1.8.06';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -13860,7 +13860,23 @@ function openAddFoodPanel() {
   pendingBarcodeCode = null;
   aiPhotoItems = [];
   renderAiPhotoItemsReview();
+  switchAddFoodTab('search');
   document.getElementById('addFoodOverlay').hidden = false;
+}
+
+// The 4-icon tab bar at the top of Add Food — only one panel visible at a
+// time instead of one long scrolling form. "barcode" has no panel of its
+// own: tapping it launches the existing full-screen scanner overlay
+// directly, same as the old standalone button did.
+function switchAddFoodTab(tab) {
+  if (tab === 'barcode') { startBarcodeScan(); return; }
+  ['search', 'ai', 'photo'].forEach((t) => {
+    const panel = document.getElementById('addFoodPanel' + t.charAt(0).toUpperCase() + t.slice(1));
+    if (panel) panel.hidden = (t !== tab);
+  });
+  document.querySelectorAll('.add-food-tab').forEach((btn) => {
+    btn.classList.toggle('is-active', btn.dataset.tab === tab);
+  });
 }
 
 // Deployed under the name "smooth-service" (Supabase's dashboard "Via
@@ -13998,6 +14014,7 @@ function initBarcodePhotoFallback() {
       fallbackBtn.hidden = false;
 
       openAddFoodPanel();
+      switchAddFoodTab('ai'); // that's where customFoodName/manual fields live now
       if (est.code) pendingBarcodeCode = est.code;
       if (est.name) document.getElementById('customFoodName').value = est.name;
       customFoodAiPer100g = { calories: est.calories || 0, protein: est.protein || 0, carbs: est.carbs || 0, fat: est.fat || 0 };
@@ -14023,6 +14040,7 @@ function initBarcodePhotoFallback() {
 // the cache first. Mainly closes the PH-local/imported product gap in OFF.
 function offerBarcodeTeach(code) {
   openAddFoodPanel();
+  switchAddFoodTab('ai'); // that's where customFoodName/manual fields live now
   pendingBarcodeCode = code;
   document.getElementById('customFoodTeachNote').hidden = false;
   document.getElementById('foodSearchStatus').textContent = '';
@@ -14319,14 +14337,11 @@ function computeAiPhotoItemValues(it) {
 function renderAiPhotoItemsReview() {
   const wrap = document.getElementById('aiPhotoItemsReview');
   const list = document.getElementById('aiPhotoItemsList');
-  const manualSection = document.getElementById('customFoodManualSection');
   if (!aiPhotoItems.length) {
     wrap.hidden = true;
-    manualSection.hidden = false;
     return;
   }
   wrap.hidden = false;
-  manualSection.hidden = true;
   document.getElementById('aiPhotoItemsHint').textContent =
     `⚠️ Detected ${aiPhotoItems.length} separate item${aiPhotoItems.length === 1 ? '' : 's'} — check the estimated weight for each and adjust if needed before adding.`;
 
@@ -14386,6 +14401,10 @@ function initAddFoodPanel() {
   const overlay = document.getElementById('addFoodOverlay');
   document.getElementById('btnCloseAddFood').addEventListener('click', () => { overlay.hidden = true; });
   bindOverlayBackdropClose(overlay, () => { overlay.hidden = true; });
+
+  document.querySelectorAll('.add-food-tab').forEach((btn) => {
+    btn.addEventListener('click', () => switchAddFoodTab(btn.dataset.tab));
+  });
 
   const searchInput = document.getElementById('foodSearchInput');
   searchInput.addEventListener('input', () => {
@@ -14676,7 +14695,9 @@ let barcodeStream = null;
 let barcodeDetectInterval = null;
 
 function initBarcodeScanner() {
-  document.getElementById('btnScanBarcode').addEventListener('click', startBarcodeScan);
+  // No dedicated launch button here anymore — the "Scan Barcode" tab in
+  // Add Food's icon row calls startBarcodeScan() directly (see
+  // switchAddFoodTab), since the old standalone button was folded into it.
   document.getElementById('btnCloseBarcodeScan').addEventListener('click', stopBarcodeScan);
   document.getElementById('barcodeScanOverlay').addEventListener('click', e => {
     if (e.target === document.getElementById('barcodeScanOverlay')) stopBarcodeScan();
