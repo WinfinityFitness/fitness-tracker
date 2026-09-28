@@ -3899,6 +3899,9 @@ a.contact-row:hover { border-color: var(--cyan); }
 .ai-photo-item-macros { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-primary); }
 .ai-photo-item-micros { font-family: var(--font-mono); font-size: 0.63rem; color: var(--text-muted); }
 .ai-photo-item-row.is-excluded { opacity: 0.45; }
+.field--inline { flex-direction: row; align-items: center; gap: 8px; margin: 10px 0; }
+.ai-photo-margin-input-wrap { display: inline-flex; align-items: center; gap: 3px; color: var(--text-primary); font-weight: 700; }
+.ai-photo-margin-input-wrap input[type="number"] { width: 52px; padding: 6px; text-align: center; }
 
 /* Frosted-glass / embossed-thin surface — used where neon line icons need a
    subtle, translucent seat rather than a flat solid block. No backdrop-filter

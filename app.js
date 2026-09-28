@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.07';
+const APP_VERSION = 'WF_SYS_V.1.8.08';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -13859,6 +13859,7 @@ function openAddFoodPanel() {
   customFoodAiPer100g = null;
   pendingBarcodeCode = null;
   aiPhotoItems = [];
+  document.getElementById('aiPhotoSafetyMarginPct').value = 5;
   renderAiPhotoItemsReview();
   switchAddFoodTab('search');
   document.getElementById('addFoodOverlay').hidden = false;
@@ -14319,8 +14320,17 @@ function addAiPhotoItemsToDiary(items) {
 
 // {calories, protein, ...} for one item's CURRENT grams, scaled from its
 // per-100g baseline.
+// AI photo estimates tend to run a bit low, so a user-set safety margin
+// pads every item's nutrition values up by this percentage (weight/grams
+// itself is left alone — this only inflates the calorie/macro/micro
+// numbers, not the claimed portion size). Defaults to +5%, freely editable.
+function getPhotoSafetyMarginPct() {
+  const el = document.getElementById('aiPhotoSafetyMarginPct');
+  return el ? (parseFloat(el.value) || 0) : 0;
+}
+
 function computeAiPhotoItemValues(it) {
-  const scale = it.grams / 100;
+  const scale = (it.grams / 100) * (1 + getPhotoSafetyMarginPct() / 100);
   return {
     c: round0(it.per100g.calories * scale), p: round0(it.per100g.protein * scale), cb: round0(it.per100g.carbs * scale), f: round0(it.per100g.fat * scale),
     fiber: round0(it.per100g.fiber * scale), sodium: round0(it.per100g.sodium * scale), potassium: round0(it.per100g.potassium * scale),
@@ -14608,6 +14618,11 @@ function initAddFoodPanel() {
   ['portionPctVeg', 'portionPctCarbs', 'portionPctProtein'].forEach((id) => {
     document.getElementById(id).addEventListener('input', renderPortionGuideSvg);
   });
+  // Shared by both "Estimate from Photo" and "Portion Guide Photo" — both
+  // feed the same aiPhotoItems review list, so one margin field covers
+  // either capture method. Re-renders live so the padded numbers are
+  // visible immediately, never applied silently at add-time.
+  document.getElementById('aiPhotoSafetyMarginPct').addEventListener('input', renderAiPhotoItemsReview);
   document.getElementById('btnCapturePortionGuide').addEventListener('click', async () => {
     const video = document.getElementById('portionGuideVideo');
     if (!video.videoWidth) return;

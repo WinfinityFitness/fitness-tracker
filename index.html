@@ -2790,6 +2790,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <div class="btn-row">
         <button type="button" class="btn btn--sm" id="btnPortionGuidePhoto">🍽️ Portion Guide Photo</button>
       </div>
+      <label class="field field--inline ai-photo-margin-field">
+        <span>Safety margin</span>
+        <span class="ai-photo-margin-input-wrap">+<input type="number" id="aiPhotoSafetyMarginPct" value="5" min="0" max="100" step="1">%</span>
+      </label>
+      <p class="hint hint--sm">Pads every detected item's calories/macros up by this much (weight stays as estimated) — AI photo estimates tend to run a little low. Applies to both capture methods above.</p>
       <div class="ai-photo-items-review" id="aiPhotoItemsReview" hidden>
         <p class="hint hint--accent" id="aiPhotoItemsHint"></p>
         <div id="aiPhotoItemsList"></div>
