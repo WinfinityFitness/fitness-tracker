@@ -140,12 +140,17 @@ Deno.serve(async (req) => {
   // damaged/worn/curved barcode at all — the user takes two still photos
   // instead (barcode + nutrition facts label), which Gemini reads directly.
   const hasBarcodePair = barcodeImageBase64 && labelImageBase64;
+  // Label photo with no barcode photo at all — the product has no scannable
+  // barcode nearby (loose/bulk item, home-repackaged food, a faded/missing
+  // barcode) but the Nutrition Facts panel itself is legible. Same reading
+  // as the pair path, just no "code" to report.
+  const hasLabelOnly = labelImageBase64 && !barcodeImageBase64;
   // Admin Prep Meal auto-fill: a pasted recipe/menu, a URL to fetch one
   // from, or a photo (of the dish itself or of a printed recipe page).
   const hasMealMenuImage = mealMenuImageBase64 && typeof mealMenuImageBase64 === 'string';
   const hasMealMenu = (typeof mealMenuText === 'string' && mealMenuText.trim()) || (typeof mealMenuUrl === 'string' && mealMenuUrl.trim()) || hasMealMenuImage;
-  if (!hasImage && !hasBarcodePair && !hasMealMenu && (!foodName || typeof foodName !== 'string')) {
-    return jsonResponse({ error: 'foodName, imageBase64, a barcode/label photo pair, or a meal menu text/URL is required' }, 400);
+  if (!hasImage && !hasBarcodePair && !hasLabelOnly && !hasMealMenu && (!foodName || typeof foodName !== 'string')) {
+    return jsonResponse({ error: 'foodName, imageBase64, a barcode/label photo pair, a label photo, or a meal menu text/URL is required' }, 400);
   }
 
   const apiKeys = [...personalGeminiKeys, ...(await getGeminiApiKeys())];
@@ -201,12 +206,21 @@ ${sourceText}
     parts.push({
       text: `Look at these two photos of a packaged food product. The FIRST photo shows the product's barcode, the SECOND shows its Nutrition Facts label.
 From the first photo, read the barcode's printed numeric code (the digits printed below or beside the bars — digits only, no spaces or dashes). If you can also decode the bar pattern itself, use it to double-check the digits.
-From the second photo, read the product name (if visible) and the nutrition facts.
+From the second photo, read the product name (if visible), the nutrition facts, and the printed serving size (e.g. "1 bar (40g)", "2/3 cup (55g)") if shown.
 Respond with ONLY a JSON object, no markdown, no explanation, in exactly this shape:
-{"code": string, "name": string, "calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "sodium": number}
-Normalize all nutrition values to per 100 grams — the label may show per-serving, so convert using the serving size in grams if one is given. calories in kcal, protein/carbs/fat/fiber in grams, sodium in milligrams. If either photo is unclear, give your best reasonable reading — never refuse.`,
+{"code": string, "name": string, "servingSize": string, "calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "sodium": number, "potassium": number, "vitaminA": number, "vitaminC": number, "iron": number}
+Normalize all nutrition values to per 100 grams — the label may show per-serving, so convert using the serving size in grams if one is given. calories in kcal, protein/carbs/fat/fiber in grams, sodium/potassium in milligrams, vitaminA in micrograms RAE, vitaminC in milligrams, iron in milligrams. "servingSize" is the label's OWN printed serving size exactly as shown (e.g. "1 bar (40g)"), or "" if not printed. If any nutrient isn't listed on the label, use 0. If either photo is unclear, give your best reasonable reading — never refuse.`,
     });
     parts.push({ inlineData: { mimeType: barcodeImageMimeType || 'image/jpeg', data: barcodeImageBase64 } });
+    parts.push({ inlineData: { mimeType: labelImageMimeType || 'image/jpeg', data: labelImageBase64 } });
+  } else if (hasLabelOnly) {
+    parts.push({
+      text: `Look at this photo of a food product's Nutrition Facts label (there is no barcode photo — this product has no scannable barcode, or it wasn't photographed).
+Read the product name (if visible anywhere in the photo), the nutrition facts, and the printed serving size (e.g. "1 bar (40g)", "2/3 cup (55g)") if shown.
+Respond with ONLY a JSON object, no markdown, no explanation, in exactly this shape:
+{"name": string, "servingSize": string, "calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "sodium": number, "potassium": number, "vitaminA": number, "vitaminC": number, "iron": number}
+Normalize all nutrition values to per 100 grams — the label may show per-serving, so convert using the serving size in grams if one is given. calories in kcal, protein/carbs/fat/fiber in grams, sodium/potassium in milligrams, vitaminA in micrograms RAE, vitaminC in milligrams, iron in milligrams. "servingSize" is the label's OWN printed serving size exactly as shown, or "" if not printed. If the product name isn't visible in this photo, use "". If any nutrient isn't listed on the label, use 0. If the photo is unclear, give your best reasonable reading — never refuse.`,
+    });
     parts.push({ inlineData: { mimeType: labelImageMimeType || 'image/jpeg', data: labelImageBase64 } });
   } else if (hasImage) {
     parts.push({
@@ -322,17 +336,19 @@ All values are per 100g. calories in kcal. protein/carbs/fat/fiber in grams. sod
   }
 
   return jsonResponse({
-    name: hasBarcodePair ? (parsed.name || null) : undefined,
+    name: (hasBarcodePair || hasLabelOnly) ? (parsed.name || null) : undefined,
     code: hasBarcodePair ? (parsed.code ? String(parsed.code).replace(/[^0-9]/g, '') : null) : undefined,
+    // The label's OWN printed serving size (e.g. "1 bar (40g)"), shown to
+    // the user as a reference so they type the real serving they're
+    // logging instead of accepting an arbitrary default — only the
+    // barcode-pair/label-only prompts above ask for this.
+    servingSize: (hasBarcodePair || hasLabelOnly) ? (parsed.servingSize || '') : undefined,
     calories: Number(parsed.calories) || 0,
     protein: Number(parsed.protein) || 0,
     carbs: Number(parsed.carbs) || 0,
     fat: Number(parsed.fat) || 0,
     fiber: Number(parsed.fiber) || 0,
     sodium: Number(parsed.sodium) || 0,
-    // Only the plain text-name path's prompt actually asks for these —
-    // the barcode-label path's own prompt above doesn't, so these just
-    // come back 0 for that path (same as before this field existed).
     potassium: Number(parsed.potassium) || 0,
     vitaminA: Number(parsed.vitaminA) || 0,
     vitaminC: Number(parsed.vitaminC) || 0,

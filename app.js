@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.09';
+const APP_VERSION = 'WF_SYS_V.1.8.10';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -13843,6 +13843,9 @@ function openAddFoodPanel() {
   selectedFoodData = null;
   document.getElementById('customFoodName').value = '';
   document.getElementById('customFoodGrams').value = '100';
+  document.getElementById('customFoodGrams').placeholder = 'e.g. 250';
+  customFoodRequiresServingConfirm = false;
+  customFoodLabelServingSize = '';
   document.getElementById('customFoodUnit').value = 'g';
   document.getElementById('customFoodUnitWarning').hidden = true;
   document.getElementById('customFoodCalories').value = '';
@@ -13950,7 +13953,68 @@ async function estimateFoodFromBarcodePhotos(barcodeImageBase64, barcodeImageMim
   return data;
 }
 
+// Same idea, but for when there's no barcode to photograph at all (loose/
+// bulk item, home-repackaged food, a faded or missing barcode) and the
+// nutrition facts label is legible on its own — one photo instead of two.
+async function estimateFoodFromLabelPhotoOnly(labelImageBase64, labelImageMimeType) {
+  let res;
+  try {
+    res = await fetch(`${SUPABASE_URL}/functions/v1/smooth-service`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ labelImageBase64, labelImageMimeType, personalGeminiKeys: getPersonalGeminiKeys() }),
+    });
+  } catch (e) {
+    throw new Error('AI label reading unavailable — check your connection.');
+  }
+  let data;
+  try { data = await res.json(); } catch (e) { throw new Error('AI label reading unavailable — try again later.'); }
+  if (!res.ok) throw new Error(data.error || 'AI label reading failed');
+  return data;
+}
+
 let barcodePhotoBase64 = null;
+// Set true whenever the Add Food "ai" panel gets pre-filled from a scanned
+// label (barcode+label pair, or label alone) — the save button then
+// requires the user to actually type the real serving weight instead of
+// silently accepting an unreviewed default, since that's the whole point
+// of reading a label (see btnAddCustomFood's handler in initAddFoodPanel).
+let customFoodRequiresServingConfirm = false;
+let customFoodLabelServingSize = '';
+
+// Shared by both the barcode+label pair path and the label-alone path —
+// pre-fills the Add Food "ai" panel from a label-reading AI response, but
+// deliberately leaves the serving size BLANK (not defaulted to 100g) so
+// the user has to type the food's actual serving from the label before
+// they can save. Full macros AND micros are captured here so they carry
+// through to the diary entry, not just calories/protein/carbs/fat.
+function applyLabelEstimateToAddFoodForm(est) {
+  openAddFoodPanel();
+  switchAddFoodTab('ai'); // that's where customFoodName/manual fields live now
+  if (est.code) pendingBarcodeCode = est.code;
+  if (est.name) document.getElementById('customFoodName').value = est.name;
+  customFoodAiPer100g = {
+    calories: est.calories || 0, protein: est.protein || 0, carbs: est.carbs || 0, fat: est.fat || 0,
+    fiber: est.fiber || 0, sodium: est.sodium || 0, potassium: est.potassium || 0,
+    vitaminA: est.vitaminA || 0, vitaminC: est.vitaminC || 0, iron: est.iron || 0,
+  };
+  customFoodRequiresServingConfirm = true;
+  customFoodLabelServingSize = est.servingSize || '';
+  const gramsInput = document.getElementById('customFoodGrams');
+  gramsInput.value = '';
+  gramsInput.placeholder = customFoodLabelServingSize
+    ? `Label says "${customFoodLabelServingSize}" — type what you're actually having, in grams`
+    : 'Type the actual serving you\'re having, in grams';
+  document.getElementById('customFoodUnit').value = 'g';
+  document.getElementById('customFoodUnitWarning').hidden = true;
+  recomputeCustomFoodFromAi();
+  // Reuses the existing "will be remembered for the next scan" note —
+  // only relevant if a code was actually captured from the photo.
+  document.getElementById('customFoodTeachNote').hidden = !est.code;
+  document.getElementById('aiPhotoStatus').textContent = customFoodLabelServingSize
+    ? `⚠️ AI-read from your photo${est.code ? 's' : ''} — label serving size is "${customFoodLabelServingSize}". Type the actual serving size below before saving.`
+    : `⚠️ AI-read from your photo${est.code ? 's' : ''} — type the actual serving size below before saving.`;
+}
 
 function initBarcodePhotoFallback() {
   const fallbackBtn = document.getElementById('btnBarcodePhotoFallback');
@@ -13972,7 +14036,6 @@ function initBarcodePhotoFallback() {
     barcodePhotoBase64 = null;
     barcodePreview.hidden = true;
     labelPreview.hidden = true;
-    labelBtn.disabled = true;
     statusEl.textContent = '';
   });
 
@@ -13987,7 +14050,6 @@ function initBarcodePhotoFallback() {
       barcodePreview.src = dataUrl;
       barcodePreview.hidden = false;
       barcodePhotoBase64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
-      labelBtn.disabled = false;
       statusEl.textContent = 'Barcode photo captured — now take a photo of the Nutrition Facts label.';
     } catch (e) {
       statusEl.textContent = 'Could not read that photo — try again.';
@@ -13996,37 +14058,30 @@ function initBarcodePhotoFallback() {
     }
   });
 
+  // No longer gated behind having a barcode photo first — this button
+  // works on its own too, for products with no scannable barcode nearby
+  // (loose/bulk items, home-repackaged food, a faded/missing barcode).
   labelBtn.addEventListener('click', () => labelInput.click());
   labelInput.addEventListener('change', async () => {
     const file = labelInput.files[0];
     labelInput.value = '';
-    if (!file || !barcodePhotoBase64) return;
+    if (!file) return;
+    const havingBarcodeToo = !!barcodePhotoBase64;
     labelSpinner.hidden = false;
-    statusEl.textContent = 'Reading barcode and nutrition facts with AI…';
+    statusEl.textContent = havingBarcodeToo ? 'Reading barcode and nutrition facts with AI…' : 'Reading nutrition facts with AI…';
     try {
       const { dataUrl } = await resizeAndCompressImage(file);
       labelPreview.src = dataUrl;
       labelPreview.hidden = false;
       const labelBase64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
-      const est = await estimateFoodFromBarcodePhotos(barcodePhotoBase64, 'image/jpeg', labelBase64, 'image/jpeg');
+      const est = havingBarcodeToo
+        ? await estimateFoodFromBarcodePhotos(barcodePhotoBase64, 'image/jpeg', labelBase64, 'image/jpeg')
+        : await estimateFoodFromLabelPhotoOnly(labelBase64, 'image/jpeg');
 
       document.getElementById('barcodeScanOverlay').hidden = true;
       section.hidden = true;
       fallbackBtn.hidden = false;
-
-      openAddFoodPanel();
-      switchAddFoodTab('ai'); // that's where customFoodName/manual fields live now
-      if (est.code) pendingBarcodeCode = est.code;
-      if (est.name) document.getElementById('customFoodName').value = est.name;
-      customFoodAiPer100g = { calories: est.calories || 0, protein: est.protein || 0, carbs: est.carbs || 0, fat: est.fat || 0 };
-      document.getElementById('customFoodGrams').value = 100;
-      document.getElementById('customFoodUnit').value = 'g';
-      document.getElementById('customFoodUnitWarning').hidden = true;
-      recomputeCustomFoodFromAi();
-      // Reuses the existing "will be remembered for the next scan" note —
-      // only relevant if a code was actually captured from the photo.
-      document.getElementById('customFoodTeachNote').hidden = !est.code;
-      document.getElementById('aiPhotoStatus').textContent = '⚠️ AI-read from your photos — review the values below before saving.';
+      applyLabelEstimateToAddFoodForm(est);
     } catch (e) {
       statusEl.textContent = e.message || 'AI reading failed — check your connection or try again.';
     } finally {
@@ -14441,6 +14496,26 @@ function recomputeCustomFoodFromAi() {
   document.getElementById('customFoodProtein').value = round0(customFoodAiPer100g.protein * scale);
   document.getElementById('customFoodCarbs').value = round0(customFoodAiPer100g.carbs * scale);
   document.getElementById('customFoodFat').value = round0(customFoodAiPer100g.fat * scale);
+
+  // Micros aren't editable inputs here (would clutter this form) — just a
+  // read-only summary, live-scaled the same as the macro fields above, so
+  // they're visible before saving and carried through to the diary entry.
+  const microsEl = document.getElementById('customFoodMicrosSummary');
+  const hasMicros = ['fiber', 'sodium', 'potassium', 'vitaminA', 'vitaminC', 'iron'].some((k) => customFoodAiPer100g[k]);
+  if (microsEl) {
+    if (hasMicros) {
+      const fiber = round0(customFoodAiPer100g.fiber * scale);
+      const sodium = round0(customFoodAiPer100g.sodium * scale);
+      const potassium = round0(customFoodAiPer100g.potassium * scale);
+      const vitA = round0(customFoodAiPer100g.vitaminA * scale);
+      const vitC = round0(customFoodAiPer100g.vitaminC * scale);
+      const iron = round0(customFoodAiPer100g.iron * scale * 10) / 10;
+      microsEl.textContent = `Fiber ${fiber}g · Sodium ${sodium}mg · Potassium ${potassium}mg · Vit A ${vitA}mcg · Vit C ${vitC}mg · Iron ${iron}mg`;
+      microsEl.hidden = false;
+    } else {
+      microsEl.hidden = true;
+    }
+  }
 }
 
 function initAddFoodPanel() {
@@ -14493,7 +14568,11 @@ function initAddFoodPanel() {
     aiSpinner.hidden = false;
     try {
       const est = await estimateFoodNutritionWithAI(name);
-      customFoodAiPer100g = { calories: est.calories || 0, protein: est.protein || 0, carbs: est.carbs || 0, fat: est.fat || 0 };
+      customFoodAiPer100g = {
+        calories: est.calories || 0, protein: est.protein || 0, carbs: est.carbs || 0, fat: est.fat || 0,
+        fiber: est.fiber || 0, sodium: est.sodium || 0, potassium: est.potassium || 0,
+        vitaminA: est.vitaminA || 0, vitaminC: est.vitaminC || 0, iron: est.iron || 0,
+      };
       document.getElementById('customFoodGrams').value = 100;
       document.getElementById('customFoodUnit').value = 'g';
       document.getElementById('customFoodUnitWarning').hidden = true;
@@ -14724,12 +14803,31 @@ function initAddFoodPanel() {
     const name = document.getElementById('customFoodName').value.trim();
     if (!name) { alert('Enter a food name.'); return; }
     const qty = parseFloat(document.getElementById('customFoodGrams').value) || null;
+    // A label/barcode scan deliberately leaves this blank (see
+    // applyLabelEstimateToAddFoodForm) instead of defaulting to 100g, so
+    // the actual serving being logged always comes from what the user
+    // typed after reading the label themselves — never an unreviewed guess.
+    if (customFoodRequiresServingConfirm && !qty) {
+      alert('Type the actual serving size you\'re having' + (customFoodLabelServingSize ? ` (the label says "${customFoodLabelServingSize}")` : '') + ' before adding.');
+      return;
+    }
     const unit = document.getElementById('customFoodUnit').value;
     const grams = qty != null ? servingUnitToGrams(qty, unit) : null;
     const calories = parseFloat(document.getElementById('customFoodCalories').value) || 0;
     const protein = parseFloat(document.getElementById('customFoodProtein').value) || 0;
     const carbs = parseFloat(document.getElementById('customFoodCarbs').value) || 0;
     const fat = parseFloat(document.getElementById('customFoodFat').value) || 0;
+    // Micros scale the same way as the macro fields above, from whatever
+    // AI estimate (typed name, label photo, or barcode+label pair) is
+    // currently loaded — 0 if this was a fully manual entry with no AI
+    // estimate at all.
+    const microScale = (customFoodAiPer100g && grams) ? grams / 100 : 0;
+    const fiber = customFoodAiPer100g ? round0(customFoodAiPer100g.fiber * microScale) : 0;
+    const sodium = customFoodAiPer100g ? round0(customFoodAiPer100g.sodium * microScale) : 0;
+    const potassium = customFoodAiPer100g ? round0(customFoodAiPer100g.potassium * microScale) : 0;
+    const vitaminA = customFoodAiPer100g ? round0(customFoodAiPer100g.vitaminA * microScale) : 0;
+    const vitaminC = customFoodAiPer100g ? round0(customFoodAiPer100g.vitaminC * microScale) : 0;
+    const iron = customFoodAiPer100g ? Math.round(customFoodAiPer100g.iron * microScale * 10) / 10 : 0;
     if (pendingBarcodeCode && grams) {
       const scale = 100 / grams;
       contributeBarcodeProduct(pendingBarcodeCode, name, {
@@ -14737,8 +14835,10 @@ function initAddFoodPanel() {
       });
     }
     pendingBarcodeCode = null;
+    customFoodRequiresServingConfirm = false;
+    customFoodLabelServingSize = '';
     document.getElementById('customFoodTeachNote').hidden = true;
-    addFoodItemToDiary({ name, grams, qty, unit, calories, protein, carbs, fat, fiber: 0, sodium: 0, source: 'custom' });
+    addFoodItemToDiary({ name, grams, qty, unit, calories, protein, carbs, fat, fiber, sodium, potassium, vitaminA, vitaminC, iron, source: 'custom' });
   });
 }
 

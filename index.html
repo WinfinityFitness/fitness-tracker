@@ -2758,6 +2758,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
               <input type="number" id="customFoodFat" placeholder="0">
             </label>
           </div>
+          <p class="hint hint--sm" id="customFoodMicrosSummary" hidden></p>
           <button type="button" class="btn btn--primary add-food-bottom-btn" id="btnAddCustomFood">Add to diary</button>
         </div>
       </fieldset>
@@ -2832,17 +2833,17 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
 
     <button type="button" class="btn" id="btnBarcodePhotoFallback" style="margin-top:10px;">Can't scan? Take photos instead</button>
     <div id="barcodePhotoFallbackSection" hidden>
-      <p class="hint hint--sm">For barcodes the camera can't read (worn, curved, or damaged packaging) — take a still photo of the barcode, then one of the Nutrition Facts label, and AI reads both.</p>
+      <p class="hint hint--sm">For a barcode the camera can't read (worn, curved, or damaged packaging), or a product with no barcode at all — take a photo of the Nutrition Facts label and AI reads it. Add a barcode photo too if you have one, so the product's own barcode gets saved for next time.</p>
 
       <div class="btn-row">
-        <button type="button" class="btn btn--sm" id="btnTakeBarcodePhoto">1. Photo of barcode</button>
+        <button type="button" class="btn btn--sm" id="btnTakeBarcodePhoto">Photo of barcode (optional)</button>
         <span class="ai-spinner" id="barcodePhotoSpinner" hidden></span>
       </div>
       <input type="file" accept="image/*" capture="environment" id="barcodePhotoInput" hidden>
       <img class="ai-photo-preview" id="barcodePhotoPreview" alt="" hidden>
 
       <div class="btn-row">
-        <button type="button" class="btn btn--sm" id="btnTakeLabelPhoto" disabled>2. Photo of nutrition facts</button>
+        <button type="button" class="btn btn--sm" id="btnTakeLabelPhoto">Photo of Nutrition Facts label</button>
         <span class="ai-spinner" id="labelPhotoSpinner" hidden></span>
       </div>
       <input type="file" accept="image/*" capture="environment" id="labelPhotoInput" hidden>
