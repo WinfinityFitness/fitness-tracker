@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.97">
+<link rel="stylesheet" href="style.css?v=1.7.98">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -2983,6 +2983,31 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </div>
 </div>
 
+<div class="donation-overlay" id="apiKeyPromptOverlay" hidden>
+  <div class="donation-card">
+    <img class="donation-logo" src="icons/icon-512.png" alt="Winfinity">
+    <p class="donation-message" style="text-align:left;">
+      <strong>AI food estimates and photo scans already work for free</strong> on Winfinity's shared Gemini pool — you don't need to do anything to use them.<br><br>
+      Adding your own free Gemini key just gives <em>you</em> a private quota instead of sharing the pool with everyone else, so AI estimates stay fast even during busy hours. It's optional, takes under a minute, and is stored only on this device.<br><br>
+      <strong>How to get one:</strong><br>
+      1. Tap "Get a Free Gemini API Key" below<br>
+      2. Sign in with any Google account<br>
+      3. Tap "Create API key" and copy it<br>
+      4. Paste it below and tap Save key
+    </p>
+    <button type="button" class="btn btn--outline btn--block" id="btnApiPromptGetKey">Get a Free Gemini API Key ↗</button>
+    <label class="field" style="margin-top:8px; text-align:left;">
+      <span>Paste your Gemini API key</span>
+      <input type="text" id="apiPromptKeyInput" placeholder="Paste your Gemini API key" autocomplete="off">
+    </label>
+    <div class="donation-btn-row" style="margin-top:8px;">
+      <button type="button" class="btn" id="btnApiPromptSkip" style="flex:1;">Maybe later</button>
+      <button type="button" class="btn btn--primary" id="btnApiPromptSave" style="flex:1;">Save key</button>
+    </div>
+    <p class="hint hint--sm" id="apiPromptNote" style="margin-top:6px;"></p>
+  </div>
+</div>
+
 <div class="sheet-overlay" id="missionLogOverlay" hidden>
   <div class="sheet">
     <div class="sheet-handle"></div>
@@ -5051,11 +5076,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.7.97"></script>
+<script src="config.js?v=1.7.98"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.97"></script>
+<script src="app.js?v=1.7.98"></script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.10';
+const APP_VERSION = 'WF_SYS_V.1.8.11';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -22791,7 +22791,47 @@ function initWelcomeDemoOverlay() {
   const overlay = document.getElementById('welcomeDemoOverlay');
   const btn = document.getElementById('btnCloseWelcomeDemo');
   if (!overlay || !btn) return;
-  btn.addEventListener('click', () => { overlay.hidden = true; });
+  btn.addEventListener('click', () => {
+    overlay.hidden = true;
+    showApiKeyPromptOnce();
+  });
+}
+
+// Shown exactly once, right after a brand-new user dismisses the sample-data
+// heads-up overlay above (i.e. immediately after their first profile save) --
+// not shown again on later launches once dismissed either way, and skipped
+// entirely for anyone who already has a personal key saved (nothing to nag
+// about). Saves into the same wft_personal_gemini_keys list the Settings ->
+// "My AI API Key" panel reads/writes (loadPersonalGeminiKeys/
+// savePersonalGeminiKeys, defined above), so a key added here shows up there
+// too and vice versa -- one BYOK list, two entry points.
+function showApiKeyPromptOnce() {
+  if (localStorage.getItem('wft_api_key_prompt_seen')) return;
+  localStorage.setItem('wft_api_key_prompt_seen', '1');
+  if (getPersonalGeminiKeys().length) return;
+  const overlay = document.getElementById('apiKeyPromptOverlay');
+  if (overlay) overlay.hidden = false;
+}
+
+function initApiKeyPromptOverlay() {
+  const overlay = document.getElementById('apiKeyPromptOverlay');
+  const getBtn = document.getElementById('btnApiPromptGetKey');
+  const input = document.getElementById('apiPromptKeyInput');
+  const saveBtn = document.getElementById('btnApiPromptSave');
+  const skipBtn = document.getElementById('btnApiPromptSkip');
+  const note = document.getElementById('apiPromptNote');
+  if (!overlay || !saveBtn) return;
+  getBtn.addEventListener('click', () => window.open('https://aistudio.google.com/apikey', '_blank', 'noopener'));
+  saveBtn.addEventListener('click', () => {
+    const key = input.value.trim();
+    if (!key) { note.textContent = 'Paste a key first, or tap Maybe later.'; return; }
+    const keys = loadPersonalGeminiKeys();
+    keys.push({ label: `Key ${keys.length + 1}`, key });
+    savePersonalGeminiKeys(keys);
+    renderPersonalGeminiKeyList();
+    overlay.hidden = true;
+  });
+  skipBtn.addEventListener('click', () => { overlay.hidden = true; });
 }
 
 function initClearAllData() {
@@ -25164,6 +25204,7 @@ safeInit(initAutoHideHints, 'initAutoHideHints');
 safeInit(initDrive, 'initDrive');
 safeInit(initClearAllData, 'initClearAllData');
 safeInit(initWelcomeDemoOverlay, 'initWelcomeDemoOverlay');
+safeInit(initApiKeyPromptOverlay, 'initApiKeyPromptOverlay');
 safeInit(initCustomBackground, 'initCustomBackground');
 safeInit(initTextSizeSlider, 'initTextSizeSlider');
 safeInit(initPushNotifications, 'initPushNotifications');
