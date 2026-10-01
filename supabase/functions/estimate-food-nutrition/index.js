@@ -244,9 +244,10 @@ ${pastedNutritionText.trim()}
     parts.push({
       text: `Identify EACH separate food component visible on the plate in this photo — do not combine them into one estimate. List every distinct item separately (e.g. the meat, each vegetable or side, a sauce, a slice of fruit) rather than describing the plate as a whole.
 For each component, estimate its actual weight in grams based on how much of it is visible in the photo (not a fixed serving size), and give its nutrition facts for THAT estimated amount — the real quantity shown, not per 100g.
-Respond with ONLY a JSON array, no markdown, no explanation, in exactly this shape:
-[{"name": string, "grams": number, "calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "sodium": number, "potassium": number, "vitaminA": number, "vitaminC": number, "iron": number}]
-"grams" is your estimated weight of that one component, in grams. calories in kcal. protein/carbs/fat/fiber in grams. sodium/potassium in milligrams. vitaminA in micrograms RAE. vitaminC in milligrams. iron in milligrams. If a value is negligible, use 0 rather than omitting the field. If unsure about any component, give your best reasonable estimate — never refuse, and always list at least one item.`,
+Separately, check whether a digital kitchen scale's display is visible anywhere in the photo (the plate/bowl of food sitting on a scale, with a numeric weight readout shown on the scale's screen). If one is clearly visible and legible, read that exact number -- this is a precise measurement, far more reliable than a visual weight guess, and will be used to correct your per-item estimates. Normalize whatever unit the display shows (g, kg, oz, lb) to grams.
+Respond with ONLY a JSON object, no markdown, no explanation, in exactly this shape:
+{"items": [{"name": string, "grams": number, "calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "sodium": number, "potassium": number, "vitaminA": number, "vitaminC": number, "iron": number}], "scaleReadingGrams": number}
+"grams" is your estimated weight of that one component, in grams. calories in kcal. protein/carbs/fat/fiber in grams. sodium/potassium in milligrams. vitaminA in micrograms RAE. vitaminC in milligrams. iron in milligrams. If a value is negligible, use 0 rather than omitting the field. If unsure about any component, give your best reasonable estimate — never refuse, and always list at least one item. "scaleReadingGrams" is the scale's displayed weight converted to grams, or 0 if no scale/display is visible in the photo at all.`,
     });
     parts.push({ inlineData: { mimeType: imageMimeType || 'image/jpeg', data: imageBase64 } });
   } else {
@@ -330,11 +331,13 @@ All values are per 100g. calories in kcal. protein/carbs/fat/fiber in grams. sod
 
   // Plate photo path returns one entry per detected food component (real
   // estimated grams + micros for that component), not a single combined
-  // per-100g estimate like the other paths below. `parsed` is a JSON array
-  // here per the hasImage prompt above; tolerate a bare object too in case
-  // the model ever collapses to a single item despite the prompt.
+  // per-100g estimate like the other paths below, plus an optional
+  // scaleReadingGrams if a kitchen scale's display was visible in the
+  // photo. `parsed` is a JSON object ({items, scaleReadingGrams}) per the
+  // hasImage prompt above; tolerate a bare array (or single object) too in
+  // case the model ever drops the wrapper or collapses to one item.
   if (hasImage) {
-    const items = Array.isArray(parsed) ? parsed : [parsed];
+    const items = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.items) ? parsed.items : [parsed];
     return jsonResponse({
       items: items.map((it) => ({
         name: it?.name || null,
@@ -350,6 +353,7 @@ All values are per 100g. calories in kcal. protein/carbs/fat/fiber in grams. sod
         vitaminC: Number(it?.vitaminC) || 0,
         iron: Number(it?.iron) || 0,
       })),
+      scaleReadingGrams: Number(parsed?.scaleReadingGrams) || 0,
     });
   }
 

@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.12';
+const APP_VERSION = 'WF_SYS_V.1.8.13';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -14652,6 +14652,31 @@ function initAddFoodPanel() {
       const rawBase64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
       const est = await estimateFoodNutritionFromPhoto(rawBase64, 'image/jpeg');
       const rawItems = Array.isArray(est.items) ? est.items : [];
+
+      // If a digital scale's display was visible and legible in the photo,
+      // the server reports that exact reading separately from its own
+      // visual per-item weight guesses (which are rarely precise — a photo
+      // alone can't tell 180g of rice from 220g). Anchor the TOTAL to the
+      // real scale reading (minus the container/tare weight) while keeping
+      // each item's SHARE of that total from the visual estimate — only
+      // `grams` gets rescaled, not the per-100g nutrition density below,
+      // since correcting the total weight doesn't change what the food
+      // actually is made of per 100g.
+      let scaleStatusNote = '';
+      const scaleReading = Number(est.scaleReadingGrams) || 0;
+      if (scaleReading > 0) {
+        const containerWeight = parseFloat(document.getElementById('containerWeightInput').value) || 0;
+        const netWeight = Math.max(0, scaleReading - containerWeight);
+        const visualTotal = rawItems.reduce((sum, it) => sum + (Number(it.grams) || 0), 0);
+        if (visualTotal > 0 && netWeight > 0) {
+          const factor = netWeight / visualTotal;
+          rawItems.forEach((it) => { it.grams = (Number(it.grams) || 0) * factor; });
+        }
+        scaleStatusNote = containerWeight
+          ? ` Scale read ${Math.round(scaleReading)}g, minus ${Math.round(containerWeight)}g container = ${Math.round(netWeight)}g total — used to correct the weight estimate.`
+          : ` Scale read ${Math.round(scaleReading)}g — used to correct the weight estimate.`;
+      }
+
       // Server gives real estimated grams + values for that exact amount
       // (not per-100g) — derive a per-100g baseline from it so the review
       // list's own grams input can rescale each row independently.
@@ -14671,7 +14696,7 @@ function initAddFoodPanel() {
       });
       renderAiPhotoItemsReview();
       statusEl.textContent = aiPhotoItems.length
-        ? '⚠️ AI estimate — review each item\'s weight below (tap to correct it) before adding to your diary.'
+        ? '⚠️ AI estimate — review each item\'s weight below (tap to correct it) before adding to your diary.' + scaleStatusNote
         : 'Could not identify any food in that photo — try again or add manually below.';
     } catch (e) {
       statusEl.textContent = e.message || 'AI photo estimate unavailable — check your connection or add manually.';

@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.99">
+<link rel="stylesheet" href="style.css?v=1.8.00">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -2776,6 +2776,12 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
     </div>
 
     <div class="add-food-panel" id="addFoodPanelPhoto" hidden>
+      <p class="hint hint--sm">On a kitchen scale? Photograph the plate while it's still on the scale with the number visible — AI reads the scale's actual display instead of guessing the weight from how full the plate looks.</p>
+      <label class="field">
+        <span>Container/plate weight (tare), in grams — optional</span>
+        <input type="number" id="containerWeightInput" placeholder="e.g. 150 — weight of the empty plate/bowl">
+      </label>
+      <p class="hint hint--sm" style="margin-top:0;">Leave blank if you zeroed/tared the scale yourself before placing the food, or if there's no scale in the photo at all.</p>
       <div class="btn-row">
         <button type="button" class="btn btn--sm" id="btnEstimateAiPhoto">📷 Estimate from Photo</button>
         <span class="ai-spinner" id="aiPhotoSpinner" hidden></span>
@@ -5096,11 +5102,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.7.99"></script>
+<script src="config.js?v=1.8.00"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.99"></script>
+<script src="app.js?v=1.8.00"></script>
 </body>
 </html>
