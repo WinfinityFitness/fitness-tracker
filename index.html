@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.7.98">
+<link rel="stylesheet" href="style.css?v=1.7.99">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -2718,6 +2718,17 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
           <span class="ai-spinner" id="aiEstimateSpinner" hidden></span>
         </div>
         <p class="hint" id="aiEstimateStatus"></p>
+
+        <p class="hint hint--sm" style="margin-top:10px;">Or paste nutrition info you already have (copied from a label, an app, or a website) and let AI read the exact numbers instead of guessing:</p>
+        <label class="field">
+          <span>Pasted nutrition info</span>
+          <textarea id="pastedNutritionInput" rows="3" placeholder="e.g. &quot;Lucky Me Pancit Canton, 1 pack (60g): Calories 280, Protein 6g, Carbs 40g, Fat 11g, Sodium 1030mg&quot;"></textarea>
+        </label>
+        <div class="btn-row">
+          <button type="button" class="btn btn--sm" id="btnEstimatePastedText">📋 Extract from Pasted Text</button>
+          <span class="ai-spinner" id="pastedTextSpinner" hidden></span>
+        </div>
+        <p class="hint" id="pastedTextStatus"></p>
         <div id="customFoodManualSection">
           <p class="hint hint--sm">Or fill these in yourself — weigh the food on a scale first for the most accurate result.</p>
           <div class="field-row">
@@ -2772,6 +2783,15 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <input type="file" accept="image/*" capture="environment" id="aiPhotoInput" hidden>
       <img class="ai-photo-preview" id="aiPhotoPreview" alt="" hidden>
       <p class="hint" id="aiPhotoStatus"></p>
+
+      <p class="hint hint--sm" style="margin-top:10px;">Or upload a screenshot that already shows the nutrition facts (a nutrition label, a food app, a website) — AI reads the exact printed numbers instead of estimating from how the food looks:</p>
+      <div class="btn-row">
+        <button type="button" class="btn btn--sm" id="btnEstimateScreenshot">🖼️ Upload Screenshot</button>
+        <span class="ai-spinner" id="screenshotSpinner" hidden></span>
+      </div>
+      <input type="file" accept="image/*" id="screenshotInput" hidden>
+      <img class="ai-photo-preview" id="screenshotPreview" alt="" hidden>
+      <p class="hint" id="screenshotStatus"></p>
 
       <p class="hint hint--sm">Or use the Portion Guide camera — a percentage-divided circle overlay to help line up your plate before shooting:</p>
       <div class="field-row">
@@ -5076,11 +5096,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.7.98"></script>
+<script src="config.js?v=1.7.99"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.7.98"></script>
+<script src="app.js?v=1.7.99"></script>
 </body>
 </html>

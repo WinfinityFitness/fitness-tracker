@@ -109,7 +109,7 @@ function isKeySpecificErrorText(text) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
-  let foodName, servingDescription, imageBase64, imageMimeType, barcodeImageBase64, barcodeImageMimeType, labelImageBase64, labelImageMimeType, mealMenuText, mealMenuUrl, mealMenuImageBase64, mealMenuImageMimeType, personalGeminiKeys;
+  let foodName, servingDescription, imageBase64, imageMimeType, barcodeImageBase64, barcodeImageMimeType, labelImageBase64, labelImageMimeType, mealMenuText, mealMenuUrl, mealMenuImageBase64, mealMenuImageMimeType, pastedNutritionText, personalGeminiKeys;
   try {
     const body = await req.json();
     foodName = body.foodName;
@@ -124,6 +124,11 @@ Deno.serve(async (req) => {
     mealMenuUrl = body.mealMenuUrl;
     mealMenuImageBase64 = body.mealMenuImageBase64;
     mealMenuImageMimeType = body.mealMenuImageMimeType;
+    // Regular Fuel-tab "paste nutrition info" path (distinct from the admin
+    // Prep Meal mealMenuText above: different JSON shape, no ingredients/
+    // procedure fields, and reads exact stated numbers rather than ever
+    // estimating from a dish/recipe description).
+    pastedNutritionText = body.pastedNutritionText;
     // Optional per-user BYOK keys (Settings > My AI API Key) -- isolated to
     // this one request, never persisted server-side. Tried before the
     // shared admin/env keys below, so a user who added their own key runs
@@ -149,8 +154,9 @@ Deno.serve(async (req) => {
   // from, or a photo (of the dish itself or of a printed recipe page).
   const hasMealMenuImage = mealMenuImageBase64 && typeof mealMenuImageBase64 === 'string';
   const hasMealMenu = (typeof mealMenuText === 'string' && mealMenuText.trim()) || (typeof mealMenuUrl === 'string' && mealMenuUrl.trim()) || hasMealMenuImage;
-  if (!hasImage && !hasBarcodePair && !hasLabelOnly && !hasMealMenu && (!foodName || typeof foodName !== 'string')) {
-    return jsonResponse({ error: 'foodName, imageBase64, a barcode/label photo pair, a label photo, or a meal menu text/URL is required' }, 400);
+  const hasPastedText = typeof pastedNutritionText === 'string' && pastedNutritionText.trim();
+  if (!hasImage && !hasBarcodePair && !hasLabelOnly && !hasMealMenu && !hasPastedText && (!foodName || typeof foodName !== 'string')) {
+    return jsonResponse({ error: 'foodName, imageBase64, a barcode/label photo pair, a label photo, pasted nutrition text, or a meal menu text/URL is required' }, 400);
   }
 
   const apiKeys = [...personalGeminiKeys, ...(await getGeminiApiKeys())];
@@ -222,6 +228,18 @@ Respond with ONLY a JSON object, no markdown, no explanation, in exactly this sh
 Normalize all nutrition values to per 100 grams — the label may show per-serving, so convert using the serving size in grams if one is given. calories in kcal, protein/carbs/fat/fiber in grams, sodium/potassium in milligrams, vitaminA in micrograms RAE, vitaminC in milligrams, iron in milligrams. "servingSize" is the label's OWN printed serving size exactly as shown, or "" if not printed. If the product name isn't visible in this photo, use "". If any nutrient isn't listed on the label, use 0. If the photo is unclear, give your best reasonable reading — never refuse.`,
     });
     parts.push({ inlineData: { mimeType: labelImageMimeType || 'image/jpeg', data: labelImageBase64 } });
+  } else if (hasPastedText) {
+    parts.push({
+      text: `The user pasted this food nutrition info (copied from a label, a food-tracking app, or a website) into a fitness tracking app. READ the exact values already stated in the text below -- do not estimate or guess any number that's explicitly given, only fill in a value yourself if it's genuinely missing from the text.
+Respond with ONLY a JSON object, no markdown, no explanation, in exactly this shape:
+{"name": string, "servingSize": string, "calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "sodium": number, "potassium": number, "vitaminA": number, "vitaminC": number, "iron": number}
+Normalize all nutrition values to per 100 grams -- the text may state per-serving values, so convert using the serving size in grams if one is given. calories in kcal, protein/carbs/fat/fiber in grams, sodium/potassium in milligrams, vitaminA in micrograms RAE, vitaminC in milligrams, iron in milligrams. "servingSize" is whatever serving size is stated in the text exactly as written (e.g. "1 pack (60g)"), or "" if none is given. "name" is the food's name if stated, or "" if not. If any nutrient isn't mentioned at all, use 0. Never refuse.
+
+PASTED TEXT:
+"""
+${pastedNutritionText.trim()}
+"""`,
+    });
   } else if (hasImage) {
     parts.push({
       text: `Identify EACH separate food component visible on the plate in this photo — do not combine them into one estimate. List every distinct item separately (e.g. the meat, each vegetable or side, a sauce, a slice of fruit) rather than describing the plate as a whole.
@@ -336,13 +354,13 @@ All values are per 100g. calories in kcal. protein/carbs/fat/fiber in grams. sod
   }
 
   return jsonResponse({
-    name: (hasBarcodePair || hasLabelOnly) ? (parsed.name || null) : undefined,
+    name: (hasBarcodePair || hasLabelOnly || hasPastedText) ? (parsed.name || null) : undefined,
     code: hasBarcodePair ? (parsed.code ? String(parsed.code).replace(/[^0-9]/g, '') : null) : undefined,
-    // The label's OWN printed serving size (e.g. "1 bar (40g)"), shown to
-    // the user as a reference so they type the real serving they're
+    // The label's/text's OWN stated serving size (e.g. "1 bar (40g)"), shown
+    // to the user as a reference so they type the real serving they're
     // logging instead of accepting an arbitrary default — only the
-    // barcode-pair/label-only prompts above ask for this.
-    servingSize: (hasBarcodePair || hasLabelOnly) ? (parsed.servingSize || '') : undefined,
+    // barcode-pair/label-only/pasted-text prompts above ask for this.
+    servingSize: (hasBarcodePair || hasLabelOnly || hasPastedText) ? (parsed.servingSize || '') : undefined,
     calories: Number(parsed.calories) || 0,
     protein: Number(parsed.protein) || 0,
     carbs: Number(parsed.carbs) || 0,

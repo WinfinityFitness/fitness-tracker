@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.11';
+const APP_VERSION = 'WF_SYS_V.1.8.12';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -13973,6 +13973,27 @@ async function estimateFoodFromLabelPhotoOnly(labelImageBase64, labelImageMimeTy
   return data;
 }
 
+// Regular Fuel-tab "paste nutrition info" path — reads exact stated values
+// out of pasted text (copied from a label, app, or website) rather than
+// guessing from a food name. Same response shape as the label-photo paths
+// below, so applyLabelEstimateToAddFoodForm can fill the form either way.
+async function estimateFoodNutritionFromPastedText(pastedNutritionText) {
+  let res;
+  try {
+    res = await fetch(`${SUPABASE_URL}/functions/v1/smooth-service`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ pastedNutritionText, personalGeminiKeys: getPersonalGeminiKeys() }),
+    });
+  } catch (e) {
+    throw new Error('AI text reading unavailable — check your connection.');
+  }
+  let data;
+  try { data = await res.json(); } catch (e) { throw new Error('AI text reading unavailable — try again later.'); }
+  if (!res.ok) throw new Error(data.error || 'AI text reading failed');
+  return data;
+}
+
 let barcodePhotoBase64 = null;
 // Set true whenever the Add Food "ai" panel gets pre-filled from a scanned
 // label (barcode+label pair, or label alone) — the save button then
@@ -13988,7 +14009,9 @@ let customFoodLabelServingSize = '';
 // the user has to type the food's actual serving from the label before
 // they can save. Full macros AND micros are captured here so they carry
 // through to the diary entry, not just calories/protein/carbs/fat.
-function applyLabelEstimateToAddFoodForm(est) {
+function applyLabelEstimateToAddFoodForm(est, sourceLabel, statusElId) {
+  sourceLabel = sourceLabel || (est.code ? 'photos' : 'photo');
+  statusElId = statusElId || 'aiPhotoStatus';
   openAddFoodPanel();
   switchAddFoodTab('ai'); // that's where customFoodName/manual fields live now
   if (est.code) pendingBarcodeCode = est.code;
@@ -14003,7 +14026,7 @@ function applyLabelEstimateToAddFoodForm(est) {
   const gramsInput = document.getElementById('customFoodGrams');
   gramsInput.value = '';
   gramsInput.placeholder = customFoodLabelServingSize
-    ? `Label says "${customFoodLabelServingSize}" — type what you're actually having, in grams`
+    ? `Stated serving is "${customFoodLabelServingSize}" — type what you're actually having, in grams`
     : 'Type the actual serving you\'re having, in grams';
   document.getElementById('customFoodUnit').value = 'g';
   document.getElementById('customFoodUnitWarning').hidden = true;
@@ -14011,9 +14034,9 @@ function applyLabelEstimateToAddFoodForm(est) {
   // Reuses the existing "will be remembered for the next scan" note —
   // only relevant if a code was actually captured from the photo.
   document.getElementById('customFoodTeachNote').hidden = !est.code;
-  document.getElementById('aiPhotoStatus').textContent = customFoodLabelServingSize
-    ? `⚠️ AI-read from your photo${est.code ? 's' : ''} — label serving size is "${customFoodLabelServingSize}". Type the actual serving size below before saving.`
-    : `⚠️ AI-read from your photo${est.code ? 's' : ''} — type the actual serving size below before saving.`;
+  document.getElementById(statusElId).textContent = customFoodLabelServingSize
+    ? `⚠️ AI-read from your ${sourceLabel} — stated serving size is "${customFoodLabelServingSize}". Type the actual serving size below before saving.`
+    : `⚠️ AI-read from your ${sourceLabel} — type the actual serving size below before saving.`;
 }
 
 function initBarcodePhotoFallback() {
@@ -14586,6 +14609,26 @@ function initAddFoodPanel() {
     }
   });
 
+  const pastedTextBtn = document.getElementById('btnEstimatePastedText');
+  const pastedTextSpinner = document.getElementById('pastedTextSpinner');
+  pastedTextBtn.addEventListener('click', async () => {
+    const text = document.getElementById('pastedNutritionInput').value.trim();
+    const statusEl = document.getElementById('pastedTextStatus');
+    if (!text) { statusEl.textContent = 'Paste some nutrition info first.'; return; }
+    statusEl.textContent = 'Reading pasted text with AI…';
+    pastedTextBtn.disabled = true;
+    pastedTextSpinner.hidden = false;
+    try {
+      const est = await estimateFoodNutritionFromPastedText(text);
+      applyLabelEstimateToAddFoodForm(est, 'pasted text', 'pastedTextStatus');
+    } catch (e) {
+      statusEl.textContent = e.message || 'AI text reading unavailable — check your connection or add manually.';
+    } finally {
+      pastedTextBtn.disabled = false;
+      pastedTextSpinner.hidden = true;
+    }
+  });
+
   const photoBtn = document.getElementById('btnEstimateAiPhoto');
   const photoSpinner = document.getElementById('aiPhotoSpinner');
   const photoInput = document.getElementById('aiPhotoInput');
@@ -14644,6 +14687,44 @@ function initAddFoodPanel() {
     photoInput.value = '';
     if (!file) return;
     await processFoodPhotoBlob(file);
+  });
+
+  // Upload Screenshot — deliberately a different path from the dish-photo
+  // Estimate from Photo above: this is for an image that ALREADY shows
+  // printed/on-screen nutrition numbers (a label photo, a food app
+  // screenshot, a website screenshot), so it reuses the same label-reading
+  // prompt/response shape as the barcode scanner's "no barcode" fallback
+  // (estimateFoodFromLabelPhotoOnly) rather than the dish-estimation one —
+  // AI reads the exact stated values instead of estimating from appearance.
+  // No capture="environment" on the file input (unlike aiPhotoInput above)
+  // so the picker offers the gallery/files, not just the live camera —
+  // a screenshot already exists, it isn't taken fresh.
+  const screenshotBtn = document.getElementById('btnEstimateScreenshot');
+  const screenshotSpinner = document.getElementById('screenshotSpinner');
+  const screenshotInput = document.getElementById('screenshotInput');
+  const screenshotPreview = document.getElementById('screenshotPreview');
+  screenshotBtn.addEventListener('click', () => screenshotInput.click());
+  screenshotInput.addEventListener('change', async () => {
+    const file = screenshotInput.files[0];
+    screenshotInput.value = '';
+    if (!file) return;
+    const statusEl = document.getElementById('screenshotStatus');
+    statusEl.textContent = 'Reading screenshot with AI…';
+    screenshotBtn.disabled = true;
+    screenshotSpinner.hidden = false;
+    try {
+      const { dataUrl } = await resizeAndCompressImage(file);
+      screenshotPreview.src = dataUrl;
+      screenshotPreview.hidden = false;
+      const rawBase64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+      const est = await estimateFoodFromLabelPhotoOnly(rawBase64, 'image/jpeg');
+      applyLabelEstimateToAddFoodForm(est, 'screenshot', 'screenshotStatus');
+    } catch (e) {
+      statusEl.textContent = e.message || 'AI screenshot reading unavailable — check your connection or add manually.';
+    } finally {
+      screenshotBtn.disabled = false;
+      screenshotSpinner.hidden = true;
+    }
   });
 
   // ---------------------------------------------------------------------
