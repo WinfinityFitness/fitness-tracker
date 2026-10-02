@@ -986,6 +986,31 @@
           <p class="note" id="assignTargetsNote"></p>
         </div>
 
+        <!-- Push Daily Log (per client, opened from the Monitor card below)
+             -- REPLACES the client's food diary for that date on their next
+             Refresh tap, same pull as Assign Targets. See
+             coach_push_daily_log in supabase_coach_daily_log_push_migration.sql
+             and applyPushedDailyLog in app.js. -->
+        <div class="card" id="pushDailyLogCard" hidden>
+          <h2>Push Daily Log &mdash; <span id="pushDailyLogClientId"></span></h2>
+          <p class="note" style="margin-top:0;">Replaces this client's food diary for the chosen date the next time they tap Refresh on their Assigned Targets widget. This overwrites whatever they already logged that day.</p>
+          <label class="field"><span>Date</span><input type="date" id="pdlDate"></label>
+          <div class="row2">
+            <label class="field"><span>Calories (kcal)</span><input type="number" id="pdlCalories"></label>
+            <label class="field"><span>Protein (g)</span><input type="number" id="pdlProtein"></label>
+          </div>
+          <div class="row2">
+            <label class="field"><span>Carbs (g)</span><input type="number" id="pdlCarbs"></label>
+            <label class="field"><span>Fat (g)</span><input type="number" id="pdlFat"></label>
+          </div>
+          <label class="field"><span>Note (shown to client, optional)</span><input type="text" id="pdlNote" maxlength="140" placeholder="e.g. Logged from your check-in photos"></label>
+          <div class="btn-row">
+            <button type="button" class="btn" id="btnSavePushDailyLog">Push to Client</button>
+            <button type="button" class="btn btn-secondary" id="btnClosePushDailyLog">Cancel</button>
+          </div>
+          <p class="note" id="pushDailyLogNote"></p>
+        </div>
+
         <!-- Assign Weekly Workout (per client, opened from the Monitor card
              below) -- sets/reps/weight per exercise, sent to the client's
              own Load Session dropdown (see coach_assign_workout in
@@ -1013,6 +1038,7 @@
           <div class="btn-row" id="monitorClientActions" style="margin:0 0 12px;">
             <button type="button" class="link-btn" id="btnMonitorRename">Rename</button>
             <button type="button" class="link-btn" id="btnMonitorAssignTargets">Assign Targets</button>
+            <button type="button" class="link-btn" id="btnMonitorPushDailyLog">Push Daily Log</button>
             <button type="button" class="link-btn" id="btnMonitorAssignWorkout">Assign Workout</button>
             <button type="button" class="link-btn" id="btnMonitorRemove">Remove</button>
           </div>
@@ -1305,7 +1331,7 @@ document.querySelectorAll('#ownerMainTabs .main-tab-btn').forEach(btn => {
    Now" here just means forcing a cache-busted reload instead of quietly
    trusting whatever the browser already has cached, not installing
    anything. */
-const COACH_PORTAL_VERSION = '2.4.6';
+const COACH_PORTAL_VERSION = '2.4.7';
 document.getElementById('versionBadgeText').textContent = COACH_PORTAL_VERSION;
 
 async function fetchLatestCoachPortalVersion() {
@@ -3730,6 +3756,46 @@ document.getElementById('btnSaveAssignTargets').addEventListener('click', async 
     note.textContent = 'Saved.'; note.className = 'note success';
   } catch (e) {
     note.textContent = 'Could not save: ' + (e.message || e); note.className = 'note error';
+  }
+});
+
+function openPushDailyLog(publicId) {
+  document.getElementById('pushDailyLogCard').hidden = false;
+  document.getElementById('pushDailyLogClientId').textContent = publicId;
+  document.getElementById('pushDailyLogCard').dataset.targetId = publicId;
+  document.getElementById('pdlDate').value = new Date().toISOString().slice(0, 10);
+  ['pdlCalories', 'pdlProtein', 'pdlCarbs', 'pdlFat', 'pdlNote'].forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('pushDailyLogNote').textContent = '';
+  document.getElementById('pushDailyLogCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+document.getElementById('btnMonitorPushDailyLog').addEventListener('click', () => {
+  if (!monitorState || !monitorState.publicId) return;
+  openPushDailyLog(monitorState.publicId);
+});
+document.getElementById('btnClosePushDailyLog').addEventListener('click', () => {
+  document.getElementById('pushDailyLogCard').hidden = true;
+});
+document.getElementById('btnSavePushDailyLog').addEventListener('click', async () => {
+  const note = document.getElementById('pushDailyLogNote');
+  if (demoMode) { note.textContent = 'Preview mode — changes aren\'t sent.'; note.className = 'note'; return; }
+  const targetId = document.getElementById('pushDailyLogCard').dataset.targetId;
+  const logDate = document.getElementById('pdlDate').value;
+  if (!logDate) { note.textContent = 'Pick a date.'; note.className = 'note error'; return; }
+  if (!confirm(`This replaces ${targetId}'s entire food diary for ${logDate} the next time they refresh. Continue?`)) return;
+  const numOrNull = (id) => { const v = document.getElementById(id).value; return v === '' ? null : Number(v); };
+  note.textContent = 'Pushing…'; note.className = 'note';
+  try {
+    const { error } = await sb.rpc('coach_push_daily_log', {
+      p_coach_digital_id: coachSession.digitalId, p_coach_password: coachSession.password,
+      p_target_digital_id: targetId, p_log_date: logDate,
+      p_calories: numOrNull('pdlCalories'), p_protein: numOrNull('pdlProtein'),
+      p_carbs: numOrNull('pdlCarbs'), p_fat: numOrNull('pdlFat'),
+      p_note: document.getElementById('pdlNote').value.trim() || null,
+    });
+    if (error) throw error;
+    note.textContent = `Pushed — ${targetId} will see it next time they refresh.`; note.className = 'note success';
+  } catch (e) {
+    note.textContent = 'Could not push: ' + (e.message || e); note.className = 'note error';
   }
 });
 

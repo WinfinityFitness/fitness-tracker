@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.13';
+const APP_VERSION = 'WF_SYS_V.1.8.14';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -16711,6 +16711,31 @@ function applyAssignedWorkout(profile, workoutData) {
   return true;
 }
 
+// Coach "Push Daily Log" (coach-portal.html, assigned_daily_log table) --
+// unlike applyAssignedWorkout above, this REPLACES the target date's whole
+// meals object rather than merging, since the point of this feature is the
+// coach's numbers winning over whatever the client already logged (or
+// didn't). Scoped to only apply when log_date is still TODAY by the time
+// the client refreshes -- a push the client doesn't see until a day later
+// silently overwriting an unrelated day's diary would be more confusing
+// than useful, so it's simply skipped (the row stays, but goes stale).
+function applyPushedDailyLog(profile, logData) {
+  if (!logData) return false;
+  if (profile.coachDailyLogAppliedAt === logData.updated_at) return false;
+  if (logData.log_date !== todayISO()) return false;
+  const item = {
+    name: logData.note ? `Coach-logged: ${logData.note}` : 'Coach-logged intake',
+    calories: Number(logData.calories) || 0,
+    protein: Number(logData.protein) || 0,
+    carbs: Number(logData.carbs) || 0,
+    fat: Number(logData.fat) || 0,
+    fiber: 0, sodium: 0, potassium: 0, vitaminA: 0, vitaminC: 0, iron: 0,
+  };
+  saveMealsForDate(logData.log_date, { breakfast: [], lunch: [], dinner: [], snacks: [item] });
+  profile.coachDailyLogAppliedAt = logData.updated_at;
+  return true;
+}
+
 async function refreshCoachAssignmentFromServer() {
   const note = document.getElementById('coachRefreshNote');
   const btn = document.getElementById('btnRefreshCoachAssignment');
@@ -16728,8 +16753,10 @@ async function refreshCoachAssignmentFromServer() {
     // "check for updates" button just for workouts.
     const { data: workoutData, error: workoutError } = await sb.from('assigned_workouts').select('*').eq('share_key', shareKey).maybeSingle();
     if (workoutError) throw workoutError;
+    const { data: dailyLogData, error: dailyLogError } = await sb.from('assigned_daily_log').select('*').eq('share_key', shareKey).maybeSingle();
+    if (dailyLogError) throw dailyLogError;
 
-    if (!data && !workoutData) {
+    if (!data && !workoutData && !dailyLogData) {
       note.textContent = 'No assignment from your coach yet.';
       return;
     }
@@ -16757,12 +16784,17 @@ async function refreshCoachAssignmentFromServer() {
       ? ` New workout "${workoutData.program_name || 'Coach Assigned Workout'}" added to your saved sessions!`
       : '';
 
+    const isNewDailyLog = applyPushedDailyLog(profile, dailyLogData);
+    const dailyLogNote = isNewDailyLog ? ` Your coach replaced today's food diary with their own entry.` : '';
+
     saveProfile(profile);
     loadCoachAssignment();
     renderNutritionTargets();
     renderDashboard();
     renderTrainingStats();
-    note.textContent = (targetsNote || 'No target assignment yet.') + workoutNote;
+    const currentNutDate = document.getElementById('nutDate') && document.getElementById('nutDate').value;
+    if (isNewDailyLog && currentNutDate) { renderFoodDiary(currentNutDate); refreshFuelViewsForDate(currentNutDate); }
+    note.textContent = (targetsNote || 'No target assignment yet.') + workoutNote + dailyLogNote;
   } catch (e) {
     note.textContent = e.message || 'Could not check for an assignment — try again.';
   } finally {
