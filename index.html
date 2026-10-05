@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.8.03">
+<link rel="stylesheet" href="style.css?v=1.8.04">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -1193,8 +1193,8 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
           <p class="hint hint--sm bio-orb-desc" id="bodyFatDesc" hidden>Jackson-Pollock 7-site skinfold estimate. Not a medical measurement.</p>
         </div>
         <div class="bio-scan-col">
-          <div class="chart-card-head"><span class="chart-card-title">Edema Extrapolation</span></div>
-          <div class="ring-card ring-card--flush bio-orb" id="waterRetentionOrb" role="button" tabindex="0" aria-expanded="false" aria-label="Show edema extrapolation method"></div>
+          <div class="chart-card-head"><span class="chart-card-title">Fluid Retention</span></div>
+          <div class="ring-card ring-card--flush bio-orb" id="waterRetentionOrb" role="button" tabindex="0" aria-expanded="false" aria-label="Show fluid retention estimate method"></div>
           <p class="hint hint--sm bio-orb-desc" id="waterRetentionDesc" hidden>Illustrative water-retention estimate from today's carbs/sodium intake plus stress/fatigue/sleep average, scaled against your Watson-formula total body water. Not a medical measurement.</p>
         </div>
       </div>
@@ -5108,11 +5108,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.8.03"></script>
+<script src="config.js?v=1.8.04"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.8.03"></script>
+<script src="app.js?v=1.8.04"></script>
 </body>
 </html>

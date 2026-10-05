@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.16';
+const APP_VERSION = 'WF_SYS_V.1.8.17';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -2498,7 +2498,7 @@ function renderWdsEdemaRing() {
   const kg = profile ? currentWeightKg(profile) : null;
   const tbwLiters = kg ? computeWatsonTBW(profile, kg) : null;
   if (!tbwLiters) {
-    renderRing(container, 0, { size: 82, stroke: 6, magenta: true, centerText: '–', label: 'Edema extrapolation', sub: 'Complete Bio profile to estimate' });
+    renderRing(container, 0, { size: 82, stroke: 6, magenta: true, centerText: '–', label: 'Fluid retention', sub: 'Complete Bio profile to estimate' });
     return;
   }
   const date = todayISO();
@@ -2515,7 +2515,7 @@ function renderWdsEdemaRing() {
     : 0;
   const totalG = glycogenWaterG + stateWaterG + periodBonusG;
   const gaugePct = Math.min(100, (totalG / 3500) * 100);
-  renderRing(container, gaugePct, { size: 82, stroke: 6, magenta: true, centerText: round0(totalG) + 'g', label: 'Edema extrapolation', sub: `Estimate for ${fmtDate(parseISO(date))}` });
+  renderRing(container, gaugePct, { size: 82, stroke: 6, magenta: true, centerText: round0(totalG) + 'g', label: 'Fluid retention', sub: `Estimate for ${fmtDate(parseISO(date))}` });
 }
 
 async function renderWdsNexus() {
@@ -8656,7 +8656,7 @@ function renderWaterRetentionOrb() {
   if (!tbwLiters) {
     renderRing(container, 0, {
       size: 108, stroke: 8, magenta: true,
-      centerText: '–', label: 'Edema extrapolation', sub: 'Complete Bio profile to estimate',
+      centerText: '–', label: 'Fluid retention', sub: 'Complete Bio profile to estimate',
     });
     return;
   }
@@ -8685,7 +8685,7 @@ function renderWaterRetentionOrb() {
 
   renderRing(container, gaugePct, {
     size: 108, stroke: 8, magenta: true,
-    centerText: round0(totalG) + 'g', label: 'Edema extrapolation', sub: `Estimate for ${fmtDate(parseISO(date))}`,
+    centerText: round0(totalG) + 'g', label: 'Fluid retention', sub: `Estimate for ${fmtDate(parseISO(date))}`,
   });
 }
 
