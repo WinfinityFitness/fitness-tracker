@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.8.04">
+<link rel="stylesheet" href="style.css?v=1.8.05">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -2729,6 +2729,22 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
           <span class="ai-spinner" id="pastedTextSpinner" hidden></span>
         </div>
         <p class="hint" id="pastedTextStatus"></p>
+
+        <p class="hint hint--sm" style="margin-top:10px;">Or paste a list of foods with their weights (one per line) and let AI estimate nutrition for each at that exact amount — no photo or label needed:</p>
+        <label class="field">
+          <span>Pasted food list</span>
+          <textarea id="pastedFoodListInput" rows="4" placeholder="e.g.&#10;Dynamite - 98.1g&#10;Baliwag manok - 383g with bones&#10;Baliwag liempo - 94g&#10;White rice - 118g"></textarea>
+        </label>
+        <div class="btn-row">
+          <button type="button" class="btn btn--sm" id="btnEstimateFoodList">📝 Estimate List</button>
+          <span class="ai-spinner" id="pastedFoodListSpinner" hidden></span>
+        </div>
+        <p class="hint" id="pastedFoodListStatus"></p>
+        <div class="ai-photo-items-review" id="pastedFoodListReview" hidden>
+          <p class="hint hint--accent" id="pastedFoodListHint"></p>
+          <div id="pastedFoodListItemsList"></div>
+          <button type="button" class="btn btn--primary add-food-bottom-btn" id="btnAddPastedFoodListItems">Add Selected to Diary</button>
+        </div>
         <div id="customFoodManualSection">
           <p class="hint hint--sm">Or fill these in yourself — weigh the food on a scale first for the most accurate result.</p>
           <div class="field-row">
@@ -5108,11 +5124,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.8.04"></script>
+<script src="config.js?v=1.8.05"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.8.04"></script>
+<script src="app.js?v=1.8.05"></script>
 </body>
 </html>

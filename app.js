@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.17';
+const APP_VERSION = 'WF_SYS_V.1.8.18';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -13633,6 +13633,14 @@ let customFoodAiPer100g = null;
 let aiPhotoGroups = [];
 let aiPhotoGroupSeq = 0;
 
+// One entry per line of the "Paste multiple foods" list (Estimate AI tab),
+// same shape as an aiPhotoGroups item (name, grams, per100g baseline,
+// selected) so it can reuse renderAiPhotoItemRow/computeAiPhotoItemValues/
+// refreshAiPhotoRowNumbers unchanged -- just rendered into its own review
+// list (#pastedFoodListItemsList) instead of a photo group's card, since
+// there's no photo, no scale reading, and no container-weight concept here.
+let pastedFoodListItems = [];
+
 // Directly overrides the day's flat nutrition totals (the same fields
 // Daily Fuel Status reads), bypassing the Dietary Algorithm/meals entirely —
 // for users transferring totals already computed by another app (e.g.
@@ -13910,6 +13918,10 @@ function openAddFoodPanel() {
   document.getElementById('aiPhotoNotesInput').value = '';
   document.getElementById('aiPhotoSafetyMarginPct').value = 5;
   renderAiPhotoItemsReview();
+  pastedFoodListItems = [];
+  document.getElementById('pastedFoodListInput').value = '';
+  document.getElementById('pastedFoodListStatus').textContent = '';
+  renderPastedFoodListReview();
   switchAddFoodTab('search');
   document.getElementById('addFoodOverlay').hidden = false;
 }
@@ -14037,6 +14049,29 @@ async function estimateFoodNutritionFromPastedText(pastedNutritionText) {
   let data;
   try { data = await res.json(); } catch (e) { throw new Error('AI text reading unavailable — try again later.'); }
   if (!res.ok) throw new Error(data.error || 'AI text reading failed');
+  return data;
+}
+
+// Distinct from estimateFoodNutritionFromPastedText above: that one READS
+// exact numbers already stated in pasted nutrition-facts text (a label, an
+// app, a website). This one ESTIMATES nutrition for a plain list of food
+// names with amounts ("Dynamite - 98.1g", one per line) -- no nutrition
+// numbers in the source text at all, just what was eaten and how much,
+// same per-item real-amount estimate shape the dish-photo path returns.
+async function estimateFoodListFromPastedText(pastedFoodListText) {
+  let res;
+  try {
+    res = await fetch(`${SUPABASE_URL}/functions/v1/smooth-service`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ pastedFoodListText, personalGeminiKeys: getPersonalGeminiKeys() }),
+    });
+  } catch (e) {
+    throw new Error('AI list estimate unavailable — check your connection.');
+  }
+  let data;
+  try { data = await res.json(); } catch (e) { throw new Error('AI list estimate unavailable — try again later.'); }
+  if (!res.ok) throw new Error(data.error || 'AI list estimate failed');
   return data;
 }
 
@@ -14581,6 +14616,64 @@ function reanalyzeAiPhotoGroup(gi) {
   if (group) analyzeAiPhotoGroup(group);
 }
 
+// Renders the "Paste multiple foods" review list (Estimate AI tab) -- a
+// flat list, not grouped like the photo flow (one text submission produces
+// many items, but there's only ever one source, no per-item photo/scale).
+// Reuses renderAiPhotoItemRow/refreshAiPhotoRowNumbers for the row markup
+// and editing behavior (grams input rescales from per100g, re-estimate
+// corrects a misidentified name) -- the gi argument passed to
+// renderAiPhotoItemRow is unused here since wiring below looks items up by
+// idx directly in pastedFoodListItems, not through aiPhotoGroups.
+function renderPastedFoodListReview() {
+  const wrap = document.getElementById('pastedFoodListReview');
+  const list = document.getElementById('pastedFoodListItemsList');
+  if (!pastedFoodListItems.length) {
+    wrap.hidden = true;
+    return;
+  }
+  wrap.hidden = false;
+  document.getElementById('pastedFoodListHint').textContent =
+    `⚠️ Estimated ${pastedFoodListItems.length} item${pastedFoodListItems.length === 1 ? '' : 's'} — review before adding.`;
+  list.innerHTML = pastedFoodListItems.map((it, idx) => renderAiPhotoItemRow(0, it, idx)).join('');
+
+  list.querySelectorAll('.ai-photo-item-row').forEach((row) => {
+    const idx = parseInt(row.dataset.idx, 10);
+    const it = pastedFoodListItems[idx];
+    row.querySelector('.ai-photo-item-check').addEventListener('change', (e) => {
+      it.selected = e.target.checked;
+      row.classList.toggle('is-excluded', !e.target.checked);
+    });
+    row.querySelector('.ai-photo-item-name').addEventListener('input', (e) => { it.name = e.target.value; });
+    row.querySelector('.ai-photo-item-grams').addEventListener('input', (e) => {
+      it.grams = parseFloat(e.target.value) || 0;
+      refreshAiPhotoRowNumbers(row, it);
+    });
+    row.querySelector('.ai-photo-item-reestimate-btn').addEventListener('click', async () => {
+      const name = it.name.trim();
+      const statusEl = row.querySelector('.ai-photo-item-reestimate-status');
+      if (!name) { statusEl.textContent = 'Type a corrected food name first.'; return; }
+      const btn = row.querySelector('.ai-photo-item-reestimate-btn');
+      btn.disabled = true;
+      statusEl.textContent = 'Re-estimating…';
+      try {
+        const est = await estimateFoodNutritionWithAI(name);
+        it.name = name;
+        it.per100g = {
+          calories: est.calories || 0, protein: est.protein || 0, carbs: est.carbs || 0, fat: est.fat || 0,
+          fiber: est.fiber || 0, sodium: est.sodium || 0, potassium: est.potassium || 0,
+          vitaminA: est.vitaminA || 0, vitaminC: est.vitaminC || 0, iron: est.iron || 0,
+        };
+        refreshAiPhotoRowNumbers(row, it);
+        statusEl.textContent = '✓ Updated with corrected nutrition.';
+      } catch (e) {
+        statusEl.textContent = e.message || 'Re-estimate failed — try again.';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+}
+
 // Renders every uploaded/captured photo as its own card -- a thumbnail plus
 // whichever of three states it's in: still analyzing, failed (with a
 // Re-analyze button), or done (its own container-weight/tare field if a
@@ -14851,6 +14944,68 @@ function initAddFoodPanel() {
       pastedTextBtn.disabled = false;
       pastedTextSpinner.hidden = true;
     }
+  });
+
+  const foodListBtn = document.getElementById('btnEstimateFoodList');
+  const foodListSpinner = document.getElementById('pastedFoodListSpinner');
+  foodListBtn.addEventListener('click', async () => {
+    const text = document.getElementById('pastedFoodListInput').value.trim();
+    const statusEl = document.getElementById('pastedFoodListStatus');
+    if (!text) { statusEl.textContent = 'Paste a list of foods first.'; return; }
+    statusEl.textContent = 'Estimating each item with AI…';
+    foodListBtn.disabled = true;
+    foodListSpinner.hidden = false;
+    try {
+      const est = await estimateFoodListFromPastedText(text);
+      const rawItems = Array.isArray(est.items) ? est.items : [];
+      // Same per-100g-baseline derivation as the dish-photo path (see
+      // analyzeAiPhotoGroup's own comment) -- the server gives real
+      // amounts for the stated weight, not per-100g, so a baseline is
+      // derived here for the review list's own grams input to rescale from.
+      pastedFoodListItems = rawItems.map((it) => {
+        const grams = Number(it.grams) > 0 ? Number(it.grams) : 100;
+        const factor = 100 / grams;
+        return {
+          name: it.name || 'Food item',
+          grams,
+          selected: true,
+          per100g: {
+            calories: (it.calories || 0) * factor, protein: (it.protein || 0) * factor, carbs: (it.carbs || 0) * factor, fat: (it.fat || 0) * factor,
+            fiber: (it.fiber || 0) * factor, sodium: (it.sodium || 0) * factor, potassium: (it.potassium || 0) * factor,
+            vitaminA: (it.vitaminA || 0) * factor, vitaminC: (it.vitaminC || 0) * factor, iron: (it.iron || 0) * factor,
+          },
+        };
+      });
+      renderPastedFoodListReview();
+      statusEl.textContent = pastedFoodListItems.length
+        ? '⚠️ AI estimate — review each item\'s weight below (tap to correct it) before adding to your diary.'
+        : 'Could not identify any food in that list — check the wording and try again.';
+    } catch (e) {
+      statusEl.textContent = e.message || 'AI list estimate unavailable — check your connection or add manually.';
+    } finally {
+      foodListBtn.disabled = false;
+      foodListSpinner.hidden = true;
+    }
+  });
+
+  document.getElementById('btnAddPastedFoodListItems').addEventListener('click', () => {
+    const chosen = pastedFoodListItems.filter((it) => it.selected).map((it) => {
+      const v = computeAiPhotoItemValues(it);
+      return {
+        name: it.name.trim() || 'Food item',
+        grams: it.grams, qty: it.grams, unit: 'g',
+        calories: v.c, protein: v.p, carbs: v.cb, fat: v.f,
+        fiber: v.fiber, sodium: v.sodium, potassium: v.potassium,
+        vitaminA: v.vitA, vitaminC: v.vitC, iron: v.iron,
+        source: 'ai-text-list',
+      };
+    });
+    if (!chosen.length) { alert('Select at least one item to add.'); return; }
+    addAiPhotoItemsToDiary(chosen);
+    pastedFoodListItems = [];
+    renderPastedFoodListReview();
+    document.getElementById('pastedFoodListInput').value = '';
+    document.getElementById('pastedFoodListStatus').textContent = '';
   });
 
   const photoBtn = document.getElementById('btnEstimateAiPhoto');

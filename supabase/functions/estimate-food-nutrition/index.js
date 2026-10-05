@@ -153,7 +153,7 @@ async function tryGroundedImageEstimate(parts, apiKeys) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
-  let foodName, servingDescription, imageBase64, imageMimeType, photoNotes, barcodeImageBase64, barcodeImageMimeType, labelImageBase64, labelImageMimeType, mealMenuText, mealMenuUrl, mealMenuImageBase64, mealMenuImageMimeType, pastedNutritionText, personalGeminiKeys;
+  let foodName, servingDescription, imageBase64, imageMimeType, photoNotes, barcodeImageBase64, barcodeImageMimeType, labelImageBase64, labelImageMimeType, mealMenuText, mealMenuUrl, mealMenuImageBase64, mealMenuImageMimeType, pastedNutritionText, pastedFoodListText, personalGeminiKeys;
   try {
     const body = await req.json();
     foodName = body.foodName;
@@ -178,6 +178,14 @@ Deno.serve(async (req) => {
     // procedure fields, and reads exact stated numbers rather than ever
     // estimating from a dish/recipe description).
     pastedNutritionText = body.pastedNutritionText;
+    // Fuel-tab "paste multiple foods" path -- a plain list of food names
+    // WITH amounts but no nutrition numbers at all ("Dynamite - 98.1g",
+    // one per line). Distinct from pastedNutritionText above (which reads
+    // numbers already stated) and from foodName (which is one single food
+    // with no amount) -- this ESTIMATES nutrition for N foods at once, each
+    // at its own stated amount, same real-amount-per-item shape the
+    // dish-photo path below returns.
+    pastedFoodListText = typeof body.pastedFoodListText === 'string' ? body.pastedFoodListText.trim() : '';
     // Optional per-user BYOK keys (Settings > My AI API Key) -- isolated to
     // this one request, never persisted server-side. Tried before the
     // shared admin/env keys below, so a user who added their own key runs
@@ -204,8 +212,9 @@ Deno.serve(async (req) => {
   const hasMealMenuImage = mealMenuImageBase64 && typeof mealMenuImageBase64 === 'string';
   const hasMealMenu = (typeof mealMenuText === 'string' && mealMenuText.trim()) || (typeof mealMenuUrl === 'string' && mealMenuUrl.trim()) || hasMealMenuImage;
   const hasPastedText = typeof pastedNutritionText === 'string' && pastedNutritionText.trim();
-  if (!hasImage && !hasBarcodePair && !hasLabelOnly && !hasMealMenu && !hasPastedText && (!foodName || typeof foodName !== 'string')) {
-    return jsonResponse({ error: 'foodName, imageBase64, a barcode/label photo pair, a label photo, pasted nutrition text, or a meal menu text/URL is required' }, 400);
+  const hasPastedFoodList = !!pastedFoodListText;
+  if (!hasImage && !hasBarcodePair && !hasLabelOnly && !hasMealMenu && !hasPastedText && !hasPastedFoodList && (!foodName || typeof foodName !== 'string')) {
+    return jsonResponse({ error: 'foodName, imageBase64, a barcode/label photo pair, a label photo, pasted nutrition text, a pasted food list, or a meal menu text/URL is required' }, 400);
   }
 
   const apiKeys = [...personalGeminiKeys, ...(await getGeminiApiKeys())];
@@ -287,6 +296,19 @@ Normalize all nutrition values to per 100 grams -- the text may state per-servin
 PASTED TEXT:
 """
 ${pastedNutritionText.trim()}
+"""`,
+    });
+  } else if (hasPastedFoodList) {
+    parts.push({
+      text: `The user listed multiple foods they ate, one per line, each with the amount they actually had -- but NO nutrition numbers, unlike the pasted-label case. For EACH line, read the stated amount directly from the line (a weight like "98.1g" or "383g", converting to grams if given in another unit; a count like "2 pieces"; a loose description like "with bones" or "a cup") and ESTIMATE nutrition facts for THAT line's food AT THAT EXACT amount -- the real quantity for that line, not per 100g. If a line gives no amount at all, assume a reasonable typical serving.
+List every line as its own separate item -- do not combine them.
+Respond with ONLY a JSON object, no markdown, no explanation, in exactly this shape:
+{"items": [{"name": string, "grams": number, "calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "sodium": number, "potassium": number, "vitaminA": number, "vitaminC": number, "iron": number}]}
+"name" is the food's name as the user wrote it (clean up obvious typos, keep brand/dish names as given). "grams" is the amount for THAT line, converted to grams. calories in kcal. protein/carbs/fat/fiber in grams. sodium/potassium in milligrams. vitaminA in micrograms RAE. vitaminC in milligrams. iron in milligrams. If unsure about any item, give your best reasonable estimate -- never refuse, and always list one item per line given.
+
+FOOD LIST:
+"""
+${pastedFoodListText}
 """`,
     });
   } else if (hasImage) {
@@ -387,14 +409,14 @@ All values are per 100g. calories in kcal. protein/carbs/fat/fiber in grams. sod
     });
   }
 
-  // Plate photo path returns one entry per detected food component (real
-  // estimated grams + micros for that component), not a single combined
-  // per-100g estimate like the other paths below, plus an optional
-  // scaleReadingGrams if a kitchen scale's display was visible in the
-  // photo. `parsed` is a JSON object ({items, scaleReadingGrams}) per the
-  // hasImage prompt above; tolerate a bare array (or single object) too in
-  // case the model ever drops the wrapper or collapses to one item.
-  if (hasImage) {
+  // Plate photo path AND the pasted-food-list path both return one entry
+  // per food component/line (real estimated grams + micros for that one
+  // item), not a single combined per-100g estimate like the other paths
+  // below -- the list path just has no scaleReadingGrams (no photo, no
+  // scale, always 0). `parsed` is a JSON object ({items[, scaleReadingGrams]})
+  // per either prompt above; tolerate a bare array (or single object) too
+  // in case the model ever drops the wrapper or collapses to one item.
+  if (hasImage || hasPastedFoodList) {
     const items = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.items) ? parsed.items : [parsed];
     return jsonResponse({
       items: items.map((it) => ({
