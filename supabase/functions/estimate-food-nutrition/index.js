@@ -106,6 +106,50 @@ function isKeySpecificErrorText(text) {
   return /RESOURCE_EXHAUSTED|429|exceeded your current quota|quota|API_KEY_INVALID|API key not valid|PERMISSION_DENIED|UNAUTHENTICATED|invalid api key/i.test(text || '');
 }
 
+// Best-effort accuracy boost for the dish-photo path ONLY: one grounded
+// call with Gemini's web-search tool so it can look up real nutrition data
+// for anything it can identify by name, instead of guessing purely from
+// appearance. Tool use and JSON response-mime mode are mutually exclusive
+// in the Gemini API, so this asks for JSON via the PROMPT text alone (same
+// "Respond with ONLY a JSON object" instruction already in the prompt, just
+// without responseMimeType enforcing it) and parses whatever text comes
+// back, stripping a markdown fence if the model added one anyway.
+// ANY failure here -- this model/key not supporting the tool, a non-JSON
+// reply, a network error -- is swallowed and the caller falls through to
+// the normal non-grounded JSON-mode path completely unchanged. This is a
+// bonus accuracy pass that's allowed to just not happen, never a required
+// step the feature depends on.
+async function tryGroundedImageEstimate(parts, apiKeys) {
+  for (const apiKey of apiKeys) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts }],
+            tools: [{ google_search: {} }],
+            generationConfig: { temperature: 0.2 },
+          }),
+        }
+      );
+      if (!res.ok) {
+        const errText = await res.text();
+        if (isKeySpecificErrorText(errText)) continue; // try the next key
+        return null; // request-shaped error (e.g. tool unsupported) -- give up on grounding entirely, let the normal path run
+      }
+      const data = await res.json();
+      const text = (data?.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');
+      const match = text.replace(/```json/gi, '').replace(/```/g, '').match(/\{[\s\S]*\}/);
+      if (!match) continue;
+      const parsed = JSON.parse(match[0]);
+      if (parsed && Array.isArray(parsed.items) && parsed.items.length) return parsed;
+    } catch (e) { /* fall through -- try the next key, then the normal path */ }
+  }
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
@@ -243,7 +287,8 @@ ${pastedNutritionText.trim()}
   } else if (hasImage) {
     parts.push({
       text: `Identify EACH separate food component visible on the plate in this photo — do not combine them into one estimate. List every distinct item separately (e.g. the meat, each vegetable or side, a sauce, a slice of fruit) rather than describing the plate as a whole.
-For each component, estimate its actual weight in grams based on how much of it is visible in the photo (not a fixed serving size), and give its nutrition facts for THAT estimated amount — the real quantity shown, not per 100g.
+For each component, estimate its actual weight in grams based on how much of it is visible in the photo (not a fixed serving size), and give its nutrition facts for THAT estimated amount — the real quantity shown, not per 100g. If you have a web search tool available, use it to look up accurate, well-sourced nutrition data for anything you can identify by name (a branded/packaged product, a standard recipe, a restaurant item) rather than estimating from appearance alone — appearance-only guessing is a fallback for home-cooked or unidentifiable food, not the default.
+Separately, check whether any part of the photo includes a printed food label or packaging (a wrapper, a box, a sticker) showing the product's name and/or its weight. If so, read it and USE those exact printed values for that component's name and/or grams instead of guessing — printed text is always more reliable than a visual estimate.
 Separately, check whether a digital kitchen scale's display is visible anywhere in the photo (the plate/bowl of food sitting on a scale, with a numeric weight readout shown on the scale's screen). If one is clearly visible and legible, read that exact number -- this is a precise measurement, far more reliable than a visual weight guess, and will be used to correct your per-item estimates. Normalize whatever unit the display shows (g, kg, oz, lb) to grams.
 Respond with ONLY a JSON object, no markdown, no explanation, in exactly this shape:
 {"items": [{"name": string, "grams": number, "calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "sodium": number, "potassium": number, "vitaminA": number, "vitaminC": number, "iron": number}], "scaleReadingGrams": number}
@@ -259,60 +304,66 @@ All values are per 100g. calories in kcal. protein/carbs/fat/fiber in grams. sod
     });
   }
 
-  // Two independent retry dimensions, nested: KEYS (outer) rotate on a
-  // quota-exhausted error (429/RESOURCE_EXHAUSTED) -- one admin-added
-  // Gemini key ran out of free-tier quota, try the next one silently.
-  // MODELS (inner, unchanged from before) retry on a 503 "currently
-  // experiencing high demand" -- Gemini's hosted capacity, not our key,
-  // being the bottleneck. Any OTHER error (bad request, malformed key,
-  // etc.) fails immediately without wasting retries across keys/models
-  // that would just fail the exact same way.
-  const MODELS_TO_TRY = ['gemini-3.5-flash', 'gemini-3.5-flash', 'gemini-2.5-flash-lite'];
-  const RETRY_DELAYS_MS = [0, 800, 0];
+  // hasImage only -- see tryGroundedImageEstimate's own comment. Any other
+  // path (label photo, pasted text, meal menu, text-only estimate) always
+  // uses the normal JSON-mode call below, unchanged.
+  let parsed = hasImage ? await tryGroundedImageEstimate(parts, apiKeys) : null;
 
-  let geminiRes, lastErrText;
-  keyLoop:
-  for (const apiKey of apiKeys) {
-    for (let i = 0; i < MODELS_TO_TRY.length; i++) {
-      if (RETRY_DELAYS_MS[i]) await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[i]));
-      try {
-        geminiRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${MODELS_TO_TRY[i]}:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts }],
-              generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
-            }),
-          }
-        );
-      } catch (e) {
-        lastErrText = String(e);
-        continue;
+  if (!parsed) {
+    // Two independent retry dimensions, nested: KEYS (outer) rotate on a
+    // quota-exhausted error (429/RESOURCE_EXHAUSTED) -- one admin-added
+    // Gemini key ran out of free-tier quota, try the next one silently.
+    // MODELS (inner, unchanged from before) retry on a 503 "currently
+    // experiencing high demand" -- Gemini's hosted capacity, not our key,
+    // being the bottleneck. Any OTHER error (bad request, malformed key,
+    // etc.) fails immediately without wasting retries across keys/models
+    // that would just fail the exact same way.
+    const MODELS_TO_TRY = ['gemini-3.5-flash', 'gemini-3.5-flash', 'gemini-2.5-flash-lite'];
+    const RETRY_DELAYS_MS = [0, 800, 0];
+
+    let geminiRes, lastErrText;
+    keyLoop:
+    for (const apiKey of apiKeys) {
+      for (let i = 0; i < MODELS_TO_TRY.length; i++) {
+        if (RETRY_DELAYS_MS[i]) await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[i]));
+        try {
+          geminiRes = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${MODELS_TO_TRY[i]}:generateContent?key=${apiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts }],
+                generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
+              }),
+            }
+          );
+        } catch (e) {
+          lastErrText = String(e);
+          continue;
+        }
+        if (geminiRes.ok) break keyLoop;
+        lastErrText = await geminiRes.text();
+        if (isKeySpecificErrorText(lastErrText)) continue keyLoop; // something's wrong with THIS key -- move on to the next key entirely
+        if (!/503|UNAVAILABLE|high demand/i.test(lastErrText)) break keyLoop; // a request-shaped error -- every key would fail the same way
+        // else: capacity error, keep trying the next model with this same key
       }
-      if (geminiRes.ok) break keyLoop;
-      lastErrText = await geminiRes.text();
-      if (isKeySpecificErrorText(lastErrText)) continue keyLoop; // something's wrong with THIS key -- move on to the next key entirely
-      if (!/503|UNAVAILABLE|high demand/i.test(lastErrText)) break keyLoop; // a request-shaped error -- every key would fail the same way
-      // else: capacity error, keep trying the next model with this same key
     }
-  }
 
-  if (!geminiRes || !geminiRes.ok) {
-    const detail = isKeySpecificErrorText(lastErrText) && apiKeys.length > 1
-      ? `None of the ${apiKeys.length} configured Gemini keys worked right now (quota exhausted or invalid).`
-      : lastErrText;
-    return jsonResponse({ error: 'AI request failed', detail }, 502);
-  }
+    if (!geminiRes || !geminiRes.ok) {
+      const detail = isKeySpecificErrorText(lastErrText) && apiKeys.length > 1
+        ? `None of the ${apiKeys.length} configured Gemini keys worked right now (quota exhausted or invalid).`
+        : lastErrText;
+      return jsonResponse({ error: 'AI request failed', detail }, 502);
+    }
 
-  const geminiData = await geminiRes.json();
-  const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  let parsed;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    return jsonResponse({ error: 'Could not parse AI response' }, 502);
+    const geminiData = await geminiRes.json();
+    const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return jsonResponse({ error: 'Could not parse AI response' }, 502);
+    }
   }
 
   if (hasMealMenu) {

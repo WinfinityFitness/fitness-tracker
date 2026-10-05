@@ -3915,6 +3915,20 @@ a.contact-row:hover { border-color: var(--cyan); }
 .ai-photo-item-macros { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-primary); }
 .ai-photo-item-micros { font-family: var(--font-mono); font-size: 0.63rem; color: var(--text-muted); }
 .ai-photo-item-row.is-excluded { opacity: 0.45; }
+
+/* One card per uploaded/captured photo in the multi-photo Estimate from
+   Photo review list -- groups that card's thumbnail, status/retry, tare
+   field, and item rows together so a batch upload reads as N separate
+   photos rather than one flat merged list. */
+.ai-photo-group { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 8px; background: var(--surface-1); border: 1px solid var(--border-soft); }
+.ai-photo-group .ai-photo-preview { max-height: 140px; margin: 0; }
+.ai-photo-group-head { display: flex; align-items: center; gap: 8px; }
+.ai-photo-group-head .ai-photo-preview { flex: 1; }
+.ai-photo-group.is-analyzing, .ai-photo-group.is-failed, .ai-photo-group.is-empty { align-items: flex-start; }
+.ai-photo-tare-field input[type="number"] { width: 70px; padding: 6px; text-align: center; }
+.ai-photo-capture-row { align-items: center; }
+.ai-photo-camera-btn { padding: 7px 10px; }
+
 .field--inline { flex-direction: row; align-items: center; gap: 8px; margin: 10px 0; }
 .ai-photo-margin-input-wrap { display: inline-flex; align-items: center; gap: 3px; color: var(--text-primary); font-weight: 700; }
 .ai-photo-margin-input-wrap input[type="number"] { width: 52px; padding: 6px; text-align: center; }

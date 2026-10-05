@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.14';
+const APP_VERSION = 'WF_SYS_V.1.8.15';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -13475,6 +13475,12 @@ function renderFoodDiary(date) {
               </select>
             </div>
           </div>
+          ${item.scaleReadingGrams ? `
+          <div><span class="field-label">Container weight / tare (g) — scale read ${round0(item.scaleReadingGrams)}g</span><input type="number" class="meal-edit-tare" value="${item.containerWeightGrams || ''}" placeholder="0"></div>
+          ` : ''}
+          ${item.labelServingGrams ? `
+          <div><span class="field-label">Servings taken (label serving ≈ ${round0(item.labelServingGrams)}g)</span><input type="number" class="meal-edit-servings" value="${item.servingsTaken || ''}" step="0.1" placeholder="e.g. 1.5"></div>
+          ` : ''}
           <div class="field-row">
             <div>
               <span class="field-label meal-edit-calories-label">
@@ -13558,6 +13564,32 @@ function wireMealItemEditForm(meals) {
   qtyInput.addEventListener('input', applyServingScale);
   unitSelect.addEventListener('change', applyServingScale);
 
+  // Both of these just drive the SAME qty field a user could type into
+  // directly -- they're a shortcut for the arithmetic, not a parallel data
+  // path -- so applyServingScale() above handles the macro rescale either
+  // way, unchanged.
+  const tareInput = form.querySelector('.meal-edit-tare');
+  if (tareInput) {
+    tareInput.addEventListener('input', () => {
+      const tare = parseFloat(tareInput.value) || 0;
+      const netWeight = Math.max(0, (item.scaleReadingGrams || 0) - tare);
+      const groupTotal = item.visualGroupTotal || item.visualGrams || 1;
+      const newGrams = item.visualGrams != null ? item.visualGrams * (netWeight / groupTotal) : netWeight;
+      qtyInput.value = round0(newGrams);
+      unitSelect.value = 'g';
+      applyServingScale();
+    });
+  }
+  const servingsInput = form.querySelector('.meal-edit-servings');
+  if (servingsInput) {
+    servingsInput.addEventListener('input', () => {
+      const servings = parseFloat(servingsInput.value) || 0;
+      qtyInput.value = round0(servings * (item.labelServingGrams || 0));
+      unitSelect.value = 'g';
+      applyServingScale();
+    });
+  }
+
   chainBtn.addEventListener('click', () => {
     mealEditCaloriesLocked = !mealEditCaloriesLocked;
     chainBtn.classList.toggle('is-locked', mealEditCaloriesLocked);
@@ -13587,11 +13619,19 @@ let foodSearchDebounceId = null;
 // leaves this null, so grams/unit changes don't touch hand-typed values.
 let customFoodAiPer100g = null;
 
-// One entry per food component the AI photo estimate detected on the plate
-// (name, current grams, and a per-100g nutrition baseline it was derived
-// from) — lets each row's grams be edited independently and rescale just
-// that row, instead of the old single-combined-estimate behavior.
-let aiPhotoItems = [];
+// One entry per uploaded/captured PHOTO for the Estimate from Photo flow.
+// Each photo is analyzed independently (its own request, its own success/
+// failure) so a multi-photo upload can mix results -- most succeed, one
+// fails and gets retried, without losing or re-sending the others. A
+// successful group holds one item per food component detected IN THAT
+// PHOTO (name, current grams, and a per-100g nutrition baseline derived
+// from the server's real-amount estimate), plus that photo's own scale
+// reading (if any) for a per-photo container-weight(tare) correction.
+// Shape: { id, previewDataUrl, status: 'analyzing'|'done'|'failed',
+//          errorMsg, scaleReadingGrams, containerWeight, items: [...] }
+// Each item: { name, grams, visualGrams, visualGroupTotal, selected, per100g }
+let aiPhotoGroups = [];
+let aiPhotoGroupSeq = 0;
 
 // Directly overrides the day's flat nutrition totals (the same fields
 // Daily Fuel Status reads), bypassing the Dietary Algorithm/meals entirely —
@@ -13736,6 +13776,10 @@ function initFoodDiary() {
       item.protein = parseFloat(form.querySelector('.meal-edit-protein').value) || 0;
       item.carbs = parseFloat(form.querySelector('.meal-edit-carbs').value) || 0;
       item.fat = parseFloat(form.querySelector('.meal-edit-fat').value) || 0;
+      const tareEl = form.querySelector('.meal-edit-tare');
+      if (tareEl) item.containerWeightGrams = parseFloat(tareEl.value) || 0;
+      const servingsEl = form.querySelector('.meal-edit-servings');
+      if (servingsEl) item.servingsTaken = parseFloat(servingsEl.value) || 0;
       editingMealItem = null;
       mealEditPer100g = null;
       mealEditCaloriesLocked = false;
@@ -13857,11 +13901,12 @@ function openAddFoodPanel() {
   document.getElementById('aiEstimateSpinner').hidden = true;
   document.getElementById('aiPhotoStatus').textContent = '';
   document.getElementById('aiPhotoSpinner').hidden = true;
-  document.getElementById('aiPhotoPreview').hidden = true;
-  document.getElementById('aiPhotoPreview').src = '';
   customFoodAiPer100g = null;
   pendingBarcodeCode = null;
-  aiPhotoItems = [];
+  customFoodLabelServingGrams = null;
+  document.getElementById('customFoodServingsTakenField').hidden = true;
+  document.getElementById('customFoodServingsTaken').value = '';
+  aiPhotoGroups = [];
   document.getElementById('aiPhotoSafetyMarginPct').value = 5;
   renderAiPhotoItemsReview();
   switchAddFoodTab('search');
@@ -14002,6 +14047,23 @@ let barcodePhotoBase64 = null;
 // of reading a label (see btnAddCustomFood's handler in initAddFoodPanel).
 let customFoodRequiresServingConfirm = false;
 let customFoodLabelServingSize = '';
+// Grams-per-serving parsed out of the label's own stated serving size (e.g.
+// "1 bar (40g)" -> 40, "2/3 cup (55g)" -> 55) when a number is present —
+// lets the "Servings taken" field multiply directly into grams instead of
+// the user doing that arithmetic themselves. Null when nothing parseable
+// was stated, in which case that field stays hidden and grams-only entry
+// (the original behavior) is unchanged.
+let customFoodLabelServingGrams = null;
+
+// "1 bar (40g)" / "2/3 cup (55 g)" / "Serving size 40g" -> 40. Deliberately
+// narrow (just the first explicit "<number>g" or "<number> g" it finds) —
+// a wrong guess here would silently mis-scale a logged meal, so it's better
+// to find nothing and hide the field than to guess at an ambiguous format.
+function parseGramsFromServingSize(servingSize) {
+  if (!servingSize) return null;
+  const m = String(servingSize).match(/(\d+(?:\.\d+)?)\s*g\b/i);
+  return m ? parseFloat(m[1]) : null;
+}
 
 // Shared by both the barcode+label pair path and the label-alone path —
 // pre-fills the Add Food "ai" panel from a label-reading AI response, but
@@ -14023,6 +14085,7 @@ function applyLabelEstimateToAddFoodForm(est, sourceLabel, statusElId) {
   };
   customFoodRequiresServingConfirm = true;
   customFoodLabelServingSize = est.servingSize || '';
+  customFoodLabelServingGrams = parseGramsFromServingSize(customFoodLabelServingSize);
   const gramsInput = document.getElementById('customFoodGrams');
   gramsInput.value = '';
   gramsInput.placeholder = customFoodLabelServingSize
@@ -14030,6 +14093,15 @@ function applyLabelEstimateToAddFoodForm(est, sourceLabel, statusElId) {
     : 'Type the actual serving you\'re having, in grams';
   document.getElementById('customFoodUnit').value = 'g';
   document.getElementById('customFoodUnitWarning').hidden = true;
+  const servingsTakenField = document.getElementById('customFoodServingsTakenField');
+  const servingsTakenInput = document.getElementById('customFoodServingsTaken');
+  servingsTakenInput.value = '';
+  if (customFoodLabelServingGrams) {
+    document.getElementById('customFoodServingsTakenHint').textContent = `${customFoodLabelServingGrams}g`;
+    servingsTakenField.hidden = false;
+  } else {
+    servingsTakenField.hidden = true;
+  }
   recomputeCustomFoodFromAi();
   // Reuses the existing "will be remembered for the next scan" note —
   // only relevant if a code was actually captured from the photo.
@@ -14416,27 +14488,13 @@ function computeAiPhotoItemValues(it) {
   };
 }
 
-// Renders the editable list of food components the AI photo estimate
-// detected. Each row's grams input rescales just that row's own macros/
-// micros from its per-100g baseline — editing one component never touches
-// the others, matching how they were estimated independently in the first
-// place. The grams/name inputs update their own row's text in place rather
-// than re-rendering the whole list, so typing doesn't lose focus mid-edit.
-function renderAiPhotoItemsReview() {
-  const wrap = document.getElementById('aiPhotoItemsReview');
-  const list = document.getElementById('aiPhotoItemsList');
-  if (!aiPhotoItems.length) {
-    wrap.hidden = true;
-    return;
-  }
-  wrap.hidden = false;
-  document.getElementById('aiPhotoItemsHint').textContent =
-    `⚠️ Detected ${aiPhotoItems.length} separate item${aiPhotoItems.length === 1 ? '' : 's'} — check the estimated weight for each and adjust if needed before adding.`;
-
-  list.innerHTML = aiPhotoItems.map((it, i) => {
-    const v = computeAiPhotoItemValues(it);
-    return `
-      <div class="ai-photo-item-row${it.selected ? '' : ' is-excluded'}" data-idx="${i}">
+// One row's editable fields+macros/micros, identical markup/behavior
+// regardless of which photo group it belongs to -- data-gi/data-idx on the
+// row identify which group+item a later event handler should mutate.
+function renderAiPhotoItemRow(gi, it, idx) {
+  const v = computeAiPhotoItemValues(it);
+  return `
+      <div class="ai-photo-item-row${it.selected ? '' : ' is-excluded'}" data-gi="${gi}" data-idx="${idx}">
         <input type="checkbox" class="ai-photo-item-check" ${it.selected ? 'checked' : ''}>
         <div class="ai-photo-item-fields">
           <div class="ai-photo-item-name-row">
@@ -14445,40 +14503,186 @@ function renderAiPhotoItemsReview() {
           </div>
           <p class="ai-photo-item-reestimate-status"></p>
           <div class="ai-photo-item-grams-row">
-            <input type="number" class="ai-photo-item-grams" value="${it.grams}" min="0"><span>g</span>
+            <input type="number" class="ai-photo-item-grams" value="${round0(it.grams)}" min="0"><span>g</span>
           </div>
           <div class="ai-photo-item-macros">${v.c} kcal · ${v.p}g protein · ${v.cb}g carbs · ${v.f}g fat</div>
           <div class="ai-photo-item-micros">Fiber ${v.fiber}g · Sodium ${v.sodium}mg · Potassium ${v.potassium}mg · Vit A ${v.vitA}mcg · Vit C ${v.vitC}mg · Iron ${v.iron}mg</div>
         </div>
       </div>`;
+}
+
+function refreshAiPhotoRowNumbers(row, it) {
+  const v = computeAiPhotoItemValues(it);
+  row.querySelector('.ai-photo-item-macros').textContent = `${v.c} kcal · ${v.p}g protein · ${v.cb}g carbs · ${v.f}g fat`;
+  row.querySelector('.ai-photo-item-micros').textContent = `Fiber ${v.fiber}g · Sodium ${v.sodium}mg · Potassium ${v.potassium}mg · Vit A ${v.vitA}mcg · Vit C ${v.vitC}mg · Iron ${v.iron}mg`;
+}
+
+// Re-distributes a group's scale-corrected total across its items,
+// proportional to each item's ORIGINAL visual weight guess (visualGrams,
+// fixed at analysis time) -- the per-100g baseline (nutrition density)
+// never changes here, only each item's grams share of the corrected total,
+// same math as the original single-photo version of this feature.
+function applyGroupTare(group) {
+  if (!(group.scaleReadingGrams > 0) || !group.items.length) return;
+  const netWeight = Math.max(0, group.scaleReadingGrams - (group.containerWeight || 0));
+  const visualTotal = group.items.reduce((sum, it) => sum + (it.visualGrams || 0), 0) || 1;
+  group.items.forEach((it) => { it.grams = it.visualGrams * (netWeight / visualTotal); });
+}
+
+// Analyzes (or re-analyzes) ONE group in place -- shared by the initial
+// batch upload and the per-photo "Re-analyze" retry button rendered below,
+// so a retry is just "run this again on the same group", not a separate
+// code path.
+async function analyzeAiPhotoGroup(group) {
+  group.status = 'analyzing';
+  group.errorMsg = '';
+  renderAiPhotoItemsReview();
+  try {
+    // previewDataUrl looks like "data:image/jpeg;base64,<bytes>" — Gemini's
+    // inlineData.data wants just the bytes after the comma.
+    const rawBase64 = group.previewDataUrl.slice(group.previewDataUrl.indexOf(',') + 1);
+    const est = await estimateFoodNutritionFromPhoto(rawBase64, 'image/jpeg');
+    const rawItems = Array.isArray(est.items) ? est.items : [];
+    group.scaleReadingGrams = Number(est.scaleReadingGrams) || 0;
+    group.containerWeight = 0;
+    // Per-100g baseline derived from the server's real-amount estimate
+    // BEFORE any tare correction -- that's the item's true nutrition
+    // density and must stay invariant no matter how applyGroupTare() above
+    // later rescales `grams` (a lighter/heavier total on the scale doesn't
+    // change what the food is made of per 100g).
+    const visualGroupTotal = rawItems.reduce((sum, it) => sum + (Number(it.grams) > 0 ? Number(it.grams) : 100), 0) || 1;
+    group.items = rawItems.map((it) => {
+      const visualGrams = Number(it.grams) > 0 ? Number(it.grams) : 100;
+      const factor = 100 / visualGrams;
+      return {
+        name: it.name || 'Food item',
+        grams: visualGrams,
+        visualGrams,
+        visualGroupTotal,
+        selected: true,
+        per100g: {
+          calories: (it.calories || 0) * factor, protein: (it.protein || 0) * factor, carbs: (it.carbs || 0) * factor, fat: (it.fat || 0) * factor,
+          fiber: (it.fiber || 0) * factor, sodium: (it.sodium || 0) * factor, potassium: (it.potassium || 0) * factor,
+          vitaminA: (it.vitaminA || 0) * factor, vitaminC: (it.vitaminC || 0) * factor, iron: (it.iron || 0) * factor,
+        },
+      };
+    });
+    group.status = 'done';
+  } catch (e) {
+    group.status = 'failed';
+    group.errorMsg = e.message || 'AI photo estimate unavailable';
+  }
+  renderAiPhotoItemsReview();
+}
+
+function reanalyzeAiPhotoGroup(gi) {
+  const group = aiPhotoGroups[gi];
+  if (group) analyzeAiPhotoGroup(group);
+}
+
+// Renders every uploaded/captured photo as its own card -- a thumbnail plus
+// whichever of three states it's in: still analyzing, failed (with a
+// Re-analyze button), or done (its own container-weight/tare field if a
+// scale reading was detected, then its editable item rows). Mirrors the
+// single-image version's editing behavior (grams input rescales just that
+// row from its per-100g baseline) but scoped per group via data-gi.
+function renderAiPhotoItemsReview() {
+  const wrap = document.getElementById('aiPhotoItemsReview');
+  const list = document.getElementById('aiPhotoGroupsList');
+  if (!aiPhotoGroups.length) {
+    wrap.hidden = true;
+    return;
+  }
+  wrap.hidden = false;
+  const doneGroups = aiPhotoGroups.filter((g) => g.status === 'done' && g.items.length);
+  const totalItems = doneGroups.reduce((n, g) => n + g.items.length, 0);
+  const failedCount = aiPhotoGroups.filter((g) => g.status === 'failed').length;
+  const hintParts = [];
+  if (totalItems) hintParts.push(`⚠️ Detected ${totalItems} item${totalItems === 1 ? '' : 's'} across ${doneGroups.length} photo${doneGroups.length === 1 ? '' : 's'} — review before adding.`);
+  if (failedCount) hintParts.push(`${failedCount} photo${failedCount === 1 ? '' : 's'} failed to analyze — see below.`);
+  document.getElementById('aiPhotoItemsHint').textContent = hintParts.join(' ') || 'Analyzing…';
+
+  list.innerHTML = aiPhotoGroups.map((g, gi) => {
+    if (g.status === 'analyzing') {
+      return `<div class="ai-photo-group is-analyzing" data-gi="${gi}">
+        <img class="ai-photo-preview" src="${g.previewDataUrl}" alt="">
+        <p class="hint hint--sm">Analyzing…</p>
+      </div>`;
+    }
+    if (g.status === 'failed') {
+      return `<div class="ai-photo-group is-failed" data-gi="${gi}">
+        <img class="ai-photo-preview" src="${g.previewDataUrl}" alt="">
+        <p class="hint hint--warning">⚠️ Could not analyze this photo: ${escapeHtml(g.errorMsg || 'unknown error')}</p>
+        <div class="btn-row">
+          <button type="button" class="btn btn--sm ai-photo-retry-btn" data-gi="${gi}">↻ Re-analyze</button>
+          <button type="button" class="btn btn--sm btn--secondary ai-photo-remove-btn" data-gi="${gi}">Remove</button>
+        </div>
+      </div>`;
+    }
+    if (!g.items.length) {
+      return `<div class="ai-photo-group is-empty" data-gi="${gi}">
+        <img class="ai-photo-preview" src="${g.previewDataUrl}" alt="">
+        <p class="hint">Could not identify any food in this photo.</p>
+        <div class="btn-row">
+          <button type="button" class="btn btn--sm ai-photo-retry-btn" data-gi="${gi}">↻ Re-analyze</button>
+          <button type="button" class="btn btn--sm btn--secondary ai-photo-remove-btn" data-gi="${gi}">Remove</button>
+        </div>
+      </div>`;
+    }
+    const tareField = g.scaleReadingGrams > 0
+      ? `<label class="field field--inline ai-photo-tare-field"><span>Scale read ${round0(g.scaleReadingGrams)}g — container/tare (g)</span><input type="number" class="ai-photo-tare-input" value="${g.containerWeight || ''}" placeholder="0"></label>`
+      : '';
+    return `<div class="ai-photo-group" data-gi="${gi}">
+        <div class="ai-photo-group-head">
+          <img class="ai-photo-preview" src="${g.previewDataUrl}" alt="">
+          <button type="button" class="btn btn--sm btn--secondary ai-photo-remove-btn" data-gi="${gi}">Remove photo</button>
+        </div>
+        ${tareField}
+        ${g.items.map((it, idx) => renderAiPhotoItemRow(gi, it, idx)).join('')}
+      </div>`;
   }).join('');
 
-  function refreshRowNumbers(row, it) {
-    const v = computeAiPhotoItemValues(it);
-    row.querySelector('.ai-photo-item-macros').textContent = `${v.c} kcal · ${v.p}g protein · ${v.cb}g carbs · ${v.f}g fat`;
-    row.querySelector('.ai-photo-item-micros').textContent = `Fiber ${v.fiber}g · Sodium ${v.sodium}mg · Potassium ${v.potassium}mg · Vit A ${v.vitA}mcg · Vit C ${v.vitC}mg · Iron ${v.iron}mg`;
-  }
+  list.querySelectorAll('.ai-photo-retry-btn').forEach((btn) => {
+    btn.addEventListener('click', () => reanalyzeAiPhotoGroup(parseInt(btn.dataset.gi, 10)));
+  });
+  list.querySelectorAll('.ai-photo-remove-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      aiPhotoGroups.splice(parseInt(btn.dataset.gi, 10), 1);
+      renderAiPhotoItemsReview();
+    });
+  });
+  list.querySelectorAll('.ai-photo-tare-input').forEach((input) => {
+    const gi = parseInt(input.closest('.ai-photo-group').dataset.gi, 10);
+    input.addEventListener('input', () => {
+      const group = aiPhotoGroups[gi];
+      group.containerWeight = parseFloat(input.value) || 0;
+      applyGroupTare(group);
+      renderAiPhotoItemsReview();
+    });
+  });
 
   list.querySelectorAll('.ai-photo-item-row').forEach((row) => {
+    const gi = parseInt(row.dataset.gi, 10);
     const idx = parseInt(row.dataset.idx, 10);
+    const group = aiPhotoGroups[gi];
     row.querySelector('.ai-photo-item-check').addEventListener('change', (e) => {
-      aiPhotoItems[idx].selected = e.target.checked;
+      group.items[idx].selected = e.target.checked;
       row.classList.toggle('is-excluded', !e.target.checked);
     });
     row.querySelector('.ai-photo-item-name').addEventListener('input', (e) => {
-      aiPhotoItems[idx].name = e.target.value;
+      group.items[idx].name = e.target.value;
     });
     row.querySelector('.ai-photo-item-grams').addEventListener('input', (e) => {
-      const it = aiPhotoItems[idx];
+      const it = group.items[idx];
       it.grams = parseFloat(e.target.value) || 0;
-      refreshRowNumbers(row, it);
+      refreshAiPhotoRowNumbers(row, it);
     });
     // The AI misidentified this component — user corrects the name, then
     // this re-queries nutrition for that corrected name (same text-based
     // estimate the "Estimate AI" tab uses) and replaces just this item's
     // per-100g baseline, keeping the photo's own weight estimate as-is.
     row.querySelector('.ai-photo-item-reestimate-btn').addEventListener('click', async () => {
-      const it = aiPhotoItems[idx];
+      const it = group.items[idx];
       const name = it.name.trim();
       const statusEl = row.querySelector('.ai-photo-item-reestimate-status');
       if (!name) { statusEl.textContent = 'Type a corrected food name first.'; return; }
@@ -14493,7 +14697,7 @@ function renderAiPhotoItemsReview() {
           fiber: est.fiber || 0, sodium: est.sodium || 0, potassium: est.potassium || 0,
           vitaminA: est.vitaminA || 0, vitaminC: est.vitaminC || 0, iron: est.iron || 0,
         };
-        refreshRowNumbers(row, it);
+        refreshAiPhotoRowNumbers(row, it);
         statusEl.textContent = '✓ Updated with corrected nutrition.';
       } catch (e) {
         statusEl.textContent = e.message || 'Re-estimate failed — try again.';
@@ -14609,6 +14813,19 @@ function initAddFoodPanel() {
     }
   });
 
+  // Only visible when the label's own stated serving size had a parseable
+  // gram weight (customFoodLabelServingGrams) — lets the user say "I had
+  // 1.5 servings" instead of doing the gram multiplication themselves.
+  // Writes straight into the grams field so recomputeCustomFoodFromAi()'s
+  // existing per-100g scaling does the rest, unchanged.
+  document.getElementById('customFoodServingsTaken').addEventListener('input', (e) => {
+    if (!customFoodLabelServingGrams) return;
+    const servings = parseFloat(e.target.value) || 0;
+    document.getElementById('customFoodGrams').value = round0(servings * customFoodLabelServingGrams);
+    document.getElementById('customFoodUnit').value = 'g';
+    recomputeCustomFoodFromAi();
+  });
+
   const pastedTextBtn = document.getElementById('btnEstimatePastedText');
   const pastedTextSpinner = document.getElementById('pastedTextSpinner');
   pastedTextBtn.addEventListener('click', async () => {
@@ -14630,88 +14847,56 @@ function initAddFoodPanel() {
   });
 
   const photoBtn = document.getElementById('btnEstimateAiPhoto');
+  const photoCameraBtn = document.getElementById('btnEstimateAiPhotoCamera');
   const photoSpinner = document.getElementById('aiPhotoSpinner');
   const photoInput = document.getElementById('aiPhotoInput');
-  const photoPreview = document.getElementById('aiPhotoPreview');
+  const photoCameraInput = document.getElementById('aiPhotoCameraInput');
 
-  // Shared by the plain file-picker photo AND the live Portion Guide camera
-  // capture below — same AI call, same review-list population, regardless
-  // of where the image blob came from.
-  async function processFoodPhotoBlob(blob) {
+  // Shared entry point for the gallery picker, the direct-camera button,
+  // and the Portion Guide camera below -- each just hands over one or more
+  // blobs. Photos are analyzed SEQUENTIALLY (not in parallel) so a multi-
+  // photo upload doesn't burst a pile of simultaneous requests at once
+  // against the shared Gemini key pool.
+  async function addAiPhotoBlobs(blobs) {
     const statusEl = document.getElementById('aiPhotoStatus');
-    statusEl.textContent = 'Reading photo…';
     photoBtn.disabled = true;
+    photoCameraBtn.disabled = true;
     photoSpinner.hidden = false;
+    statusEl.textContent = blobs.length > 1 ? `Reading ${blobs.length} photos…` : 'Reading photo…';
     try {
-      const { dataUrl } = await resizeAndCompressImage(blob);
-      photoPreview.src = dataUrl;
-      photoPreview.hidden = false;
-      statusEl.textContent = 'Estimating from photo…';
-      // dataUrl looks like "data:image/jpeg;base64,<bytes>" — Gemini's
-      // inlineData.data wants just the bytes after the comma.
-      const rawBase64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
-      const est = await estimateFoodNutritionFromPhoto(rawBase64, 'image/jpeg');
-      const rawItems = Array.isArray(est.items) ? est.items : [];
-
-      // If a digital scale's display was visible and legible in the photo,
-      // the server reports that exact reading separately from its own
-      // visual per-item weight guesses (which are rarely precise — a photo
-      // alone can't tell 180g of rice from 220g). Anchor the TOTAL to the
-      // real scale reading (minus the container/tare weight) while keeping
-      // each item's SHARE of that total from the visual estimate — only
-      // `grams` gets rescaled, not the per-100g nutrition density below,
-      // since correcting the total weight doesn't change what the food
-      // actually is made of per 100g.
-      let scaleStatusNote = '';
-      const scaleReading = Number(est.scaleReadingGrams) || 0;
-      if (scaleReading > 0) {
-        const containerWeight = parseFloat(document.getElementById('containerWeightInput').value) || 0;
-        const netWeight = Math.max(0, scaleReading - containerWeight);
-        const visualTotal = rawItems.reduce((sum, it) => sum + (Number(it.grams) || 0), 0);
-        if (visualTotal > 0 && netWeight > 0) {
-          const factor = netWeight / visualTotal;
-          rawItems.forEach((it) => { it.grams = (Number(it.grams) || 0) * factor; });
-        }
-        scaleStatusNote = containerWeight
-          ? ` Scale read ${Math.round(scaleReading)}g, minus ${Math.round(containerWeight)}g container = ${Math.round(netWeight)}g total — used to correct the weight estimate.`
-          : ` Scale read ${Math.round(scaleReading)}g — used to correct the weight estimate.`;
+      const newGroups = [];
+      for (const blob of blobs) {
+        try {
+          const { dataUrl } = await resizeAndCompressImage(blob);
+          newGroups.push({ id: ++aiPhotoGroupSeq, previewDataUrl: dataUrl, status: 'analyzing', errorMsg: '', scaleReadingGrams: 0, containerWeight: 0, items: [] });
+        } catch (e) { /* unreadable file -- skip it, don't fail the whole batch */ }
       }
-
-      // Server gives real estimated grams + values for that exact amount
-      // (not per-100g) — derive a per-100g baseline from it so the review
-      // list's own grams input can rescale each row independently.
-      aiPhotoItems = rawItems.map((it) => {
-        const grams = Number(it.grams) > 0 ? Number(it.grams) : 100;
-        const factor = 100 / grams;
-        return {
-          name: it.name || 'Food item',
-          grams,
-          selected: true,
-          per100g: {
-            calories: (it.calories || 0) * factor, protein: (it.protein || 0) * factor, carbs: (it.carbs || 0) * factor, fat: (it.fat || 0) * factor,
-            fiber: (it.fiber || 0) * factor, sodium: (it.sodium || 0) * factor, potassium: (it.potassium || 0) * factor,
-            vitaminA: (it.vitaminA || 0) * factor, vitaminC: (it.vitaminC || 0) * factor, iron: (it.iron || 0) * factor,
-          },
-        };
-      });
+      if (!newGroups.length) { statusEl.textContent = 'Could not read that photo — try again.'; return; }
+      aiPhotoGroups.push(...newGroups);
       renderAiPhotoItemsReview();
-      statusEl.textContent = aiPhotoItems.length
-        ? '⚠️ AI estimate — review each item\'s weight below (tap to correct it) before adding to your diary.' + scaleStatusNote
-        : 'Could not identify any food in that photo — try again or add manually below.';
-    } catch (e) {
-      statusEl.textContent = e.message || 'AI photo estimate unavailable — check your connection or add manually.';
+      for (const group of newGroups) await analyzeAiPhotoGroup(group);
+      statusEl.textContent = '⚠️ AI estimate — review each photo\'s items below (tap a weight to correct it) before adding to your diary.';
     } finally {
       photoBtn.disabled = false;
+      photoCameraBtn.disabled = false;
       photoSpinner.hidden = true;
     }
   }
 
   photoBtn.addEventListener('click', () => photoInput.click());
   photoInput.addEventListener('change', async () => {
-    const file = photoInput.files[0];
+    const files = Array.from(photoInput.files || []);
     photoInput.value = '';
+    if (!files.length) return;
+    await addAiPhotoBlobs(files);
+  });
+
+  photoCameraBtn.addEventListener('click', () => photoCameraInput.click());
+  photoCameraInput.addEventListener('change', async () => {
+    const file = photoCameraInput.files[0];
+    photoCameraInput.value = '';
     if (!file) return;
-    await processFoodPhotoBlob(file);
+    await addAiPhotoBlobs([file]);
   });
 
   // Upload Screenshot — deliberately a different path from the dish-photo
@@ -14840,7 +15025,7 @@ function initAddFoodPanel() {
     document.getElementById(id).addEventListener('input', renderPortionGuideSvg);
   });
   // Shared by both "Estimate from Photo" and "Portion Guide Photo" — both
-  // feed the same aiPhotoItems review list, so one margin field covers
+  // feed the same aiPhotoGroups review list, so one margin field covers
   // either capture method. Re-renders live so the padded numbers are
   // visible immediately, never applied silently at add-time.
   document.getElementById('aiPhotoSafetyMarginPct').addEventListener('input', renderAiPhotoItemsReview);
@@ -14855,26 +15040,35 @@ function initAddFoodPanel() {
     canvas.getContext('2d').drawImage(video, 0, 0);
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9));
     stopPortionGuideCamera();
-    if (blob) await processFoodPhotoBlob(blob);
+    if (blob) await addAiPhotoBlobs([blob]);
   });
 
   document.getElementById('btnAddAiPhotoItems').addEventListener('click', () => {
-    const chosen = aiPhotoItems.filter((it) => it.selected).map((it) => {
-      const v = computeAiPhotoItemValues(it);
-      return {
-        name: it.name.trim() || 'Food item',
-        grams: it.grams, qty: it.grams, unit: 'g',
-        calories: v.c, protein: v.p, carbs: v.cb, fat: v.f,
-        fiber: v.fiber, sodium: v.sodium, potassium: v.potassium,
-        vitaminA: v.vitA, vitaminC: v.vitC, iron: v.iron,
-        source: 'ai-photo',
-      };
+    const chosen = [];
+    aiPhotoGroups.forEach((group) => {
+      group.items.filter((it) => it.selected).forEach((it) => {
+        const v = computeAiPhotoItemValues(it);
+        chosen.push({
+          name: it.name.trim() || 'Food item',
+          grams: it.grams, qty: it.grams, unit: 'g',
+          calories: v.c, protein: v.p, carbs: v.cb, fat: v.f,
+          fiber: v.fiber, sodium: v.sodium, potassium: v.potassium,
+          vitaminA: v.vitA, vitaminC: v.vitC, iron: v.iron,
+          source: 'ai-photo',
+          // Carried onto the saved diary item so its edit form can later
+          // show the same container-weight(tare) shortcut without needing
+          // to re-detect the scale from the original photo.
+          scaleReadingGrams: group.scaleReadingGrams || undefined,
+          visualGrams: it.visualGrams,
+          visualGroupTotal: it.visualGroupTotal,
+          containerWeightGrams: group.containerWeight || undefined,
+        });
+      });
     });
     if (!chosen.length) { alert('Select at least one item to add.'); return; }
     addAiPhotoItemsToDiary(chosen);
-    aiPhotoItems = [];
+    aiPhotoGroups = [];
     renderAiPhotoItemsReview();
-    photoPreview.hidden = true;
     document.getElementById('aiPhotoStatus').textContent = '';
   });
 
@@ -14940,11 +15134,19 @@ function initAddFoodPanel() {
         calories: calories * scale, protein: protein * scale, carbs: carbs * scale, fat: fat * scale,
       });
     }
+    // Carried onto the saved item only when a label serving was actually
+    // read (labelServingGrams set) -- lets the diary's own edit form later
+    // show the same "Servings taken" shortcut instead of forcing a re-read
+    // of the label to adjust the amount.
+    const labelServingGrams = customFoodLabelServingGrams || undefined;
+    const servingsTaken = labelServingGrams ? (parseFloat(document.getElementById('customFoodServingsTaken').value) || undefined) : undefined;
     pendingBarcodeCode = null;
     customFoodRequiresServingConfirm = false;
     customFoodLabelServingSize = '';
+    customFoodLabelServingGrams = null;
+    document.getElementById('customFoodServingsTakenField').hidden = true;
     document.getElementById('customFoodTeachNote').hidden = true;
-    addFoodItemToDiary({ name, grams, qty, unit, calories, protein, carbs, fat, fiber, sodium, potassium, vitaminA, vitaminC, iron, source: 'custom' });
+    addFoodItemToDiary({ name, grams, qty, unit, calories, protein, carbs, fat, fiber, sodium, potassium, vitaminA, vitaminC, iron, source: 'custom', labelServingGrams, servingsTaken });
   });
 }
 

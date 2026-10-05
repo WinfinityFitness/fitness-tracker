@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.8.01">
+<link rel="stylesheet" href="style.css?v=1.8.02">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -2755,6 +2755,10 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
             </label>
           </div>
           <p class="hint hint--warning" id="customFoodUnitWarning" hidden>⚠️ Approximate conversion — weigh in grams for exact accuracy.</p>
+          <label class="field" id="customFoodServingsTakenField" hidden>
+            <span>Servings taken (label serving is <span id="customFoodServingsTakenHint"></span>)</span>
+            <input type="number" id="customFoodServingsTaken" placeholder="e.g. 1.5" step="0.1" min="0">
+          </label>
           <div class="field-row">
             <label class="field">
               <span>Protein (g)</span>
@@ -2776,18 +2780,16 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
     </div>
 
     <div class="add-food-panel" id="addFoodPanelPhoto" hidden>
-      <p class="hint hint--sm">On a kitchen scale? Photograph the plate while it's still on the scale with the number visible — AI reads the scale's actual display instead of guessing the weight from how full the plate looks.</p>
-      <label class="field">
-        <span>Container/plate weight (tare), in grams — optional</span>
-        <input type="number" id="containerWeightInput" placeholder="e.g. 150 — weight of the empty plate/bowl">
-      </label>
-      <p class="hint hint--sm" style="margin-top:0;">Leave blank if you zeroed/tared the scale yourself before placing the food, or if there's no scale in the photo at all.</p>
-      <div class="btn-row">
-        <button type="button" class="btn btn--sm" id="btnEstimateAiPhoto">📷 Estimate from Photo</button>
+      <p class="hint hint--sm">Upload one or more food photos — each is analyzed automatically. On a kitchen scale? Include the scale's display in the shot and AI reads the actual weight instead of guessing; a container weight (tare) input will show up per photo below once it's analyzed. Any food label/packaging visible in the shot (name, printed weight) is read too, to sharpen the estimate.</p>
+      <div class="btn-row ai-photo-capture-row">
+        <button type="button" class="btn btn--sm" id="btnEstimateAiPhoto">🖼️ Estimate from Photo</button>
+        <button type="button" class="icon-btn glass-emboss ai-photo-camera-btn" id="btnEstimateAiPhotoCamera" aria-label="Take a photo with the camera instead">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h3l1.5-2h7L17 7h3a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        </button>
         <span class="ai-spinner" id="aiPhotoSpinner" hidden></span>
       </div>
-      <input type="file" accept="image/*" capture="environment" id="aiPhotoInput" hidden>
-      <img class="ai-photo-preview" id="aiPhotoPreview" alt="" hidden>
+      <input type="file" accept="image/*" multiple id="aiPhotoInput" hidden>
+      <input type="file" accept="image/*" capture="environment" id="aiPhotoCameraInput" hidden>
       <p class="hint" id="aiPhotoStatus"></p>
 
       <p class="hint hint--sm" style="margin-top:10px;">Or upload a screenshot that already shows the nutrition facts (a nutrition label, a food app, a website) — AI reads the exact printed numbers instead of estimating from how the food looks:</p>
@@ -2824,7 +2826,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <p class="hint hint--sm">Pads every detected item's calories/macros up by this much (weight stays as estimated) — AI photo estimates tend to run a little low. Applies to both capture methods above.</p>
       <div class="ai-photo-items-review" id="aiPhotoItemsReview" hidden>
         <p class="hint hint--accent" id="aiPhotoItemsHint"></p>
-        <div id="aiPhotoItemsList"></div>
+        <div id="aiPhotoGroupsList"></div>
         <button type="button" class="btn btn--primary add-food-bottom-btn" id="btnAddAiPhotoItems">Add Selected to Diary</button>
       </div>
     </div>
@@ -5102,11 +5104,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.8.01"></script>
+<script src="config.js?v=1.8.02"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.8.01"></script>
+<script src="app.js?v=1.8.02"></script>
 </body>
 </html>
