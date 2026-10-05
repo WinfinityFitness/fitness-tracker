@@ -153,13 +153,18 @@ async function tryGroundedImageEstimate(parts, apiKeys) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
-  let foodName, servingDescription, imageBase64, imageMimeType, barcodeImageBase64, barcodeImageMimeType, labelImageBase64, labelImageMimeType, mealMenuText, mealMenuUrl, mealMenuImageBase64, mealMenuImageMimeType, pastedNutritionText, personalGeminiKeys;
+  let foodName, servingDescription, imageBase64, imageMimeType, photoNotes, barcodeImageBase64, barcodeImageMimeType, labelImageBase64, labelImageMimeType, mealMenuText, mealMenuUrl, mealMenuImageBase64, mealMenuImageMimeType, pastedNutritionText, personalGeminiKeys;
   try {
     const body = await req.json();
     foodName = body.foodName;
     servingDescription = body.servingDescription;
     imageBase64 = body.imageBase64;
     imageMimeType = body.imageMimeType;
+    // Optional free-text hint for the dish-photo path ("grilled chicken,
+    // about 200g, no rice") -- the photo alone can be ambiguous (mixed
+    // dishes, unusual angles, portions AI misjudges), so this lets the
+    // user steer the read without having to fully hand-enter the food.
+    photoNotes = typeof body.photoNotes === 'string' ? body.photoNotes.trim() : '';
     barcodeImageBase64 = body.barcodeImageBase64;
     barcodeImageMimeType = body.barcodeImageMimeType;
     labelImageBase64 = body.labelImageBase64;
@@ -289,7 +294,9 @@ ${pastedNutritionText.trim()}
       text: `Identify EACH separate food component visible on the plate in this photo — do not combine them into one estimate. List every distinct item separately (e.g. the meat, each vegetable or side, a sauce, a slice of fruit) rather than describing the plate as a whole.
 For each component, estimate its actual weight in grams based on how much of it is visible in the photo (not a fixed serving size), and give its nutrition facts for THAT estimated amount — the real quantity shown, not per 100g. If you have a web search tool available, use it to look up accurate, well-sourced nutrition data for anything you can identify by name (a branded/packaged product, a standard recipe, a restaurant item) rather than estimating from appearance alone — appearance-only guessing is a fallback for home-cooked or unidentifiable food, not the default.
 Separately, check whether any part of the photo includes a printed food label or packaging (a wrapper, a box, a sticker) showing the product's name and/or its weight. If so, read it and USE those exact printed values for that component's name and/or grams instead of guessing — printed text is always more reliable than a visual estimate.
-Separately, check whether a digital kitchen scale's display is visible anywhere in the photo (the plate/bowl of food sitting on a scale, with a numeric weight readout shown on the scale's screen). If one is clearly visible and legible, read that exact number -- this is a precise measurement, far more reliable than a visual weight guess, and will be used to correct your per-item estimates. Normalize whatever unit the display shows (g, kg, oz, lb) to grams.
+Separately, check whether a digital kitchen scale's display is visible anywhere in the photo (the plate/bowl of food sitting on a scale, with a numeric weight readout shown on the scale's screen). If one is clearly visible and legible, read that exact number -- this is a precise measurement, far more reliable than a visual weight guess, and will be used to correct your per-item estimates. Normalize whatever unit the display shows (g, kg, oz, lb) to grams.${photoNotes ? `
+The user also typed this note about the photo -- treat it as a hint from someone who knows what's actually in the shot, and prefer it over your own guess wherever it conflicts with what you see (e.g. it may name an ingredient the photo doesn't make obvious, give a more accurate weight than you'd visually guess, or say an ingredient you might assume is present is actually absent):
+"${photoNotes}"` : ''}
 Respond with ONLY a JSON object, no markdown, no explanation, in exactly this shape:
 {"items": [{"name": string, "grams": number, "calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "sodium": number, "potassium": number, "vitaminA": number, "vitaminC": number, "iron": number}], "scaleReadingGrams": number}
 "grams" is your estimated weight of that one component, in grams. calories in kcal. protein/carbs/fat/fiber in grams. sodium/potassium in milligrams. vitaminA in micrograms RAE. vitaminC in milligrams. iron in milligrams. If a value is negligible, use 0 rather than omitting the field. If unsure about any component, give your best reasonable estimate — never refuse, and always list at least one item. "scaleReadingGrams" is the scale's displayed weight converted to grams, or 0 if no scale/display is visible in the photo at all.`,

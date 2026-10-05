@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.8.02">
+<link rel="stylesheet" href="style.css?v=1.8.03">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -2781,6 +2781,10 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
 
     <div class="add-food-panel" id="addFoodPanelPhoto" hidden>
       <p class="hint hint--sm">Upload one or more food photos — each is analyzed automatically. On a kitchen scale? Include the scale's display in the shot and AI reads the actual weight instead of guessing; a container weight (tare) input will show up per photo below once it's analyzed. Any food label/packaging visible in the shot (name, printed weight) is read too, to sharpen the estimate.</p>
+      <label class="field">
+        <span>Notes (optional) — a hint for AI, e.g. "grilled chicken, about 200g, no rice"</span>
+        <textarea id="aiPhotoNotesInput" rows="2" placeholder="Helps when the photo alone is ambiguous — applies to every photo in this upload"></textarea>
+      </label>
       <div class="btn-row ai-photo-capture-row">
         <button type="button" class="btn btn--sm" id="btnEstimateAiPhoto">🖼️ Estimate from Photo</button>
         <button type="button" class="icon-btn glass-emboss ai-photo-camera-btn" id="btnEstimateAiPhotoCamera" aria-label="Take a photo with the camera instead">
@@ -5104,11 +5108,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.8.02"></script>
+<script src="config.js?v=1.8.03"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.8.02"></script>
+<script src="app.js?v=1.8.03"></script>
 </body>
 </html>

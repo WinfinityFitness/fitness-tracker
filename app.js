@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.15';
+const APP_VERSION = 'WF_SYS_V.1.8.16';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -13907,6 +13907,7 @@ function openAddFoodPanel() {
   document.getElementById('customFoodServingsTakenField').hidden = true;
   document.getElementById('customFoodServingsTaken').value = '';
   aiPhotoGroups = [];
+  document.getElementById('aiPhotoNotesInput').value = '';
   document.getElementById('aiPhotoSafetyMarginPct').value = 5;
   renderAiPhotoItemsReview();
   switchAddFoodTab('search');
@@ -13960,13 +13961,13 @@ async function estimateFoodNutritionWithAI(foodName) {
 // identifies the food and estimates nutrition from the image in one call.
 // imageBase64 is RAW base64 (no "data:image/jpeg;base64," prefix — Gemini's
 // inlineData.data field wants just the encoded bytes).
-async function estimateFoodNutritionFromPhoto(imageBase64, mimeType) {
+async function estimateFoodNutritionFromPhoto(imageBase64, mimeType, notes) {
   let res;
   try {
     res = await fetch(`${SUPABASE_URL}/functions/v1/smooth-service`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-      body: JSON.stringify({ imageBase64, imageMimeType: mimeType, personalGeminiKeys: getPersonalGeminiKeys() }),
+      body: JSON.stringify({ imageBase64, imageMimeType: mimeType, photoNotes: notes || undefined, personalGeminiKeys: getPersonalGeminiKeys() }),
     });
   } catch (e) {
     throw new Error('AI photo estimate unavailable — check your connection.');
@@ -14541,7 +14542,7 @@ async function analyzeAiPhotoGroup(group) {
     // previewDataUrl looks like "data:image/jpeg;base64,<bytes>" — Gemini's
     // inlineData.data wants just the bytes after the comma.
     const rawBase64 = group.previewDataUrl.slice(group.previewDataUrl.indexOf(',') + 1);
-    const est = await estimateFoodNutritionFromPhoto(rawBase64, 'image/jpeg');
+    const est = await estimateFoodNutritionFromPhoto(rawBase64, 'image/jpeg', group.notes);
     const rawItems = Array.isArray(est.items) ? est.items : [];
     group.scaleReadingGrams = Number(est.scaleReadingGrams) || 0;
     group.containerWeight = 0;
@@ -14613,6 +14614,7 @@ function renderAiPhotoItemsReview() {
       return `<div class="ai-photo-group is-failed" data-gi="${gi}">
         <img class="ai-photo-preview" src="${g.previewDataUrl}" alt="">
         <p class="hint hint--warning">⚠️ Could not analyze this photo: ${escapeHtml(g.errorMsg || 'unknown error')}</p>
+        <label class="field"><span>Notes (optional hint, sent with the retry)</span><textarea class="ai-photo-group-notes" rows="2" placeholder="e.g. grilled chicken, about 200g, no rice">${escapeHtml(g.notes || '')}</textarea></label>
         <div class="btn-row">
           <button type="button" class="btn btn--sm ai-photo-retry-btn" data-gi="${gi}">↻ Re-analyze</button>
           <button type="button" class="btn btn--sm btn--secondary ai-photo-remove-btn" data-gi="${gi}">Remove</button>
@@ -14623,6 +14625,7 @@ function renderAiPhotoItemsReview() {
       return `<div class="ai-photo-group is-empty" data-gi="${gi}">
         <img class="ai-photo-preview" src="${g.previewDataUrl}" alt="">
         <p class="hint">Could not identify any food in this photo.</p>
+        <label class="field"><span>Notes (optional hint, sent with the retry)</span><textarea class="ai-photo-group-notes" rows="2" placeholder="e.g. grilled chicken, about 200g, no rice">${escapeHtml(g.notes || '')}</textarea></label>
         <div class="btn-row">
           <button type="button" class="btn btn--sm ai-photo-retry-btn" data-gi="${gi}">↻ Re-analyze</button>
           <button type="button" class="btn btn--sm btn--secondary ai-photo-remove-btn" data-gi="${gi}">Remove</button>
@@ -14642,6 +14645,10 @@ function renderAiPhotoItemsReview() {
       </div>`;
   }).join('');
 
+  list.querySelectorAll('.ai-photo-group-notes').forEach((textarea) => {
+    const gi = parseInt(textarea.closest('.ai-photo-group').dataset.gi, 10);
+    textarea.addEventListener('input', () => { aiPhotoGroups[gi].notes = textarea.value; });
+  });
   list.querySelectorAll('.ai-photo-retry-btn').forEach((btn) => {
     btn.addEventListener('click', () => reanalyzeAiPhotoGroup(parseInt(btn.dataset.gi, 10)));
   });
@@ -14863,12 +14870,18 @@ function initAddFoodPanel() {
     photoCameraBtn.disabled = true;
     photoSpinner.hidden = false;
     statusEl.textContent = blobs.length > 1 ? `Reading ${blobs.length} photos…` : 'Reading photo…';
+    // Snapshot once per batch, not re-read per photo -- applies the same
+    // hint to every photo in this upload, matching what the field's own
+    // label says. Each group keeps its own editable copy afterward (see
+    // the notes textarea in renderAiPhotoItemsReview) so a later
+    // Re-analyze can use a per-photo-corrected hint instead.
+    const notes = document.getElementById('aiPhotoNotesInput').value.trim();
     try {
       const newGroups = [];
       for (const blob of blobs) {
         try {
           const { dataUrl } = await resizeAndCompressImage(blob);
-          newGroups.push({ id: ++aiPhotoGroupSeq, previewDataUrl: dataUrl, status: 'analyzing', errorMsg: '', scaleReadingGrams: 0, containerWeight: 0, items: [] });
+          newGroups.push({ id: ++aiPhotoGroupSeq, previewDataUrl: dataUrl, status: 'analyzing', errorMsg: '', scaleReadingGrams: 0, containerWeight: 0, notes, items: [] });
         } catch (e) { /* unreadable file -- skip it, don't fail the whole batch */ }
       }
       if (!newGroups.length) { statusEl.textContent = 'Could not read that photo — try again.'; return; }
