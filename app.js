@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.20';
+const APP_VERSION = 'WF_SYS_V.1.8.21';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -7464,9 +7464,17 @@ function initSettingsOverlay() {
   });
   document.getElementById('btnPreviewAlarmTone').addEventListener('click', () => playAlarmTone(toneSelect.value));
 
-  initHydrationReminderSettings();
-  initWebSyncSettings();
-  initPersonalGeminiKeySettings();
+  // Each isolated with its own safeInit -- these three sections are
+  // unrelated, so a crash in one (bad/legacy data in that section's own
+  // localStorage, say) must never silently skip wiring the others. Before
+  // this, all three ran as one plain sequential block inside
+  // initSettingsOverlay itself: a throw partway through left everything
+  // after it -- including, worst case, the personal Gemini key Add button
+  // -- with no click handler at all, which looks exactly like "the button
+  // does nothing" with no error the user could ever see.
+  safeInit(initHydrationReminderSettings, 'initHydrationReminderSettings');
+  safeInit(initWebSyncSettings, 'initWebSyncSettings');
+  safeInit(initPersonalGeminiKeySettings, 'initPersonalGeminiKeySettings');
 }
 
 
