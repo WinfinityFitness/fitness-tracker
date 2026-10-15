@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.19';
+const APP_VERSION = 'WF_SYS_V.1.8.20';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -7524,11 +7524,11 @@ function renderPersonalGeminiKeyList() {
 function initPersonalGeminiKeySettings() {
   const addBtn = document.getElementById('btnAddPersonalGeminiKey');
   const getBtn = document.getElementById('btnGetPersonalGeminiKey');
+  const input = document.getElementById('personalGeminiKeyInput');
   if (!addBtn) return;
   renderPersonalGeminiKeyList();
   getBtn.addEventListener('click', () => window.open('https://aistudio.google.com/apikey', '_blank', 'noopener'));
-  addBtn.addEventListener('click', () => {
-    const input = document.getElementById('personalGeminiKeyInput');
+  function addKey() {
     const key = input.value.trim();
     if (!key) return;
     const keys = loadPersonalGeminiKeys();
@@ -7536,7 +7536,15 @@ function initPersonalGeminiKeySettings() {
     savePersonalGeminiKeys(keys);
     input.value = '';
     renderPersonalGeminiKeyList();
-  });
+  }
+  addBtn.addEventListener('click', addKey);
+  // The Add Key button sits right below this field -- on a phone, pasting a
+  // key often leaves the on-screen keyboard open and covering it, so a tap
+  // aimed at the button can land on the keyboard instead and look like
+  // nothing happened. Enter/Go on the keyboard reaches this field either
+  // way, so it works as a reliable fallback regardless of where the button
+  // actually ends up on screen.
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addKey(); } });
 }
 
 // Admin-managed footer link popups -- Social (replacing the old fixed
@@ -22606,14 +22614,19 @@ function initAnnouncementWidget() {
       handleAdminRpcError('admin_get_ai_keys', e, noteEl);
     }
   });
-  document.getElementById('btnAiKeyAdd').addEventListener('click', () => {
+  function addAiKey() {
     const input = document.getElementById('aiKeyInput');
     const key = input.value.trim();
     if (!key) return;
     pendingAiKeys.push({ label: `Key ${pendingAiKeys.length + 1}`, key });
     input.value = '';
     renderAiKeyList();
-  });
+  }
+  document.getElementById('btnAiKeyAdd').addEventListener('click', addAiKey);
+  // Same reasoning as initPersonalGeminiKeySettings's own Enter handler --
+  // a mobile keyboard left open after pasting can cover the Add Key button
+  // right below the field, so Enter/Go gives a reliable fallback.
+  document.getElementById('aiKeyInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addAiKey(); } });
   document.getElementById('btnAiKeysSave').addEventListener('click', async () => {
     const noteEl = document.getElementById('aiKeysNote');
     if (!isAdminLoggedIn()) { noteEl.textContent = 'Not logged in.'; return; }
