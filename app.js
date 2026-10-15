@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.21';
+const APP_VERSION = 'WF_SYS_V.1.8.22';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -7531,11 +7531,15 @@ function renderPersonalGeminiKeyList() {
 }
 function initPersonalGeminiKeySettings() {
   const addBtn = document.getElementById('btnAddPersonalGeminiKey');
-  const getBtn = document.getElementById('btnGetPersonalGeminiKey');
   const input = document.getElementById('personalGeminiKeyInput');
   if (!addBtn) return;
   renderPersonalGeminiKeyList();
-  getBtn.addEventListener('click', () => window.open('https://aistudio.google.com/apikey', '_blank', 'noopener'));
+  // "Get a Free Gemini API Key" is a real <a href target="_blank"> now, not
+  // a button + window.open() -- a script-initiated window.open() is
+  // unreliable (often silently swallowed) inside a TWA/installed-PWA
+  // WebView, which has no tab chrome of its own to open a second window
+  // into. A plain anchor click is handled by Android's own intent system
+  // instead and reliably hands off to the default browser everywhere.
   function addKey() {
     const key = input.value.trim();
     if (!key) return;
