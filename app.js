@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.18';
+const APP_VERSION = 'WF_SYS_V.1.8.19';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -13965,7 +13965,7 @@ async function estimateFoodNutritionWithAI(foodName) {
   }
   let data;
   try { data = await res.json(); } catch (e) { throw new Error('AI estimate unavailable — try again later.'); }
-  if (!res.ok) throw new Error(data.error || 'AI estimate failed');
+  if (!res.ok) throw new Error(data.detail || data.error || 'AI estimate failed');
   return data;
 }
 
@@ -13986,7 +13986,7 @@ async function estimateFoodNutritionFromPhoto(imageBase64, mimeType, notes) {
   }
   let data;
   try { data = await res.json(); } catch (e) { throw new Error('AI photo estimate unavailable — try again later.'); }
-  if (!res.ok) throw new Error(data.error || 'AI photo estimate failed');
+  if (!res.ok) throw new Error(data.detail || data.error || 'AI photo estimate failed');
   return data;
 }
 
@@ -14007,7 +14007,7 @@ async function estimateFoodFromBarcodePhotos(barcodeImageBase64, barcodeImageMim
   }
   let data;
   try { data = await res.json(); } catch (e) { throw new Error('AI barcode reading unavailable — try again later.'); }
-  if (!res.ok) throw new Error(data.error || 'AI barcode reading failed');
+  if (!res.ok) throw new Error(data.detail || data.error || 'AI barcode reading failed');
   return data;
 }
 
@@ -14027,7 +14027,7 @@ async function estimateFoodFromLabelPhotoOnly(labelImageBase64, labelImageMimeTy
   }
   let data;
   try { data = await res.json(); } catch (e) { throw new Error('AI label reading unavailable — try again later.'); }
-  if (!res.ok) throw new Error(data.error || 'AI label reading failed');
+  if (!res.ok) throw new Error(data.detail || data.error || 'AI label reading failed');
   return data;
 }
 
@@ -14048,7 +14048,7 @@ async function estimateFoodNutritionFromPastedText(pastedNutritionText) {
   }
   let data;
   try { data = await res.json(); } catch (e) { throw new Error('AI text reading unavailable — try again later.'); }
-  if (!res.ok) throw new Error(data.error || 'AI text reading failed');
+  if (!res.ok) throw new Error(data.detail || data.error || 'AI text reading failed');
   return data;
 }
 
@@ -14071,7 +14071,7 @@ async function estimateFoodListFromPastedText(pastedFoodListText) {
   }
   let data;
   try { data = await res.json(); } catch (e) { throw new Error('AI list estimate unavailable — try again later.'); }
-  if (!res.ok) throw new Error(data.error || 'AI list estimate failed');
+  if (!res.ok) throw new Error(data.detail || data.error || 'AI list estimate failed');
   return data;
 }
 
@@ -21040,7 +21040,7 @@ async function estimatePrepMealFromMenu({ mealMenuText, mealMenuUrl, mealMenuIma
   }
   let data;
   try { data = await res.json(); } catch (e) { throw new Error('AI auto-fill unavailable — try again later.'); }
-  if (!res.ok) throw new Error(data.error || 'AI auto-fill failed');
+  if (!res.ok) throw new Error(data.detail || data.error || 'AI auto-fill failed');
   return data;
 }
 

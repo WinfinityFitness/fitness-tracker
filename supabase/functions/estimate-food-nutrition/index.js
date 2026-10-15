@@ -380,9 +380,22 @@ All values are per 100g. calories in kcal. protein/carbs/fat/fiber in grams. sod
     }
 
     if (!geminiRes || !geminiRes.ok) {
-      const detail = isKeySpecificErrorText(lastErrText) && apiKeys.length > 1
-        ? `None of the ${apiKeys.length} configured Gemini keys worked right now (quota exhausted or invalid).`
-        : lastErrText;
+      // A key-specific failure (quota exhausted, invalid/revoked key) gets a
+      // plain-English detail regardless of how many keys are configured --
+      // previously a single-key setup (the common case: just the
+      // GEMINI_API_KEY secret, no admin-added keys) fell through to dumping
+      // Gemini's raw nested error JSON as "detail", which every client
+      // call site below then either ignored (showing just the useless
+      // generic "error" field) or would have shown verbatim -- neither is
+      // what someone hitting a quota wall actually needs to know.
+      let detail;
+      if (isKeySpecificErrorText(lastErrText)) {
+        detail = isQuotaErrorText(lastErrText)
+          ? `The AI's free daily quota is used up for ${apiKeys.length > 1 ? 'all configured Gemini keys' : 'the configured Gemini key'} -- try again later, or add your own personal key in Settings > My AI API Key.`
+          : `${apiKeys.length > 1 ? 'None of the configured Gemini keys are' : 'The configured Gemini key isn\'t'} valid right now (invalid or revoked) -- check Menu > AI API Keys.`;
+      } else {
+        detail = lastErrText;
+      }
       return jsonResponse({ error: 'AI request failed', detail }, 502);
     }
 
