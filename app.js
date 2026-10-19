@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.29';
+const APP_VERSION = 'WF_SYS_V.1.8.30';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -6631,7 +6631,29 @@ setTimeout(revealSplashContent, SPLASH_REVEAL_SAFETY_MS);
 // touched this account's data. Deliberately central here (not at each of
 // the many call sites that edit profile/logs/reviews) so it can never be
 // forgotten on a new call site.
-function markLocalEdited() { localStorage.setItem('wft_local_edited_at', String(Date.now())); }
+function markLocalEdited() { localStorage.setItem('wft_local_edited_at', String(Date.now())); scheduleQuickSync(); }
+
+// Debounced near-immediate push after a meaningful local edit. Without
+// this, a change only ever reached the cloud on the next 15-minute
+// foreground auto-sync tick (or an explicit "Sync Now" tap in Settings) —
+// which reads as "it just doesn't sync" to anyone editing on one device
+// and immediately checking another. Debounced rather than firing on every
+// single keystroke-level save, so adding several Food Diary items back to
+// back batches into one push a few seconds after the user stops, instead
+// of spamming the RPCs on every intermediate save.
+let quickSyncTimer = null;
+function scheduleQuickSync() {
+  if (localStorage.getItem('wft_web_sync_enabled') !== '1') return;
+  clearTimeout(quickSyncTimer);
+  quickSyncTimer = setTimeout(async () => {
+    if (!navigator.onLine || !sbConfigured()) return;
+    // Pull-before-push, same reasoning as syncWithCloud below — this
+    // device's own edit must never clobber a different day that some
+    // other device pushed in the meantime.
+    try { await checkForNewerCloudData(); } catch (e) { /* best effort */ }
+    try { await pushWebSyncSnapshot(); } catch (e) { /* best effort — the 15-min loop still catches up */ }
+  }, 6000);
+}
 
 // Per-day edit tracking for logs/reviews/dailyReviews, so a cross-device
 // merge (see mergeDateMapCategory below) can tell exactly which days THIS
