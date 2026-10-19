@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.25';
+const APP_VERSION = 'WF_SYS_V.1.8.26';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -7265,6 +7265,14 @@ function initBackButtonNav() {
       // Exception to everything below — a popup always just closes on back.
       const closeBtn = openOverlay.querySelector('.sheet-close');
       if (closeBtn) closeBtn.click(); else openOverlay.hidden = true;
+      // Re-push the reserve entry this back press just consumed, same
+      // reasoning as the other two branches below — otherwise every
+      // overlay dismissed via the hardware/TWA back button silently drains
+      // the history stack by one with nothing replacing it. Once that
+      // stack empties out, the NEXT back press has nothing left to pop and
+      // the TWA closes/backgrounds immediately instead of ever reaching
+      // the "land on launcher" logic further down.
+      history.pushState({ wftNav: true }, '');
     } else if (window.scrollY > SCROLL_TOP_THRESHOLD) {
       // First back press while scrolled down a tab: scroll to top instead
       // of navigating away, and re-push the state so there's still
