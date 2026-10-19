@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.24';
+const APP_VERSION = 'WF_SYS_V.1.8.25';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -7296,6 +7296,16 @@ function initBackButtonNav() {
       if (!prevBtn) {
         const stillActive = document.querySelector('.tab-btn.is-active');
         tabHistory = stillActive ? [stillActive.dataset.target] : [];
+        // Tab history is exhausted -- this is the actual "root" of back
+        // navigation. Land on the launcher instead of just re-arming
+        // silently at whatever tab was already showing, so enough back
+        // presses always end up somewhere real instead of going nowhere
+        // forever. launcherScreen is itself a .sheet-overlay, so the
+        // MutationObserver above would normally push a new history entry
+        // for it opening -- skipped here because handlingPopstate is still
+        // true for the rest of this handler, same as every other branch.
+        const launcherScreen = document.getElementById('launcherScreen');
+        if (launcherScreen && launcherScreen.hidden) openLauncher();
       }
       history.pushState({ wftNav: true }, '');
     }
@@ -9230,6 +9240,8 @@ const LAUNCHER_ICONS = {
   endDayLog: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.4 6.4 0 0 0 10.5 10.5Z"/>',
   weekendLog: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 14h2M14 14h2M8 17h2M14 17h2"/>',
   historyLogs: '<path d="M3 4v5h5"/><path d="M3.5 13a8.5 8.5 0 1 0 2.3-6.8L3 9"/><path d="M12 8v5l3.5 2"/>',
+  outdoorActivity: '<circle cx="12" cy="9" r="2.5"/><path d="M12 2a7 7 0 0 0-7 7c0 5.5 7 13 7 13s7-7.5 7-13a7 7 0 0 0-7-7z"/>',
+  dietaryAlgorithm: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 2.5h6v3H9z"/><path d="M8 11h8M8 14h8M8 17h5"/>',
 };
 
 function openHistoryLogsFromLauncher() {
@@ -9239,6 +9251,14 @@ function openHistoryLogsFromLauncher() {
     const panel = document.getElementById('historyLogsPanel');
     if (panel && panel.hidden) toggle.click();
     if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+}
+
+function openOutdoorActivityFromLauncher() {
+  document.querySelector('.tab-btn[data-target="training"]').click();
+  requestAnimationFrame(() => {
+    const section = document.getElementById('outdoorActivitySection');
+    if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 }
 
@@ -9253,6 +9273,8 @@ const LAUNCHER_TILES = [
   { id: 'endDayLog', label: 'End Day Log', action: () => openEndDayLog() },
   { id: 'weekendLog', label: 'Weekend Log', action: () => openWeekendLog() },
   { id: 'historyLogs', label: 'History Logs', action: openHistoryLogsFromLauncher },
+  { id: 'outdoorActivity', label: 'Outdoor Activity Tracker', action: openOutdoorActivityFromLauncher },
+  { id: 'dietaryAlgorithm', label: 'Dietary Algorithm', action: () => document.getElementById('btnOpenFoodDiary').click() },
 ];
 
 const LAUNCHER_ORDER_KEY = 'wft_launcher_order';
@@ -9287,6 +9309,8 @@ function renderLauncherGrid() {
       </button>`;
   }).join('');
   wireLauncherDragAndTap(grid);
+  const footnote = document.getElementById('launcherFootnote');
+  if (footnote) footnote.textContent = `${LAUNCHER_TILES.length} shortcuts · press and drag a tile to rearrange · tap to open`;
 }
 
 // Pointer-based (touch + mouse) drag reorder, with a movement threshold to
