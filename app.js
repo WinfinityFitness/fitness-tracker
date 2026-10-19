@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.28';
+const APP_VERSION = 'WF_SYS_V.1.8.29';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -6633,6 +6633,29 @@ setTimeout(revealSplashContent, SPLASH_REVEAL_SAFETY_MS);
 // forgotten on a new call site.
 function markLocalEdited() { localStorage.setItem('wft_local_edited_at', String(Date.now())); }
 
+// Per-day edit tracking for logs/reviews/dailyReviews, so a cross-device
+// merge (see mergeDateMapCategory below) can tell exactly which days THIS
+// device actually touched instead of only knowing "something, somewhere,
+// changed" -- that's what lets a same-time edit on two different dates on
+// two different devices combine instead of one of them getting silently
+// discarded. Every call site that edits these three already does a
+// read-mutate-save of the whole date-keyed object, so diffing old vs new
+// here catches every edit for free with no changes needed at those call
+// sites.
+function getEditedAtMap(category) {
+  try { return JSON.parse(localStorage.getItem('wft_edited_at_' + category)) || {}; }
+  catch { return {}; }
+}
+function bumpEditedDates(category, oldMap, newMap) {
+  const edited = getEditedAtMap(category);
+  const now = Date.now();
+  const allDates = new Set([...Object.keys(oldMap || {}), ...Object.keys(newMap || {})]);
+  allDates.forEach(date => {
+    if (JSON.stringify((oldMap || {})[date]) !== JSON.stringify((newMap || {})[date])) edited[date] = now;
+  });
+  localStorage.setItem('wft_edited_at_' + category, JSON.stringify(edited));
+}
+
 function getProfile() {
   if (wdsRemoteData) return wdsRemoteData.profile;
   try { return JSON.parse(localStorage.getItem(KEYS.profile)) || null; }
@@ -6645,7 +6668,7 @@ function getLogs() {
   try { return JSON.parse(localStorage.getItem(KEYS.logs)) || {}; }
   catch { return {}; }
 }
-function saveLogs(logs) { localStorage.setItem(KEYS.logs, JSON.stringify(logs)); markLocalEdited(); }
+function saveLogs(logs) { bumpEditedDates('logs', getLogs(), logs); localStorage.setItem(KEYS.logs, JSON.stringify(logs)); markLocalEdited(); }
 
 /* One-time migration: water tracking switched from 16oz cups to milliliters. */
 function migrateWaterUnitsIfNeeded() {
@@ -6708,14 +6731,14 @@ function getReviews() {
   try { return JSON.parse(localStorage.getItem(KEYS.reviews)) || {}; }
   catch { return {}; }
 }
-function saveReviews(r) { localStorage.setItem(KEYS.reviews, JSON.stringify(r)); markLocalEdited(); }
+function saveReviews(r) { bumpEditedDates('reviews', getReviews(), r); localStorage.setItem(KEYS.reviews, JSON.stringify(r)); markLocalEdited(); }
 
 function getDailyReviews() {
   if (wdsRemoteData) return wdsRemoteData.dailyReviewsObj;
   try { return JSON.parse(localStorage.getItem(KEYS.dailyReviews)) || {}; }
   catch { return {}; }
 }
-function saveDailyReviews(r) { localStorage.setItem(KEYS.dailyReviews, JSON.stringify(r)); markLocalEdited(); }
+function saveDailyReviews(r) { bumpEditedDates('dailyReviews', getDailyReviews(), r); localStorage.setItem(KEYS.dailyReviews, JSON.stringify(r)); markLocalEdited(); }
 
 /* ---------------------------------------------------------------- */
 /* Unit conversions (canonical storage: kg, cm)                      */
@@ -19104,13 +19127,51 @@ function applyPulledSnapshot(data) {
   renderBodyFatHistory();
 }
 
-// Last-edit-wins cross-device sync: runs before every push (see
-// syncWithCloud inside initWebSyncSettings) so a device that's been sitting
-// idle with stale local data never clobbers what another device has since
-// pushed. Reads via share_key (web_sync_get_snapshot_by_share_key), not the
-// PIN-gated public_id lookup -- this device already holds share_key either
-// way (it's the same bearer secret pushWebSyncSnapshot already writes
-// with), so no new prompt is needed just to check.
+// A few seconds' slack on every timestamp compare below, so a device's own
+// just-finished push (which bumps the server's updated_at to "now" itself)
+// never reads back moments later as "another device has newer data" purely
+// from clock/round-trip skew between the two sides.
+const CLOUD_MERGE_SLACK_MS = 3000;
+
+// Per-day merge for one of logs/reviews/dailyReviews -- a day present on
+// only one side is a pure addition (no conflict at all); identical data on
+// both sides is left alone; different data is only taken from the server
+// if this device's own copy of THAT SPECIFIC day was already stale/synced,
+// or is clearly older by more than the slack above. A day edited on both
+// sides within the slack window is genuinely ambiguous and comes back as a
+// conflict for the caller to ask about, rather than silently overwriting
+// (or silently keeping) either side.
+function mergeDateMapCategory(category, localMap, serverEntries) {
+  const edited = getEditedAtMap(category);
+  const lastSyncedAt = Number(localStorage.getItem('wft_web_sync_last_at') || 0);
+  const merged = Object.assign({}, localMap);
+  const conflicts = [];
+  (serverEntries || []).forEach(entry => {
+    const date = entry.date;
+    const serverVal = entry.data;
+    const localVal = localMap[date];
+    if (localVal === undefined) { merged[date] = serverVal; return; } // addition from the other device
+    if (JSON.stringify(localVal) === JSON.stringify(serverVal)) return; // identical — nothing to merge
+    const serverAt = entry.updatedAt ? new Date(entry.updatedAt).getTime() : 0;
+    const localAt = edited[date] || 0;
+    const localUnsynced = localAt > lastSyncedAt;
+    if (!localUnsynced) { merged[date] = serverVal; return; } // this device's copy of this day was already stale
+    if (serverAt > localAt + CLOUD_MERGE_SLACK_MS) { merged[date] = serverVal; return; } // server clearly newer for this day
+    if (localAt > serverAt + CLOUD_MERGE_SLACK_MS) return; // local clearly newer for this day — keep local, will push up
+    conflicts.push({ category, date, serverVal }); // edited on both sides within seconds of each other
+  });
+  return { merged, conflicts };
+}
+
+// Last-edit-wins cross-device sync, but per DAY rather than per whole
+// account — runs before every push (see syncWithCloud inside
+// initWebSyncSettings) so a device that's been sitting idle with stale
+// local data never clobbers what another device has since pushed for a
+// day this device never touched. Reads via share_key
+// (web_sync_get_snapshot_by_share_key), not the PIN-gated public_id lookup
+// — this device already holds share_key either way (it's the same
+// bearer secret pushWebSyncSnapshot already writes with), so no new
+// prompt is needed just to check.
 async function checkForNewerCloudData() {
   if (localStorage.getItem('wft_web_sync_enabled') !== '1') return;
   if (!sbConfigured() || !navigator.onLine) return;
@@ -19123,25 +19184,69 @@ async function checkForNewerCloudData() {
     if (error) throw error;
     data = result;
   } catch (e) { return; } // best effort — offline, RPC not migrated yet, etc.
-  if (!data || !data.lastEditedAt) return;
-  const serverEditedAt = new Date(data.lastEditedAt).getTime();
-  const localEditedAt = Number(localStorage.getItem('wft_local_edited_at') || 0);
-  // A few seconds' slack so this device's own just-finished push (which
-  // bumps the server's updated_at to "now" itself) never reads back on the
-  // very next check as "another device has newer data", purely from
-  // clock/round-trip skew between the two timestamps.
-  if (!(serverEditedAt > localEditedAt + 5000)) return;
-  const lastSyncedAt = Number(localStorage.getItem('wft_web_sync_last_at') || 0);
-  const hasUnsyncedLocalChanges = localEditedAt > lastSyncedAt;
-  if (hasUnsyncedLocalChanges) {
-    // Genuine conflict — both sides changed since they last agreed. Ask
-    // rather than silently pick a winner, per the user's own call on this.
-    if (!confirm("Newer data was found from another device, but this device also has changes that haven't synced yet. Load the newer data from your other device? Changes made here since your last sync will be lost.")) {
-      return;
+  if (!data) return;
+
+  // Quick skip — nothing anywhere on this account has changed since the
+  // last time this device checked, so there's nothing to merge.
+  const serverEditedAt = data.lastEditedAt ? new Date(data.lastEditedAt).getTime() : 0;
+  const lastMergeCheckAt = Number(localStorage.getItem('wft_last_merge_check_at') || 0);
+  if (serverEditedAt <= lastMergeCheckAt) return;
+  localStorage.setItem('wft_last_merge_check_at', String(Date.now()));
+
+  const results = {
+    logs: mergeDateMapCategory('logs', getLogs(), data.logs),
+    reviews: mergeDateMapCategory('reviews', getReviews(), data.reviews),
+    dailyReviews: mergeDateMapCategory('dailyReviews', getDailyReviews(), data.dailyReviews),
+  };
+  const allConflicts = [].concat(results.logs.conflicts, results.reviews.conflicts, results.dailyReviews.conflicts);
+  if (allConflicts.length) {
+    // Same day genuinely edited on both devices within seconds of each
+    // other — can't order these by timestamp alone, so ask once rather
+    // than silently picking a side for all of them.
+    const dayWord = allConflicts.length === 1 ? 'day' : 'days';
+    const useOther = confirm(`${allConflicts.length} ${dayWord} of data were edited on both this device and another device at nearly the same time. Use the OTHER device's version for ${allConflicts.length === 1 ? 'that day' : 'those days'}? (Cancel keeps this device's version.)`);
+    if (useOther) allConflicts.forEach(c => { results[c.category].merged[c.date] = c.serverVal; });
+  }
+
+  let changed = false;
+  if (JSON.stringify(results.logs.merged) !== JSON.stringify(getLogs())) { saveLogs(results.logs.merged); changed = true; }
+  if (JSON.stringify(results.reviews.merged) !== JSON.stringify(getReviews())) { saveReviews(results.reviews.merged); changed = true; }
+  if (JSON.stringify(results.dailyReviews.merged) !== JSON.stringify(getDailyReviews())) { saveDailyReviews(results.dailyReviews.merged); changed = true; }
+
+  // Profile isn't date-keyed, so it stays whole-object last-edit-wins (with
+  // the same ask-if-ambiguous treatment) rather than a per-day merge.
+  let profileChanged = false;
+  if (data.profile) {
+    const localProfile = getProfile();
+    if (JSON.stringify(localProfile) !== JSON.stringify(data.profile)) {
+      const localEditedAt = Number(localStorage.getItem('wft_local_edited_at') || 0);
+      const lastSyncedAt = Number(localStorage.getItem('wft_web_sync_last_at') || 0);
+      const localUnsynced = localEditedAt > lastSyncedAt;
+      if (!localUnsynced || serverEditedAt > localEditedAt + CLOUD_MERGE_SLACK_MS) {
+        saveProfile(data.profile);
+        profileChanged = true;
+      } else if (!(localEditedAt > serverEditedAt + CLOUD_MERGE_SLACK_MS)) {
+        if (confirm("Your profile was also edited on another device around the same time. Use the other device's version?")) {
+          saveProfile(data.profile);
+          profileChanged = true;
+        }
+      }
     }
   }
-  applyPulledSnapshot(data);
-  showRestToast('Synced newer data from your other device.');
+  if (data.theme) localStorage.setItem('wft_theme', data.theme);
+  if (data.skin) localStorage.setItem('wft_skin', data.skin);
+
+  if (changed || profileChanged) {
+    localStorage.removeItem('wft_demo_seeded_at');
+    migrateWaterUnitsIfNeeded();
+    loadSetupForm();
+    loadCheckinForm();
+    renderDashboard();
+    renderHistory();
+    renderMeasureHistory();
+    renderBodyFatHistory();
+    showRestToast('Merged newer data from your other device.');
+  }
 }
 
 function initWebSyncSettings() {
