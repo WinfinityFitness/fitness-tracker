@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.8.27">
+<link rel="stylesheet" href="style.css?v=1.8.28">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -2337,6 +2337,22 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <h2>Welcome — Entity Setup</h2>
     </div>
     <p class="hint" style="margin-top:0;">Before you begin, tell us a bit about yourself so we can calibrate your targets. You can always edit this later on the BIO page.</p>
+    <button type="button" class="link-btn" id="btnOnboardingLinkExisting" style="margin-bottom:10px;">Already using Winfinity on another device? Sign in with your Digital ID →</button>
+    <div id="onboardingLinkExistingForm" hidden style="margin-bottom:14px;">
+      <label class="field">
+        <span>Digital ID</span>
+        <input type="text" id="onboardingLinkId" placeholder="WF-ABC123" autocapitalize="characters">
+      </label>
+      <label class="field">
+        <span>Web Dashboard Sync PIN</span>
+        <input type="password" id="onboardingLinkPin" placeholder="PIN set in Settings on your other device" autocomplete="off">
+      </label>
+      <p class="hint" id="onboardingLinkError" hidden style="color:var(--critical);"></p>
+      <div class="btn-row">
+        <button type="button" class="btn btn--primary" id="btnOnboardingLinkSubmit">Sign In</button>
+        <button type="button" class="btn" id="btnOnboardingLinkCancel">Cancel</button>
+      </div>
+    </div>
     <div id="onboardingFormMount"></div>
   </div>
 </div>
@@ -5146,11 +5162,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.8.27"></script>
+<script src="config.js?v=1.8.28"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.8.27"></script>
+<script src="app.js?v=1.8.28"></script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.27';
+const APP_VERSION = 'WF_SYS_V.1.8.28';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -6625,19 +6625,27 @@ setTimeout(() => {
 }, 0);
 setTimeout(revealSplashContent, SPLASH_REVEAL_SAFETY_MS);
 
+// Bumped by every save* below -- the one timestamp checkForNewerCloudData()
+// (see Web Dashboard Sync section) compares against the cloud's own
+// lastEditedAt to decide whether THIS device or some other device last
+// touched this account's data. Deliberately central here (not at each of
+// the many call sites that edit profile/logs/reviews) so it can never be
+// forgotten on a new call site.
+function markLocalEdited() { localStorage.setItem('wft_local_edited_at', String(Date.now())); }
+
 function getProfile() {
   if (wdsRemoteData) return wdsRemoteData.profile;
   try { return JSON.parse(localStorage.getItem(KEYS.profile)) || null; }
   catch { return null; }
 }
-function saveProfile(p) { localStorage.setItem(KEYS.profile, JSON.stringify(p)); }
+function saveProfile(p) { localStorage.setItem(KEYS.profile, JSON.stringify(p)); markLocalEdited(); }
 
 function getLogs() {
   if (wdsRemoteData) return wdsRemoteData.logsObj;
   try { return JSON.parse(localStorage.getItem(KEYS.logs)) || {}; }
   catch { return {}; }
 }
-function saveLogs(logs) { localStorage.setItem(KEYS.logs, JSON.stringify(logs)); }
+function saveLogs(logs) { localStorage.setItem(KEYS.logs, JSON.stringify(logs)); markLocalEdited(); }
 
 /* One-time migration: water tracking switched from 16oz cups to milliliters. */
 function migrateWaterUnitsIfNeeded() {
@@ -6700,14 +6708,14 @@ function getReviews() {
   try { return JSON.parse(localStorage.getItem(KEYS.reviews)) || {}; }
   catch { return {}; }
 }
-function saveReviews(r) { localStorage.setItem(KEYS.reviews, JSON.stringify(r)); }
+function saveReviews(r) { localStorage.setItem(KEYS.reviews, JSON.stringify(r)); markLocalEdited(); }
 
 function getDailyReviews() {
   if (wdsRemoteData) return wdsRemoteData.dailyReviewsObj;
   try { return JSON.parse(localStorage.getItem(KEYS.dailyReviews)) || {}; }
   catch { return {}; }
 }
-function saveDailyReviews(r) { localStorage.setItem(KEYS.dailyReviews, JSON.stringify(r)); }
+function saveDailyReviews(r) { localStorage.setItem(KEYS.dailyReviews, JSON.stringify(r)); markLocalEdited(); }
 
 /* ---------------------------------------------------------------- */
 /* Unit conversions (canonical storage: kg, cm)                      */
@@ -19067,6 +19075,75 @@ async function pushWebSyncSnapshot() {
   localStorage.setItem('wft_web_sync_last_at', String(Date.now()));
 }
 
+// Shared by the "sign in with existing Digital ID" onboarding link and
+// checkForNewerCloudData()'s background pull below -- the same
+// local-overwrite pipeline, just reached from two different entry points.
+// Deliberately goes through saveProfile/saveLogs/saveReviews/
+// saveDailyReviews (which each call markLocalEdited()) rather than writing
+// localStorage directly, then immediately re-stamps wft_web_sync_last_at
+// to match -- so right after this runs, wft_local_edited_at ==
+// wft_web_sync_last_at ("this device is caught up with the cloud"), not
+// "this device just made a fresh local edit nothing else knows about".
+function applyPulledSnapshot(data) {
+  if (data.profile) saveProfile(data.profile);
+  if (data.logs) saveLogs(wdsArrayToDateMap(data.logs));
+  if (data.reviews) saveReviews(wdsArrayToDateMap(data.reviews));
+  if (data.dailyReviews) saveDailyReviews(wdsArrayToDateMap(data.dailyReviews));
+  if (data.theme) localStorage.setItem('wft_theme', data.theme);
+  if (data.skin) localStorage.setItem('wft_skin', data.skin);
+  localStorage.removeItem('wft_demo_seeded_at');
+  // Idempotent, same as every other place that applies a possibly-older
+  // data shape (applyRestoredBackup, etc).
+  migrateWaterUnitsIfNeeded();
+  localStorage.setItem('wft_web_sync_last_at', String(Date.now()));
+  loadSetupForm();
+  loadCheckinForm();
+  renderDashboard();
+  renderHistory();
+  renderMeasureHistory();
+  renderBodyFatHistory();
+}
+
+// Last-edit-wins cross-device sync: runs before every push (see
+// syncWithCloud inside initWebSyncSettings) so a device that's been sitting
+// idle with stale local data never clobbers what another device has since
+// pushed. Reads via share_key (web_sync_get_snapshot_by_share_key), not the
+// PIN-gated public_id lookup -- this device already holds share_key either
+// way (it's the same bearer secret pushWebSyncSnapshot already writes
+// with), so no new prompt is needed just to check.
+async function checkForNewerCloudData() {
+  if (localStorage.getItem('wft_web_sync_enabled') !== '1') return;
+  if (!sbConfigured() || !navigator.onLine) return;
+  if (!getProfile()) return; // still mid-onboarding, nothing local to compare yet
+  const shareKey = localStorage.getItem('wft_lb_share_key');
+  if (!shareKey) return;
+  let data;
+  try {
+    const { data: result, error } = await sb.rpc('web_sync_get_snapshot_by_share_key', { p_share_key: shareKey, p_days: 400 });
+    if (error) throw error;
+    data = result;
+  } catch (e) { return; } // best effort — offline, RPC not migrated yet, etc.
+  if (!data || !data.lastEditedAt) return;
+  const serverEditedAt = new Date(data.lastEditedAt).getTime();
+  const localEditedAt = Number(localStorage.getItem('wft_local_edited_at') || 0);
+  // A few seconds' slack so this device's own just-finished push (which
+  // bumps the server's updated_at to "now" itself) never reads back on the
+  // very next check as "another device has newer data", purely from
+  // clock/round-trip skew between the two timestamps.
+  if (!(serverEditedAt > localEditedAt + 5000)) return;
+  const lastSyncedAt = Number(localStorage.getItem('wft_web_sync_last_at') || 0);
+  const hasUnsyncedLocalChanges = localEditedAt > lastSyncedAt;
+  if (hasUnsyncedLocalChanges) {
+    // Genuine conflict — both sides changed since they last agreed. Ask
+    // rather than silently pick a winner, per the user's own call on this.
+    if (!confirm("Newer data was found from another device, but this device also has changes that haven't synced yet. Load the newer data from your other device? Changes made here since your last sync will be lost.")) {
+      return;
+    }
+  }
+  applyPulledSnapshot(data);
+  showRestToast('Synced newer data from your other device.');
+}
+
 function initWebSyncSettings() {
   const toggle = document.getElementById('webSyncEnabled');
   const fields = document.getElementById('webSyncFields');
@@ -19233,9 +19310,17 @@ function initWebSyncSettings() {
     } catch (e) { /* best effort — Sync Now stays the fallback */ }
   }
 
+  // Pull-before-push, every time — a device that's about to push its own
+  // (possibly stale) local copy must never clobber newer data some other
+  // device already put up there since this device last checked.
+  async function syncWithCloud() {
+    await checkForNewerCloudData();
+    await maybeAutoSync();
+  }
+
   function startForegroundSyncLoop() {
     if (fgSyncTimer) clearInterval(fgSyncTimer);
-    fgSyncTimer = setInterval(maybeAutoSync, FG_SYNC_INTERVAL_MS);
+    fgSyncTimer = setInterval(syncWithCloud, FG_SYNC_INTERVAL_MS);
   }
 
   // Chains one setTimeout per tier rather than a flat repeating interval,
@@ -19245,7 +19330,7 @@ function initWebSyncSettings() {
     const tier = Math.min(Number(localStorage.getItem('wft_web_sync_bg_tier') || 0), BG_TIER_CAP);
     bgSyncTimer = setTimeout(async () => {
       if (!document.hidden) return; // resumed already — visibilitychange owns scheduling now
-      await maybeAutoSync();
+      await syncWithCloud();
       scheduleNextBackgroundSync();
     }, (tier + 1) * 60 * 60 * 1000);
   }
@@ -19258,11 +19343,16 @@ function initWebSyncSettings() {
     } else {
       if (bgSyncTimer) { clearTimeout(bgSyncTimer); bgSyncTimer = null; }
       localStorage.removeItem('wft_web_sync_bg_tier');
-      maybeAutoSync(); // catch-up in case the background timer above never actually fired
+      syncWithCloud(); // catch-up in case the background timer above never actually fired
       startForegroundSyncLoop();
     }
   });
-  window.addEventListener('online', maybeAutoSync);
+  window.addEventListener('online', syncWithCloud);
+  // Initial pull-check right at boot too, not just on the first 15-min
+  // tick or the next tab focus — otherwise a device reopened after another
+  // device pushed newer data would keep showing its own stale copy until
+  // one of those later triggers happened to fire.
+  checkForNewerCloudData();
   if (document.hidden) scheduleNextBackgroundSync(); else startForegroundSyncLoop();
 }
 
@@ -23647,6 +23737,72 @@ function initClearAllData() {
   });
 }
 
+// Lets a second device (desktop browser, another phone) skip onboarding
+// entirely and adopt an existing account instead of minting a brand-new
+// Digital ID — the same web_sync_get_dashboard RPC the wellness dashboard's
+// own sign-in gate uses, since it already returns the real share_key once
+// the PIN checks out. Wired from initOnboarding below; calls onComplete()
+// on success exactly like finishing the normal setup form would.
+function initOnboardingLinkExisting(onComplete) {
+  const linkBtn = document.getElementById('btnOnboardingLinkExisting');
+  const linkForm = document.getElementById('onboardingLinkExistingForm');
+  const idInput = document.getElementById('onboardingLinkId');
+  const pinInput = document.getElementById('onboardingLinkPin');
+  const errorEl = document.getElementById('onboardingLinkError');
+  const submitBtn = document.getElementById('btnOnboardingLinkSubmit');
+  const cancelBtn = document.getElementById('btnOnboardingLinkCancel');
+  if (!linkBtn || !linkForm) return;
+
+  linkBtn.addEventListener('click', () => {
+    linkForm.hidden = false;
+    linkBtn.hidden = true;
+    idInput.focus();
+  });
+  cancelBtn.addEventListener('click', () => {
+    linkForm.hidden = true;
+    linkBtn.hidden = false;
+    errorEl.hidden = true;
+  });
+
+  async function submitLink() {
+    const cleanId = idInput.value.trim().toUpperCase();
+    const cleanPin = pinInput.value.trim();
+    errorEl.hidden = true;
+    if (!cleanId || !cleanPin) {
+      errorEl.textContent = 'Enter both your Digital ID and PIN.';
+      errorEl.hidden = false;
+      return;
+    }
+    if (!sbConfigured()) {
+      errorEl.textContent = 'Not connected — check your internet connection and try again.';
+      errorEl.hidden = false;
+      return;
+    }
+    submitBtn.disabled = true;
+    try {
+      const { data, error } = await sb.rpc('web_sync_get_dashboard', { p_public_id: cleanId, p_pin: cleanPin, p_days: 400 });
+      if (error) throw error;
+      // Reclaim this account's real identity on THIS device rather than
+      // keeping whatever fresh wft_public_id/wft_lb_share_key it may have
+      // already minted — same reasoning as applyRestoredBackup's own
+      // shareKey/digitalId reclaim.
+      localStorage.setItem('wft_lb_share_key', data.shareKey);
+      localStorage.setItem('wft_public_id', cleanId);
+      localStorage.setItem('wft_web_sync_enabled', '1');
+      applyPulledSnapshot(data);
+      document.getElementById('onboardingOverlay').hidden = true;
+      if (onComplete) onComplete();
+    } catch (e) {
+      errorEl.textContent = (e && e.message) || 'Sign-in failed — check your Digital ID and PIN.';
+      errorEl.hidden = false;
+    } finally {
+      submitBtn.disabled = false;
+    }
+  }
+  submitBtn.addEventListener('click', submitLink);
+  pinInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitLink(); });
+}
+
 function initOnboarding(onComplete) {
   if (getProfile()) { if (onComplete) onComplete(); return; }
 
@@ -23658,6 +23814,7 @@ function initOnboarding(onComplete) {
 
   mount.appendChild(form);
   overlay.hidden = false;
+  initOnboardingLinkExisting(onComplete);
 
   form.addEventListener('submit', () => {
     setTimeout(() => {
