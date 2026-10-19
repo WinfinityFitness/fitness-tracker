@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.23';
+const APP_VERSION = 'WF_SYS_V.1.8.24';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9395,6 +9395,20 @@ function closeLauncher() {
   if (overlay) overlay.hidden = true;
 }
 
+// Whether the boot sequence should still auto-open the launcher once the
+// ad splash gate (see initAdSplash) has resolved -- set once, here, before
+// that gate even starts, since the deep-link/share-target query params it
+// reads get stripped by their own handlers shortly after. The ad splash
+// itself calls openLauncherOnBoot() at every one of its own exit points
+// (shown-then-closed, or never shown at all) instead of the launcher
+// opening independently on its own timer, so the two can never race --
+// the ad is always first when it's showing at all.
+let launcherAutoOpenAllowed = true;
+
+function openLauncherOnBoot() {
+  if (launcherAutoOpenAllowed) openLauncher();
+}
+
 function initLauncherScreen() {
   const openBtn = document.getElementById('btnOpenLauncher');
   if (!openBtn) return;
@@ -9404,8 +9418,7 @@ function initLauncherScreen() {
   // knows exactly where the user wants to be -- showing the launcher over
   // that on cold start would bury the thing they tapped to get here.
   const params = new URLSearchParams(location.search);
-  const skipAutoOpen = params.has('openSheet') || params.has('shared-target');
-  if (!skipAutoOpen) openLauncher();
+  launcherAutoOpenAllowed = !(params.has('openSheet') || params.has('shared-target'));
 }
 
 function handleDeepLinkUrl(url) {
@@ -20164,15 +20177,20 @@ function fetchAdSettings() {
 // then picks a random active product from ad_products. Silently does
 // nothing if any of those aren't available (offline, not configured, no
 // products yet) — an ad that fails to load should never block app entry.
+// The launcher (openLauncherOnBoot) deliberately does NOT open on its own
+// timer -- every path out of this function calls it, so the ad splash is
+// always what the user sees first when it's showing at all, and the
+// launcher only follows once that gate has actually resolved (shown then
+// closed, or skipped outright because there was nothing to show).
 async function initAdSplash() {
-  if (!sbConfigured()) return;
+  if (!sbConfigured()) { openLauncherOnBoot(); return; }
   try {
     const settings = await fetchAdSettings();
-    if (!settings || !settings.ads_enabled) return;
-    if (await isAdFreeUser()) return;
+    if (!settings || !settings.ads_enabled) { openLauncherOnBoot(); return; }
+    if (await isAdFreeUser()) { openLauncherOnBoot(); return; }
 
     const { data: products } = await sb.from('ad_products').select('*').eq('active', true);
-    if (!products || !products.length) return;
+    if (!products || !products.length) { openLauncherOnBoot(); return; }
 
     // Shows up to 8 at once in a 2x4 grid instead of one random pick —
     // shuffled so a small pool doesn't always lead with the same product
@@ -20205,8 +20223,8 @@ async function initAdSplash() {
       }
     }, 1000);
 
-    closeBtn.addEventListener('click', () => { overlay.hidden = true; }, { once: true });
-  } catch (e) { /* best effort — never block app entry over a failed ad load */ }
+    closeBtn.addEventListener('click', () => { overlay.hidden = true; openLauncherOnBoot(); }, { once: true });
+  } catch (e) { openLauncherOnBoot(); /* best effort — never block app entry over a failed ad load */ }
 }
 
 // Admin-only widget on the Nexus tab: app-wide ads on/off switch plus the
