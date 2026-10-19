@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.26';
+const APP_VERSION = 'WF_SYS_V.1.8.27';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9445,6 +9445,17 @@ function initLauncherScreen() {
   const openBtn = document.getElementById('btnOpenLauncher');
   if (!openBtn) return;
   openBtn.addEventListener('click', openLauncher);
+
+  // Tapping the header's own brand/title (not just the small grid icon)
+  // also returns to the launcher grid -- same "tap the logo to go home"
+  // convention most apps use.
+  const headerBrand = document.getElementById('headerBrand');
+  if (headerBrand) {
+    headerBrand.addEventListener('click', openLauncher);
+    headerBrand.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLauncher(); }
+    });
+  }
 
   // A deep link (push notification) or a Web Share Target hand-off already
   // knows exactly where the user wants to be -- showing the launcher over

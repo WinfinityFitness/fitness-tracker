@@ -235,6 +235,7 @@ body.has-custom-bg { background-color: transparent; }
   gap: 8px;
 }
 .brand { display: flex; align-items: center; gap: 8px; }
+#headerBrand { cursor: pointer; }
 .header-right { display: flex; align-items: center; gap: 8px; }
 .brand-logo { display: block; filter: drop-shadow(0 0 6px var(--cyan-glow)); }
 .app-header h1 {
