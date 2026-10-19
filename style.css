@@ -3061,6 +3061,48 @@ a.contact-row:hover { border-color: var(--cyan); }
 .sheet-overlay--fullscreen .sheet-handle { display: none; }
 #datePickerOverlay { z-index: 170; padding-left: 18px; padding-right: 18px; }
 
+/* ---------------- Launcher (2x5 shortcut grid) ---------------- */
+#launcherScreen { z-index: 450; }
+.launcher-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.launcher-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.launcher-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 110px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  padding: 10px 8px;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text-primary);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.launcher-tile:hover { border-color: var(--cyan); }
+.launcher-tile:active { transform: scale(0.97); }
+.launcher-tile-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em; text-align: center; line-height: 1.25; text-transform: uppercase; }
+/* Applied only to the one tile currently being dragged -- lifted above its
+   siblings and no longer part of normal flow interaction (the drag loop
+   itself moves it with a live transform; see initLauncherScreen). */
+.launcher-tile.is-dragging {
+  position: relative;
+  z-index: 5;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+  border-color: var(--cyan);
+  transition: none;
+}
+.launcher-footnote { text-align: center; margin: 18px 0 0; }
+
 /* ---------------- Admin Command Center (slide-out drawer) ---------------- */
 /* Tab visibility is gated to isAdminLoggedIn() in refreshDigitalIdOverrideVisibility()
    — it never shows for a regular user. A full circle (same 8mm/30px

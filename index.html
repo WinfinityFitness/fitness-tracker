@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.8.09">
+<link rel="stylesheet" href="style.css?v=1.8.10">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -443,8 +443,30 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <div class="header-right">
     <span class="app-header-sub" id="headerToday"></span>
     <img class="brand-logo mode-icon" id="headerModeIcon" src="" alt="" width="28" height="28" hidden>
+    <button type="button" class="icon-btn glass-emboss" id="btnOpenLauncher" aria-label="Open launcher">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="5" r="1.6"/><circle cx="12" cy="5" r="1.6"/><circle cx="19" cy="5" r="1.6"/><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/><circle cx="5" cy="19" r="1.6"/><circle cx="12" cy="19" r="1.6"/><circle cx="19" cy="19" r="1.6"/></svg>
+    </button>
   </div>
 </header>
+
+<!-- Launcher: full-screen 2x5 shortcut grid shown on open instead of
+     landing directly on Status, and reachable any time via the header's
+     grid icon. Tiles are rendered by renderLauncherGrid() (app.js) from
+     LAUNCHER_TILES, in whatever order the user last dragged them into
+     (wft_launcher_order) -- order lives in JS/localStorage, not here. -->
+<div class="sheet-overlay sheet-overlay--fullscreen" id="launcherScreen" hidden>
+  <div class="sheet">
+    <div class="launcher-top">
+      <div class="brand">
+        <img class="brand-logo" src="icons/icon-192.png" alt="" width="28" height="28">
+        <h1>WINFINITY</h1>
+      </div>
+      <span class="app-header-sub" id="launcherDate"></span>
+    </div>
+    <div class="launcher-grid" id="launcherGrid"></div>
+    <p class="mod-tag launcher-footnote">10 shortcuts &middot; press and drag a tile to rearrange &middot; tap to open</p>
+  </div>
+</div>
 
 <div class="game-popover" id="gamePopover" hidden>
   <div class="game-popover-inner">
@@ -5124,11 +5146,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.8.09"></script>
+<script src="config.js?v=1.8.10"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.8.09"></script>
+<script src="app.js?v=1.8.10"></script>
 </body>
 </html>

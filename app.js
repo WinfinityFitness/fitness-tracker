@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.22';
+const APP_VERSION = 'WF_SYS_V.1.8.23';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9209,6 +9209,203 @@ function initProPhotoFeature() {
   document.getElementById('btnRefreshProPhotos').addEventListener('click', refreshProPhotosFromDrive);
 
   renderProPhotoGallery();
+}
+
+// ---------------------------------------------------------------------
+// Launcher -- a full-screen 2x5 shortcut grid shown instead of landing
+// directly on Status (still reachable any time via the header's grid
+// icon). Each tile's action reuses the exact same code path a manual tap
+// on the real control would, rather than duplicating tab-switch/render
+// logic: tab tiles just .click() the real .tab-btn, log tiles call the
+// existing openStartDayLog/openEndDayLog/openWeekendLog functions.
+// ---------------------------------------------------------------------
+const LAUNCHER_ICONS = {
+  status: '<rect x="3" y="12" width="4" height="8" rx="1"/><rect x="10" y="7" width="4" height="13" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/>',
+  training: '<path d="M5 8v8M19 8v8M2 10v4M22 10v4"/><path d="M5 12h14"/><rect x="5" y="9" width="2.5" height="6" rx="0.5"/><rect x="16.5" y="9" width="2.5" height="6" rx="0.5"/>',
+  nutrition: '<path d="M7 3v7a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V3"/><path d="M9 12v9"/><path d="M17 3c-2 2-2 5 0 7"/><path d="M17 10v11"/>',
+  bio: '<path d="M6 4c0 3 3 3 3 6s-3 3-3 6"/><path d="M18 4c0 3-3 3-3 6s3 3 3 6"/><path d="M7 6h10M7 12h10M7 18h10"/>',
+  leaderboard: '<circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><circle cx="12" cy="12" r="2"/><path d="M12 7v3M10.4 13.3 6.6 17.4M13.6 13.3l3.8 4.1"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  startDayLog: '<circle cx="12" cy="13" r="4"/><path d="M12 3v2M4.2 7.2l1.4 1.4M19.8 7.2l-1.4 1.4M3 13h2M19 13h2"/>',
+  endDayLog: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.4 6.4 0 0 0 10.5 10.5Z"/>',
+  weekendLog: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 14h2M14 14h2M8 17h2M14 17h2"/>',
+  historyLogs: '<path d="M3 4v5h5"/><path d="M3.5 13a8.5 8.5 0 1 0 2.3-6.8L3 9"/><path d="M12 8v5l3.5 2"/>',
+};
+
+function openHistoryLogsFromLauncher() {
+  document.querySelector('.tab-btn[data-target="leaderboard"]').click();
+  requestAnimationFrame(() => {
+    const toggle = document.getElementById('btnToggleHistoryLogs');
+    const panel = document.getElementById('historyLogsPanel');
+    if (panel && panel.hidden) toggle.click();
+    if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+}
+
+const LAUNCHER_TILES = [
+  { id: 'status', label: 'Status', action: () => document.querySelector('.tab-btn[data-target="status"]').click() },
+  { id: 'training', label: 'Training', action: () => document.querySelector('.tab-btn[data-target="training"]').click() },
+  { id: 'nutrition', label: 'Fuel', action: () => document.querySelector('.tab-btn[data-target="nutrition"]').click() },
+  { id: 'bio', label: 'Bio', action: () => document.querySelector('.tab-btn[data-target="bio"]').click() },
+  { id: 'leaderboard', label: 'Nexus', action: () => document.querySelector('.tab-btn[data-target="leaderboard"]').click() },
+  { id: 'menu', label: 'Menu', action: () => document.querySelector('.tab-btn[data-target="menu"]').click() },
+  { id: 'startDayLog', label: 'Start Day Log', action: () => openStartDayLog() },
+  { id: 'endDayLog', label: 'End Day Log', action: () => openEndDayLog() },
+  { id: 'weekendLog', label: 'Weekend Log', action: () => openWeekendLog() },
+  { id: 'historyLogs', label: 'History Logs', action: openHistoryLogsFromLauncher },
+];
+
+const LAUNCHER_ORDER_KEY = 'wft_launcher_order';
+
+// Validates a saved order against the tile set actually shipped in THIS
+// version -- an app update that ever adds/renames/removes a tile must not
+// leave a stale id dangling (dropped) or a new tile invisible (appended),
+// rather than throwing when the list has drifted from a previous version.
+function getLauncherOrder() {
+  const allIds = LAUNCHER_TILES.map(t => t.id);
+  let saved = [];
+  try { saved = JSON.parse(localStorage.getItem(LAUNCHER_ORDER_KEY)) || []; } catch (e) { /* ignore malformed storage */ }
+  const valid = saved.filter(id => allIds.includes(id));
+  const missing = allIds.filter(id => !valid.includes(id));
+  return [...valid, ...missing];
+}
+function saveLauncherOrder(order) {
+  localStorage.setItem(LAUNCHER_ORDER_KEY, JSON.stringify(order));
+}
+
+function renderLauncherGrid() {
+  const grid = document.getElementById('launcherGrid');
+  if (!grid) return;
+  const order = getLauncherOrder();
+  const byId = Object.fromEntries(LAUNCHER_TILES.map(t => [t.id, t]));
+  grid.innerHTML = order.map(id => {
+    const tile = byId[id];
+    return `
+      <button type="button" class="launcher-tile" data-tile-id="${tile.id}">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${LAUNCHER_ICONS[tile.id]}</svg>
+        <span class="launcher-tile-label">${escapeHtml(tile.label)}</span>
+      </button>`;
+  }).join('');
+  wireLauncherDragAndTap(grid);
+}
+
+// Pointer-based (touch + mouse) drag reorder, with a movement threshold to
+// tell a drag from a tap -- tiles are real <button>s with real actions, so
+// this never attaches a click listener at all; a tap is recognized and
+// dispatched manually in the pointerup branch where movement stayed under
+// the threshold, which is also what keeps a genuine drag from ever
+// triggering navigation on release.
+function wireLauncherDragAndTap(grid) {
+  const DRAG_THRESHOLD_PX = 10;
+  let dragState = null;
+
+  grid.querySelectorAll('.launcher-tile').forEach(tileEl => {
+    tileEl.addEventListener('pointerdown', (e) => {
+      if (e.button != null && e.button !== 0) return;
+      dragState = {
+        tileEl, pointerId: e.pointerId,
+        startX: e.clientX, startY: e.clientY,
+        dragging: false,
+      };
+    });
+    // Keyboard activation (Enter/Space on a focused tile) never goes
+    // through pointer events at all, so this is its own path -- guarded
+    // against double-firing for a pointer tap by the pointerHandled flag
+    // endDrag's tap branch sets right before calling the same action.
+    tileEl.addEventListener('click', () => {
+      if (tileEl.dataset.pointerHandled) { delete tileEl.dataset.pointerHandled; return; }
+      const tile = LAUNCHER_TILES.find(t => t.id === tileEl.dataset.tileId);
+      if (tile) { closeLauncher(); tile.action(); }
+    });
+  });
+
+  grid.addEventListener('pointermove', (e) => {
+    if (!dragState || dragState.pointerId !== e.pointerId) return;
+    const dx = e.clientX - dragState.startX;
+    const dy = e.clientY - dragState.startY;
+    if (!dragState.dragging) {
+      if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+      dragState.dragging = true;
+      dragState.tileEl.classList.add('is-dragging');
+      dragState.tileEl.setPointerCapture(e.pointerId);
+    }
+    dragState.tileEl.style.transform = `translate(${dx}px, ${dy}px) scale(0.97)`;
+    // Hit-test what's under the pointer WITH the dragged tile briefly
+    // excluded from pointer events -- otherwise elementFromPoint just
+    // keeps returning the dragged tile itself, since it's positioned
+    // directly under the pointer that's moving it.
+    dragState.tileEl.style.pointerEvents = 'none';
+    const over = document.elementFromPoint(e.clientX, e.clientY);
+    dragState.tileEl.style.pointerEvents = '';
+    const overTile = over && over.closest('.launcher-tile');
+    if (overTile && overTile !== dragState.tileEl && overTile.parentElement === grid) {
+      const order = getLauncherOrder();
+      const fromIdx = order.indexOf(dragState.tileEl.dataset.tileId);
+      const toIdx = order.indexOf(overTile.dataset.tileId);
+      if (fromIdx !== -1 && toIdx !== -1) {
+        order.splice(fromIdx, 1);
+        order.splice(toIdx, 0, dragState.tileEl.dataset.tileId);
+        saveLauncherOrder(order);
+        // Re-render drops the live transform/is-dragging state along with
+        // the DOM node itself -- stash the in-progress gesture's screen
+        // position and re-arm it on the tile's replacement so the drag
+        // continues smoothly instead of visibly resetting mid-gesture.
+        const resumeDx = dx, resumeDy = dy, resumeStartX = dragState.startX, resumeStartY = dragState.startY, resumeId = dragState.tileEl.dataset.tileId;
+        renderLauncherGrid();
+        const resumedEl = grid.querySelector(`.launcher-tile[data-tile-id="${resumeId}"]`);
+        if (resumedEl) {
+          resumedEl.classList.add('is-dragging');
+          resumedEl.style.transform = `translate(${resumeDx}px, ${resumeDy}px) scale(0.97)`;
+          try { resumedEl.setPointerCapture(e.pointerId); } catch (err) { /* already released mid-reorder -- fine, drag still tracks via dragState */ }
+          dragState.tileEl = resumedEl;
+          dragState.startX = resumeStartX;
+          dragState.startY = resumeStartY;
+        }
+      }
+    }
+  });
+
+  function endDrag(e) {
+    if (!dragState || dragState.pointerId !== e.pointerId) return;
+    const wasDragging = dragState.dragging;
+    const tileEl = dragState.tileEl;
+    const tileId = tileEl.dataset.tileId;
+    tileEl.classList.remove('is-dragging');
+    tileEl.style.transform = '';
+    dragState = null;
+    if (!wasDragging) {
+      const tile = LAUNCHER_TILES.find(t => t.id === tileId);
+      if (tile) { tileEl.dataset.pointerHandled = '1'; closeLauncher(); tile.action(); }
+    }
+  }
+  grid.addEventListener('pointerup', endDrag);
+  grid.addEventListener('pointercancel', endDrag);
+}
+
+function openLauncher() {
+  const overlay = document.getElementById('launcherScreen');
+  if (!overlay) return;
+  const dateEl = document.getElementById('launcherDate');
+  if (dateEl) dateEl.textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+  renderLauncherGrid();
+  overlay.hidden = false;
+}
+function closeLauncher() {
+  const overlay = document.getElementById('launcherScreen');
+  if (overlay) overlay.hidden = true;
+}
+
+function initLauncherScreen() {
+  const openBtn = document.getElementById('btnOpenLauncher');
+  if (!openBtn) return;
+  openBtn.addEventListener('click', openLauncher);
+
+  // A deep link (push notification) or a Web Share Target hand-off already
+  // knows exactly where the user wants to be -- showing the launcher over
+  // that on cold start would bury the thing they tapped to get here.
+  const params = new URLSearchParams(location.search);
+  const skipAutoOpen = params.has('openSheet') || params.has('shared-target');
+  if (!skipAutoOpen) openLauncher();
 }
 
 function handleDeepLinkUrl(url) {
@@ -25741,6 +25938,10 @@ safeInit(initApiKeyPromptOverlay, 'initApiKeyPromptOverlay');
 safeInit(initCustomBackground, 'initCustomBackground');
 safeInit(initTextSizeSlider, 'initTextSizeSlider');
 safeInit(initPushNotifications, 'initPushNotifications');
+// Must run before initDeepLinkHandling/initShareTargetHandling below --
+// it reads location.search to decide whether to auto-open, and both of
+// those strip their own param from the URL once they've handled it.
+safeInit(initLauncherScreen, 'initLauncherScreen');
 safeInit(initDeepLinkHandling, 'initDeepLinkHandling');
 safeInit(initShareTargetHandling, 'initShareTargetHandling');
 safeInit(initWidgetActionHandling, 'initWidgetActionHandling');
