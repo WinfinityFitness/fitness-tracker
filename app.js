@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.30';
+const APP_VERSION = 'WF_SYS_V.1.8.31';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -7411,8 +7411,19 @@ function restoreLastState() {
     const btn = document.querySelector(`.tab-btn[data-target="${savedTab}"]`);
     if (btn && !btn.classList.contains('is-active')) btn.click();
   }
+  // Skipped when the launcher is about to auto-open on this boot
+  // (launcherAutoOpenAllowed -- see openLauncherOnBoot) -- restoring an
+  // overlay here runs well before that happens (this fires synchronously
+  // off the same 2s boot timer that KICKS OFF the ad-splash flow, not
+  // after it resolves), so the overlay would open first and the launcher
+  // would then open ON TOP of it moments later. Closing the launcher by
+  // tapping a grid tile only hides the launcher itself, not whatever got
+  // restored underneath it -- so the leftover overlay stayed visible,
+  // covering the tile's own destination and looking exactly like tapping
+  // the tile opened the wrong (last-opened) page instead. Simplest fix:
+  // never restore an overlay that's just going to be instantly buried.
   const savedOverlay = localStorage.getItem('wft_last_overlay');
-  const triggerId = savedOverlay && RESTORABLE_OVERLAYS[savedOverlay];
+  const triggerId = !launcherAutoOpenAllowed && savedOverlay && RESTORABLE_OVERLAYS[savedOverlay];
   if (triggerId) {
     const trigger = document.getElementById(triggerId);
     if (trigger) setTimeout(() => trigger.click(), 150);
