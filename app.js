@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.31';
+const APP_VERSION = 'WF_SYS_V.1.8.32';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9317,7 +9317,12 @@ const LAUNCHER_ICONS = {
 };
 
 function openHistoryLogsFromLauncher() {
-  document.querySelector('.tab-btn[data-target="leaderboard"]').click();
+  // historyLogsPanel actually lives inside the Menu tab-panel (index.html),
+  // not Nexus/leaderboard -- clicking the leaderboard tab here just landed
+  // on Nexus with the toggle/scroll targeting elements hidden inside a
+  // different, inactive tab-panel, which looked like the tile did nothing
+  // beyond opening Nexus.
+  document.querySelector('.tab-btn[data-target="menu"]').click();
   requestAnimationFrame(() => {
     const toggle = document.getElementById('btnToggleHistoryLogs');
     const panel = document.getElementById('historyLogsPanel');
