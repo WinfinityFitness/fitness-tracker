@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.8.35">
+<link rel="stylesheet" href="style.css?v=1.8.36">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -834,6 +834,28 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       </label>
       <button type="button" class="btn" id="btnSaveTemplate">Save as new session</button>
       <p class="save-note" id="sessionTemplateNote"></p>
+    </fieldset>
+
+    <fieldset class="field-group field-group--compact">
+      <legend>Paste workout</legend>
+      <p class="hint hint--sm">Paste a finished workout export (exercise names, "Set N: weight × reps" or "Set N: reps") and it's logged as a completed session — no typing each set by hand.</p>
+      <label class="field">
+        <span>Pasted workout text</span>
+        <textarea id="pasteWorkoutInput" rows="5" placeholder="e.g.&#10;Squat (Smith Machine)&#10;Set 1: 40 kg × 8&#10;Set 2: 40 kg × 8"></textarea>
+      </label>
+      <button type="button" class="btn btn--sm" id="btnParsePasteWorkout">Parse workout</button>
+      <div id="pasteWorkoutReview" hidden style="margin-top:10px;">
+        <label class="field">
+          <span>Date</span>
+          <input type="date" id="pasteWorkoutDate">
+        </label>
+        <p class="hint hint--accent" id="pasteWorkoutSummary"></p>
+        <div id="pasteWorkoutPreviewList"></div>
+        <div class="btn-row">
+          <button type="button" class="btn btn--primary" id="btnSavePasteWorkout">Save as Finished Workout</button>
+          <button type="button" class="btn" id="btnCancelPasteWorkout">Cancel</button>
+        </div>
+      </div>
     </fieldset>
 
     <div class="stat-grid stat-grid--compact">
@@ -5162,11 +5184,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.8.35"></script>
+<script src="config.js?v=1.8.36"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.8.35"></script>
+<script src="app.js?v=1.8.36"></script>
 </body>
 </html>

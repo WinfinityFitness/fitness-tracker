@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.35';
+const APP_VERSION = 'WF_SYS_V.1.8.36';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -12111,6 +12111,130 @@ function initDatePicker() {
       const getHighlight = DATE_PICKER_HIGHLIGHT_SETS[inputId];
       openDatePicker(input, titles[inputId] || 'Select Date', getHighlight ? getHighlight() : null);
     });
+  });
+}
+
+// Parses a finished-workout export (the shape Strong/Hevy-style apps paste
+// out: a title line, a long-form date line, then one block per exercise --
+// a name line followed by "Set N: WEIGHT kg|lb × REPS" or "Set N: REPS reps"
+// lines, with an optional "Notes: ..." line attaching to whichever exercise
+// came just before it) into this app's own exercises[] shape. Pure/no DOM
+// access, deterministic regex parsing -- no AI call needed, the input
+// format is already fully structured.
+const PASTE_WORKOUT_MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+function parsePastedWorkoutText(text) {
+  const lines = String(text || '').split('\n').map(l => l.trim());
+  let dateISO = null;
+  const exercises = [];
+  let current = null;
+
+  lines.forEach(line => {
+    if (!line) return;
+
+    if (!dateISO) {
+      const dateMatch = line.match(/([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})/);
+      if (dateMatch) {
+        const monthIdx = PASTE_WORKOUT_MONTHS.indexOf(dateMatch[1].toLowerCase());
+        if (monthIdx !== -1) {
+          dateISO = `${dateMatch[3]}-${String(monthIdx + 1).padStart(2, '0')}-${String(dateMatch[2]).padStart(2, '0')}`;
+          return; // the title/date lines above the first exercise, not an exercise themselves
+        }
+      }
+    }
+
+    const setWeightMatch = line.match(/^Set\s+\d+:\s*([\d.]+)\s*(kg|lb)\s*[×x]\s*(\d+)/i);
+    const setRepsOnlyMatch = !setWeightMatch && line.match(/^Set\s+\d+:\s*(\d+)\s*reps?\b/i);
+    const notesMatch = line.match(/^Notes:\s*(.*)$/i);
+
+    if (setWeightMatch) {
+      if (!current) return; // a stray "Set N:" line before any exercise name -- ignore rather than guess
+      current.sets.push({
+        reps: parseInt(setWeightMatch[3], 10),
+        weightKg: Math.round(toKg(parseFloat(setWeightMatch[1]), setWeightMatch[2].toLowerCase()) * 100) / 100,
+        completed: true,
+      });
+      return;
+    }
+    if (setRepsOnlyMatch) {
+      if (!current) return;
+      current.sets.push({ reps: parseInt(setRepsOnlyMatch[1], 10), weightKg: null, completed: true });
+      return;
+    }
+    if (notesMatch) {
+      if (current) current.notes = notesMatch[1].trim();
+      return;
+    }
+
+    // Anything else non-blank starts a new exercise -- this also harmlessly
+    // catches the title line (e.g. "Maldives Day 2") above the date line,
+    // but it ends up with zero sets and gets filtered out below.
+    current = { name: line, sets: [], unit: 'kg', restSeconds: 60 };
+    exercises.push(current);
+  });
+
+  return { dateISO, exercises: exercises.filter(ex => ex.sets.length > 0) };
+}
+
+function initPasteWorkout() {
+  const input = document.getElementById('pasteWorkoutInput');
+  const parseBtn = document.getElementById('btnParsePasteWorkout');
+  const review = document.getElementById('pasteWorkoutReview');
+  const dateInput = document.getElementById('pasteWorkoutDate');
+  const summaryEl = document.getElementById('pasteWorkoutSummary');
+  const previewList = document.getElementById('pasteWorkoutPreviewList');
+  const saveBtn = document.getElementById('btnSavePasteWorkout');
+  const cancelBtn = document.getElementById('btnCancelPasteWorkout');
+  if (!input || !parseBtn) return;
+
+  let parsedExercises = [];
+
+  function renderPreview() {
+    previewList.innerHTML = parsedExercises.map(ex => {
+      const setsText = ex.sets.map(s => s.weightKg != null ? `${s.weightKg}kg×${s.reps}` : `${s.reps} reps`).join(', ');
+      return `<p class="hint" style="margin:4px 0;"><strong>${escapeHtml(ex.name)}</strong> — ${ex.sets.length} set${ex.sets.length === 1 ? '' : 's'}: ${escapeHtml(setsText)}${ex.notes ? ` <em>(${escapeHtml(ex.notes)})</em>` : ''}</p>`;
+    }).join('');
+  }
+
+  parseBtn.addEventListener('click', () => {
+    const { dateISO, exercises } = parsePastedWorkoutText(input.value);
+    if (!exercises.length) {
+      showRestToast('No exercises found — check the pasted text matches the "Set N: weight × reps" format.');
+      review.hidden = true;
+      return;
+    }
+    parsedExercises = exercises;
+    dateInput.value = dateISO || todayISO();
+    const totalSets = exercises.reduce((n, ex) => n + ex.sets.length, 0);
+    summaryEl.textContent = `Found ${exercises.length} exercise${exercises.length === 1 ? '' : 's'}, ${totalSets} set${totalSets === 1 ? '' : 's'}.${dateISO ? '' : ' No date found in the text — defaulted to today; change it below if needed.'}`;
+    renderPreview();
+    review.hidden = false;
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    review.hidden = true;
+    input.value = '';
+    parsedExercises = [];
+  });
+
+  saveBtn.addEventListener('click', () => {
+    if (!parsedExercises.length) return;
+    const date = dateInput.value || todayISO();
+    updateLogFields(date, { exercises: parsedExercises, workout: true });
+    setSessionFinished(date, true);
+    // If the Training tab is already looking at this exact date, refresh
+    // its live session view too -- otherwise leave it alone (the date
+    // being pasted for is very often a different day than whatever's
+    // currently open, e.g. logging yesterday's gym export today).
+    if (document.getElementById('trainDate').value === date) {
+      loadTrainingForDate(date);
+    }
+    renderTrainingStats();
+    updateTabDots();
+    autoSyncLeaderboardIfOptedIn();
+    showRestToast(`Workout saved for ${fmtDate(parseISO(date))}.`);
+    review.hidden = true;
+    input.value = '';
+    parsedExercises = [];
   });
 }
 
@@ -26356,6 +26480,7 @@ safeInit(initFuelLogQuickPopup, 'initFuelLogQuickPopup');
 safeInit(initCommunityQuickPopup, 'initCommunityQuickPopup');
 safeInit(initMeasurements, 'initMeasurements');
 safeInit(initTraining, 'initTraining');
+safeInit(initPasteWorkout, 'initPasteWorkout');
 safeInit(initExerciseTimerPopup, 'initExerciseTimerPopup');
 safeInit(initCardioTracker, 'initCardioTracker');
 safeInit(initMissionLog, 'initMissionLog');
