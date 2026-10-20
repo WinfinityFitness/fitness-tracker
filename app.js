@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.33';
+const APP_VERSION = 'WF_SYS_V.1.8.34';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -19344,6 +19344,28 @@ function initWebSyncSettings() {
   fields.hidden = !enabled;
   refreshOldPinVisibility();
   renderStatus();
+
+  // wft_web_sync_enabled is per-device, but whether a PIN actually exists
+  // is a property of the ACCOUNT (share_key), which a second device
+  // doesn't know about yet from its own fresh localStorage -- it could
+  // already have been set from a different device entirely (e.g. this one
+  // just linked to an existing account via "sign in with Digital ID").
+  // Reconciling against the real server state here means the "current
+  // PIN" field actually shows up when one is genuinely needed, instead of
+  // every "Set PIN" attempt on that second device failing server-side
+  // with "Not authorized" because there was nowhere to enter it.
+  if (sbConfigured()) {
+    sb.rpc('web_sync_has_pin', { p_share_key: getOrCreateShareKey() }).then(({ data, error }) => {
+      if (error || data == null) return; // best effort — local flag stays the fallback
+      const reallyHasPin = data === true;
+      if (reallyHasPin === enabled) return; // already in agreement, nothing to reconcile
+      localStorage.setItem('wft_web_sync_enabled', reallyHasPin ? '1' : '0');
+      toggle.checked = reallyHasPin;
+      fields.hidden = !reallyHasPin;
+      refreshOldPinVisibility();
+      renderStatus();
+    }).catch(() => {});
+  }
 
   toggle.addEventListener('change', async () => {
     if (toggle.checked) {
