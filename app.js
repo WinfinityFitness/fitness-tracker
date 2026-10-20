@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.34';
+const APP_VERSION = 'WF_SYS_V.1.8.35';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -19183,14 +19183,56 @@ function applyPulledSnapshot(data) {
 // from clock/round-trip skew between the two sides.
 const CLOUD_MERGE_SLACK_MS = 3000;
 
+// "No real value here" -- undefined/null, an empty array, or an
+// empty/all-empty object (the meals field's {breakfast:[],lunch:[],...}
+// shape when nothing's been logged). 0 and false are real values, not
+// blank -- someone genuinely logging 0 steps or an unchecked workout must
+// never be treated the same as "field never touched".
+function isFieldBlank(v) {
+  if (v === undefined || v === null) return true;
+  if (Array.isArray(v)) return v.length === 0;
+  if (typeof v === 'object') return Object.values(v).every(sub => Array.isArray(sub) ? sub.length === 0 : (sub === undefined || sub === null));
+  return false;
+}
+
+// Field-by-field merge of one day's record -- NOT a whole-day swap. A day
+// that has real data on one side (say the PC logged Food Diary meals) and
+// is blank/partial on the other (say mobile never touched that day, or
+// only has its weight/steps) must never have the real side replaced
+// wholesale by the blank one just because the blank one "won" at the
+// whole-day level. Each field is resolved on its own: missing on one side
+// -> filled in from the other (pure addition, no data lost); present on
+// only one side -> kept, never erased by the other side's blank; present
+// and DIFFERENT (genuinely real values) on both sides is the only real
+// per-field conflict, resolved the same way whole-day conflicts used to be.
+function mergeDayRecord(localVal, serverVal, localUnsynced) {
+  const merged = Object.assign({}, localVal);
+  const fieldConflicts = [];
+  const allKeys = new Set([...Object.keys(localVal || {}), ...Object.keys(serverVal || {})]);
+  allKeys.forEach(key => {
+    if (key === 'date') return;
+    const lv = localVal ? localVal[key] : undefined;
+    const sv = serverVal ? serverVal[key] : undefined;
+    if (JSON.stringify(lv) === JSON.stringify(sv)) return;
+    const lvBlank = isFieldBlank(lv);
+    const svBlank = isFieldBlank(sv);
+    if (lvBlank && !svBlank) { merged[key] = sv; return; } // fill in what this device never had
+    if (!lvBlank && svBlank) return; // never let the other side's blank erase real local data
+    if (lvBlank && svBlank) return; // nothing on either side for this field
+    // Both sides have real, DIFFERENT values for this one field.
+    if (!localUnsynced) { merged[key] = sv; return; } // this device's whole day was already stale/synced
+    fieldConflicts.push(key);
+  });
+  return { merged, fieldConflicts };
+}
+
 // Per-day merge for one of logs/reviews/dailyReviews -- a day present on
 // only one side is a pure addition (no conflict at all); identical data on
-// both sides is left alone; different data is only taken from the server
-// if this device's own copy of THAT SPECIFIC day was already stale/synced,
-// or is clearly older by more than the slack above. A day edited on both
-// sides within the slack window is genuinely ambiguous and comes back as a
-// conflict for the caller to ask about, rather than silently overwriting
-// (or silently keeping) either side.
+// both sides is left alone; a day present on both sides is merged field by
+// field (mergeDayRecord above) rather than one side's whole record
+// replacing the other's, so a day with real data on one device never gets
+// wiped out just because the other device's copy of that same day happens
+// to be blank or partial.
 function mergeDateMapCategory(category, localMap, serverEntries) {
   const edited = getEditedAtMap(category);
   const lastSyncedAt = Number(localStorage.getItem('wft_web_sync_last_at') || 0);
@@ -19202,13 +19244,11 @@ function mergeDateMapCategory(category, localMap, serverEntries) {
     const localVal = localMap[date];
     if (localVal === undefined) { merged[date] = serverVal; return; } // addition from the other device
     if (JSON.stringify(localVal) === JSON.stringify(serverVal)) return; // identical — nothing to merge
-    const serverAt = entry.updatedAt ? new Date(entry.updatedAt).getTime() : 0;
     const localAt = edited[date] || 0;
     const localUnsynced = localAt > lastSyncedAt;
-    if (!localUnsynced) { merged[date] = serverVal; return; } // this device's copy of this day was already stale
-    if (serverAt > localAt + CLOUD_MERGE_SLACK_MS) { merged[date] = serverVal; return; } // server clearly newer for this day
-    if (localAt > serverAt + CLOUD_MERGE_SLACK_MS) return; // local clearly newer for this day — keep local, will push up
-    conflicts.push({ category, date, serverVal }); // edited on both sides within seconds of each other
+    const { merged: mergedDay, fieldConflicts } = mergeDayRecord(localVal, serverVal, localUnsynced);
+    merged[date] = mergedDay;
+    if (fieldConflicts.length) conflicts.push({ category, date, fields: fieldConflicts, serverVal });
   });
   return { merged, conflicts };
 }
@@ -19250,12 +19290,21 @@ async function checkForNewerCloudData() {
   };
   const allConflicts = [].concat(results.logs.conflicts, results.reviews.conflicts, results.dailyReviews.conflicts);
   if (allConflicts.length) {
-    // Same day genuinely edited on both devices within seconds of each
-    // other — can't order these by timestamp alone, so ask once rather
-    // than silently picking a side for all of them.
-    const dayWord = allConflicts.length === 1 ? 'day' : 'days';
-    const useOther = confirm(`${allConflicts.length} ${dayWord} of data were edited on both this device and another device at nearly the same time. Use the OTHER device's version for ${allConflicts.length === 1 ? 'that day' : 'those days'}? (Cancel keeps this device's version.)`);
-    if (useOther) allConflicts.forEach(c => { results[c.category].merged[c.date] = c.serverVal; });
+    // A real field (not a blank one -- see mergeDayRecord) was genuinely
+    // edited differently on both devices within seconds of each other —
+    // can't order these by timestamp alone, so ask once rather than
+    // silently picking a side. Resolved per FIELD, not per whole day, so
+    // accepting "the other device's version" here only overwrites the
+    // specific fields that actually conflicted, never anything else that
+    // was already correctly merged on this day.
+    const totalFields = allConflicts.reduce((n, c) => n + c.fields.length, 0);
+    const fieldWord = totalFields === 1 ? 'value' : 'values';
+    const useOther = confirm(`${totalFields} ${fieldWord} were edited differently on this device and another device at nearly the same time. Use the OTHER device's version for ${totalFields === 1 ? 'it' : 'them'}? (Cancel keeps this device's version.)`);
+    if (useOther) {
+      allConflicts.forEach(c => {
+        c.fields.forEach(field => { results[c.category].merged[c.date][field] = c.serverVal[field]; });
+      });
+    }
   }
 
   let changed = false;
