@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.32';
+const APP_VERSION = 'WF_SYS_V.1.8.33';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -6647,10 +6647,9 @@ function scheduleQuickSync() {
   clearTimeout(quickSyncTimer);
   quickSyncTimer = setTimeout(async () => {
     if (!navigator.onLine || !sbConfigured()) return;
-    // Pull-before-push, same reasoning as syncWithCloud below — this
-    // device's own edit must never clobber a different day that some
+    // pushWebSyncSnapshot() itself pulls first now (see its own comment) —
+    // this device's own edit must never clobber a different day that some
     // other device pushed in the meantime.
-    try { await checkForNewerCloudData(); } catch (e) { /* best effort */ }
     try { await pushWebSyncSnapshot(); } catch (e) { /* best effort — the 15-min loop still catches up */ }
   }, 6000);
 }
@@ -19103,6 +19102,19 @@ async function wdsPushProfileUpdate(profile) {
 
 async function pushWebSyncSnapshot() {
   if (!sbConfigured()) throw new Error('Not connected.');
+  // Pull-before-push lived only in syncWithCloud() (initWebSyncSettings),
+  // but pushWebSyncSnapshot() itself is also called directly from several
+  // other places (Sync Now, the post-workout auto-sync, the avatar-change
+  // sync, this file's own debounced quick-sync) that never went through
+  // that wrapper -- each one pushed this device's current local snapshot
+  // with no fresh pull first. On a device that's been idle, its own
+  // routine timer-driven push (unconditional every 15 min regardless of
+  // whether anything local actually changed) could re-upload a STALE
+  // local copy and silently clobber a correction another device had
+  // already pushed moments earlier. Pulling here, inside the one real
+  // push function every call site funnels through, closes that gap for
+  // good instead of relying on every caller to remember it.
+  try { await checkForNewerCloudData(); } catch (e) { /* best effort */ }
   const shareKey = getOrCreateShareKey();
   try {
     // Clone before touching photo fields — getProfile() is mobile's
