@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.36';
+const APP_VERSION = 'WF_SYS_V.1.8.37';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -19281,6 +19281,48 @@ async function pushWebSyncSnapshot() {
 // to match -- so right after this runs, wft_local_edited_at ==
 // wft_web_sync_last_at ("this device is caught up with the cloud"), not
 // "this device just made a fresh local edit nothing else knows about".
+// Re-runs whichever tab's own date-scoped render functions (the same ones
+// initTabs()'s click handler calls when you switch TO that tab) for
+// whatever tab is already on screen, plus the Food Diary overlay if that's
+// open. A cross-device merge can correctly update getLogs()/getProfile()
+// in the background while the user is sitting on, say, the Fuel tab -- the
+// data was already there (confirmed: getLogs() held it before this even
+// ran), but nothing had told that tab's own already-rendered DOM to
+// re-read it. Without this, a sync that worked perfectly at the data layer
+// still looked broken because the visible page never changed until the
+// user manually switched tabs away and back.
+function refreshVisibleTabContent() {
+  const target = document.querySelector('.tab-btn.is-active');
+  const tab = target && target.dataset.target;
+  if (tab === 'status') { loadCheckinForm(); renderDashboard(); }
+  if (tab === 'training') {
+    loadTrainingForDate(document.getElementById('trainDate').value);
+    renderTrainingStats();
+  }
+  if (tab === 'nutrition') {
+    const nutDate = document.getElementById('nutDate').value;
+    loadNutritionForDate(nutDate);
+    renderNutritionTargets();
+    renderNutritionAverages();
+    refreshFuelWaterViews(nutDate);
+    const p = getProfile();
+    if (p) renderComputedTargets(p);
+  }
+  if (tab === 'bio') {
+    loadBioForDate(document.getElementById('bioDate').value);
+    renderWaterRetentionOrb();
+  }
+  if (tab === 'menu') {
+    renderHistory();
+    renderMeasureHistory();
+    renderBodyFatHistory();
+    renderDailyReviewChecklist(document.getElementById('dailyReviewDate').value || todayISO());
+  }
+  const foodDiaryOverlay = document.getElementById('foodDiaryOverlay');
+  const foodDiaryDateInput = document.getElementById('foodDiaryDateInput');
+  if (foodDiaryOverlay && !foodDiaryOverlay.hidden && foodDiaryDateInput) renderFoodDiary(foodDiaryDateInput.value);
+}
+
 function applyPulledSnapshot(data) {
   if (data.profile) saveProfile(data.profile);
   if (data.logs) saveLogs(wdsArrayToDateMap(data.logs));
@@ -19299,6 +19341,7 @@ function applyPulledSnapshot(data) {
   renderHistory();
   renderMeasureHistory();
   renderBodyFatHistory();
+  refreshVisibleTabContent();
 }
 
 // A few seconds' slack on every timestamp compare below, so a device's own
@@ -19468,6 +19511,7 @@ async function checkForNewerCloudData() {
     renderHistory();
     renderMeasureHistory();
     renderBodyFatHistory();
+    refreshVisibleTabContent();
     showRestToast('Merged newer data from your other device.');
   }
 }
