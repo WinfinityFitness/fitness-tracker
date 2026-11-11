@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.9.00';
+const APP_VERSION = 'WF_SYS_V.1.9.01';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -3147,9 +3147,9 @@ async function refreshWdsMyday() {
 function renderWdsMyday() {
   const el = document.getElementById('wdsMydayRow');
   if (!el) return;
-  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
-  const myName = (wdsRemoteData && wdsRemoteData.profile && wdsRemoteData.profile.name) || (wdsRemoteData && wdsRemoteData.publicId) || '?';
-  const myPhoto = wdsResolveOwnAvatarUrl(wdsRemoteData && wdsRemoteData.profile && wdsRemoteData.profile.photoDataUrl, myShareKey);
+  const myShareKey = currentShareKey();
+  const myName = currentSocialCodeName() || '?';
+  const myPhoto = wdsResolveOwnAvatarUrl(currentSocialProfile().photoDataUrl, myShareKey);
   const mineGroup = wdsStoryGroups.find(g => g.shareKey === myShareKey);
   const otherGroups = wdsStoryGroups.filter(g => g.shareKey !== myShareKey);
 
@@ -3244,7 +3244,7 @@ function wdsRenderCurrentStory() {
   const story = group && group.stories[wdsStoryLocalIdx];
   if (!story) { wdsCloseStoryViewer(); return; }
 
-  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+  const myShareKey = currentShareKey();
   const isOwn = !!myShareKey && story.share_key === myShareKey;
   const mediaHtml = story.image_url
     ? `<img class="wds-story-content-image" src="${escapeHtml(story.image_url)}" alt="">`
@@ -3309,18 +3309,23 @@ function wdsCloseStoryViewer() {
 // background — sending doesn't open the chat popup or leave the story,
 // so it doesn't interrupt watching.
 async function wdsSendStoryReply(story, text) {
-  if (!wdsRemoteData || !text.trim()) return;
+  if (!currentShareKey() || !text.trim()) return;
   // No real DM as a guest (there's no real reciprocal account to receive
   // it) — the caller flashes "Sent!" regardless of this function's outcome,
   // so the interaction still feels complete.
   if (wdsGuestMode) return;
-  const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
+  const codeName = currentSocialCodeName();
   try {
     const { data: roomId, error } = await sb.rpc('start_dm_by_name', {
-      p_my_key: wdsRemoteData.shareKey, p_my_name: codeName, p_other_name: story.code_name,
+      p_my_key: currentShareKey(), p_my_name: codeName, p_other_name: story.code_name,
     });
     if (error || !roomId) return;
-    await postChatMessage(text, null, wdsRemoteData.shareKey, codeName, roomId);
+    await postChatMessage(text, null, currentShareKey(), codeName, roomId);
+    // refreshWdsChatRooms() is wellness's own Messenger room-list refresh
+    // (hard-requires wdsRemoteData, no fallback) -- harmless to skip on FT
+    // specifically, since there's no embedded Messenger UI yet to refresh
+    // (see the Nexus-in-FT plan's later phases).
+    if (!isDesktopShellSite) return;
     await refreshWdsChatRooms();
   } catch (e) { /* best effort */ }
 }
@@ -7464,13 +7469,11 @@ function initFtNexusFeedEmbed() {
   wrap.appendChild(center);
   wrap.hidden = false;
 
-  // Phase 1 scope is feed-only -- hide the icon-tabs row and the Stories
-  // ("My Day") tray; their real destinations (Stories, Groups, Messenger)
-  // don't exist in this embed yet.
+  // Icon-tabs row (Reels/Marketplace/Groups/Settings) stays hidden -- those
+  // destinations (Groups, Messenger) don't exist in this embed yet. Stories
+  // ("My Day") IS in scope now (Phase 2) -- left visible.
   const iconTabs = document.getElementById('wdsNexusIconTabs');
   if (iconTabs) iconTabs.hidden = true;
-  const mydayRow = document.getElementById('wdsMydayRow');
-  if (mydayRow) mydayRow.hidden = true;
 
   // Composer wiring -- duplicated from initDesktopShell()'s own inline
   // setup (that function is never called on FT; see the hard safety rule
@@ -7546,6 +7549,184 @@ function initFtNexusFeedEmbed() {
     }
     finally { composerPostBtn.disabled = false; }
   });
+
+  // Reactors / Sharers / Share-compose overlays -- opened from inside
+  // initWdsFeed()'s own click delegation (wdsShowReactors/
+  // wdsOpenShareCompose), but their close/backdrop/submit buttons are
+  // wired separately in wellness's own initDesktopShell(). Duplicated
+  // here, same reasoning as the composer above, so Share (and the
+  // "who reacted" list) actually works from this embed instead of opening
+  // with no way to close or submit it.
+  const reactorsCloseBtn = document.getElementById('btnWdsReactorsClose');
+  if (reactorsCloseBtn) reactorsCloseBtn.addEventListener('click', wdsCloseReactorsOverlay);
+  const reactorsOverlay = document.getElementById('wdsReactorsOverlay');
+  if (reactorsOverlay) reactorsOverlay.addEventListener('click', e => { if (e.target.id === 'wdsReactorsOverlay') wdsCloseReactorsOverlay(); });
+  const reactorTabs = document.getElementById('wdsReactorTabs');
+  if (reactorTabs) reactorTabs.addEventListener('click', e => {
+    const tabBtn = e.target.closest('[data-reactor-filter]');
+    if (!tabBtn) return;
+    wdsReactorsFilter = tabBtn.dataset.reactorFilter;
+    wdsRenderReactorTabs();
+    wdsRenderReactorsList();
+  });
+
+  const sharersCloseBtn = document.getElementById('btnWdsSharersClose');
+  if (sharersCloseBtn) sharersCloseBtn.addEventListener('click', wdsCloseSharersOverlay);
+  const sharersOverlay = document.getElementById('wdsSharersOverlay');
+  if (sharersOverlay) sharersOverlay.addEventListener('click', e => { if (e.target.id === 'wdsSharersOverlay') wdsCloseSharersOverlay(); });
+
+  const shareComposeCloseBtn = document.getElementById('btnWdsShareComposeClose');
+  if (shareComposeCloseBtn) shareComposeCloseBtn.addEventListener('click', wdsCloseShareComposeOverlay);
+  const shareComposeOverlay = document.getElementById('wdsShareComposeOverlay');
+  if (shareComposeOverlay) shareComposeOverlay.addEventListener('click', e => { if (e.target.id === 'wdsShareComposeOverlay') wdsCloseShareComposeOverlay(); });
+  const shareComposeSubmitBtn = document.getElementById('btnWdsShareComposeSubmit');
+  if (shareComposeSubmitBtn) shareComposeSubmitBtn.addEventListener('click', async () => {
+    if (!currentShareKey() || !wdsSharingPostId) return;
+    const shareInput = document.getElementById('wdsShareComposeInput');
+    const shareErrorEl = document.getElementById('wdsShareComposeError');
+    if (shareErrorEl) shareErrorEl.hidden = true;
+    shareComposeSubmitBtn.disabled = true;
+    try {
+      await shareFeedPost(currentShareKey(), currentSocialCodeName(), wdsSharingPostId, shareInput ? shareInput.value : '');
+      wdsCloseShareComposeOverlay();
+      await refreshWdsFeed(true);
+    } catch (e) {
+      if (shareErrorEl) { shareErrorEl.textContent = 'Could not share: ' + ((e && e.message) || 'unknown error') + '.'; shareErrorEl.hidden = false; }
+    }
+    finally { shareComposeSubmitBtn.disabled = false; }
+  });
+
+  // Stories ("My Day") -- Phase 2. Viewing (ring tray + full viewer +
+  // reply) reuses wellness's own top-level functions as-is
+  // (refreshWdsMyday/wdsOpenStoryViewer/wdsRenderCurrentStory/
+  // wdsAdvanceStory/wdsCloseStoryViewer/wdsSendStoryReply -- all already
+  // identity-fixed above). Creating a new story uses a small FT-only
+  // composer (text + one photo, #ftStoryComposerCard) instead of
+  // wellness's full canvas/drag/zoom editor (#wdsStoryComposerOverlay) --
+  // that editor is ~300 tightly-coupled lines inline inside
+  // initDesktopShell() and not worth duplicating for a first pass; both
+  // ultimately call the same postFeedStory().
+  refreshWdsMyday();
+
+  const mydayRowEl = document.getElementById('wdsMydayRow');
+  const ftStoryCard = document.getElementById('ftStoryComposerCard');
+  const ftStoryInput = document.getElementById('ftStoryComposerInput');
+  const ftStoryAttachBtn = document.getElementById('btnFtStoryAttach');
+  const ftStoryImageInput = document.getElementById('ftStoryImageInput');
+  const ftStoryPendingImage = document.getElementById('ftStoryComposerPendingImage');
+  const ftStoryPostBtn = document.getElementById('btnFtStoryPost');
+  const ftStoryCancelBtn = document.getElementById('btnFtStoryCancel');
+  const ftStoryErrorEl = document.getElementById('ftStoryComposerError');
+  let ftPendingStoryImageDataUrl = null;
+
+  if (mydayRowEl) mydayRowEl.addEventListener('click', e => {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    if (target.dataset.action === 'add-story') {
+      if (ftStoryCard) { ftStoryCard.hidden = false; ftStoryCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+      return;
+    }
+    const storyId = Number(target.dataset.storyId);
+    if (storyId) wdsOpenStoryViewer(storyId);
+  });
+
+  if (ftStoryAttachBtn && ftStoryImageInput) {
+    ftStoryAttachBtn.addEventListener('click', () => ftStoryImageInput.click());
+    ftStoryImageInput.addEventListener('change', () => {
+      const file = ftStoryImageInput.files && ftStoryImageInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        ftPendingStoryImageDataUrl = reader.result;
+        if (ftStoryPendingImage) {
+          ftStoryPendingImage.hidden = false;
+          ftStoryPendingImage.innerHTML = `<div class="wds-composer-pending-image-item"><img src="${reader.result}" alt=""><button type="button" id="btnFtStoryRemoveImage" aria-label="Remove image">✕</button></div>`;
+          const removeBtn = document.getElementById('btnFtStoryRemoveImage');
+          if (removeBtn) removeBtn.addEventListener('click', () => {
+            ftPendingStoryImageDataUrl = null;
+            ftStoryImageInput.value = '';
+            ftStoryPendingImage.hidden = true;
+            ftStoryPendingImage.innerHTML = '';
+          });
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  const closeFtStoryCard = () => {
+    if (!ftStoryCard) return;
+    ftStoryCard.hidden = true;
+    if (ftStoryInput) ftStoryInput.value = '';
+    ftPendingStoryImageDataUrl = null;
+    if (ftStoryImageInput) ftStoryImageInput.value = '';
+    if (ftStoryPendingImage) { ftStoryPendingImage.hidden = true; ftStoryPendingImage.innerHTML = ''; }
+    if (ftStoryErrorEl) ftStoryErrorEl.hidden = true;
+  };
+  if (ftStoryCancelBtn) ftStoryCancelBtn.addEventListener('click', closeFtStoryCard);
+  if (ftStoryPostBtn) ftStoryPostBtn.addEventListener('click', async () => {
+    if (ftStoryErrorEl) ftStoryErrorEl.hidden = true;
+    if (!currentShareKey() || !sbConfigured()) {
+      if (ftStoryErrorEl) { ftStoryErrorEl.textContent = 'Not signed in — try refreshing the page.'; ftStoryErrorEl.hidden = false; }
+      return;
+    }
+    const text = ftStoryInput ? ftStoryInput.value : '';
+    if (!text.trim() && !ftPendingStoryImageDataUrl) return;
+    ftStoryPostBtn.disabled = true;
+    try {
+      await postFeedStory(text, ftPendingStoryImageDataUrl, currentShareKey(), currentSocialCodeName(), null);
+      closeFtStoryCard();
+      await refreshWdsMyday();
+    } catch (e) {
+      if (ftStoryErrorEl) { ftStoryErrorEl.textContent = 'Could not post: ' + ((e && e.message) || 'unknown error') + '. Try again.'; ftStoryErrorEl.hidden = false; }
+    }
+    finally { ftStoryPostBtn.disabled = false; }
+  });
+
+  const storyViewerCloseBtn = document.getElementById('btnWdsStoryViewerClose');
+  if (storyViewerCloseBtn) storyViewerCloseBtn.addEventListener('click', wdsCloseStoryViewer);
+  const storyViewerOverlay = document.getElementById('wdsStoryViewerOverlay');
+  if (storyViewerOverlay) storyViewerOverlay.addEventListener('click', e => { if (e.target.id === 'wdsStoryViewerOverlay') wdsCloseStoryViewer(); });
+
+  const storyViewerContent = document.getElementById('wdsStoryViewerContent');
+  if (storyViewerContent) {
+    storyViewerContent.addEventListener('click', async e => {
+      const unsendBtn = e.target.closest('#btnWdsUnsendStory');
+      if (unsendBtn) {
+        if (!currentShareKey()) return;
+        unsendBtn.disabled = true;
+        try {
+          await unsendFeedStory(Number(unsendBtn.dataset.storyId), currentShareKey());
+          wdsCloseStoryViewer();
+          await refreshWdsMyday();
+        } catch (e2) { unsendBtn.disabled = false; }
+        return;
+      }
+      const quickReactBtn = e.target.closest('[data-quick-react]');
+      if (quickReactBtn) {
+        const group = wdsStoryGroups[wdsStoryGroupIdx];
+        const story = group && group.stories[wdsStoryLocalIdx];
+        if (story) { await wdsSendStoryReply(story, quickReactBtn.dataset.quickReact); wdsFlashStorySent(); }
+        return;
+      }
+      const tapZone = e.target.closest('[data-story-tap]');
+      if (tapZone) wdsAdvanceStory(tapZone.dataset.storyTap === 'prev' ? -1 : 1);
+    });
+    storyViewerContent.addEventListener('focusin', e => {
+      if (e.target.matches('.wds-story-reply-input')) clearTimeout(wdsStoryTimer);
+    });
+    storyViewerContent.addEventListener('keydown', async e => {
+      if (e.key !== 'Enter' || !e.target.matches('.wds-story-reply-input')) return;
+      const input = e.target;
+      if (!input.value.trim()) return;
+      const group = wdsStoryGroups[wdsStoryGroupIdx];
+      const story = group && group.stories[wdsStoryLocalIdx];
+      if (!story) return;
+      const text = input.value;
+      input.value = '';
+      await wdsSendStoryReply(story, text);
+      wdsFlashStorySent();
+    });
+  }
 
   initWdsFeed();
   refreshWdsFeed(true);
