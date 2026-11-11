@@ -6279,6 +6279,17 @@ html.wf-desktop-shell body { overflow-x: auto; }
    in this column specifically instead of shrinking the text further. */
 .wds-uni-left .perf-grid { grid-template-columns: 1fr; }
 
+/* Phase 1 of the Nexus-in-FT plan (see app.js's initFtNexusFeedEmbed) --
+   hosts the real wds feed inside FT's own narrow Nexus tab. Only
+   .wds-uni-center itself gets reparented here at runtime, never the
+   .wds-unified grid wrapper that carries the desktop-only 3-column
+   layout and its min-width: 960px -- so that constraint never applies to
+   this embed at all. .wds-uni-center already renders correctly at any
+   width via its own .wds-uni-col flex styling; this just adds the
+   breathing room FT's own tab content uses elsewhere. */
+.wf-nexus-embed { margin-top: 16px; }
+.wf-nexus-embed .wds-uni-center { gap: 16px; }
+
 .wds-mini-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .wds-mini-stat { display: flex; flex-direction: column; gap: 2px; }
 .wds-mini-stat span { font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); }

@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.8.37';
+const APP_VERSION = 'WF_SYS_V.1.9.00';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -617,7 +617,7 @@ function initDesktopShell() {
   const composerErrorEl = document.getElementById('wdsComposerError');
   composerPostBtn.addEventListener('click', async () => {
     if (composerErrorEl) composerErrorEl.hidden = true;
-    if (!wdsRemoteData || !wdsRemoteData.shareKey || !sbConfigured()) {
+    if (!currentShareKey() || !sbConfigured()) {
       if (composerErrorEl) { composerErrorEl.textContent = 'Not signed in — try refreshing the page.'; composerErrorEl.hidden = false; }
       return;
     }
@@ -626,8 +626,7 @@ function initDesktopShell() {
     if (!text.trim() && !images.length) return;
     composerPostBtn.disabled = true;
     try {
-      const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
-      await postFeedPost(text, images, wdsRemoteData.shareKey, codeName, wdsComposerLinkPreview);
+      await postFeedPost(text, images, currentShareKey(), currentSocialCodeName(), wdsComposerLinkPreview);
       composerInput.value = '';
       clearWdsPendingPostImage();
       wdsComposerPreviewUrl = null;
@@ -916,15 +915,14 @@ function initDesktopShell() {
     if (e.target.id === 'wdsShareComposeOverlay') wdsCloseShareComposeOverlay();
   });
   document.getElementById('btnWdsShareComposeSubmit').addEventListener('click', async () => {
-    if (!wdsRemoteData || !wdsRemoteData.shareKey || !wdsSharingPostId) return;
+    if (!currentShareKey() || !wdsSharingPostId) return;
     const btn = document.getElementById('btnWdsShareComposeSubmit');
     const input = document.getElementById('wdsShareComposeInput');
     const errorEl = document.getElementById('wdsShareComposeError');
     if (errorEl) errorEl.hidden = true;
     btn.disabled = true;
     try {
-      const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
-      await shareFeedPost(wdsRemoteData.shareKey, codeName, wdsSharingPostId, input ? input.value : '');
+      await shareFeedPost(currentShareKey(), currentSocialCodeName(), wdsSharingPostId, input ? input.value : '');
       wdsCloseShareComposeOverlay();
       await refreshWdsFeed(true);
     } catch (e) {
@@ -5085,7 +5083,7 @@ async function fetchFeedPosts() {
   // the query even ran. null is the correct "no real identity" viewer key
   // — the query's own logic already treats that as "public posts only",
   // exactly the guest's intended visibility.
-  const myShareKey = (wdsRemoteData && !wdsGuestMode) ? wdsRemoteData.shareKey : null;
+  const myShareKey = wdsGuestMode ? null : currentShareKey();
   const { data, error } = await sb.rpc('get_visible_feed_posts', {
     p_viewer_share_key: myShareKey, p_cutoff: cutoff, p_limit: wdsGuestMode ? 10 : 30,
   });
@@ -5593,7 +5591,7 @@ function wdsCommentHtml(c, myShareKey, isReply) {
 function renderFeedPosts(posts) {
   const list = document.getElementById('wdsFeedList');
   if (!posts.length) { list.innerHTML = '<p class="empty-note">No posts yet. Be the first to share something!</p>'; return; }
-  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+  const myShareKey = currentShareKey();
   list.innerHTML = posts.map(p => {
     const isOwn = !!myShareKey && p.share_key === myShareKey;
     const isShare = !!p.shared_post_id;
@@ -6329,7 +6327,7 @@ function initWdsFeed() {
     const card = e.target.closest('.wds-feed-post');
     if (!card) return;
     const postId = Number(card.dataset.postId);
-    const shareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+    const shareKey = currentShareKey();
 
     const likeBtn = e.target.closest('[data-action="like"]');
     if (likeBtn) {
@@ -6352,7 +6350,7 @@ function initWdsFeed() {
       clearTimeout(wdsLikeClickTimer);
       wdsLikeClickTimer = setTimeout(async () => {
         try {
-          const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
+          const codeName = currentSocialCodeName();
           await toggleFeedPostLike(postId, shareKey, currentEmoji, codeName);
           await refreshWdsFeed(true);
         } catch (err) { /* best effort */ }
@@ -6369,7 +6367,7 @@ function initWdsFeed() {
       clearTimeout(wdsLikeClickTimer);
       wdsLikeClickTimer = setTimeout(async () => {
         try {
-          const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
+          const codeName = currentSocialCodeName();
           await toggleFeedCommentLike(commentId, shareKey, currentCommentEmoji, codeName);
           wdsFeedExpandedComments.add(postId);
           await refreshWdsFeed(true);
@@ -6411,7 +6409,7 @@ function initWdsFeed() {
     if (e.target.closest('[data-action="send-comment"]')) {
       const input = card.querySelector('.wds-post-comment-compose input');
       if (!input || !input.value.trim() || !shareKey) return;
-      const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
+      const codeName = currentSocialCodeName();
       try {
         await postFeedComment(postId, input.value, shareKey, codeName);
         input.value = '';
@@ -6440,7 +6438,7 @@ function initWdsFeed() {
       const box = card.querySelector(`.wds-post-reply-compose[data-parent-comment-id="${parentId}"]`);
       const input = box ? box.querySelector('input') : null;
       if (!input || !input.value.trim() || !shareKey) return;
-      const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
+      const codeName = currentSocialCodeName();
       try {
         await postFeedComment(postId, input.value, shareKey, codeName, parentId);
         input.value = '';
@@ -7429,6 +7427,130 @@ function restoreLastState() {
   }
 }
 
+// Embeds the real wds social feed into FT's own Nexus tab, using this
+// device's own already-signed-in local identity (currentShareKey() etc.)
+// -- NOT wellness.winfinityfitness.com's separate Digital ID + PIN
+// sign-in. Phase 1 of the Nexus-in-FT plan: feed only (post/view/react/
+// comment/share). Stories tray, icon-tabs row, Groups, Messenger, and
+// Profile pages stay deliberately hidden/untouched here -- later phases.
+//
+// Mechanism: a ONE-TIME reparent of .wds-uni-center (the wds dashboard's
+// own feed column, already fully built -- composer, feed list, the
+// overlays feed interactions need) into a wrapper inside #tab-leaderboard.
+// It's always present in the DOM already (#wdsShell is a sibling of
+// #app, hidden purely by CSS -- see style.css's html.wf-desktop-shell
+// rule), so moving it doesn't need new markup for the feed itself, just a
+// new CSS scope (.wf-nexus-embed) to collapse its desktop 3-column layout
+// down to one column at phone width.
+//
+// Hard safety rule: this must NEVER run when isDesktopShellSite is true
+// (wellness.winfinityfitness.com's own real 3-column dashboard must be
+// completely untouched), and must NEVER assign wdsRemoteData -- doing
+// that on the FT hostname would silently break getProfile()/getLogs() for
+// every other tab (Status/Training/Fuel/Bio), since both already check
+// `if (wdsRemoteData) return wdsRemoteData.profile/.logsObj` as their very
+// first line. Identity flows only through currentShareKey() /
+// currentDigitalId() / currentSocialProfile() / currentSocialCodeName(),
+// which fall back to this device's own local identity exactly because
+// wdsRemoteData is (and must stay) null here.
+let ftNexusEmbedInitialized = false;
+function initFtNexusFeedEmbed() {
+  if (isDesktopShellSite || ftNexusEmbedInitialized) return;
+  const wrap = document.getElementById('wfNexusEmbedWrap');
+  const center = document.querySelector('.wds-uni-center');
+  if (!wrap || !center) return;
+  ftNexusEmbedInitialized = true;
+
+  wrap.appendChild(center);
+  wrap.hidden = false;
+
+  // Phase 1 scope is feed-only -- hide the icon-tabs row and the Stories
+  // ("My Day") tray; their real destinations (Stories, Groups, Messenger)
+  // don't exist in this embed yet.
+  const iconTabs = document.getElementById('wdsNexusIconTabs');
+  if (iconTabs) iconTabs.hidden = true;
+  const mydayRow = document.getElementById('wdsMydayRow');
+  if (mydayRow) mydayRow.hidden = true;
+
+  // Composer wiring -- duplicated from initDesktopShell()'s own inline
+  // setup (that function is never called on FT; see the hard safety rule
+  // above) rather than extracted into a function both would call, so this
+  // first change to a path wellness depends on daily touches zero existing
+  // wellness code. Deliberately its own local state, not shared with
+  // wellness's copy.
+  const composerInput = document.getElementById('wdsComposerInput');
+  const composerPostBtn = document.getElementById('btnWdsComposerPost');
+  const composerAttachBtn = document.getElementById('btnWdsComposerAttach');
+  const composerImageInput = document.getElementById('wdsComposerImageInput');
+  const composerPendingImage = document.getElementById('wdsComposerPendingImage');
+  const composerErrorEl = document.getElementById('wdsComposerError');
+  const composerAvatarEl = document.getElementById('wdsComposerAvatar');
+  if (!composerInput || !composerPostBtn) { initWdsFeed(); return; }
+
+  const myProfile = currentSocialProfile();
+  wdsSetAvatarVisual(
+    composerAvatarEl,
+    wdsResolveOwnAvatarUrl(myProfile.photoDataUrl, currentShareKey()),
+    ((myProfile.name || currentDigitalId() || '').trim().charAt(0).toUpperCase())
+  );
+
+  let ftPendingPostImageDataUrls = [];
+  const renderFtPendingPostImages = () => {
+    if (!composerPendingImage) return;
+    if (!ftPendingPostImageDataUrls.length) { composerPendingImage.hidden = true; composerPendingImage.innerHTML = ''; return; }
+    composerPendingImage.hidden = false;
+    composerPendingImage.innerHTML = ftPendingPostImageDataUrls.map((url, i) => `
+      <div class="wds-composer-pending-image-item">
+        <img src="${url}" alt="">
+        <button type="button" data-remove-pending-image="${i}" aria-label="Remove image">✕</button>
+      </div>`).join('');
+  };
+  if (composerAttachBtn && composerImageInput) {
+    composerAttachBtn.addEventListener('click', () => composerImageInput.click());
+    composerImageInput.addEventListener('change', () => {
+      Array.from(composerImageInput.files || []).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = () => { ftPendingPostImageDataUrls.push(reader.result); renderFtPendingPostImages(); };
+        reader.readAsDataURL(file);
+      });
+    });
+  }
+  if (composerPendingImage) {
+    composerPendingImage.addEventListener('click', e => {
+      const removeBtn = e.target.closest('[data-remove-pending-image]');
+      if (!removeBtn) return;
+      ftPendingPostImageDataUrls.splice(Number(removeBtn.dataset.removePendingImage), 1);
+      renderFtPendingPostImages();
+    });
+  }
+
+  composerPostBtn.addEventListener('click', async () => {
+    if (composerErrorEl) composerErrorEl.hidden = true;
+    if (!currentShareKey() || !sbConfigured()) {
+      if (composerErrorEl) { composerErrorEl.textContent = 'Not signed in — try refreshing the page.'; composerErrorEl.hidden = false; }
+      return;
+    }
+    const text = composerInput.value;
+    const images = ftPendingPostImageDataUrls;
+    if (!text.trim() && !images.length) return;
+    composerPostBtn.disabled = true;
+    try {
+      await postFeedPost(text, images, currentShareKey(), currentSocialCodeName(), null);
+      composerInput.value = '';
+      ftPendingPostImageDataUrls = [];
+      if (composerImageInput) composerImageInput.value = '';
+      renderFtPendingPostImages();
+      await refreshWdsFeed(true);
+    } catch (e) {
+      if (composerErrorEl) { composerErrorEl.textContent = 'Could not post: ' + ((e && e.message) || 'unknown error') + '. Try again.'; composerErrorEl.hidden = false; }
+    }
+    finally { composerPostBtn.disabled = false; }
+  });
+
+  initWdsFeed();
+  refreshWdsFeed(true);
+}
+
 function initTabs() {
   const btns = document.querySelectorAll('.tab-btn[data-target]');
   btns.forEach(btn => {
@@ -7469,6 +7591,7 @@ function initTabs() {
         }).catch(() => {});
         refreshChatRooms();
         startNexusPolling();
+        initFtNexusFeedEmbed();
       } else {
         stopNexusPolling();
       }
@@ -21052,20 +21175,41 @@ function escapeHtmlText(str) {
   return div.innerHTML;
 }
 
-// The Group Page only ever opens from the Wellness topnav, i.e. always in
-// desktop-shell context -- the signed-in user's real identity there is
-// wdsRemoteData.shareKey (set by the Digital ID + PIN sign-in flow), NOT
-// getOrCreateShareKey()'s plain-mobile device-local value, which is a
-// different, unrelated identity that happens to also exist in the same
-// browser. Falls back to getOrCreateShareKey() only for Guest Log In mode
-// (wdsRemoteData null there too) or if this ever runs outside the shell --
-// harmless, just resolves to "not attached to a coach" in that case.
-function currentWellnessShareKey() {
+// The real signed-in identity for whichever surface is currently running:
+// on wellness (desktop-shell, Digital ID + PIN sign-in) that's
+// wdsRemoteData's own shareKey/publicId/profile; everywhere else (plain
+// mobile FT, or Guest Log In mode where wdsRemoteData is also null) it
+// falls back to this device's own local identity. Originally written only
+// for the wellness-only Group Page (hence the old name
+// currentWellnessShareKey) -- generalized so the same fallback can be
+// reused by the feed/social functions now also running embedded inside
+// FT's own Nexus tab, which must NEVER read from wdsRemoteData directly
+// (see the big comment on wdsRemoteData itself: assigning it on the FT
+// hostname would silently break getProfile()/getLogs() for every other
+// tab). Never assign wdsRemoteData from FT -- only ever read it, and only
+// through these three helpers.
+function currentShareKey() {
   return (wdsRemoteData && wdsRemoteData.shareKey) || getOrCreateShareKey();
+}
+function currentDigitalId() {
+  return (wdsRemoteData && wdsRemoteData.publicId) || getOrCreatePublicId();
+}
+function currentSocialProfile() {
+  return (wdsRemoteData && wdsRemoteData.profile) || getProfile() || {};
+}
+// The "display name, falling back to Digital ID" pattern repeated at every
+// wds post/comment/reaction/message call site -- NOT the same thing as
+// effectiveLeaderboardName() (that one falls back to an anonymized
+// generated code name for the leaderboard's own display convention; this
+// one falls back to the real Digital ID, matching what wds already shows
+// everywhere else in the feed/profile UI).
+function currentSocialCodeName() {
+  const profile = currentSocialProfile();
+  return (profile && profile.name) || currentDigitalId();
 }
 
 async function loadCoachGroupInfo() {
-  const shareKey = currentWellnessShareKey();
+  const shareKey = currentShareKey();
   const noCoachNote = document.getElementById('coachGroupNoCoachNote');
   const content = document.getElementById('coachGroupContent');
   if (!sbConfigured() || !shareKey) { noCoachNote.hidden = false; content.hidden = true; return; }
@@ -21112,7 +21256,7 @@ function renderCoachGroupPosts(posts) {
 }
 
 async function loadCoachGroupPosts() {
-  const shareKey = currentWellnessShareKey();
+  const shareKey = currentShareKey();
   if (!sbConfigured() || !shareKey) { renderCoachGroupPosts([]); return; }
   try {
     const { data, error } = await sb.rpc('get_coach_group_posts', { p_share_key: shareKey });
@@ -21121,7 +21265,7 @@ async function loadCoachGroupPosts() {
 }
 
 async function postToCoachGroup() {
-  const shareKey = currentWellnessShareKey();
+  const shareKey = currentShareKey();
   const input = document.getElementById('coachGroupComposerInput');
   const message = input.value.trim();
   if (!message) return;
