@@ -3177,6 +3177,22 @@ a.contact-row:hover { border-color: var(--cyan); }
   transition: none;
 }
 .launcher-footnote { text-align: center; margin: 18px 0 0; }
+.launcher-top-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.launcher-lock-btn {
+  width: 38px; height: 38px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface-1); color: var(--text-primary);
+  border: 1px solid var(--border); cursor: pointer; padding: 0;
+  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+.launcher-lock-btn:hover { border-color: var(--cyan); }
+.launcher-lock-btn .lock-open { display: none; }
+.launcher-lock-btn.is-unlocked { color: var(--cyan); border-color: var(--cyan); }
+.launcher-lock-btn.is-unlocked .lock-open { display: block; }
+.launcher-lock-btn.is-unlocked .lock-closed { display: none; }
+/* Locked: tiles never grab touches, so the page can scroll and a tap just opens. Unlocked: tiles are draggable. */
+.launcher-grid:not(.is-editing) .launcher-tile { touch-action: pan-y; }
+.launcher-grid.is-editing .launcher-tile { border-style: dashed; border-color: var(--cyan); cursor: grab; }
 
 /* ---------------- Admin Command Center (slide-out drawer) ---------------- */
 /* Tab visibility is gated to isAdminLoggedIn() in refreshDigitalIdOverrideVisibility()

@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.9.06">
+<link rel="stylesheet" href="style.css?v=1.9.07">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -501,7 +501,13 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
         <img class="brand-logo" src="icons/icon-192.png" alt="" width="28" height="28">
         <h1>WINFINITY</h1>
       </div>
-      <span class="app-header-sub" id="launcherDate"></span>
+      <div class="launcher-top-right">
+        <span class="app-header-sub" id="launcherDate"></span>
+        <button type="button" class="launcher-lock-btn" id="launcherLockBtn" aria-pressed="true" aria-label="Tile positions locked. Tap to unlock and rearrange">
+          <svg class="lock-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+          <svg class="lock-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/></svg>
+        </button>
+      </div>
     </div>
     <div class="launcher-grid" id="launcherGrid"></div>
     <p class="mod-tag launcher-footnote" id="launcherFootnote"></p>
@@ -5253,11 +5259,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.9.06"></script>
+<script src="config.js?v=1.9.07"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.9.06"></script>
+<script src="app.js?v=1.9.07"></script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.9.06';
+const APP_VERSION = 'WF_SYS_V.1.9.07';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9663,16 +9663,50 @@ const LAUNCHER_ORDER_KEY = 'wft_launcher_order';
 // version -- an app update that ever adds/renames/removes a tile must not
 // leave a stale id dangling (dropped) or a new tile invisible (appended),
 // rather than throwing when the list has drifted from a previous version.
+// Tiles are locked by default. Unlocking (padlock button) lets them be dragged; the new
+// arrangement is held as a draft and only written to storage when locked again.
+let launcherEditing = false;
+let launcherDraft = null;
 function getLauncherOrder() {
   const allIds = LAUNCHER_TILES.map(t => t.id);
   let saved = [];
-  try { saved = JSON.parse(localStorage.getItem(LAUNCHER_ORDER_KEY)) || []; } catch (e) { /* ignore malformed storage */ }
+  if (launcherEditing && launcherDraft) saved = launcherDraft;
+  else try { saved = JSON.parse(localStorage.getItem(LAUNCHER_ORDER_KEY)) || []; } catch (e) { /* ignore malformed storage */ }
   const valid = saved.filter(id => allIds.includes(id));
   const missing = allIds.filter(id => !valid.includes(id));
   return [...valid, ...missing];
 }
 function saveLauncherOrder(order) {
+  if (launcherEditing) { launcherDraft = order.slice(); return; }
   localStorage.setItem(LAUNCHER_ORDER_KEY, JSON.stringify(order));
+}
+
+function updateLauncherLockUI() {
+  const grid = document.getElementById('launcherGrid');
+  const btn = document.getElementById('launcherLockBtn');
+  const footnote = document.getElementById('launcherFootnote');
+  if (grid) grid.classList.toggle('is-editing', launcherEditing);
+  if (btn) {
+    btn.classList.toggle('is-unlocked', launcherEditing);
+    btn.setAttribute('aria-pressed', launcherEditing ? 'false' : 'true');
+    btn.setAttribute('aria-label', launcherEditing ? 'Tile positions unlocked. Tap to lock and save' : 'Tile positions locked. Tap to unlock and rearrange');
+  }
+  if (footnote) footnote.textContent = launcherEditing
+    ? 'Unlocked · drag tiles to rearrange · tap the padlock to lock and save'
+    : `${LAUNCHER_TILES.length} shortcuts · tap the padlock to rearrange · tap a tile to open`;
+}
+function setLauncherEditing(on) {
+  if (on === launcherEditing) return;
+  if (on) {
+    launcherDraft = getLauncherOrder();
+    launcherEditing = true;
+  } else {
+    const order = getLauncherOrder();
+    launcherEditing = false;
+    launcherDraft = null;
+    saveLauncherOrder(order);
+  }
+  updateLauncherLockUI();
 }
 
 function renderLauncherGrid() {
@@ -9692,8 +9726,7 @@ function renderLauncherGrid() {
       </button>`;
   }).join('');
   wireLauncherDragAndTap(grid);
-  const footnote = document.getElementById('launcherFootnote');
-  if (footnote) footnote.textContent = `${LAUNCHER_TILES.length} shortcuts · press and drag a tile to rearrange · tap to open`;
+  updateLauncherLockUI();
 }
 
 // Pointer-based (touch + mouse) drag reorder, with a movement threshold to
@@ -9722,6 +9755,7 @@ function wireLauncherDragAndTap(grid) {
     tileEl.addEventListener('click', () => {
       if (tileEl.dataset.pointerHandled) { delete tileEl.dataset.pointerHandled; return; }
       const tile = LAUNCHER_TILES.find(t => t.id === tileEl.dataset.tileId);
+      if (launcherEditing) return;
       if (tile) { closeLauncher(); tile.action(); }
     });
   });
@@ -9730,6 +9764,11 @@ function wireLauncherDragAndTap(grid) {
     if (!dragState || dragState.pointerId !== e.pointerId) return;
     const dx = e.clientX - dragState.startX;
     const dy = e.clientY - dragState.startY;
+    if (!launcherEditing) {
+      // Locked: no dragging; a swipe (page scroll) must not count as a tap
+      if (Math.hypot(dx, dy) >= DRAG_THRESHOLD_PX) dragState.moved = true;
+      return;
+    }
     if (!dragState.dragging) {
       if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
       dragState.dragging = true;
@@ -9775,12 +9814,13 @@ function wireLauncherDragAndTap(grid) {
   function endDrag(e) {
     if (!dragState || dragState.pointerId !== e.pointerId) return;
     const wasDragging = dragState.dragging;
+    const wasMoved = dragState.moved || e.type === 'pointercancel';
     const tileEl = dragState.tileEl;
     const tileId = tileEl.dataset.tileId;
     tileEl.classList.remove('is-dragging');
     tileEl.style.transform = '';
     dragState = null;
-    if (!wasDragging) {
+    if (!wasDragging && !wasMoved && !launcherEditing) {
       const tile = LAUNCHER_TILES.find(t => t.id === tileId);
       if (tile) { tileEl.dataset.pointerHandled = '1'; closeLauncher(); tile.action(); }
     }
@@ -9798,6 +9838,7 @@ function openLauncher() {
   overlay.hidden = false;
 }
 function closeLauncher() {
+  setLauncherEditing(false); // closing while unlocked saves the arrangement, same as locking
   const overlay = document.getElementById('launcherScreen');
   if (overlay) overlay.hidden = true;
 }
@@ -9820,6 +9861,8 @@ function initLauncherScreen() {
   const openBtn = document.getElementById('btnOpenLauncher');
   if (!openBtn) return;
   openBtn.addEventListener('click', openLauncher);
+  const lockBtn = document.getElementById('launcherLockBtn');
+  if (lockBtn) lockBtn.addEventListener('click', () => setLauncherEditing(!launcherEditing));
 
   // Tapping the header's own brand/title (not just the small grid icon)
   // also returns to the launcher grid -- same "tap the logo to go home"
