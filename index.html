@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.9.01">
+<link rel="stylesheet" href="style.css?v=1.9.02">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -97,6 +97,9 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   </button>
   <button type="button" class="admin-drawer-pill-item" data-admin-only hidden data-target="splashLogoManagerSection" aria-label="App Boot Logo" title="App Boot Logo">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+  </button>
+  <button type="button" class="admin-drawer-pill-item" data-admin-only hidden data-target="tileImagesManagerSection" aria-label="Tile Background Images" title="Tile Background Images">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
   </button>
   <button type="button" class="admin-drawer-pill-item" data-admin-only hidden data-target="prepMealManagerSection" aria-label="Prep Meal Menu" title="Prep Meal Menu">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v6a2 2 0 0 0 2 2v12"/><path d="M6 2v6"/><path d="M10 2v6"/><path d="M18 2c-2 0-3 2-3 5v3h3v10"/></svg>
@@ -397,6 +400,43 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
       <p class="save-note" id="splashLogoManagerNote"></p>
     </div>
 
+    <div class="chart-card admin-drawer-section" id="tileImagesManagerSection" hidden>
+      <p class="mod-tag">Admin_tileimg_01</p>
+      <div class="chart-card-head"><span class="chart-card-title">Admin: Tile Background Images</span></div>
+      <p class="hint hint--sm">Sets a background image for one launcher grid tile AND that same tab's hero banner at the top, shown to everyone right away — no update required. Pick a tile below, then upload a photo (or paste one) and Save. Remove clears it back to the plain default look.</p>
+      <label class="field">
+        <span>Tile</span>
+        <select id="tileImagesSelect">
+          <option value="status">Status (tab + thumbnail)</option>
+          <option value="training">Training (tab + thumbnail)</option>
+          <option value="nutrition">Fuel (tab + thumbnail)</option>
+          <option value="bio">Bio (tab + thumbnail)</option>
+          <option value="leaderboard">Nexus (tab + thumbnail)</option>
+          <option value="menu">Menu (tab + thumbnail)</option>
+          <option value="startDayLog">Start Day Log (thumbnail only)</option>
+          <option value="endDayLog">End Day Log (thumbnail only)</option>
+          <option value="weekendLog">Weekend Log (thumbnail only)</option>
+          <option value="historyLogs">History Logs (thumbnail only)</option>
+          <option value="outdoorActivity">Outdoor Activity Tracker (thumbnail only)</option>
+          <option value="dietaryAlgorithm">Dietary Algorithm (thumbnail only)</option>
+        </select>
+      </label>
+      <div id="tileImagesPreviewWrap" style="margin:8px 0;">
+        <img id="tileImagesPreview" src="" alt="" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px;display:none;">
+        <p class="hint hint--sm" id="tileImagesEmptyNote">No image set for this tile yet.</p>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn glass-emboss" id="btnTileImagesAttach">📷 Upload image</button>
+        <input type="file" id="tileImagesFileInput" accept="image/*" hidden>
+      </div>
+      <p class="hint hint--sm">You can also paste an image (Ctrl/Cmd+V) anywhere on this panel.</p>
+      <div class="btn-row" style="margin-top:10px;">
+        <button type="button" class="btn btn--primary" id="btnTileImagesSave" style="flex:1;">Save</button>
+        <button type="button" class="btn btn--danger" id="btnTileImagesRemove">Remove</button>
+      </div>
+      <p class="save-note" id="tileImagesNote"></p>
+    </div>
+
     <div class="chart-card admin-drawer-section" id="prepMealManagerSection" hidden>
       <p class="mod-tag">Admin_prepmeal_01</p>
       <div class="chart-card-head">
@@ -571,7 +611,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
 
   <!-- ============ STATUS ============ -->
   <section class="tab-panel" id="tab-status" data-tab="status">
-    <div class="hero-card">
+    <div class="hero-card" id="heroCardStatus">
       <p class="sys-version" id="sysVersion" role="button" tabindex="0" aria-label="App version — tap for update options"></p>
       <p class="hero-eyebrow">System check-in</p>
       <h2 class="hero-title"><span class="hero-title-shrink hero-welcome-line">Welcome back,</span><span class="accent hero-name-line" id="heroName">Operator</span></h2>
@@ -767,7 +807,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
 
   <!-- ============ TRAINING ============ -->
   <section class="tab-panel" id="tab-training" data-tab="training" hidden>
-    <div class="hero-card">
+    <div class="hero-card" id="heroCardTraining">
       <p class="hero-eyebrow">Sys_train_mgmt_v2.0</p>
       <h2 class="hero-title">Training Terminal</h2>
       <p class="hero-sub">Execute precise training protocol for <span class="accent-text" id="trainDateLabel"></span></p>
@@ -991,7 +1031,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
 
   <!-- ============ NUTRITION / FUEL ============ -->
   <section class="tab-panel" id="tab-nutrition" data-tab="nutrition" hidden>
-    <div class="hero-card">
+    <div class="hero-card" id="heroCardNutrition">
       <p class="hero-eyebrow">Sys_fuel_mgmt_v2.0</p>
       <h2 class="hero-title">Fuel Intake Terminal</h2>
       <p class="hero-sub">Execute precise metabolic protocol for <span class="accent-text" id="fuelDateLabel"></span></p>
@@ -1139,7 +1179,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
 
   <!-- ============ BIO ============ -->
   <section class="tab-panel" id="tab-bio" data-tab="bio" hidden>
-    <div class="hero-card">
+    <div class="hero-card" id="heroCardBio">
       <p class="hero-eyebrow">Sync status: optimal</p>
       <h2 class="hero-title">Biometric Analytics</h2>
       <p class="hero-sub">Terminal interface for entity protocol execution and biological data synchronization.</p>
@@ -1345,7 +1385,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
 
   <!-- ============ GLOBAL NEXUS ============ -->
   <section class="tab-panel" id="tab-leaderboard" data-tab="leaderboard" hidden>
-    <div class="hero-card">
+    <div class="hero-card" id="heroCardLeaderboard">
       <p class="hero-eyebrow">System status: active</p>
       <h2 class="hero-title">Global Nexus</h2>
     </div>
@@ -1631,7 +1671,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
 
   <!-- ============ MENU ============ -->
   <section class="tab-panel" id="tab-menu" data-tab="menu" hidden>
-    <div class="hero-card">
+    <div class="hero-card" id="heroCardMenu">
       <p class="hero-eyebrow">Sys_menu_v1.0</p>
       <h2 class="hero-title">System Menu</h2>
       <p class="hero-sub">Reviews, data export, backups and configuration.</p>
@@ -5213,11 +5253,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.9.01"></script>
+<script src="config.js?v=1.9.02"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.9.01"></script>
+<script src="app.js?v=1.9.02"></script>
 </body>
 </html>

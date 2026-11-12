@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.9.01';
+const APP_VERSION = 'WF_SYS_V.1.9.02';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9682,8 +9682,11 @@ function renderLauncherGrid() {
   const byId = Object.fromEntries(LAUNCHER_TILES.map(t => [t.id, t]));
   grid.innerHTML = order.map(id => {
     const tile = byId[id];
+    const bgUrl = cachedTileImages[tile.id];
+    const cls = bgUrl ? 'launcher-tile has-bg-image' : 'launcher-tile';
+    const style = bgUrl ? ` style="background-image:url('${escapeHtml(bgUrl)}')"` : '';
     return `
-      <button type="button" class="launcher-tile" data-tile-id="${tile.id}">
+      <button type="button" class="${cls}"${style} data-tile-id="${tile.id}">
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${LAUNCHER_ICONS[tile.id]}</svg>
         <span class="launcher-tile-label">${escapeHtml(tile.label)}</span>
       </button>`;
@@ -20128,6 +20131,11 @@ function refreshDigitalIdOverrideVisibility() {
     splashLogoManagerSection.hidden = !loggedIn;
     if (loggedIn) renderSplashLogoManager();
   }
+  const tileImagesManagerSection = document.getElementById('tileImagesManagerSection');
+  if (tileImagesManagerSection) {
+    tileImagesManagerSection.hidden = !loggedIn;
+    if (loggedIn) renderTileImagesManagerPreview();
+  }
   const syncLogsSection = document.getElementById('syncLogsSection');
   if (syncLogsSection) {
     syncLogsSection.hidden = !loggedIn;
@@ -20997,11 +21005,146 @@ let cachedAdSettingsPromise = null;
 function fetchAdSettings() {
   if (!sbConfigured()) return Promise.resolve(null);
   if (!cachedAdSettingsPromise) {
-    cachedAdSettingsPromise = sb.from('ad_settings').select('ads_enabled, updates_enabled, footer_tagline, footer_webpage_url, footer_facebook_url, footer_instagram_url, footer_affiliate_url, download_url_ft, download_url_wellness, download_url_messenger').eq('id', 1).maybeSingle()
+    cachedAdSettingsPromise = sb.from('ad_settings').select('ads_enabled, updates_enabled, footer_tagline, footer_webpage_url, footer_facebook_url, footer_instagram_url, footer_affiliate_url, download_url_ft, download_url_wellness, download_url_messenger, tile_images').eq('id', 1).maybeSingle()
       .then(({ data }) => data)
       .catch(() => null);
   }
   return cachedAdSettingsPromise;
+}
+
+// Admin: per-tile background images (Settings > Admin > Tile Background
+// Images) -- applies the same fetchAdSettings() row's tile_images map to
+// the launcher grid's thumbnails (renderLauncherGrid reads this directly)
+// and, for the 6 tiles that are real tabs, that tab's own hero banner.
+// Cached in memory so renderLauncherGrid (which re-renders on every drag
+// reorder) never needs to re-fetch.
+let cachedTileImages = {};
+const TILE_HERO_CARD_IDS = {
+  status: 'heroCardStatus', training: 'heroCardTraining', nutrition: 'heroCardNutrition',
+  bio: 'heroCardBio', leaderboard: 'heroCardLeaderboard', menu: 'heroCardMenu',
+};
+async function applyTileBackgroundImages() {
+  const settings = await fetchAdSettings();
+  cachedTileImages = (settings && settings.tile_images) || {};
+  Object.entries(TILE_HERO_CARD_IDS).forEach(([tileId, elId]) => {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    const url = cachedTileImages[tileId];
+    if (url) { el.classList.add('has-bg-image'); el.style.backgroundImage = `url('${url}')`; }
+    else { el.classList.remove('has-bg-image'); el.style.backgroundImage = ''; }
+  });
+  // The launcher may already be visible/rendered before this resolves
+  // (it's the very first thing a fresh boot shows) -- re-render once the
+  // images are in so its thumbnails pick them up without needing a second
+  // open.
+  const launcherGrid = document.getElementById('launcherGrid');
+  if (launcherGrid && launcherGrid.children.length) renderLauncherGrid();
+}
+
+// Admin panel: Tile Background Images. Shows whatever's currently saved
+// for the tile picked in the dropdown (reading the same cachedTileImages
+// this device already has from applyTileBackgroundImages), and holds
+// whatever the admin just uploaded/pasted (tileImagesPendingDataUrl)
+// until Save actually uploads+persists it.
+let tileImagesPendingDataUrl = null;
+function renderTileImagesManagerPreview() {
+  const select = document.getElementById('tileImagesSelect');
+  const preview = document.getElementById('tileImagesPreview');
+  const emptyNote = document.getElementById('tileImagesEmptyNote');
+  if (!select || !preview) return;
+  tileImagesPendingDataUrl = null;
+  const existing = cachedTileImages[select.value];
+  if (existing) {
+    preview.src = existing;
+    preview.style.display = 'block';
+    emptyNote.hidden = true;
+  } else {
+    preview.src = '';
+    preview.style.display = 'none';
+    emptyNote.hidden = false;
+  }
+  const note = document.getElementById('tileImagesNote');
+  if (note) note.textContent = '';
+}
+
+function applyTileImagesPendingFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    tileImagesPendingDataUrl = reader.result;
+    const preview = document.getElementById('tileImagesPreview');
+    const emptyNote = document.getElementById('tileImagesEmptyNote');
+    if (preview) { preview.src = tileImagesPendingDataUrl; preview.style.display = 'block'; }
+    if (emptyNote) emptyNote.hidden = true;
+  };
+  reader.readAsDataURL(file);
+}
+
+function initTileImagesManager() {
+  const section = document.getElementById('tileImagesManagerSection');
+  const select = document.getElementById('tileImagesSelect');
+  const attachBtn = document.getElementById('btnTileImagesAttach');
+  const fileInput = document.getElementById('tileImagesFileInput');
+  const saveBtn = document.getElementById('btnTileImagesSave');
+  const removeBtn = document.getElementById('btnTileImagesRemove');
+  const noteEl = document.getElementById('tileImagesNote');
+  if (!section || !select) return;
+
+  select.addEventListener('change', renderTileImagesManagerPreview);
+  if (attachBtn && fileInput) {
+    attachBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => applyTileImagesPendingFile(fileInput.files[0]));
+  }
+  // Paste anywhere on this panel -- same wdsGetPastedImageFile extraction
+  // every other paste-enabled upload in this app already uses.
+  section.addEventListener('paste', e => {
+    const file = wdsGetPastedImageFile(e);
+    if (file) applyTileImagesPendingFile(file);
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    if (!isAdminLoggedIn()) { noteEl.textContent = 'Not logged in.'; return; }
+    if (!tileImagesPendingDataUrl) { noteEl.textContent = 'Upload or paste an image first.'; return; }
+    noteEl.textContent = 'Uploading…';
+    saveBtn.disabled = true;
+    try {
+      const url = await uploadChatImage(tileImagesPendingDataUrl, null, 'tile-backgrounds');
+      const { error } = await sb.rpc('admin_set_tile_image', {
+        p_digital_id: adminSession.digitalId, p_password: adminSession.password,
+        p_tile_id: select.value, p_image_url: url,
+      });
+      if (error) throw error;
+      cachedAdSettingsPromise = null; // force a fresh fetchAdSettings() read next time
+      await applyTileBackgroundImages();
+      renderTileImagesManagerPreview();
+      showRestToast('Tile image saved.');
+    } catch (e) {
+      handleAdminRpcError('admin_set_tile_image', e, noteEl);
+    } finally {
+      saveBtn.disabled = false;
+    }
+  });
+
+  removeBtn.addEventListener('click', async () => {
+    if (!isAdminLoggedIn()) { noteEl.textContent = 'Not logged in.'; return; }
+    noteEl.textContent = 'Removing…';
+    removeBtn.disabled = true;
+    try {
+      const { error } = await sb.rpc('admin_set_tile_image', {
+        p_digital_id: adminSession.digitalId, p_password: adminSession.password,
+        p_tile_id: select.value, p_image_url: null,
+      });
+      if (error) throw error;
+      cachedAdSettingsPromise = null;
+      await applyTileBackgroundImages();
+      renderTileImagesManagerPreview();
+      showRestToast('Tile image removed.');
+    } catch (e) {
+      handleAdminRpcError('admin_set_tile_image', e, noteEl);
+    } finally {
+      removeBtn.disabled = false;
+    }
+  });
 }
 
 // Startup ad splash: global ads_enabled switch, then per-user ad-free grant,
@@ -26817,6 +26960,7 @@ safeInit(initEntityDesignationOverride, 'initEntityDesignationOverride');
 safeInit(initBlockVisibilityOverride, 'initBlockVisibilityOverride');
 safeInit(initAdManager, 'initAdManager');
 safeInit(initSplashLogoManager, 'initSplashLogoManager');
+safeInit(initTileImagesManager, 'initTileImagesManager');
 safeInit(initSyncLogsShare, 'initSyncLogsShare');
 safeInit(initMediaSyncWidget, 'initMediaSyncWidget');
 safeInit(initFoodPrepsOverlay, 'initFoodPrepsOverlay');
@@ -26880,6 +27024,7 @@ safeInit(initPushNotifications, 'initPushNotifications');
 // it reads location.search to decide whether to auto-open, and both of
 // those strip their own param from the URL once they've handled it.
 safeInit(initLauncherScreen, 'initLauncherScreen');
+safeInit(() => { applyTileBackgroundImages(); }, 'applyTileBackgroundImages');
 safeInit(initDeepLinkHandling, 'initDeepLinkHandling');
 safeInit(initShareTargetHandling, 'initShareTargetHandling');
 safeInit(initWidgetActionHandling, 'initWidgetActionHandling');

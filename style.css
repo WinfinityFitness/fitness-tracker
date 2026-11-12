@@ -3091,6 +3091,28 @@ a.contact-row:hover { border-color: var(--cyan); }
 }
 .launcher-tile:hover { border-color: var(--cyan); }
 .launcher-tile:active { transform: scale(0.97); }
+/* Admin-set background image (Settings > Admin > Tile Background Images).
+   Uses ::after, not ::before -- .hero-card's own ::before is already
+   reserved for the minimalist theme's translucent widget-fill layer (see
+   the Desktop Shell section below), so reusing it here would silently
+   fight that system instead of layering on top of it. */
+.launcher-tile.has-bg-image, .hero-card.has-bg-image {
+  position: relative;
+  background-size: cover;
+  background-position: center;
+  color: #fff;
+}
+.launcher-tile.has-bg-image::after, .hero-card.has-bg-image::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(0,0,0,0.1), rgba(0,0,0,0.6));
+  pointer-events: none;
+}
+.launcher-tile.has-bg-image > *, .hero-card.has-bg-image > * { position: relative; }
+.launcher-tile.has-bg-image .launcher-tile-label { color: #fff; }
+.hero-card.has-bg-image .hero-eyebrow, .hero-card.has-bg-image .hero-title { color: #fff; }
 .launcher-tile-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em; text-align: center; line-height: 1.25; text-transform: uppercase; }
 /* Applied only to the one tile currently being dragged -- lifted above its
    siblings and no longer part of normal flow interaction (the drag loop
