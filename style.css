@@ -3143,7 +3143,20 @@ a.contact-row:hover { border-color: var(--cyan); }
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
+  /* Establishes a local stacking context so .hero-card's own ::before (the
+     "Widget Box Fill Transparency" opaque solid-color layer, see the
+     .chart-card/.hero-card/etc ::before rule below) reliably stacks BEHIND
+     this element's own background-image instead of escaping to whatever
+     ancestor stacking context happens to be nearest -- without this, the
+     ::before's z-index:-1 has nothing of its own to stack against and was
+     painting over the admin-set photo instead of staying behind it. */
+  z-index: 0;
 }
+/* That ::before layer is the plain solid-color fill meant for cards with no
+   photo; a photo card already gets its own darkening overlay from
+   .has-bg-image::after (added with the tile-background feature), so the
+   widget-fill layer should just get out of the way entirely here. */
+.hero-card.has-bg-image::before { background: transparent !important; }
 .launcher-tile-label {
   font-size: 0.86rem;
   font-weight: 800;
