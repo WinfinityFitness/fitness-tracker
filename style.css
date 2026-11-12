@@ -5595,6 +5595,17 @@ a.contact-row:hover { border-color: var(--cyan); }
   box-shadow: none !important;
   text-shadow: none !important;
   filter: none !important;
+}
+/* The flattening above strips decorative gradients/textures, which is the
+   point of Minimalist -- but it was also nuking an admin-set tile photo
+   (.has-bg-image, set via inline style), since !important beats inline
+   regardless of specificity. Real uploaded content isn't decoration, so
+   exclude it explicitly. */
+[data-theme-mode="minimalist"] .hero-card:not(.has-bg-image),
+[data-theme-mode="minimalist"] .chart-card:not(.has-bg-image),
+[data-theme-mode="minimalist"] .stat-tile:not(.has-bg-image),
+[data-theme-mode="minimalist"] .ring-card:not(.has-bg-image),
+[data-theme-mode="minimalist"] .computed-card:not(.has-bg-image) {
   background-image: none !important;
 }
 [data-theme-mode="minimalist"] .btn {
@@ -5638,11 +5649,11 @@ a.contact-row:hover { border-color: var(--cyan); }
    used as decoration, so they're flattened to solid theme-color fills
    here instead. Corner shape (clip-path katana-cuts/chamfers, border-
    radius) is untouched everywhere, same as every other skin. */
-[data-theme-mode="minimalist"][data-skin="steampunk-core"] .hero-card,
-[data-theme-mode="minimalist"][data-skin="steampunk-core"] .chart-card,
-[data-theme-mode="minimalist"][data-skin="steampunk-core"] .stat-tile,
-[data-theme-mode="minimalist"][data-skin="steampunk-core"] .ring-card,
-[data-theme-mode="minimalist"][data-skin="steampunk-core"] .computed-card {
+[data-theme-mode="minimalist"][data-skin="steampunk-core"] .hero-card:not(.has-bg-image),
+[data-theme-mode="minimalist"][data-skin="steampunk-core"] .chart-card:not(.has-bg-image),
+[data-theme-mode="minimalist"][data-skin="steampunk-core"] .stat-tile:not(.has-bg-image),
+[data-theme-mode="minimalist"][data-skin="steampunk-core"] .ring-card:not(.has-bg-image),
+[data-theme-mode="minimalist"][data-skin="steampunk-core"] .computed-card:not(.has-bg-image) {
   background-image: none !important;
 }
 [data-theme-mode="minimalist"][data-skin="steampunk-core"] .chart-card-title::before,
