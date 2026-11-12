@@ -6390,6 +6390,13 @@ html.wf-desktop-shell body { overflow-x: auto; }
    breathing room FT's own tab content uses elsewhere. */
 .wf-nexus-embed { margin-top: 16px; }
 .wf-nexus-embed .wds-uni-center { gap: 16px; }
+/* #wdsBellBtn/#wdsNotifPop get reparented in here (initFtNexusFeedEmbed) --
+   .wds-notif-pop's own top:42px/right:44px offsets are tuned for the
+   desktop topnav's much larger .wds-topnav-user positioning context;
+   override here so the dropdown anchors to this small wrapper and stays
+   on-screen on a phone width instead. */
+.wf-nexus-bell-wrap { position: absolute; top: 14px; right: 16px; }
+.wf-nexus-bell-wrap .wds-notif-pop { top: 38px; right: 0; width: min(260px, calc(100vw - 48px)); }
 
 .wds-mini-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .wds-mini-stat { display: flex; flex-direction: column; gap: 2px; }

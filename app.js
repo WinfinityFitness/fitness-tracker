@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.9.07';
+const APP_VERSION = 'WF_SYS_V.1.9.08';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -6038,9 +6038,9 @@ let wdsNotifFriendReqBaselineSet = false;
 const wdsNotifSeenFriendReqIds = new Set();
 
 async function refreshWdsFriendRequests() {
-  if (!wdsRemoteData || wdsGuestMode) return;
+  if (!currentShareKey() || wdsGuestMode) return;
   try {
-    const { data, error } = await sb.rpc('list_pending_friend_requests', { p_share_key: wdsRemoteData.shareKey });
+    const { data, error } = await sb.rpc('list_pending_friend_requests', { p_share_key: currentShareKey() });
     if (error) throw error;
     const isFirstPass = !wdsNotifFriendReqBaselineSet;
     (data || []).forEach(r => {
@@ -6076,9 +6076,9 @@ function wdsLoadSeenFriendOutcomes() {
   catch (e) { return new Set(); }
 }
 async function refreshWdsSentFriendRequestOutcomes() {
-  if (!wdsRemoteData || wdsGuestMode) return;
+  if (!currentShareKey() || wdsGuestMode) return;
   try {
-    const { data, error } = await sb.rpc('list_sent_friend_request_outcomes', { p_share_key: wdsRemoteData.shareKey });
+    const { data, error } = await sb.rpc('list_sent_friend_request_outcomes', { p_share_key: currentShareKey() });
     if (error) throw error;
     const seen = wdsLoadSeenFriendOutcomes();
     let sawNewAccept = false;
@@ -6101,15 +6101,15 @@ async function refreshWdsSentFriendRequestOutcomes() {
 }
 
 async function wdsSendFriendRequest(digitalId) {
-  if (!wdsRemoteData) throw new Error('Not signed in.');
-  const { error } = await sb.rpc('send_friend_request', { p_share_key: wdsRemoteData.shareKey, p_target_public_id: digitalId });
+  if (!currentShareKey()) throw new Error('Not signed in.');
+  const { error } = await sb.rpc('send_friend_request', { p_share_key: currentShareKey(), p_target_public_id: digitalId });
   if (error) throw error;
 }
 
 async function wdsRespondFriendRequest(requesterShareKey, accept) {
-  if (!wdsRemoteData) return;
+  if (!currentShareKey()) return;
   try {
-    const { error } = await sb.rpc('respond_friend_request', { p_share_key: wdsRemoteData.shareKey, p_requester_share_key: requesterShareKey, p_accept: accept });
+    const { error } = await sb.rpc('respond_friend_request', { p_share_key: currentShareKey(), p_requester_share_key: requesterShareKey, p_accept: accept });
     if (error) throw error;
     wdsNotifSeenFriendReqIds.delete(requesterShareKey);
     // The bell dropdown's own copy of this request otherwise lingers with
@@ -7726,6 +7726,78 @@ function initFtNexusFeedEmbed() {
       await wdsSendStoryReply(story, text);
       wdsFlashStorySent();
     });
+  }
+
+  // Notification bell + Friend Requests -- #wdsBellBtn/#wdsNotifPop live in
+  // wds's desktop topnav normally (a sibling of .wds-dashboard under
+  // #wdsShell, never touched by the .wds-uni-center reparent above), so
+  // they get moved here too, into the small wrapper added to
+  // heroCardLeaderboard. Click wiring duplicated from initDesktopShell()
+  // (app.js ~1394-1425) for the same reason the composer wiring above is
+  // duplicated rather than shared -- that function is never called on FT.
+  const bellBtn = document.getElementById('wdsBellBtn');
+  const notifPop = document.getElementById('wdsNotifPop');
+  const bellWrap = document.getElementById('wfNexusBellWrap');
+  if (bellBtn && notifPop && bellWrap) {
+    bellWrap.appendChild(bellBtn);
+    bellWrap.appendChild(notifPop);
+    bellWrap.hidden = false;
+    bellBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      notifPop.hidden = !notifPop.hidden;
+      if (!notifPop.hidden) {
+        localStorage.setItem('wft_web_nexus_last_seen', new Date().toISOString());
+        wdsMarkAllNotificationsRead();
+        renderWdsNotifications();
+      }
+    });
+    document.addEventListener('click', e => {
+      if (!notifPop.hidden && !notifPop.contains(e.target) && e.target !== bellBtn) notifPop.hidden = true;
+    });
+    notifPop.addEventListener('click', e => {
+      const acceptBtn = e.target.closest('[data-accept-friend]');
+      if (acceptBtn) { wdsRespondFriendRequest(acceptBtn.dataset.acceptFriend, true); return; }
+      const declineBtn = e.target.closest('[data-decline-friend]');
+      if (declineBtn) wdsRespondFriendRequest(declineBtn.dataset.declineFriend, false);
+    });
+    refreshWdsFriendRequests().catch(() => {});
+    refreshWdsSentFriendRequestOutcomes().catch(() => {});
+    renderWdsNotifications();
+  }
+
+  // Minimal Add-Friend entry point -- wds's own "+ Add Friend" lives inside
+  // the Profile page / topnav people-search, neither embedded here yet
+  // (see the plan's Profile pages round). Standalone fallback, same
+  // digital-ID-input pattern as the Profile page's own version
+  // (app.js ~1429-1455) but with FT's own element ids.
+  const addFriendCard = document.getElementById('ftAddFriendCard');
+  const addFriendToggle = document.getElementById('btnFtAddFriendToggle');
+  const addFriendRow = document.getElementById('ftAddFriendRow');
+  const addFriendInput = document.getElementById('ftAddFriendInput');
+  const addFriendErrorEl = document.getElementById('ftAddFriendError');
+  const sendFriendReqBtn = document.getElementById('btnFtSendFriendRequest');
+  if (addFriendCard && addFriendToggle && addFriendRow && addFriendInput && sendFriendReqBtn) {
+    addFriendCard.hidden = false;
+    addFriendToggle.addEventListener('click', () => {
+      addFriendRow.hidden = !addFriendRow.hidden;
+      if (!addFriendRow.hidden) addFriendInput.focus();
+    });
+    const sendFtFriendRequest = async () => {
+      const id = addFriendInput.value.trim().toUpperCase();
+      if (addFriendErrorEl) addFriendErrorEl.hidden = true;
+      if (!id) return;
+      sendFriendReqBtn.disabled = true;
+      try {
+        await wdsSendFriendRequest(id);
+        addFriendInput.value = '';
+        addFriendRow.hidden = true;
+      } catch (e) {
+        if (addFriendErrorEl) { addFriendErrorEl.textContent = (e && e.message) || 'Could not send friend request.'; addFriendErrorEl.hidden = false; }
+      }
+      finally { sendFriendReqBtn.disabled = false; }
+    };
+    sendFriendReqBtn.addEventListener('click', sendFtFriendRequest);
+    addFriendInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendFtFriendRequest(); } });
   }
 
   initWdsFeed();

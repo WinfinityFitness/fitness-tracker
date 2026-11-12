@@ -54,7 +54,7 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
      end up paired with a stale cached script. A version-tagged URL is
      guaranteed to be a cache MISS on every real deploy, regardless of
      whatever caching behavior sits in front of the origin. -->
-<link rel="stylesheet" href="style.css?v=1.9.07">
+<link rel="stylesheet" href="style.css?v=1.9.08">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -1394,6 +1394,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
     <div class="hero-card" id="heroCardLeaderboard">
       <p class="hero-eyebrow">System status: active</p>
       <h2 class="hero-title">Global Nexus</h2>
+      <!-- Reparent target for #wdsBellBtn + #wdsNotifPop (notification
+           bell), moved here at runtime by initFtNexusFeedEmbed() same as
+           the feed itself -- those live in wds's desktop topnav normally,
+           which FT has no equivalent of. -->
+      <div class="wf-nexus-bell-wrap" id="wfNexusBellWrap" hidden></div>
     </div>
 
     <!-- Phase 1 of the Nexus-in-FT plan: the real wds social feed,
@@ -1421,6 +1426,26 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
             <button type="button" class="wds-composer-action-btn" id="btnFtStoryCancel">Cancel</button>
           </div>
           <p class="wds-gate-error" id="ftStoryComposerError" hidden></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Minimal Add-Friend entry point for this round -- wds's own
+         send-request UI lives entirely inside the Profile page
+         (#wdsProfilePage) and desktop topnav people-search, neither
+         embedded in FT yet. Standalone fallback until the Profile pages
+         round ships a richer entry point. -->
+    <div class="wds-card" id="ftAddFriendCard" hidden>
+      <div class="wds-composer-actions" style="justify-content:flex-start;">
+        <button type="button" class="wds-composer-action-btn" id="btnFtAddFriendToggle">+ Add Friend</button>
+      </div>
+      <div class="wds-composer" id="ftAddFriendRow" hidden>
+        <div class="wds-composer-box">
+          <input type="text" class="wds-composer-input" id="ftAddFriendInput" placeholder="Digital ID (e.g. WF-XXXXXX)" maxlength="20">
+          <div class="wds-composer-actions">
+            <button type="button" class="wds-composer-action-btn wds-composer-post-btn" id="btnFtSendFriendRequest">Send Request</button>
+          </div>
+          <p class="wds-gate-error" id="ftAddFriendError" hidden></p>
         </div>
       </div>
     </div>
@@ -5259,11 +5284,11 @@ if (localStorage.getItem('wds_operator_id') && localStorage.getItem('wds_operato
   <p class="wdm-toast" id="wdmToast" hidden></p>
 </div>
 
-<script src="config.js?v=1.9.07"></script>
+<script src="config.js?v=1.9.08"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=1.9.07"></script>
+<script src="app.js?v=1.9.08"></script>
 </body>
 </html>
