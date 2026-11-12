@@ -3075,8 +3075,8 @@ a.contact-row:hover { border-color: var(--cyan); }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 110px;
+  gap: 10px;
+  min-height: 118px;
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--card-radius);
@@ -3111,9 +3111,31 @@ a.contact-row:hover { border-color: var(--cyan); }
   pointer-events: none;
 }
 .launcher-tile.has-bg-image > *, .hero-card.has-bg-image > * { position: relative; }
-.launcher-tile.has-bg-image .launcher-tile-label { color: #fff; }
+/* Legibility pass: icons/labels need to read over any photo, so every tile
+   (not just has-bg-image ones) gets a dark contact-shadow halo alongside
+   the app's usual cyan neon glow -- the halo is what keeps text/icons
+   visible on bright photos, the glow keeps it consistent with the rest of
+   the UI's look on the plain (non-photo) tiles. */
+.launcher-tile svg {
+  filter: drop-shadow(0 0 6px var(--cyan-glow)) drop-shadow(0 1px 2px rgba(0,0,0,0.55));
+}
+.launcher-tile.has-bg-image svg {
+  filter: drop-shadow(0 0 9px var(--cyan-glow)) drop-shadow(0 1px 3px rgba(0,0,0,0.9));
+}
+.launcher-tile.has-bg-image .launcher-tile-label {
+  color: #fff;
+  text-shadow: 0 0 10px rgba(0,0,0,0.9), 0 0 14px var(--cyan-glow), 0 1px 2px rgba(0,0,0,0.9);
+}
 .hero-card.has-bg-image .hero-eyebrow, .hero-card.has-bg-image .hero-title { color: #fff; }
-.launcher-tile-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em; text-align: center; line-height: 1.25; text-transform: uppercase; }
+.launcher-tile-label {
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-align: center;
+  line-height: 1.25;
+  text-transform: uppercase;
+  text-shadow: 0 0 8px var(--cyan-glow), 0 1px 2px rgba(0,0,0,0.5);
+}
 /* Applied only to the one tile currently being dragged -- lifted above its
    siblings and no longer part of normal flow interaction (the drag loop
    itself moves it with a live transform; see initLauncherScreen). */

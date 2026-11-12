@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.9.02';
+const APP_VERSION = 'WF_SYS_V.1.9.03';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -9687,7 +9687,7 @@ function renderLauncherGrid() {
     const style = bgUrl ? ` style="background-image:url('${escapeHtml(bgUrl)}')"` : '';
     return `
       <button type="button" class="${cls}"${style} data-tile-id="${tile.id}">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${LAUNCHER_ICONS[tile.id]}</svg>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${LAUNCHER_ICONS[tile.id]}</svg>
         <span class="launcher-tile-label">${escapeHtml(tile.label)}</span>
       </button>`;
   }).join('');
