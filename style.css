@@ -3111,6 +3111,11 @@ a.contact-row:hover { border-color: var(--cyan); }
   pointer-events: none;
 }
 .launcher-tile.has-bg-image > *, .hero-card.has-bg-image > * { position: relative; }
+/* The rule above's ">*" (specificity 0,2,0) outranks .sys-version's own
+   "position: absolute" (0,1,0), dragging the version badge out of its
+   pinned top-right corner and into normal flow -- put it back, scoped so
+   it only applies where the ">*" rule could have won. */
+.hero-card.has-bg-image .sys-version { position: absolute; }
 /* Legibility pass: icons/labels need to read over any photo, so every tile
    (not just has-bg-image ones) gets a dark contact-shadow halo alongside
    the app's usual cyan neon glow -- the halo is what keeps text/icons
@@ -3127,6 +3132,18 @@ a.contact-row:hover { border-color: var(--cyan); }
   text-shadow: 0 0 10px rgba(0,0,0,0.9), 0 0 14px var(--cyan-glow), 0 1px 2px rgba(0,0,0,0.9);
 }
 .hero-card.has-bg-image .hero-eyebrow, .hero-card.has-bg-image .hero-title { color: #fff; }
+.hero-card.has-bg-image .hero-sub { color: rgba(255,255,255,0.88); }
+/* The hero-card is otherwise just a block with content-sized height (a
+   couple lines of text + 18px padding), so a cover-sized photo gets
+   squeezed down to a thin sliver instead of reading as a banner. Give the
+   photo variant real banner height and anchor its text to the bottom over
+   the image, like a typical mobile app hero header. */
+.hero-card.has-bg-image {
+  min-height: 46vw;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
 .launcher-tile-label {
   font-size: 0.86rem;
   font-weight: 800;
