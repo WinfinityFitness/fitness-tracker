@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.9.08';
+const APP_VERSION = 'WF_SYS_V.1.9.09';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -15952,6 +15952,14 @@ function initAddFoodPanel() {
     photoCameraInput.value = '';
     if (!file) return;
     await addAiPhotoBlobs([file]);
+  });
+
+  // Paste anywhere in the Estimate-from-Photo zone -- same wdsGetPastedImageFile
+  // extraction every other paste-enabled upload in this app already uses.
+  const aiPhotoEstimateZone = document.getElementById('aiPhotoEstimateZone');
+  if (aiPhotoEstimateZone) aiPhotoEstimateZone.addEventListener('paste', async e => {
+    const file = wdsGetPastedImageFile(e);
+    if (file) await addAiPhotoBlobs([file]);
   });
 
   // Upload Screenshot — deliberately a different path from the dish-photo
