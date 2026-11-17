@@ -6397,6 +6397,11 @@ html.wf-desktop-shell body { overflow-x: auto; }
    on-screen on a phone width instead. */
 .wf-nexus-bell-wrap { position: absolute; top: 14px; right: 16px; }
 .wf-nexus-bell-wrap .wds-notif-pop { top: 38px; right: 0; width: min(260px, calc(100vw - 48px)); }
+/* Chats (DMs/Groups) button sits just left of the bell -- same reasoning
+   as .wf-nexus-bell-wrap, its own .wds-notif-pop-based dropdown
+   (#wdsChatListPop reuses that class) needs the same mobile-safe override. */
+.wf-nexus-chat-wrap { right: 56px; }
+.wf-nexus-chat-wrap .wds-notif-pop { top: 38px; right: 0; width: min(320px, calc(100vw - 48px)); max-height: 70vh; overflow-y: auto; }
 
 .wds-mini-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .wds-mini-stat { display: flex; flex-direction: column; gap: 2px; }

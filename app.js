@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.9.09';
+const APP_VERSION = 'WF_SYS_V.1.9.10';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -4030,8 +4030,8 @@ async function wdsSyncChatLastReadFromServer(myShareKey) {
 }
 
 async function refreshWdsChatRooms() {
-  if (!wdsRemoteData) return;
-  const myShareKey = wdsRemoteData.shareKey;
+  if (!currentShareKey()) return;
+  const myShareKey = currentShareKey();
   await wdsSyncChatLastReadFromServer(myShareKey);
   // Independent of the room-membership fetch below (and run even for a
   // user with zero joined rooms) so the pinned Nexus Com entry always has
@@ -4537,7 +4537,7 @@ function wdsRenderChatPopupMessages(roomId, messages, popupEl) {
   const popup = popupEl || document.querySelector(`.wds-chat-popup[data-room-id="${roomId}"]`);
   if (!popup) return;
   const listEl = popup.querySelector('.wds-chat-popup-list');
-  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+  const myShareKey = currentShareKey();
   const meta = wdsChatRoomMeta[roomId] || {};
   if (!messages.length) { listEl.innerHTML = '<p class="empty-note">No messages yet. Say hi!</p>'; return; }
   listEl.innerHTML = messages.map(m => {
@@ -4612,7 +4612,7 @@ function wdsEvictOldestChatPopupIfNeeded(exceptRoomId) {
 }
 
 async function wdsOpenChatPopup(roomId) {
-  if (!wdsRemoteData || !roomId) return;
+  if (!currentShareKey() || !roomId) return;
   wdsChatPopupLastActive[roomId] = Date.now();
   let popup = document.querySelector(`.wds-chat-popup[data-room-id="${roomId}"]`);
   if (popup) popup.classList.remove('is-minimized');
@@ -4735,8 +4735,8 @@ function wdsWireChatPopups() {
       const roomId = sendBtn.dataset.popupSend;
       const input = chatPopupsWrap.querySelector(`[data-popup-input="${roomId}"]`);
       const image = wdsPopupPendingImages[roomId] || null;
-      if (!input || (!input.value.trim() && !image) || !wdsRemoteData) return;
-      const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
+      if (!input || (!input.value.trim() && !image) || !currentShareKey()) return;
+      const codeName = currentSocialCodeName();
       const text = input.value;
       input.value = '';
       delete wdsPopupPendingImages[roomId];
@@ -4750,8 +4750,8 @@ function wdsWireChatPopups() {
         // Com specifically -- postChatMessage's guest-mode simulated-send
         // branch only triggers when roomIdOverride === undefined, same
         // contract Nexus Com's own compose box always relied on.
-        if (roomId === 'global') await postChatMessage(text, image, wdsRemoteData.shareKey, codeName);
-        else await postChatMessage(text, image, wdsRemoteData.shareKey, codeName, roomId);
+        if (roomId === 'global') await postChatMessage(text, image, currentShareKey(), codeName);
+        else await postChatMessage(text, image, currentShareKey(), codeName, roomId);
         await wdsRefreshChatPopup(roomId);
         await refreshWdsChatRooms();
       } catch (err) { console.error('Popup send failed:', err); }
@@ -4858,7 +4858,7 @@ async function wdsStartDM(otherName, otherShareKey) {
 function wdsRenderChatUserMenuGroups() {
   const container = document.getElementById('wdsChatUserMenuGroups');
   if (!container) return;
-  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+  const myShareKey = currentShareKey();
   const myGroups = Object.entries(wdsChatRoomMeta).filter(([id, m]) => !m.isDm && m.createdByKey === myShareKey);
   if (!myGroups.length) { container.innerHTML = '<p class="empty-note">You haven\'t created a group yet.</p>'; return; }
   container.innerHTML = myGroups.map(([id, m]) => `<button type="button" class="chat-room-menu-item" data-invite-room="${id}">${escapeHtml(m.name)}</button>`).join('');
@@ -4933,7 +4933,7 @@ let wdsNotifStoryBaselineSet = false;
 const wdsNotifSeenStoryIds = new Set();
 
 function wdsProcessFeedForNotifications(posts) {
-  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+  const myShareKey = currentShareKey();
   const isFirstPass = !wdsNotifFeedBaselineSet;
   (posts || []).forEach(p => {
     const isNewPost = !wdsNotifSeenPostIds.has(p.id);
@@ -4954,7 +4954,7 @@ function wdsProcessFeedForNotifications(posts) {
 }
 
 function wdsProcessStoriesForNotifications(stories) {
-  const myShareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+  const myShareKey = currentShareKey();
   const isFirstPass = !wdsNotifStoryBaselineSet;
   (stories || []).forEach(s => {
     const isNew = !wdsNotifSeenStoryIds.has(s.id);
@@ -6566,11 +6566,11 @@ function initWdsFeedReactionMenu(list) {
     if (!emojiBtn || !wdsFeedReactionTarget) return;
     const { type, id } = wdsFeedReactionTarget;
     const emoji = emojiBtn.dataset.emoji;
-    const shareKey = wdsRemoteData ? wdsRemoteData.shareKey : null;
+    const shareKey = currentShareKey();
     wdsCloseFeedReactionMenu();
     if (!shareKey) return;
     try {
-      const codeName = (wdsRemoteData.profile && wdsRemoteData.profile.name) || wdsRemoteData.publicId;
+      const codeName = currentSocialCodeName();
       if (type === 'post') await toggleFeedPostLike(id, shareKey, emoji, codeName);
       else await toggleFeedCommentLike(id, shareKey, emoji, codeName);
       await refreshWdsFeed(true);
@@ -7469,11 +7469,40 @@ function initFtNexusFeedEmbed() {
   wrap.appendChild(center);
   wrap.hidden = false;
 
-  // Icon-tabs row (Reels/Marketplace/Groups/Settings) stays hidden -- those
-  // destinations (Groups, Messenger) don't exist in this embed yet. Stories
-  // ("My Day") IS in scope now (Phase 2) -- left visible.
+  // Icon-tabs row (Home/Reels/Marketplace/Groups/Settings) -- Groups and
+  // Settings now have real destinations (the Messenger/Groups reparent
+  // below), so this no longer needs hiding. Home stays a no-op (feed's
+  // already showing) and Reels/Marketplace keep their existing "coming
+  // soon" toast -- same behavior wellness itself shows for those two.
   const iconTabs = document.getElementById('wdsNexusIconTabs');
-  if (iconTabs) iconTabs.hidden = true;
+  if (iconTabs) {
+    iconTabs.hidden = false;
+    // The click LISTENER for this row (not just its markup) is wired
+    // inside initDesktopShell() (app.js ~1651-1672), which never runs on
+    // FT -- un-hiding the row alone does nothing without this duplicate.
+    // 'settings' deliberately still falls through to the "coming soon"
+    // toast here (unlike on wellness): wdsOpenMessengerTogglePopup's
+    // toggles (messenger auto-redirect, force-desktop-viewport) are
+    // wellness-desktop concepts that don't apply to FT's embedded context.
+    iconTabs.addEventListener('click', e => {
+      const tabBtn = e.target.closest('[data-nexus-tab]');
+      if (!tabBtn) return;
+      const tab = tabBtn.dataset.nexusTab;
+      if (tab === 'home') {
+        iconTabs.querySelectorAll('.wds-nexus-icon-tab').forEach(t => t.classList.toggle('is-active', t === tabBtn));
+        return;
+      }
+      if (tab === 'groups') {
+        const chatListPopEl = document.getElementById('wdsChatListPop');
+        if (chatListPopEl) chatListPopEl.hidden = false;
+        refreshWdsChatRooms();
+        const groupsTabBtn = document.getElementById('btnWdsChatTabGroups');
+        if (groupsTabBtn) groupsTabBtn.click();
+        return;
+      }
+      showRestToast(`${tabBtn.title} is coming soon.`);
+    });
+  }
 
   // Composer wiring -- duplicated from initDesktopShell()'s own inline
   // setup (that function is never called on FT; see the hard safety rule
@@ -7798,6 +7827,144 @@ function initFtNexusFeedEmbed() {
     };
     sendFriendReqBtn.addEventListener('click', sendFtFriendRequest);
     addFriendInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendFtFriendRequest(); } });
+  }
+
+  // Messenger/DMs + Groups (Step 1, additive -- FT's old chat widget keeps
+  // running untouched alongside this; retiring it is a separate later
+  // step). #wdsChatPopupsWrap/#wdsChatUserMenu/#wdsChatContactRail/
+  // #wdsNewGroupOverlay all live inside #wdsShell (display:none on this
+  // hostname) as siblings of .wds-dashboard, never touched by the
+  // .wds-uni-center reparent above -- same fix initMessengerShell()
+  // (app.js ~4397-4401) already uses for the standalone Messenger PWA,
+  // applied here a third time (the bell wrapper above was the second).
+  const chatListBtn = document.getElementById('wdsChatListBtn');
+  const chatListPop = document.getElementById('wdsChatListPop');
+  const chatWrap = document.getElementById('wfNexusChatWrap');
+  const chatPopupsWrap = document.getElementById('wdsChatPopupsWrap');
+  const chatUserMenuEl = document.getElementById('wdsChatUserMenu');
+  const chatContactRail = document.getElementById('wdsChatContactRail');
+  const newGroupOverlay = document.getElementById('wdsNewGroupOverlay');
+  if (chatPopupsWrap && chatPopupsWrap.parentElement !== document.body) document.body.appendChild(chatPopupsWrap);
+  if (chatUserMenuEl && chatUserMenuEl.parentElement !== document.body) document.body.appendChild(chatUserMenuEl);
+  if (chatContactRail && chatContactRail.parentElement !== document.body) document.body.appendChild(chatContactRail);
+  if (newGroupOverlay && newGroupOverlay.parentElement !== document.body) document.body.appendChild(newGroupOverlay);
+  wdsWireChatPopups();
+
+  if (chatListBtn && chatListPop && chatWrap) {
+    chatWrap.appendChild(chatListBtn);
+    chatWrap.appendChild(chatListPop);
+    chatWrap.hidden = false;
+
+    // Deliberately NOT duplicating initDesktopShell()'s own "hand off to
+    // messenger.winfinityfitness.com on a mobile viewport" branch
+    // (app.js ~1560-1577) -- FT already IS the mobile, already-signed-in
+    // surface; it must always show the in-page dropdown, never redirect
+    // to the separate Messenger PWA.
+    chatListBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      chatListPop.hidden = !chatListPop.hidden;
+      if (!chatListPop.hidden) {
+        const notifPopEl = document.getElementById('wdsNotifPop');
+        if (notifPopEl) notifPopEl.hidden = true;
+        refreshWdsChatRooms();
+      }
+    });
+    document.addEventListener('click', e => {
+      if (!chatListPop.hidden && !chatListPop.contains(e.target) && e.target !== chatListBtn) chatListPop.hidden = true;
+    });
+    ['btnWdsChatTabAll', 'btnWdsChatTabUnread', 'btnWdsChatTabGroups'].forEach(id => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        wdsChatListTab = btn.dataset.tab;
+        document.querySelectorAll('.wds-chat-list-tab').forEach(t => t.classList.toggle('is-active', t.id === id));
+        renderWdsChatListPanel();
+      });
+    });
+    const chatListSearch = document.getElementById('wdsChatListSearch');
+    if (chatListSearch) chatListSearch.addEventListener('input', e => {
+      wdsChatListSearchText = e.target.value;
+      renderWdsChatListPanel();
+    });
+    const chatListItems = document.getElementById('wdsChatListItems');
+    if (chatListItems) chatListItems.addEventListener('click', async e => {
+      const acceptEl = e.target.closest('[data-accept-invite]');
+      if (acceptEl) {
+        if (!currentShareKey()) return;
+        await sb.rpc('accept_chat_room_invite', { p_room_id: acceptEl.dataset.acceptInvite, p_share_key: currentShareKey() });
+        await refreshWdsChatRooms();
+        return;
+      }
+      const declineEl = e.target.closest('[data-decline-invite]');
+      if (declineEl) {
+        if (!currentShareKey()) return;
+        await sb.rpc('decline_chat_room_invite', { p_room_id: declineEl.dataset.declineInvite, p_share_key: currentShareKey() });
+        await refreshWdsChatRooms();
+        return;
+      }
+      const item = e.target.closest('[data-room-id]');
+      if (item) { wdsOpenChatPopup(item.dataset.roomId); chatListPop.hidden = true; }
+    });
+
+    // New Group composer -- same digital-ID-chip pattern as
+    // initDesktopShell()'s own copy (app.js ~1710-1756), duplicated rather
+    // than shared for the same reason as everything else here, using
+    // currentShareKey()/currentSocialCodeName() from the start since this
+    // is FT's own copy, not a retrofit of wellness's.
+    const newGroupErrorEl = document.getElementById('wdsNewGroupError');
+    const renderFtNewGroupChips = () => {
+      const container = document.getElementById('wdsNewGroupChips');
+      if (!container) return;
+      container.innerHTML = wdsNewGroupInviteIds.map(id => `<span class="invite-chip">${escapeHtml(id)}<button type="button" data-remove-id="${escapeHtml(id)}" aria-label="Remove">✕</button></span>`).join('');
+      container.querySelectorAll('[data-remove-id]').forEach(btn => {
+        btn.addEventListener('click', () => { wdsNewGroupInviteIds = wdsNewGroupInviteIds.filter(id => id !== btn.dataset.removeId); renderFtNewGroupChips(); });
+      });
+    };
+    const btnNewGroup = document.getElementById('btnWdsNewGroup');
+    if (btnNewGroup && newGroupOverlay) {
+      btnNewGroup.addEventListener('click', () => {
+        chatListPop.hidden = true;
+        document.getElementById('wdsNewGroupName').value = '';
+        document.getElementById('wdsNewGroupInviteInput').value = '';
+        wdsNewGroupInviteIds = [];
+        renderFtNewGroupChips();
+        if (newGroupErrorEl) newGroupErrorEl.hidden = true;
+        newGroupOverlay.hidden = false;
+      });
+      const closeBtn = document.getElementById('btnWdsNewGroupClose');
+      if (closeBtn) closeBtn.addEventListener('click', () => { newGroupOverlay.hidden = true; });
+      bindOverlayBackdropClose(newGroupOverlay, () => { newGroupOverlay.hidden = true; });
+      const addFtInvitee = () => {
+        const input = document.getElementById('wdsNewGroupInviteInput');
+        const id = input.value.trim().toUpperCase();
+        if (id && !wdsNewGroupInviteIds.includes(id)) { wdsNewGroupInviteIds.push(id); renderFtNewGroupChips(); }
+        input.value = '';
+      };
+      const addInviteeBtn = document.getElementById('btnWdsNewGroupAddInvitee');
+      if (addInviteeBtn) addInviteeBtn.addEventListener('click', addFtInvitee);
+      const inviteInput = document.getElementById('wdsNewGroupInviteInput');
+      if (inviteInput) inviteInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addFtInvitee(); } });
+      const createBtn = document.getElementById('btnWdsNewGroupCreate');
+      if (createBtn) createBtn.addEventListener('click', async () => {
+        if (newGroupErrorEl) newGroupErrorEl.hidden = true;
+        const name = document.getElementById('wdsNewGroupName').value.trim();
+        if (!name) { if (newGroupErrorEl) { newGroupErrorEl.textContent = 'Enter a group name.'; newGroupErrorEl.hidden = false; } return; }
+        if (!currentShareKey()) return;
+        try {
+          const { data, error } = await sb.rpc('create_chat_room', {
+            p_name: name, p_creator_key: currentShareKey(), p_creator_name: currentSocialCodeName(), p_invitee_ids: wdsNewGroupInviteIds,
+          });
+          if (error) throw error;
+          newGroupOverlay.hidden = true;
+          await refreshWdsChatRooms();
+          wdsOpenChatPopup(data);
+        } catch (e) {
+          if (newGroupErrorEl) { newGroupErrorEl.textContent = 'Could not create group: ' + ((e && e.message) || 'unknown error'); newGroupErrorEl.hidden = false; }
+        }
+      });
+    }
+
+    refreshWdsChatRooms().catch(() => {});
   }
 
   initWdsFeed();
