@@ -2,7 +2,7 @@
 
 // Bump this alongside sw.js's CACHE_NAME on every edit — shown on the Status
 // tab as a real build marker instead of decorative placeholder text.
-const APP_VERSION = 'WF_SYS_V.1.9.10';
+const APP_VERSION = 'WF_SYS_V.1.9.11';
 
 /* ---------------------------------------------------------------- */
 /* Storage                                                           */
@@ -16143,10 +16143,7 @@ function initAddFoodPanel() {
   const screenshotSpinner = document.getElementById('screenshotSpinner');
   const screenshotInput = document.getElementById('screenshotInput');
   const screenshotPreview = document.getElementById('screenshotPreview');
-  screenshotBtn.addEventListener('click', () => screenshotInput.click());
-  screenshotInput.addEventListener('change', async () => {
-    const file = screenshotInput.files[0];
-    screenshotInput.value = '';
+  async function processScreenshotFile(file) {
     if (!file) return;
     const statusEl = document.getElementById('screenshotStatus');
     statusEl.textContent = 'Reading screenshot with AI…';
@@ -16165,6 +16162,19 @@ function initAddFoodPanel() {
       screenshotBtn.disabled = false;
       screenshotSpinner.hidden = true;
     }
+  }
+  screenshotBtn.addEventListener('click', () => screenshotInput.click());
+  screenshotInput.addEventListener('change', async () => {
+    const file = screenshotInput.files[0];
+    screenshotInput.value = '';
+    await processScreenshotFile(file);
+  });
+  // Paste anywhere in the screenshot zone -- same wdsGetPastedImageFile
+  // extraction every other paste-enabled upload in this app already uses.
+  const screenshotEstimateZone = document.getElementById('screenshotEstimateZone');
+  if (screenshotEstimateZone) screenshotEstimateZone.addEventListener('paste', async e => {
+    const file = wdsGetPastedImageFile(e);
+    if (file) await processScreenshotFile(file);
   });
 
   // ---------------------------------------------------------------------
